@@ -1,0 +1,33 @@
+{
+  "name": "citybuilder",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:update-golden": "vitest run -u",
+    "lint": "eslint src tests",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "pixi.js": "^8.19.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitest/ui": "^4.1.10",
+    "eslint": "^10.8.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  }
+}
