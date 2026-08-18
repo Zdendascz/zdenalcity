@@ -4,13 +4,18 @@ import { ContentRegistry } from '@/content/registry';
 import { applySaveToWorld, collectLoadWarnings, unpackSave } from '@/save/deserialize';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
-import { MAP_SIZE, ZONE } from '@/sim/layers';
+import type { Command } from '@/sim/commands';
+import { index, MAP_SIZE, ZONE } from '@/sim/layers';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
+import { computeBudget } from '@/sim/systems/economy';
 import { createWorld } from '@/sim/world';
+import { BudgetPanel } from '@/ui/budgetPanel';
+import { BuildingInfo } from '@/ui/buildingInfo';
 import { CostPopup } from '@/ui/costPopup';
+import { Notifications } from '@/ui/notifications';
 import { formatNumber } from '@/ui/format';
 import { Hud } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
@@ -146,6 +151,25 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const debug = new DebugOverlay(mount);
   debug.setVisible(false);
   const costPopup = new CostPopup(mount);
+  const notifications = new Notifications(mount);
+  const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
+  const buildingInfo = new BuildingInfo(mount, i18n);
+
+  /**
+   * Hra nesmí mlčet. Odmítnutý příkaz i spadlý kód se musí objevit na obrazovce —
+   * ve vývoji obzvlášť, protože jinak se chyba pozná až po hodině hraní.
+   */
+  function dispatch(cmd: Command): void {
+    const result = host.dispatch(cmd);
+    if (!result.ok) notifications.show(i18n.t(result.reason, result.params));
+  }
+
+  function reportCrash(message: string): void {
+    notifications.show(i18n.t('error.crash', { message }), 'error');
+  }
+
+  window.addEventListener('error', (event) => reportCrash(event.message));
+  window.addEventListener('unhandledrejection', (event) => reportCrash(String(event.reason)));
 
   const startedAt = Date.now();
   const createdAt = new Date(startedAt).toISOString();
@@ -216,10 +240,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   hudRoot.className = 'hud';
   mount.appendChild(hudRoot);
 
-  function setSpeed(index: number): void {
-    if (index < 0 || index >= SPEEDS.length) return;
-    speedIndex = index;
-    host.dispatch({ type: 'set_speed', speed: index });
+  function setSpeed(requested: number): void {
+    if (requested < 0 || requested >= SPEEDS.length) return;
+    speedIndex = requested;
+    dispatch({ type: 'set_speed', speed: requested });
   }
 
   function changeTax(zone: ZoneType, delta: number): void {
@@ -229,7 +253,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         : zone === ZONE.commercial
           ? 'commercial'
           : 'industrial';
-    host.dispatch({ type: 'set_tax_rate', zone, rate: world.economy.taxRates[category] + delta });
+    dispatch({ type: 'set_tax_rate', zone, rate: world.economy.taxRates[category] + delta });
+  }
+
+  /** Pravé tlačítko ukazuje detail budovy — bourání zůstává na nástroji. */
+  function showBuildingAt(tile: { x: number; y: number }): void {
+    const buildingId = simWorld.layers.buildingId[index(tile.x, tile.y)] ?? 0;
+    const building = buildingId === 0 ? undefined : simWorld.buildings.get(buildingId);
+    if (!building) {
+      buildingInfo.hide();
+      return;
+    }
+    buildingInfo.show(simWorld, building, content.get(building.definitionId));
   }
 
   const hud = new Hud(hudRoot, i18n, world, SPEEDS, {
@@ -248,6 +283,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onTogglePowerOverlay: () => {
       chunkRenderer.setPowerOverlay(!chunkRenderer.isPowerOverlayVisible());
     },
+    onToggleBudget: () => budgetPanel.toggle(),
     onLanguageChange: (language) => i18n.setLanguage(language),
   });
 
@@ -277,27 +313,22 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   /** Veškeré hráčské akce jdou přes dispatch — renderer na WorldState nesahá. */
-  function applyTool(
-    tile: { x: number; y: number },
-    pointerButton: number,
-    viewX: number,
-    viewY: number,
-  ): void {
-    const action = pointerButton === 2 ? { kind: 'bulldoze' as const } : activeTool.action;
+  function applyTool(tile: { x: number; y: number }, viewX: number, viewY: number): void {
+    const action = activeTool.action;
     const fundsBefore = world.economy.funds;
 
     switch (action.kind) {
       case 'road':
-        host.dispatch({ type: 'build_road', x: tile.x, y: tile.y });
+        dispatch({ type: 'build_road', x: tile.x, y: tile.y });
         break;
       case 'bulldoze':
-        host.dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
+        dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
         break;
       case 'zone':
-        host.dispatch({ type: 'zone', x: tile.x, y: tile.y, w: 1, h: 1, zone: action.zone });
+        dispatch({ type: 'zone', x: tile.x, y: tile.y, w: 1, h: 1, zone: action.zone });
         break;
       case 'place':
-        host.dispatch({
+        dispatch({
           type: 'place_building',
           definitionId: action.definitionId,
           x: tile.x,
@@ -328,9 +359,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const tile = tileAt(event);
     if (!tile) return;
 
+    if (event.button === 2) {
+      showBuildingAt(tile);
+      return;
+    }
+
     paintButton = event.button;
     lastPaintedTile = tile.y * MAP_SIZE + tile.x;
-    applyTool(tile, event.button, event.offsetX, event.offsetY);
+    applyTool(tile, event.offsetX, event.offsetY);
   });
 
   canvas.addEventListener('pointermove', (event) => {
@@ -348,7 +384,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const tile = hoveredTile.y * MAP_SIZE + hoveredTile.x;
       if (tile !== lastPaintedTile) {
         lastPaintedTile = tile;
-        applyTool(hoveredTile, paintButton, event.offsetX, event.offsetY);
+        applyTool(hoveredTile, event.offsetX, event.offsetY);
       }
     }
   });
@@ -414,6 +450,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       return;
     }
 
+    if (key === 'b') {
+      budgetPanel.toggle();
+      return;
+    }
+
+    if (event.code === 'Escape') {
+      buildingInfo.hide();
+      return;
+    }
+
     const tool = tools.find((candidate) => candidate.hotkey === key);
     if (tool) {
       selectTool(tool);
@@ -429,7 +475,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   });
 
   app.ticker.add((ticker) => {
-    host.step(ticker.deltaMS);
+    try {
+      renderFrame(ticker.deltaMS);
+    } catch (error) {
+      // Výjimka ve smyčce by jinak zmizela v konzoli. Stejná hláška se
+      // v bublinách nehromadí, jen si přičte počet.
+      reportCrash(error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  function renderFrame(deltaMS: number): void {
+    host.step(deltaMS);
 
     const dirty = host.consumeDirty();
     chunkRenderer.update(dirty);
@@ -458,9 +514,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     hud.update({
       speedIndex,
       powerOverlay: chunkRenderer.isPowerOverlayVisible(),
+      budgetVisible: budgetPanel.isVisible(),
       poweredBuildings,
       message: message ? i18n.t(message.key, message.params) : '',
     });
+
+    // Rozpočet se počítá jen když se na něj někdo dívá.
+    if (budgetPanel.isVisible()) {
+      budgetPanel.update(computeBudget(simWorld, content), simWorld.economy.funds);
+    }
 
     // Ladicí výpis je vývojářský nástroj, ne herní UI — proto nejde přes i18n.
     debug.update([
@@ -471,7 +533,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       `defs   ${content.getAll('building').length}`,
       `lang   ${i18n.getLanguage()}`,
     ]);
-  });
+  }
 
   if (import.meta.env.DEV) {
     // Ladicí přístup k běžící hře z konzole prohlížeče. Pouze ve vývojovém

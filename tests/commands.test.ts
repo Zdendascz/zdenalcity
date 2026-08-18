@@ -1,12 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { buildRoad, bulldoze } from '@/sim/commands';
-import { index, MAP_SIZE, TERRAIN } from '@/sim/layers';
+import type { Definition } from '@/content/schema';
+import type { BuildingCatalogue } from '@/sim/catalogue';
+import { buildRoad, bulldoze, placeDefinition, zoneArea } from '@/sim/commands';
+import { index, MAP_SIZE, TERRAIN, ZONE } from '@/sim/layers';
 import { createSimHost } from '@/sim/simHost';
 import { createWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 
 /** Prázdný katalog — silnice ani zóny obsah nepotřebují. */
 const NO_CONTENT = { get: () => undefined, byCategory: () => [] };
+
+const TOWER: Definition = {
+  id: 'test:tower',
+  type: 'building',
+  category: 'utility',
+  name: 'building.tower.name',
+  description: 'building.tower.desc',
+  footprint: [2, 2],
+  construction: { cost: 500, requiresRoad: true, requiresPower: false, allowedTerrain: [0] },
+  economy: { upkeep: 20 },
+  graphics: { color: '#5a5a62', heightLevels: 2 },
+};
+
+function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
+  return {
+    get: (id) => definitions.find((d) => d.id === id),
+    byCategory: (category) => definitions.filter((d) => d.category === category),
+  };
+}
 
 /** Čerstvý svět má `fullRedraw`, což by u testů dirty trackingu překáželo. */
 function worldWithCleanDirty(): WorldState {
@@ -94,6 +115,79 @@ describe('bulldoze', () => {
     const world = worldWithCleanDirty();
     bulldoze(world, MAP_SIZE, 0);
     expect(dirtyTiles(world)).toEqual([]);
+  });
+});
+
+describe('odmítnutí říká proč', () => {
+  it('silnice na vodu, mimo mapu a na obsazenou dlaždici', () => {
+    const world = worldWithCleanDirty();
+    world.layers.terrain[index(5, 5)] = TERRAIN.water;
+    world.layers.buildingId[index(6, 5)] = 7;
+
+    expect(buildRoad(world, 5, 5)).toEqual({ ok: false, reason: 'error.water' });
+    expect(buildRoad(world, -1, 0)).toEqual({ ok: false, reason: 'error.outOfBounds' });
+    expect(buildRoad(world, 6, 5)).toEqual({ ok: false, reason: 'error.occupied' });
+
+    expect(buildRoad(world, 8, 8)).toEqual({ ok: true });
+    expect(buildRoad(world, 8, 8)).toEqual({ ok: false, reason: 'error.roadExists' });
+  });
+
+  it('bourání prázdné dlaždice', () => {
+    const world = worldWithCleanDirty();
+    expect(bulldoze(world, 3, 3)).toEqual({ ok: false, reason: 'error.nothingToBulldoze' });
+  });
+
+  it('zóna, ze které neprojde ani jedna dlaždice', () => {
+    const world = worldWithCleanDirty();
+    world.layers.terrain[index(4, 4)] = TERRAIN.water;
+
+    expect(zoneArea(world, 4, 4, 1, 1, ZONE.residential)).toEqual({
+      ok: false,
+      reason: 'error.water',
+    });
+    // Stačí jedna použitelná dlaždice a příkaz je úspěšný.
+    expect(zoneArea(world, 4, 4, 2, 1, ZONE.residential)).toEqual({ ok: true });
+  });
+
+  it('stavba bez peněz řekne kolik chybí', () => {
+    const world = worldWithCleanDirty();
+    buildRoad(world, 5, 5);
+    world.economy.funds = 10;
+
+    const result = placeDefinition(world, catalogueOf(TOWER), 'test:tower', 5, 6);
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'error.notEnoughFunds',
+      params: { cost: 500, funds: 10 },
+    });
+  });
+
+  it('stavba bez silnice a na neznámou definici', () => {
+    const world = worldWithCleanDirty();
+    const catalogue = catalogueOf(TOWER);
+
+    expect(placeDefinition(world, catalogue, 'test:tower', 40, 40)).toEqual({
+      ok: false,
+      reason: 'error.needsRoad',
+    });
+    expect(placeDefinition(world, catalogue, 'test:nic', 5, 5)).toEqual({
+      ok: false,
+      reason: 'error.unknownDefinition',
+      params: { id: 'test:nic' },
+    });
+  });
+
+  it('obsazený footprint hlásí i potřebnou velikost', () => {
+    const world = worldWithCleanDirty();
+    buildRoad(world, 5, 5);
+    world.layers.buildingId[index(6, 7)] = 9;
+
+    expect(placeDefinition(world, catalogueOf(TOWER), 'test:tower', 5, 6)).toEqual({
+      ok: false,
+      reason: 'error.occupiedFootprint',
+      params: { width: 2, depth: 2 },
+    });
   });
 });
 

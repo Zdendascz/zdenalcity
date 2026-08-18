@@ -18,12 +18,14 @@ export interface HudCallbacks {
   onDownload(): void;
   onOpenFile(file: File): void;
   onTogglePowerOverlay(): void;
+  onToggleBudget(): void;
   onLanguageChange(language: string): void;
 }
 
 export interface HudState {
   speedIndex: number;
   powerOverlay: boolean;
+  budgetVisible: boolean;
   poweredBuildings: number;
   /** Už přeložená hláška o uložení či načtení. Prázdná = nic nezobrazovat. */
   message: string;
@@ -60,11 +62,13 @@ export class Hud {
   private readonly values = new Map<string, HTMLElement>();
   private readonly speedButtons: HTMLButtonElement[] = [];
   private powerButton: HTMLButtonElement | null = null;
+  private budgetButton: HTMLButtonElement | null = null;
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
   private lastState: HudState = {
     speedIndex: 1,
     powerOverlay: false,
+    budgetVisible: false,
     poweredBuildings: 0,
     message: '',
   };
@@ -131,6 +135,7 @@ export class Hud {
       node.classList.toggle('is-active', index === state.speedIndex);
     });
     this.powerButton?.classList.toggle('is-active', state.powerOverlay);
+    this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
 
     if (this.messageNode) {
       this.messageNode.textContent = state.message;
@@ -288,6 +293,10 @@ export class Hud {
     power.textContent = this.i18n.t('ui.overlay.power');
     this.powerButton = power;
 
+    const budget = button('chip', () => this.callbacks.onToggleBudget());
+    budget.textContent = this.i18n.t('ui.budget.toggle');
+    this.budgetButton = budget;
+
     const languageRow = el('div', 'panel__row');
     languageRow.appendChild(el('span', 'panel__label', this.i18n.t('ui.language.label')));
 
@@ -302,7 +311,7 @@ export class Hud {
     select.addEventListener('change', () => this.callbacks.onLanguageChange(select.value));
     languageRow.appendChild(select);
 
-    panel.append(power, languageRow);
+    panel.append(power, budget, languageRow);
     this.panels.appendChild(panel);
   }
 }

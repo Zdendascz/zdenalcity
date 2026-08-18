@@ -95,8 +95,10 @@ export class BuildingRenderer {
       .poly(faces.top)
       .fill({ color: appearance.color });
 
-    // Kreslení vzestupně podle x + y, aby bližší budovy překrývaly vzdálenější.
-    view.zIndex = building.x + building.y;
+    // Hloubka se řídí **předním rohem** půdorysu, ne počátkem. Kdyby se řadilo
+    // podle `x + y`, dvoudlaždicová továrna by se schovala za jednodlaždicový
+    // obchod, který stojí za ní — právě tak vypadala nahlášená chyba.
+    view.zIndex = building.x + width + (building.y + depth);
   }
 
   private remove(id: number): void {

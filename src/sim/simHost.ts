@@ -2,6 +2,8 @@ import type { BuildingCatalogue } from './catalogue';
 import { buildRoad, bulldoze, placeDefinition, setTaxRate, zoneArea } from './commands';
 import type { Command } from './commands';
 import type { ReadonlyLayers } from './layers';
+import { OK, reject } from './result';
+import type { CommandResult } from './result';
 import type { System } from './systems';
 import { createDirtySet, tickWorld } from './world';
 import type { Building, DemandState, DirtySet, EconomyState, WorldState } from './world';
@@ -34,7 +36,8 @@ export interface ReadonlyWorldView {
  * Až se simulace přesune do Web Workeru, volající kód se nemění.
  */
 export interface SimHost {
-  dispatch(cmd: Command): void;
+  /** Vrací výsledek — odmítnutý příkaz musí umět říct proč. */
+  dispatch(cmd: Command): CommandResult;
   step(deltaMs: number): void;
   getSnapshot(): ReadonlyWorldView;
   consumeDirty(): DirtySet;
@@ -53,33 +56,29 @@ class MainThreadSimHost implements SimHost {
     this.catalogue = catalogue;
   }
 
-  dispatch(cmd: Command): void {
+  dispatch(cmd: Command): CommandResult {
     switch (cmd.type) {
       case 'set_speed': {
         // `speed` je index do SPEEDS (klávesy 0–4), ne násobitel.
         const speedIndex = Math.trunc(cmd.speed);
-        if (speedIndex >= 0 && speedIndex < SPEEDS.length) {
-          this.speedIndex = speedIndex;
+        if (speedIndex < 0 || speedIndex >= SPEEDS.length) {
+          return reject('error.unknownSpeed', { speed: cmd.speed });
         }
-        break;
+        this.speedIndex = speedIndex;
+        return OK;
       }
       case 'build_road':
-        buildRoad(this.world, cmd.x, cmd.y);
-        break;
+        return buildRoad(this.world, cmd.x, cmd.y);
       case 'bulldoze':
-        bulldoze(this.world, cmd.x, cmd.y);
-        break;
+        return bulldoze(this.world, cmd.x, cmd.y);
       case 'zone':
-        zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone);
-        break;
+        return zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone);
       case 'place_building':
-        placeDefinition(this.world, this.catalogue, cmd.definitionId, cmd.x, cmd.y);
-        break;
+        return placeDefinition(this.world, this.catalogue, cmd.definitionId, cmd.x, cmd.y);
       case 'set_tax_rate':
-        setTaxRate(this.world, cmd.zone, cmd.rate);
-        break;
+        return setTaxRate(this.world, cmd.zone, cmd.rate);
       default:
-        assertNever(cmd);
+        return assertNever(cmd);
     }
   }
 

@@ -1,4 +1,4 @@
-import { footprintFits, placeBuilding } from '../buildings';
+import { checkFootprint, placeBuilding } from '../buildings';
 import type { BuildingCatalogue } from '../catalogue';
 import { ZONE } from '../layers';
 import { categoryForZone } from '../rci';
@@ -74,7 +74,8 @@ function tryBuild(world: WorldState, catalogue: BuildingCatalogue, tile: number)
   if (!definition) return;
 
   // Celý footprint musí ležet ve stejné zóně — dům nepřeteče do sousední čtvrti.
-  if (!footprintFits(world, definition, x, y, { requireZone: zone })) return;
+  // Důvod odmítnutí tady nikoho nezajímá: systém zkusí jiné místo příště.
+  if (!checkFootprint(world, definition, x, y, { requireZone: zone }).ok) return;
 
   placeBuilding(world, definition, x, y);
 }

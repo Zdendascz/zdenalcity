@@ -1,5 +1,7 @@
 import type { Definition } from '@/content/schema';
 import { inBounds, index } from './layers';
+import { OK, reject } from './result';
+import type { CommandResult } from './result';
 import { markBuildingDirty, markPowerNetworkDirty, markTileDirty } from './world';
 import type { Building, WorldState } from './world';
 
@@ -14,37 +16,56 @@ export interface FitOptions {
   requireZone?: number;
 }
 
-export function footprintFits(
+/**
+ * Vejde se budova na tohle místo? Vrací **konkrétní důvod**, ne jen ano/ne —
+ * hráč musí vědět, proč mu klik nic neudělal.
+ */
+export function checkFootprint(
   world: WorldState,
   definition: Definition,
   x: number,
   y: number,
   options: FitOptions = {},
-): boolean {
+): CommandResult {
   const [width, depth] = definition.footprint;
 
   for (let dy = 0; dy < depth; dy++) {
     for (let dx = 0; dx < width; dx++) {
       const tileX = x + dx;
       const tileY = y + dy;
-      if (!inBounds(tileX, tileY)) return false;
+      if (!inBounds(tileX, tileY)) {
+        return reject('error.outOfBounds');
+      }
 
       const tile = index(tileX, tileY);
       if (options.requireZone !== undefined && world.layers.zone[tile] !== options.requireZone) {
-        return false;
+        return reject('error.wrongZone');
       }
-      if (world.layers.road[tile] !== 0) return false;
-      if (world.layers.buildingId[tile] !== 0) return false;
+      if (world.layers.road[tile] !== 0) {
+        return reject('error.roadInTheWay');
+      }
+      if (world.layers.buildingId[tile] !== 0) {
+        // Vlastní klíč, ne `error.occupied`: u víceldlaždicové budovy je
+        // podstatné, kolik místa potřebuje, a text s parametry by u jednoduché
+        // silnice vypsal syrové zástupné symboly.
+        return reject('error.occupiedFootprint', { width, depth });
+      }
 
       const terrain = world.layers.terrain[tile] ?? 0;
-      if (!definition.construction.allowedTerrain.includes(terrain)) return false;
+      if (!definition.construction.allowedTerrain.includes(terrain)) {
+        return reject('error.terrainNotAllowed');
+      }
     }
   }
 
-  if (definition.construction.requiresRoad && !touchesRoad(world, definition, x, y)) return false;
-  if (definition.construction.requiresPower && !touchesPower(world, definition, x, y)) return false;
+  if (definition.construction.requiresRoad && !touchesRoad(world, definition, x, y)) {
+    return reject('error.needsRoad');
+  }
+  if (definition.construction.requiresPower && !touchesPower(world, definition, x, y)) {
+    return reject('error.needsPower');
+  }
 
-  return true;
+  return OK;
 }
 
 /** Sousedí footprint aspoň jednou stranou se silnicí? */

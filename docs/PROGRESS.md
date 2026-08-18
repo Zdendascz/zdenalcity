@@ -271,6 +271,29 @@ Ověřeno (`npm run check`, 15 souborů / 181 testů) a v běžící hře:
 6. **Bublina s cenou** vyskočí u kurzoru a do 1,4 s zmizí. Ověřeno: klik na
    elektrárnu ukázal `−4 000` na pozici kurzoru a kasa šla z 20 000 na 16 000.
 
+- [x] Hlášení problémů, ekonomický přehled, detail budovy
+
+- **Projekt je na GitLabu** — `zdendascz/citybuilder`, jedenáct commitů.
+- **Opravena hlášená vizuální chyba s pořadím budov.** Hloubka se řídila
+  počátkem půdorysu (`x + y`), takže dvoudlaždicová továrna na (54, 61) měla
+  index 115, ale jednodlaždicový obchod na (56, 61) 117 — a kreslil se přes ni,
+  přestože stojí za ní. Nově rozhoduje **přední roh** půdorysu; obě budovy mají
+  119, protože leží na stejné diagonále.
+- **Levnější provoz elektrárny** (údržba 200 → 60). Změřeno: s jednou elektrárnou
+  čistě 390/měsíc, se dvěma 399 — druhá se poprvé vyplatí. Dřív to bylo 277 a 152.
+- **Simulace už nemlčí.** Každý příkaz vrací `CommandResult`; odmítnutí nese
+  lokalizační klíč důvodu a UI ho vypíše. Ověřeno v běžící hře: klik silnicí na
+  obsazenou dlaždici vypsal „Dlaždice je obsazená", tři kliky za sebou se slily
+  do jedné bubliny s `×3`. Výjimky v běhu i mimo něj chytá globální handler
+  a vypisuje je stejnou cestou.
+- **Ekonomický přehled** na klávesu `B` nebo tlačítko. Ukazuje cenu, počet,
+  kolik jich je pod proudem, příjem, údržbu a čistý výnos po budovách plus
+  celkový součet. Čísla počítá `computeBudget` v simulaci — ta samá funkce,
+  ze které žije měsíční rozpočet, aby se výpis nemohl rozejít se skutečností.
+- **Detail budovy pravým tlačítkem**: pozice, půdorys, datum postavení, cena,
+  populace, práce, výroba a spotřeba elektřiny, připojení, daně a údržba za
+  měsíc, znečištění. Bourání se tím přesunulo výhradně na nástroj (`X`).
+
 ## Rozpracované
 _(nic)_
 
@@ -300,6 +323,12 @@ _(nic)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | **Hloubka budovy se řídí předním rohem půdorysu, ne počátkem** | Podle `x + y` se jednodlaždicový obchod dostal před dvoudlaždicovou továrnu, která sahá o dvě dlaždice dál dopředu. Autor to nahlásil ze screenshotu. Nově `(x + w) + (y + h)`. |
+| 2026-08-18 | **Příkazy vracejí `CommandResult`, ne `void`** | Hra nesmí mlčet: klik, který nic neudělá, musí říct proč. Důvod je lokalizační klíč, takže v `sim/` pořád není ani jedno uživatelsky viditelné slovo (§10). Růstový systém důvody ignoruje — zkusí příště jiné místo. |
+| 2026-08-18 | Stejné hlášky se v bublinách nehromadí, jen si přičtou počet | Malování silnice přes vodu by jinak vysypalo padesát bublin přes celou obrazovku. |
+| 2026-08-18 | `error.occupied` rozděleno na dva klíče | Jeden klíč sloužil silnici (bez parametrů) i půdorysu budovy (s `{width} × {depth}`), takže se hráči u silnice vypsaly složené závorky. Odhalilo se to až v běžící hře, ne v testech — proto teď existuje test, který hlídá, že se hláška se zástupným symbolem nikdy neodmítá bez parametrů. |
+| 2026-08-18 | Detail budovy je na pravém tlačítku, bourání jen na nástroji | T3 dalo bourání na pravé tlačítko, ale autor si vyžádal na něm info o budově. Bourání zůstává jako nástroj pod `X` a v paletě. |
+| 2026-08-18 | Rozpočet i tabulka počítají jednou funkcí `computeBudget` | Kdyby si UI daně dopočítávalo samo, výpis a skutečnost by se dřív nebo později rozešly. |
 | 2026-08-18 | **Chunk je retained `Graphics`, ne `RenderTexture`** — odchylka od §6 | Izometrické diamanty se zaklesávají, takže opsaný obdélník chunku měl 1024×512 px a 64 chunků zabralo 128 MB VRAM, z toho polovina průhledné plochy. `Graphics` se do GPU nahraje jednou a mezi překreslením se jen vykresluje, takže výkonový důvod chunkování platí dál — změřeno 0,1 ms na snímek při plném oddálení. Chunkování ani dirty tracking se neruší, mění se jen nosič. |
 | 2026-08-18 | **Budova bez proudu nedaní, ale ani nestojí údržbu** | První pokus nechal temným budovám údržbu. V běžící hře se ukázalo, že to vytváří past bez východiska: město bez elektrárny mělo nulový příjem a nenulové výdaje, spadlo z 20 000 na −33 325 a pak už na elektrárnu nikdy nevydělalo. Temná budova je proto mimo provoz úplně. |
 | 2026-08-18 | Poptávku sytí i budovy bez proudu | Kdyby nefunkční továrna poptávku po průmyslu nesnižovala, hráč by vedle ní stavěl další a další, všechny stejně temné. Poptávka počítá s tím, co ve městě stojí; proud rozhoduje o penězích, ne o urbanismu. |

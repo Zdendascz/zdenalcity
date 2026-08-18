@@ -114,6 +114,79 @@ describe('locale soubory vanilla obsahu', () => {
   });
 });
 
+describe('žádná hláška nesmí skončit jako syrový klíč', () => {
+  /**
+   * Projde zdrojáky, vytáhne z nich literální lokalizační klíče a ověří, že
+   * pro každý existuje text v obou jazycích. Bez toho by chyba, kterou nikdo
+   * netestuje, vyskočila hráči jako `error.needsRoad`.
+   */
+  const sources = import.meta.glob('../src/**/*.ts', {
+    eager: true,
+    import: 'default',
+    query: '?raw',
+  });
+
+  function collectKeys(pattern: RegExp): string[] {
+    const keys = new Set<string>();
+    for (const raw of Object.values(sources)) {
+      for (const match of String(raw).matchAll(pattern)) {
+        const key = match[1];
+        if (key) keys.add(key);
+      }
+    }
+    return [...keys].sort();
+  }
+
+  it('všechny důvody odmítnutí mají překlad', async () => {
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    const cs = content.getLocaleTable('cs');
+    const en = content.getLocaleTable('en');
+
+    const reasons = collectKeys(/reject\(\s*'([\w.]+)'/g);
+    expect(reasons.length).toBeGreaterThan(8);
+
+    for (const key of reasons) {
+      expect(cs[key], `chybí česky: ${key}`).toBeDefined();
+      expect(en[key], `chybí anglicky: ${key}`).toBeDefined();
+    }
+  });
+
+  it('hláška se zástupným symbolem se nesmí odmítat bez parametrů', async () => {
+    // Přesně tahle chyba se stala: `error.occupied` hlásila silnice bez parametrů,
+    // ale text obsahoval {width} × {depth}, takže se hráči vypsaly složené závorky.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    const en = content.getLocaleTable('en');
+
+    const bezParametru = new Set<string>();
+    for (const raw of Object.values(sources)) {
+      for (const match of String(raw).matchAll(/reject\(\s*'([\w.]+)'(\s*,)?/g)) {
+        if (match[1] && !match[2]) bezParametru.add(match[1]);
+      }
+    }
+
+    for (const key of bezParametru) {
+      expect(en[key] ?? '', `${key} se odmítá bez parametrů`).not.toMatch(/\{\w+\}/);
+    }
+  });
+
+  it('všechny literální klíče předané do t() mají překlad', async () => {
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    const cs = content.getLocaleTable('cs');
+    const en = content.getLocaleTable('en');
+
+    const used = collectKeys(/\bt\(\s*'((?:ui|error)\.[\w.]+)'/g);
+    expect(used.length).toBeGreaterThan(20);
+
+    for (const key of used) {
+      expect(cs[key], `chybí česky: ${key}`).toBeDefined();
+      expect(en[key], `chybí anglicky: ${key}`).toBeDefined();
+    }
+  });
+});
+
 describe('herní datum', () => {
   it('tik je den, 30 dní měsíc, 12 měsíců rok', () => {
     expect(dateParts(0)).toEqual({ year: 1, month: 1, day: 1 });
