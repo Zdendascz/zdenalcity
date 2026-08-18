@@ -41,7 +41,7 @@ export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Bala
     // Pokrytí se musí přepočítat dřív, než z něj čte cena půdy a kriminalita.
     createServiceSystem(catalogue),
     createDemandSystem(catalogue, balance),
-    createGrowthSystem(catalogue),
+    createGrowthSystem(catalogue, balance),
     // Úrovně až za růstem: čerstvě postavená budova má na povýšení čekat
     // cooldown, ne ho dostat ve stejném tiku.
     createLevelSystem(catalogue, balance),

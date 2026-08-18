@@ -167,7 +167,7 @@ describe('poptávka řídí růst', () => {
     for (let x = 5; x <= 15; x++) buildRoad(world, x, 10);
     zoneArea(world, 5, 11, 10, 1, ZONE.industrial);
 
-    const growth = createGrowthSystem(catalogue);
+    const growth = createGrowthSystem(catalogue, BALANCE);
     const demand = createDemandSystem(catalogue, BALANCE);
     for (let tick = 0; tick < 200; tick++) {
       tickWorld(world, [demand, growth]);
@@ -285,7 +285,7 @@ describe('bankrot', () => {
     world.demand.residential = 50;
     world.economy.funds = -1;
 
-    const growth = createGrowthSystem(catalogue);
+    const growth = createGrowthSystem(catalogue, BALANCE);
     for (let tick = 0; tick < 200; tick++) tickWorld(world, [growth]);
 
     expect(world.buildings.size).toBe(0);

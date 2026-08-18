@@ -565,7 +565,7 @@ describe('vanilla žebříček (§13 krok 5)', () => {
 describe('růst staví jen výchozí zástavbu', () => {
   it('na volné parcele nevyroste nic z vyšších pater žebříčku', () => {
     const world = zonedWorld();
-    const growth = createGrowthSystem(catalogueOf(...LADDER));
+    const growth = createGrowthSystem(catalogueOf(...LADDER), VANILLA_BALANCE);
 
     for (let tick = 0; tick < 200; tick++) tickWorld(world, [growth]);
 

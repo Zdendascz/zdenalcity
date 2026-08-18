@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import type { Definition } from '@/content/schema';
-import { buildRoad, bulldoze, zoneArea } from '@/sim/commands';
+import { buildRoad, bulldoze, setTaxRate, zoneArea } from '@/sim/commands';
+import { coarseIndex } from '@/sim/coarse';
 import { hashLayers, index, TERRAIN, ZONE } from '@/sim/layers';
 import type { ZoneType } from '@/sim/layers';
 import { createGrowthSystem } from '@/sim/systems';
 import type { BuildingCatalogue } from '@/sim/systems';
 import { createWorld, tickWorld, totalJobs, totalPopulation } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { VANILLA_BALANCE } from './support/balance';
 
 const HOUSE: Definition = {
   id: 'test:house',
@@ -33,7 +35,7 @@ function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
 
 /** Odtiká tolik tiků, aby růstový systém (interval 12) proběhl `runs`krát. */
 function run(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
-  const growth = createGrowthSystem(catalogue);
+  const growth = createGrowthSystem(catalogue, VANILLA_BALANCE);
   for (let tick = 0; tick < runs * growth.interval + growth.offset; tick++) {
     tickWorld(world, [growth]);
   }
@@ -85,7 +87,7 @@ describe('růst budov', () => {
     expect(world.layers.buildingId[index(building.x, building.y)]).toBe(building.id);
   });
 
-  it('bez silnice nevyroste nic, když ji definice vyžaduje', () => {
+  it('bez silnice nevyroste nic — žádná parcela není v dosahu', () => {
     const world = saturateDemand(createWorld(1));
     zoneArea(world, 5, 11, 11, 1, ZONE.residential);
 
@@ -169,6 +171,134 @@ describe('růst budov', () => {
     run(b, catalogueOf(HOUSE), 25);
 
     expect(hashLayers(a.layers)).not.toBe(hashLayers(b.layers));
+  });
+});
+
+describe('skóre parcely (§9)', () => {
+  /** Silnice na y = 10 a hluboká zóna pod ní, až za dosah. */
+  function deepZone(seed = 5): WorldState {
+    const world = createWorld(seed);
+    for (let x = 5; x <= 15; x++) buildRoad(world, x, 10);
+    zoneArea(world, 5, 11, 11, 6, ZONE.residential);
+    return saturateDemand(world);
+  }
+
+  it('zóna dvě dlaždice od silnice se zastaví (§13 krok 8)', () => {
+    const world = deepZone();
+    run(world, catalogueOf(HOUSE), 60);
+
+    const rows = new Set([...world.buildings.values()].map((b) => b.y));
+    expect(rows.has(11)).toBe(true); // sousedí
+    expect([...rows].some((y) => y >= 12)).toBe(true); // dosah, ne sousedství
+  });
+
+  it('dál než tři dlaždice od silnice nevyroste nic', () => {
+    const world = deepZone();
+    run(world, catalogueOf(HOUSE), 60);
+
+    // Silnice je na y = 10, takže y = 14 už je čtvrtá dlaždice.
+    for (const building of world.buildings.values()) {
+      expect(building.y, `budova na ${building.x},${building.y}`).toBeLessThanOrEqual(13);
+    }
+    expect(world.buildings.size).toBeGreaterThan(5);
+  });
+
+  it('drahá půda se zastaví dřív než levná', () => {
+    const world = createWorld(11);
+    for (let x = 4; x <= 60; x++) buildRoad(world, x, 10);
+    zoneArea(world, 5, 11, 20, 1, ZONE.residential); // levná strana
+    zoneArea(world, 40, 11, 20, 1, ZONE.residential); // drahá strana
+    saturateDemand(world);
+
+    for (let cell = 0; cell < world.coarse.landValue.length; cell++) {
+      world.coarse.landValue[cell] = 20;
+    }
+    for (let x = 40; x <= 59; x++) {
+      world.coarse.landValue[coarseIndex(x, 11)] = 200;
+    }
+
+    run(world, catalogueOf(HOUSE), 3);
+
+    // Poměr vah je (201 / 21) ^ 1,5, tedy skoro třicetinásobek — pár budov na
+    // levné straně je v pořádku, ale většina musí stát na drahé.
+    const expensive = [...world.buildings.values()].filter((b) => b.x >= 40).length;
+    const cheap = [...world.buildings.values()].filter((b) => b.x < 40).length;
+    expect(expensive).toBeGreaterThan(cheap * 3);
+  });
+});
+
+describe('poptávka jako rychlost (§9)', () => {
+  function zoned(seed: number, demand: number): WorldState {
+    const world = createWorld(seed);
+    for (let x = 5; x <= 25; x++) buildRoad(world, x, 10);
+    zoneArea(world, 5, 11, 21, 3, ZONE.residential);
+    world.demand.residential = demand;
+    return world;
+  }
+
+  it('poptávka 5 a 50 se liší, nejen znaménkem', () => {
+    const slow = zoned(9, VANILLA_BALANCE.growth.demandPerAttempt);
+    const fast = zoned(9, VANILLA_BALANCE.growth.demandPerAttempt * 8);
+
+    run(slow, catalogueOf(HOUSE), 3);
+    run(fast, catalogueOf(HOUSE), 3);
+
+    expect(fast.buildings.size).toBeGreaterThan(slow.buildings.size * 3);
+  });
+
+  it('víc než strop pokusů se za jeden běh nepostaví', () => {
+    const world = zoned(9, 1000);
+    const growth = createGrowthSystem(catalogueOf(HOUSE), VANILLA_BALANCE);
+
+    // Přesně po první běh systému, ne o jeden navíc.
+    for (let tick = 0; tick <= growth.offset; tick++) tickWorld(world, [growth]);
+
+    expect(world.buildings.size).toBeLessThanOrEqual(VANILLA_BALANCE.growth.maxAttempts);
+    expect(world.buildings.size).toBeGreaterThan(0);
+  });
+
+  it('bez poptávky se nestaví', () => {
+    const world = zoned(9, 0);
+    run(world, catalogueOf(HOUSE), 10);
+    expect(world.buildings.size).toBe(0);
+  });
+
+  it('město v mínusu nestaví', () => {
+    const world = zoned(9, 100);
+    world.economy.funds = -1;
+    run(world, catalogueOf(HOUSE), 10);
+    expect(world.buildings.size).toBe(0);
+  });
+});
+
+describe('daň brzdí růst (§13 krok 9)', () => {
+  function taxedCity(rate: number): WorldState {
+    const world = createWorld(13);
+    for (let x = 5; x <= 25; x++) buildRoad(world, x, 10);
+    zoneArea(world, 5, 11, 21, 3, ZONE.residential);
+    world.demand.residential = 50;
+    setTaxRate(world, ZONE.residential, rate);
+    return world;
+  }
+
+  it('vyšší sazba znamená měřitelně pomalejší růst', () => {
+    const neutral = taxedCity(VANILLA_BALANCE.growth.neutralTaxRate);
+    const heavy = taxedCity(18);
+
+    run(neutral, catalogueOf(HOUSE), 5);
+    run(heavy, catalogueOf(HOUSE), 5);
+
+    expect(heavy.buildings.size).toBeLessThan(neutral.buildings.size);
+  });
+
+  it('nižší sazba růst naopak zrychlí', () => {
+    const neutral = taxedCity(VANILLA_BALANCE.growth.neutralTaxRate);
+    const cheap = taxedCity(0);
+
+    run(neutral, catalogueOf(HOUSE), 3);
+    run(cheap, catalogueOf(HOUSE), 3);
+
+    expect(cheap.buildings.size).toBeGreaterThan(neutral.buildings.size);
   });
 });
 

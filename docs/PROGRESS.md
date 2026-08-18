@@ -528,9 +528,46 @@ Testy: 35 v `tests/levels.test.ts`. Že koušou, ověřeno rozbitím: bez penali
 za zanedbanost padnou dva, bez potvrzování snížení jeden, bez vynechání ruiny
 v rozpočtu jeden.
 
+- [x] T18 — přepis růstu: skóre parcely, dosah silnice, daň, poptávka jako
+  rychlost (fáze 2)
+
+Růst z fáze 1 losoval rovnoměrně ze všech volných zónovaných dlaždic, poptávku
+bral jako vypínač a silnici jako přímé sousedství. Všechny tři se změnily:
+
+```
+skóre  = (cenaPůdy + 1) ^ EXPONENT × faktorSilnice
+pokusů = clamp(round(poptávka / POPTÁVKA_NA_POKUS × faktorDaně), 0, MAX_POKUSŮ)
+```
+
+- parcela se losuje **váženě podle skóre** — drahá půda u silnice se zastaví
+  dřív než bahno na kraji mapy
+- silnice se počítá **dosahem, ne sousedstvím**: 1,0 / 0,6 / 0,3 podle
+  vzdálenosti, dál než tři dlaždice parcela z losu vypadne úplně. Vzdálenosti
+  počítá jeden průchod do šířky ze všech silnic naráz, ne prohledávání okolí
+  u každé z tisíců parcel
+- růst proto **nekontroluje** `requiresRoad` z definice; ruční stavba hráče ho
+  dodržuje dál. Bez toho by parcela dvě dlaždice od vozovky nemohla vyrůst nikdy
+- poptávka je rychlost, ne vypínač: poptávka 5 a 50 se konečně liší
+- pokusy se počítají **po kategoriích** v pevném pořadí, ne globálně — průmysl
+  se svou poptávkou nesmí čerpat pokusy obytné zóně
+- k ceně půdy se přičítá jednička, jinak by čerstvá mapa s nulovou cenou půdy
+  první měsíce nepostavila vůbec nic
+
+**Doplněk zadání:** faktor daně je v počtu pokusů, ne ve skóre parcely. Uvnitř
+kategorie je pro všechny parcely stejný, takže by se ve váženém losu vykrátil
+a daň by na růst neměla žádný vliv — přesně naopak, než co §9 chce.
+
+Ověřeno ve hře (§13 krok 8): jediná silnice s šestiřadou zónou pod ní zastavěla
+řady ve vzdálenosti 1, 2 a 3 v poměru 26 / 21 / 13 budov, čtvrtá a další řada
+zůstaly prázdné. Tím padá i stará výtka z fáze 1, že dál od silnice nevzniká nic.
+Systém stojí 0,3 ms na běh, tedy jednou za 12 tiků.
+
+Testy: 25 v `tests/growth.test.ts`, včetně §13 kroku 9 (18 % daň měřitelně
+zpomalí růst). Že koušou, ověřeno rozbitím: bez faktoru daně padnou dva testy,
+bez omezení dosahu dva, bez vah v losu jeden.
+
 ## Rozpracované
-_(nic — T17 uzavřeno, dál T18: přepis růstu — skóre parcely, dosah silnice,
-faktor daně, poptávka jako rychlost)_
+_(nic — T18 uzavřeno, dál T19: prerekvizity v růstu i ruční stavbě)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

@@ -14,6 +14,14 @@ import type { Building, WorldState } from './world';
 export interface FitOptions {
   /** Když je zadáno, všechny dlaždice footprintu musí mít právě tuhle zónu. */
   requireZone?: number;
+  /**
+   * Vynechá kontrolu sousedství se silnicí.
+   *
+   * Používá ji růst, kterému silnici nahradil **dosah** (§9 zadání fáze 2):
+   * parcela dvě dlaždice od vozovky se zastavět smí, jen vzácněji. Ruční
+   * stavba hráče pravidlo z definice dodržuje dál.
+   */
+  skipRoadCheck?: boolean;
 }
 
 /**
@@ -58,7 +66,11 @@ export function checkFootprint(
     }
   }
 
-  if (definition.construction.requiresRoad && !touchesRoad(world, definition, x, y)) {
+  if (
+    definition.construction.requiresRoad &&
+    !options.skipRoadCheck &&
+    !touchesRoad(world, definition, x, y)
+  ) {
     return reject('error.needsRoad');
   }
   if (definition.construction.requiresPower && !touchesPower(world, definition, x, y)) {

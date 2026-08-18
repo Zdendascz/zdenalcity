@@ -8,6 +8,7 @@ import { index, ZONE } from '@/sim/layers';
 import { createGrowthSystem, createPowerSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { VANILLA_BALANCE } from './support/balance';
 
 const PLANT: Definition = {
   id: 'test:plant',
@@ -155,7 +156,7 @@ describe('kapacita', () => {
     placeDefinition(world, catalogue, 'test:plant', 5, 11);
     zoneArea(world, 15, 11, 6, 1, ZONE.residential);
 
-    const growth = createGrowthSystem(catalogue);
+    const growth = createGrowthSystem(catalogue, VANILLA_BALANCE);
     const power = createPowerSystem(catalogue);
     for (let tick = 0; tick < 400; tick++) {
       tickWorld(world, [power, growth]);
@@ -211,7 +212,7 @@ describe('requiresPower při růstu', () => {
     const world = withRoad();
     zoneArea(world, 15, 11, 6, 1, ZONE.residential);
 
-    const growth = createGrowthSystem(catalogue);
+    const growth = createGrowthSystem(catalogue, VANILLA_BALANCE);
     for (let tick = 0; tick < 300; tick++) {
       tickWorld(world, [growth]);
     }
@@ -232,7 +233,7 @@ describe('requiresPower při růstu', () => {
     zoneArea(world, 15, 11, 6, 1, ZONE.residential);
 
     const power = createPowerSystem(catalogue);
-    const growth = createGrowthSystem(catalogue);
+    const growth = createGrowthSystem(catalogue, VANILLA_BALANCE);
     for (let tick = 0; tick < 300; tick++) {
       tickWorld(world, [power, growth]);
     }
@@ -250,7 +251,7 @@ describe('vanilla elektrárna', () => {
     zoneArea(world, 15, 11, 8, 1, ZONE.residential);
 
     const power = createPowerSystem(content);
-    const growth = createGrowthSystem(content);
+    const growth = createGrowthSystem(content, VANILLA_BALANCE);
     for (let tick = 0; tick < 400; tick++) {
       tickWorld(world, [power, growth]);
     }
