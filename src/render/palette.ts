@@ -12,6 +12,9 @@ export const ZONE_COLORS = {
   industrial: 0xd9c34a,
 } as const;
 
+/** Vozovka. */
+export const ROAD_COLOR = 0x44454d;
+
 /** Pozadí mimo mapu. */
 export const BACKGROUND_COLOR = 0x14161a;
 

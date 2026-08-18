@@ -1,6 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { MAP_SIZE } from '@/sim/layers';
-import { createSimHost } from '@/sim/simHost';
+import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import { createCamera, pan, zoomAt } from './camera';
 import { ChunkRenderer } from './chunkRenderer';
@@ -19,6 +19,9 @@ const SEED = 483928492;
 
 /** Jeden krok kolečka = násobitel zoomu. */
 const ZOOM_STEP = 1.15;
+
+/** Výchozí rychlost odpovídá `SimHost` — 1×. */
+const DEFAULT_SPEED_INDEX = 1;
 
 export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const host = createSimHost(SEED);
@@ -51,16 +54,19 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let lastPointerX = 0;
   let lastPointerY = 0;
   let spaceDown = false;
+  // Zrcadlí poslední odeslaný `set_speed`. SimHost rychlost nevystavuje a kvůli
+  // ladicímu výpisu nemá smysl rozšiřovat jeho rozhraní.
+  let speedIndex = DEFAULT_SPEED_INDEX;
 
   const canvas = app.canvas;
 
+  /** Panuje se prostředním tlačítkem nebo mezerníkem s levým — pravé bourá. */
   function isPanButton(event: PointerEvent): boolean {
-    // Prostřední nebo pravé tlačítko, případně mezerník + levé.
-    return event.button === 1 || event.button === 2 || (event.button === 0 && spaceDown);
+    return event.button === 1 || (event.button === 0 && spaceDown);
   }
 
-  function updateHover(event: PointerEvent): void {
-    hoveredTile = pickTile(
+  function tileAt(event: PointerEvent): { x: number; y: number } | null {
+    return pickTile(
       camera,
       event.offsetX,
       event.offsetY,
@@ -71,12 +77,25 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   canvas.addEventListener('pointerdown', (event) => {
-    if (!isPanButton(event)) return;
-    dragPointerId = event.pointerId;
-    lastPointerX = event.clientX;
-    lastPointerY = event.clientY;
-    canvas.setPointerCapture(event.pointerId);
     event.preventDefault();
+
+    if (isPanButton(event)) {
+      dragPointerId = event.pointerId;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    const tile = tileAt(event);
+    if (!tile) return;
+
+    // Veškeré hráčské akce jdou přes dispatch — renderer na WorldState nesahá.
+    if (event.button === 0) {
+      host.dispatch({ type: 'build_road', x: tile.x, y: tile.y });
+    } else if (event.button === 2) {
+      host.dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
+    }
   });
 
   canvas.addEventListener('pointermove', (event) => {
@@ -85,7 +104,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
     }
-    updateHover(event);
+    hoveredTile = tileAt(event);
   });
 
   function endDrag(event: PointerEvent): void {
@@ -111,17 +130,27 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     { passive: false },
   );
 
-  // Bez tohohle by pravé tlačítko při panování otevřelo kontextové menu.
+  // Bez tohohle by pravé tlačítko při bourání otevřelo kontextové menu.
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
   window.addEventListener('keydown', (event) => {
-    if (event.code === 'Space') spaceDown = true;
+    if (event.code === 'Space') {
+      spaceDown = true;
+      return;
+    }
+    // Klávesy 0–4 = pauza, 1×, 2×, 4×, 8×.
+    const requested = Number.parseInt(event.key, 10);
+    if (Number.isInteger(requested) && requested >= 0 && requested < SPEEDS.length) {
+      speedIndex = requested;
+      host.dispatch({ type: 'set_speed', speed: requested });
+    }
   });
   window.addEventListener('keyup', (event) => {
     if (event.code === 'Space') spaceDown = false;
   });
 
-  app.ticker.add(() => {
+  app.ticker.add((ticker) => {
+    host.step(ticker.deltaMS);
     chunkRenderer.update(host.consumeDirty());
 
     worldContainer.scale.set(camera.zoom);
@@ -142,6 +171,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     overlay.update([
       `tile   ${hoveredTile ? `${hoveredTile.x}, ${hoveredTile.y}` : '-'}`,
       `zoom   ${camera.zoom.toFixed(2)}x`,
+      `speed  ${SPEEDS[speedIndex] ?? 0}x`,
       `tick   ${world.tick}`,
       `fps    ${app.ticker.FPS.toFixed(0)}`,
     ]);

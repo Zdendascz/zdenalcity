@@ -12,6 +12,7 @@ import {
 import { pickTile } from '@/render/picking';
 import { diamondPoints, gridToScreen, screenToGrid, TILE_H, TILE_W } from '@/render/projection';
 import { shade, TERRAIN_COLORS } from '@/render/palette';
+import { roadMask, roadPolygons, ROAD_E, ROAD_N, ROAD_S, ROAD_W } from '@/render/roads';
 import { MAP_SIZE } from '@/sim/layers';
 
 const VIEW_W = 1280;
@@ -113,6 +114,47 @@ describe('camera', () => {
     const camera = createCamera(10, 20, MAX_ZOOM);
     zoomAt(camera, 2, 0, 0, VIEW_W, VIEW_H);
     expect(camera).toEqual({ x: 10, y: 20, zoom: MAX_ZOOM });
+  });
+});
+
+describe('auto-tiling silnic', () => {
+  /** Predikát, který hlásí silnici na jediné dlaždici. */
+  const only =
+    (tx: number, ty: number) =>
+    (x: number, y: number): boolean =>
+      x === tx && y === ty;
+
+  it('bitmask je N=1, E=2, S=4, W=8 se severem na (x, y-1)', () => {
+    expect(roadMask(only(5, 4), 5, 5)).toBe(ROAD_N);
+    expect(roadMask(only(6, 5), 5, 5)).toBe(ROAD_E);
+    expect(roadMask(only(5, 6), 5, 5)).toBe(ROAD_S);
+    expect(roadMask(only(4, 5), 5, 5)).toBe(ROAD_W);
+  });
+
+  it('nezapočítá dlaždici samotnou ani úhlopříčné sousedy', () => {
+    expect(roadMask(only(5, 5), 5, 5)).toBe(0);
+    expect(roadMask(only(6, 6), 5, 5)).toBe(0);
+  });
+
+  it('všech 16 variant má středový kus a rameno na každý připojený směr', () => {
+    for (let mask = 0; mask < 16; mask++) {
+      const arms = [ROAD_N, ROAD_E, ROAD_S, ROAD_W].filter((bit) => mask & bit).length;
+      expect(roadPolygons(0, 0, mask), `mask ${mask}`).toHaveLength(1 + arms);
+    }
+  });
+
+  it('středový kus je zmenšený diamant kolem středu dlaždice', () => {
+    expect(roadPolygons(0, 0, 0)[0]).toEqual([0, 8, 16, 16, 0, 24, -16, 16]);
+  });
+
+  it('rameno sahá až na hranu diamantu, aby sousedé navazovali bez mezery', () => {
+    // Severní hrana dlaždice vede z horního vrcholu (0,0) do pravého (32,16).
+    expect(roadPolygons(0, 0, ROAD_N)[1]).toEqual([0, 8, 16, 16, 32, 16, 0, 0]);
+  });
+
+  it('respektuje posun počátku dlaždice', () => {
+    const shifted = roadPolygons(100, 200, 0)[0];
+    expect(shifted).toEqual([100, 208, 116, 216, 100, 224, 84, 216]);
   });
 });
 

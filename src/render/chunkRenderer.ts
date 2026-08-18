@@ -3,8 +3,9 @@ import type { Renderer } from 'pixi.js';
 import { index } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
-import { shade, TERRAIN_COLORS, TILE_EDGE_SHADE } from './palette';
+import { ROAD_COLOR, shade, TERRAIN_COLORS, TILE_EDGE_SHADE } from './palette';
 import { diamondPoints, gridToScreen, TILE_H, TILE_W } from './projection';
+import { roadMask, roadPolygons } from './roads';
 
 /** Chunk = 16×16 dlaždic. Změna jedné dlaždice invaliduje jeden chunk, ne mapu. */
 export const CHUNK_SIZE = 16;
@@ -134,6 +135,19 @@ export class ChunkRenderer {
       .poly(points)
       .fill({ color })
       .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
+
+    if (this.world.layers.road[tileIndex] === 1) {
+      const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
+      for (const polygon of roadPolygons(origin.x - bounds.minX, origin.y - bounds.minY, mask)) {
+        graphics.poly(polygon).fill({ color: ROAD_COLOR });
+      }
+    }
+  }
+
+  /** Mimo mapu silnice nikdy není — okraj mapy se tak chová jako slepý konec. */
+  private isRoad(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return false;
+    return this.world.layers.road[index(x, y)] === 1;
   }
 
   destroy(): void {

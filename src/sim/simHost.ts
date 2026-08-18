@@ -1,3 +1,4 @@
+import { buildRoad, bulldoze } from './commands';
 import type { Command } from './commands';
 import type { ReadonlyLayers } from './layers';
 import { DEFAULT_SYSTEMS } from './systems';
@@ -61,8 +62,11 @@ class MainThreadSimHost implements SimHost {
         break;
       }
       case 'build_road':
+        buildRoad(this.world, cmd.x, cmd.y);
+        break;
       case 'bulldoze':
-        break; // T3
+        bulldoze(this.world, cmd.x, cmd.y);
+        break;
       case 'zone':
       case 'place_building':
         break; // T5

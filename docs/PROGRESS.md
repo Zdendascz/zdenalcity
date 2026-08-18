@@ -65,11 +65,33 @@ Ověřeno (`npm run check`, 6 souborů / 56 testů) a měřením v běžícím d
 - **výkon při plném oddálení (zoom 0,25): medián 0 ms, maximum 0,1 ms na snímek.**
   60 FPS s velkou rezervou, 64 chunků = 64 sprity
 
+- [x] T3 — silnice, dirty tracking, herní smyčka
+
+Vzniklo:
+- `src/sim/commands.ts` — `buildRoad` / `bulldoze` včetně validace (mimo mapu, voda,
+  opakovaná stavba, bourání prázdné dlaždice) a značkování 4 sousedů do `DirtySet`
+- `src/render/roads.ts` — bitmask sousedů (N=1, E=2, S=4, W=8) a geometrie vozovky;
+  16 variant vzniká skládáním středového kusu a ramen, ne tabulkou
+- `src/render/chunkRenderer.ts` — kreslení silnic nad terénem
+- `src/render/app.ts` — herní smyčka (`step` → `consumeDirty` → překreslení),
+  stavba levým tlačítkem, bourání pravým, rychlost klávesami 0–4
+- `tests/golden/roads.test.ts` — golden test se snapshotem hashe vrstev
+
+Ověřeno (`npm run check`, 8 souborů / 74 testů) a měřením v běžícím rendereru:
+- osamocená silnice se vykreslí jako slepý konec (jen středový kus): střed dlaždice
+  má `#44454d`, všechna čtyři ramena zůstala travnatá
+- po přistavění severního souseda se **objevilo severní rameno** a ostatní tři
+  zůstaly travnaté — auto-tiling i překreslení sousední dlaždice fungují
+- totéž **přes hranici chunku**: dlaždice (15, 64) je v chunku 0, (16, 64) v chunku 1;
+  východní rameno naskočilo po přistavění souseda a po zbourání zase zmizelo
+- pauza (klávesa 0) tik skutečně zastaví — 144 → 144 přes dva snímky
+- golden test: 45 dlaždic se silnicí (21 vodorovných + 31 svislých − 1 průsečík
+  − 6 zbouraných), 500 tiků, hash proti snapshotu
+
 ## Rozpracované
-_(nic — T2 uzavřeno)_
+_(nic — T3 uzavřeno, bootstrap kompletní)_
 
 ## Backlog
-- [ ] T3 — silnice, dirty tracking, herní smyčka
 - [ ] T4 — content registry, JSON schéma, vanilla definice
 - [ ] T5 — zóny, růst budov, populace
 - [ ] T6 — elektřina
@@ -96,6 +118,11 @@ _(nic — T2 uzavřeno)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | **Pravé tlačítko bourá, panuje se prostředním nebo mezerníkem + levým** | T2 dalo panování i na pravé tlačítko, ale T3 přiřazuje pravému tlačítku bourání. Panování zůstalo na prostředním a na mezerníku s levým, jak zadání T2 také připouští. |
+| 2026-08-18 | Silnice se staví klikem, ne tažením | Zadání T3 mluví o kliknutí. Malování tažením je v city builderech obvyklé, ale je to funkce navíc, kterou zadání nechce — snadno se doplní později. |
+| 2026-08-18 | 16 variant silnic se skládá, nedeklaruje | Středový kus plus jedno rameno na každý připojený směr dá všech 16 kombinací bez tabulky, kterou by šlo překlepnout. Ramena sahají až na hranu diamantu, takže sousedé navazují bez mezery. |
+| 2026-08-18 | Bourání v T3 odstraňuje jen silnici | Zóny a budovy zatím neexistují. Až vzniknou v T5, `bulldoze` se rozšíří. |
+| 2026-08-18 | Rychlost si `app.ts` zrcadlí ve vlastní proměnné | `SimHost` rychlost nevystavuje a jeho rozhraní je dané architekturou §5. Kvůli jednomu řádku v ladicím výpisu nemá smysl přidávat pátou metodu — UI ví, jakou rychlost samo odeslalo. |
 | 2026-08-18 | **Dlaždice mají tenkou hranu ve ztmavené barvě terénu** | Architektura §6 mluví jen o „diamantu vyplněném barvou". Jenže mapa je ve fázi 1 celá tráva, takže bez hran je to jednolitá zelená plocha, na které nejde poznat mřížka ani to, že panování funguje. Barva jde z palety (`TILE_EDGE_SHADE`), ne natvrdo. **Odchylka od §6 — ke schválení.** |
 | 2026-08-18 | `RenderTexture` chunky mají `resolution: 1` natvrdo | Výchozí rozlišení se řídí `devicePixelRatio`; na HiDPI displeji by textury byly 4× větší, tedy 512 MB. Cena: při zoomu 4× na HiDPI bude terén lehce měkčí. |
 | 2026-08-18 | `gridToScreen` vrací **horní vrchol** diamantu, ne jeho střed | Picking i kreslení chunků na té konvenci závisí, takže je zapsaná v komentáři funkce a ověřená testem. Střed dlaždice = vrchol + `TILE_H / 2`. |
