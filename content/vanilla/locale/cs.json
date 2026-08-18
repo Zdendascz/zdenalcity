@@ -6,5 +6,49 @@
   "building.industrial_small.name": "Dílna",
   "building.industrial_small.desc": "Lehký průmysl. Dává práci, trochu znečišťuje.",
   "building.coal_power_plant.name": "Uhelná elektrárna",
-  "building.coal_power_plant.desc": "Levná elektřina za cenu velkého znečištění."
+  "building.coal_power_plant.desc": "Levná elektřina za cenu velkého znečištění.",
+
+  "ui.tool.road": "Silnice",
+  "ui.tool.bulldoze": "Bourání",
+  "ui.tool.zone.residential": "Obytná zóna",
+  "ui.tool.zone.commercial": "Komerční zóna",
+  "ui.tool.zone.industrial": "Průmyslová zóna",
+  "ui.tool.group.build": "Stavba",
+  "ui.tool.group.zones": "Zóny",
+  "ui.tool.group.utility": "Infrastruktura",
+
+  "ui.hud.funds": "Kasa",
+  "ui.hud.population": "Obyvatel",
+  "ui.hud.jobs": "Práce",
+  "ui.hud.balance": "Měsíční bilance",
+  "ui.hud.dateLabel": "Datum",
+  "ui.hud.date": "Rok {year}, měsíc {month}, den {day}",
+  "ui.hud.demand": "Poptávka",
+  "ui.hud.powered": "Pod proudem",
+
+  "ui.demand.residential": "O",
+  "ui.demand.commercial": "K",
+  "ui.demand.industrial": "P",
+
+  "ui.speed.label": "Rychlost",
+  "ui.speed.pause": "Pauza",
+  "ui.speed.value": "{speed}×",
+
+  "ui.tax.title": "Daňové sazby",
+  "ui.tax.decrease": "Snížit sazbu",
+  "ui.tax.increase": "Zvýšit sazbu",
+
+  "ui.save.title": "Uložení",
+  "ui.save.quicksave": "Rychlé uložení",
+  "ui.save.quickload": "Rychlé načtení",
+  "ui.save.download": "Uložit do souboru",
+  "ui.save.open": "Načíst ze souboru",
+  "ui.save.saved": "Uloženo ({size} kB)",
+  "ui.save.loaded": "Načteno",
+  "ui.save.empty": "Zatím není co načíst",
+  "ui.save.failed": "Save se nepodařilo přečíst: {reason}",
+  "ui.save.missingContent": "Chybí obsah: {list}",
+
+  "ui.overlay.power": "Zobrazit elektřinu",
+  "ui.language.label": "Jazyk"
 }

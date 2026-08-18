@@ -4,6 +4,7 @@
  */
 export class DebugOverlay {
   private readonly element: HTMLElement;
+  private visible = true;
 
   constructor(parent: HTMLElement) {
     this.element = document.createElement('div');
@@ -13,6 +14,16 @@ export class DebugOverlay {
 
   update(lines: readonly string[]): void {
     this.element.textContent = lines.join('\n');
+  }
+
+  setVisible(visible: boolean): void {
+    this.visible = visible;
+    this.element.classList.toggle('is-hidden', !visible);
+  }
+
+  toggle(): boolean {
+    this.setVisible(!this.visible);
+    return this.visible;
   }
 
   destroy(): void {

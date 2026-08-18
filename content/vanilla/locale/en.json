@@ -6,5 +6,49 @@
   "building.industrial_small.name": "Workshop",
   "building.industrial_small.desc": "Light industry. Provides jobs, produces some pollution.",
   "building.coal_power_plant.name": "Coal Power Plant",
-  "building.coal_power_plant.desc": "Cheap electricity at the cost of heavy pollution."
+  "building.coal_power_plant.desc": "Cheap electricity at the cost of heavy pollution.",
+
+  "ui.tool.road": "Road",
+  "ui.tool.bulldoze": "Bulldoze",
+  "ui.tool.zone.residential": "Residential zone",
+  "ui.tool.zone.commercial": "Commercial zone",
+  "ui.tool.zone.industrial": "Industrial zone",
+  "ui.tool.group.build": "Build",
+  "ui.tool.group.zones": "Zones",
+  "ui.tool.group.utility": "Utilities",
+
+  "ui.hud.funds": "Funds",
+  "ui.hud.population": "Population",
+  "ui.hud.jobs": "Jobs",
+  "ui.hud.balance": "Monthly balance",
+  "ui.hud.dateLabel": "Date",
+  "ui.hud.date": "Year {year}, month {month}, day {day}",
+  "ui.hud.demand": "Demand",
+  "ui.hud.powered": "Powered",
+
+  "ui.demand.residential": "R",
+  "ui.demand.commercial": "C",
+  "ui.demand.industrial": "I",
+
+  "ui.speed.label": "Speed",
+  "ui.speed.pause": "Pause",
+  "ui.speed.value": "{speed}×",
+
+  "ui.tax.title": "Tax rates",
+  "ui.tax.decrease": "Lower the tax rate",
+  "ui.tax.increase": "Raise the tax rate",
+
+  "ui.save.title": "Save",
+  "ui.save.quicksave": "Quick save",
+  "ui.save.quickload": "Quick load",
+  "ui.save.download": "Save to file",
+  "ui.save.open": "Load from file",
+  "ui.save.saved": "Saved ({size} kB)",
+  "ui.save.loaded": "Loaded",
+  "ui.save.empty": "Nothing saved yet",
+  "ui.save.failed": "Save could not be read: {reason}",
+  "ui.save.missingContent": "Missing content: {list}",
+
+  "ui.overlay.power": "Power overlay",
+  "ui.language.label": "Language"
 }

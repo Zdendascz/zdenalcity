@@ -45,6 +45,8 @@ function describe(file: string, issues: readonly ValidationIssue[]): string[] {
 export class ContentRegistry {
   private readonly definitions = new Map<string, Definition>();
   private readonly sources: SourceInfo[] = [];
+  /** jazyk → klíč → text, slito přes všechny zdroje (§10). */
+  private readonly locales = new Map<string, Map<string, string>>();
 
   /**
    * Načte zdroj. Buď projde celý, nebo se nezaregistruje nic — částečně
@@ -66,7 +68,12 @@ export class ContentRegistry {
       ]);
     }
 
-    const knownKeys = collectLocaleKeys(source, problems);
+    const incomingLocales = collectLocales(source, problems);
+    const knownKeys = new Set<string>();
+    for (const table of incomingLocales.values()) {
+      for (const key of table.keys()) knownKeys.add(key);
+    }
+
     const accepted = new Map<string, Definition>();
 
     for (const file of source.definitions) {
@@ -95,7 +102,25 @@ export class ContentRegistry {
     for (const [id, definition] of accepted) {
       this.definitions.set(id, definition);
     }
+
+    // Pozdější zdroj smí text přepsat — tak se překládají nebo přejmenovávají
+    // cizí budovy, aniž by se sahalo na jejich definici.
+    for (const [language, table] of incomingLocales) {
+      const target = this.locales.get(language) ?? new Map<string, string>();
+      for (const [key, text] of table) target.set(key, text);
+      this.locales.set(language, target);
+    }
+
     this.sources.push({ id: manifest.id, name: manifest.name, version: manifest.version });
+  }
+
+  /** Jazyky, ke kterým existuje aspoň jeden text. Seřazené, ať je pořadí stabilní. */
+  getLanguages(): string[] {
+    return [...this.locales.keys()].sort();
+  }
+
+  getLocaleTable(language: string): Record<string, string> {
+    return Object.fromEntries(this.locales.get(language) ?? []);
   }
 
   get(id: string): Definition | undefined {
@@ -120,8 +145,11 @@ export class ContentRegistry {
   }
 }
 
-function collectLocaleKeys(source: ContentSource, problems: string[]): Set<string> {
-  const keys = new Set<string>();
+function collectLocales(
+  source: ContentSource,
+  problems: string[],
+): Map<string, Map<string, string>> {
+  const locales = new Map<string, Map<string, string>>();
 
   for (const language of Object.keys(source.locales).sort()) {
     const table = source.locales[language];
@@ -129,14 +157,17 @@ function collectLocaleKeys(source: ContentSource, problems: string[]): Set<strin
       problems.push(`locale/${language}.json: musí být plochý objekt klíč → text`);
       continue;
     }
+
+    const entries = new Map<string, string>();
     for (const [key, value] of Object.entries(table)) {
       if (typeof value !== 'string') {
         problems.push(`locale/${language}.json: ${key} — hodnota musí být řetězec`);
         continue;
       }
-      keys.add(key);
+      entries.set(key, value);
     }
+    locales.set(language, entries);
   }
 
-  return keys;
+  return locales;
 }

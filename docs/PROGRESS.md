@@ -219,8 +219,36 @@ Ověřeno (`npm run check`, 14 souborů / 166 testů) a v běžící hře — **
 - chybějící mod: hlásí zdroj i definici a **budovu nesmaže**, jen se nevykreslí
 - fixtura v1 se načte do aktuální verze a její vrstvy sedí proti snapshotu
 
+- [x] T9 — HUD, toolbar, i18n, převod textů na klíče
+
+Vzniklo:
+- `src/ui/i18n.ts` — `t()`, fallback jazyk → angličtina → klíč, výběr jazyka
+- `src/ui/hud.ts` — kasa, populace, práce, bilance, datum, poptávka, rychlost,
+  daně, uložení, přepínač jazyka a overlaye
+- `src/ui/toolbar.ts`, `src/ui/tools.ts` — paleta nástrojů se skupinami
+- `src/ui/saveFile.ts` — uložení do souboru a načtení ze souboru
+- `src/ui/dom.ts` — pár pomocníků, žádný framework
+- `src/content/registry.ts` — locale tabulky se slévají přes zdroje a registr
+  je vydává; `getLanguages()`, `getLocaleTable()`
+- `content/vanilla/locale/{cs,en}.json` — doplněno 40 klíčů `ui.*`
+- `src/style.css` — celý HUD
+
+Ověřeno (`npm run check`, 15 souborů / 181 testů) a v běžící hře:
+- **v žádném souboru UI není uživatelsky viditelný text** — všechno jde přes
+  `t()` a texty dodává obsah, takže je mod může doplnit i přepsat
+- tlačítko infrastruktury se jmenuje **„Uhelná elektrárna"**, protože popisek
+  je `name` z definice — v kódu není jméno ani jedné budovy (P5)
+- přepnutí jazyka přepsalo úplně všechno: `Kasa → Funds`, `Silnice → Road`,
+  `Obytná zóna → Residential zone`
+- tlačítka fungují: nástroj se označí jako aktivní, daň 7 → 8 %, pauza zastaví
+  tik (1404 → 1404), rychlost 4× se označí, overlay elektřiny se propíše
+  do rendereru
+- uložení hlásí `Saved (1.8 kB)`, načtení `Loaded`
+- chybějící překlad padá na angličtinu, úplně chybějící klíč se vypíše sám,
+  aby byl při testování vidět
+
 ## Rozpracované
-_(nic — T8 uzavřeno)_
+_(nic — T9 uzavřeno)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -248,6 +276,12 @@ _(nic — T8 uzavřeno)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | **Texty UI jsou v locale souborech obsahu, ne v samostatných souborech hry** | §10 říká, že mody a DLC přidávají vlastní locale soubory, které se slévají do stejného registru. Kdyby měla hra vlastní kanál pro `ui.*` klíče, existovaly by dvě cesty k témuž a mod by nemohl přepsat text hry. Takhle je cesta jedna a pozdější zdroj smí text přepsat. |
+| 2026-08-18 | Popisek nástroje infrastruktury je `name` z definice | Tlačítko tak pojmenuje obsah, ne kód. Přidání budovy do JSONu rovnou přidá tlačítko s překladem, bez zásahu do UI. |
+| 2026-08-18 | Chybějící klíč se vypíše jako sám sebe | §10 to vyžaduje a je to záměr: prázdný text nebo tichý fallback na jiný jazyk by se v testování přehlédl, `ui.hud.funds` uprostřed panelu ne. |
+| 2026-08-18 | Ladicí výpis zůstal, ale skrytý pod F3 a mimo lokalizaci | Je to vývojářský nástroj, ne herní UI — `fps`, `tick`, `zoom`. Kdyby šel přes `t()`, mísily by se v locale souborech texty pro hráče s texty pro vývojáře. |
+| 2026-08-18 | Ukládání do souboru je dvě funkce nad DOM API, ne implementace `Platform` z §9 | `Platform` má smysl s Electronem a Steamem, tedy fáze 4. Vyrobit ho teď by znamenalo rozhraní s metodami na achievementy a Workshop, které nikdo nevolá — přesně ten kód do zásoby, který zadání zakazuje. |
+| 2026-08-18 | Popisek a hodnota data mají oddělené klíče | `ui.hud.date` je celá věta s parametry; jako popisek se vypsala i se zástupnými symboly (`rok {year}, měsíc {month}`). Odhalil to až první screenshot HUDu. Popisek je proto `ui.hud.dateLabel`. |
 | 2026-08-18 | **`createSimHost` bere svět zvenčí, ne seed** | Save potřebuje zapisovatelný `WorldState`. Kdyby ho vlastnil host, musel by mít metody `save`/`load` a `sim/` by tím začal záviset na formátu savu — obrácený směr, než jaký architektura chce. Teď svět vlastní `app.ts`, dá ho hostovi i save vrstvě a `sim/` o savech neví. |
 | 2026-08-18 | Load **mutuje existující svět**, nevytváří nový | Renderer i UI drží `getSnapshot()` jako živý pohled (rozhodnutí z T2), takže výměna objektu by jim nechala zastaralou referenci a mapa by po loadu zamrzla. Vrstvy se přepíšou na místě, mapa budov se vyprázdní a naplní. |
 | 2026-08-18 | `seed` se při loadu přepisuje přes cílený cast | `readonly seed` v §4 je pojistka proti nechtěnému přepsání za běhu. Load je ta jediná legitimní výjimka — ze světa se stává jiné město — a je označená komentářem přímo na místě. |
@@ -317,8 +351,12 @@ _(nic — T8 uzavřeno)_
   Načítat package.json v runtime kódu by ale bylo čistší.
 - **Rychlý save se ztrácí s obnovením stránky.** Drží v proměnné, ne v IndexedDB.
   Skutečná persistence je platform vrstva (§9) a patří do fáze 4.
-- **Debug overlay má dvanáct řádků** a na malém okně zabírá půl obrazovky.
-  Nahradí ho HUD v T9.
+- **HUD při šířce okna kolem 280 px zabírá skoro celou plochu.** Panely se sice
+  zalamují a nic nepřeteče, ale mapa pod nimi skoro není vidět. Na běžném okně
+  (1100 px a víc) je to v pořádku. Kdyby měla hra běžet i v malém okně, chce to
+  kompaktní režim — panely na ikony a poptávku jen jako tři proužky.
+- **Město se dá pojmenovat jen v kódu.** Save ukládá `cityName: 'quicksave'`,
+  protože dialog nové hry neexistuje. Formát na jméno připravený je.
 - **Elektřina zatím nemá herní důsledek, jen vizuální.** `building.powered` se
   správně počítá, ale nic se podle něj neděje. V T6 jsem čekal, že to vyřeší T7
   přes daně — nejde to, protože §13 řadí daně (krok 6) před elektrárnu (krok 7),
