@@ -378,6 +378,17 @@ Ověřeno (`npm run check`, 18 souborů / 241 testů) a v běžící hře:
 - skládka je levnější, pobere míň odpadu a znečišťuje víc než spalovna
 - pokus postavit skládku mimo silnici skončil hláškou „musí sousedit se silnicí"
 
+- [x] Náhled půdorysu pod kurzorem (na žádost autora)
+
+Zvýraznění pod kurzorem kreslí **celý půdorys**, ne jen jednu dlaždici — u budovy
+4×4 jinak nebylo poznat, kam se vlastně položí. Rámeček navíc **zčervená, když
+se stavba nevejde**, a ptá se na to stejné funkce jako příkaz (`checkFootprint`),
+takže nemůže tvrdit něco jiného, než co se po kliknutí stane.
+
+Ověřeno v běžící hře čtením pixelů: volné místo dá `#85ad6a` (tráva + bílá 18 %),
+místo překrývající policejní stanici `#85934b` (tráva + červená). U nástroje
+silnice zůstává zvýrazněná jedna dlaždice, u elektrárny šestnáct.
+
 ## Rozpracované
 _(nic — T14 uzavřeno, dál T15: balance.json)_
 
@@ -549,11 +560,9 @@ _(nic — T14 uzavřeno, dál T15: balance.json)_
   - **Silnice se vyhodnocuje jako přímé sousedství**, ne dosah. Dlaždice o dvě
     pole dál je nedosažitelná napořád, a co hůř: takové dlaždice pořád padají
     do losu, takže velká zóna daleko od silnic zpomaluje růst i tam, kde stavět jde.
-- **Elektrárna se nevejde do zastavěné čtvrti a hra to neřekne.** Půdorys 4×4
-  potřebuje šestnáct volných dlaždic a jednu stranu u silnice; když to nevyjde,
-  klik prostě nic neudělá. Narazil jsem na to dvakrát za sebou při ověřování.
-  Souvisí to s tím samým, co u zóny mělké na footprint — chce to ukazovat obrys
-  a důvod odmítnutí.
+- **Zóna mělčí než půdorys budovy pořád mlčí.** Rámeček řeší ruční stavbu, ale
+  u zóny hráč nevidí, že se do ní zvolená budova nikdy nevejde. Zbývá z původní
+  dvojice problémů.
 - Starý Node 20.11.1 zůstal nainstalovaný v `C:\Program Files\nodejs\`, jen už není
   v PATH. Reinstalace Node.js z MSI by ho tam vrátila a konflikt by se obnovil —
   příznaky a oprava v `docs/SETUP.md`.

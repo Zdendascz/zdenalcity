@@ -2,6 +2,7 @@ import { Application, Container, Graphics } from 'pixi.js';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { applySaveToWorld, collectLoadWarnings, unpackSave } from '@/save/deserialize';
+import { checkFootprint } from '@/sim/buildings';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
@@ -36,6 +37,7 @@ import {
   COVERAGE_MAX_ALPHA,
   CRIME_COLOR,
   CRIME_MAX_ALPHA,
+  HOVER_BLOCKED_COLOR,
   HOVER_COLOR,
   HOVER_FILL_ALPHA,
   HOVER_LINE_ALPHA,
@@ -45,7 +47,7 @@ import {
   POLLUTION_MAX_ALPHA,
 } from './palette';
 import { pickTile } from './picking';
-import { diamondPoints, gridToScreen } from './projection';
+import { footprintQuad, gridToScreen } from './projection';
 
 /** Mapa je zatím všude tráva, takže na seedu vizuálně nezáleží. Generátor přijde později. */
 const SEED = 483928492;
@@ -300,6 +302,24 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           ? 'commercial'
           : 'industrial';
     dispatch({ type: 'set_tax_rate', zone, rate: world.economy.taxRates[category] + delta });
+  }
+
+  /** Půdorys, který právě vybraný nástroj položí. Vše kromě budov je 1×1. */
+  function activeFootprint(): readonly [number, number] {
+    if (activeTool.action.kind !== 'place') return [1, 1];
+    return content.get(activeTool.action.definitionId)?.footprint ?? [1, 1];
+  }
+
+  /**
+   * Vejde se sem to, co hráč drží? Ptá se stejné funkce jako příkaz, takže
+   * rámeček nemůže tvrdit něco jiného, než co se pak stane.
+   */
+  function placementFits(tile: { x: number; y: number }, width: number, depth: number): boolean {
+    if (activeTool.action.kind !== 'place') return true;
+    if (tile.x + width > MAP_SIZE || tile.y + depth > MAP_SIZE) return false;
+
+    const definition = content.get(activeTool.action.definitionId);
+    return definition ? checkFootprint(simWorld, definition, tile.x, tile.y).ok : true;
   }
 
   /** Pravé tlačítko ukazuje detail budovy — bourání zůstává na nástroji. */
@@ -589,11 +609,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     hover.clear();
     if (hoveredTile) {
-      const origin = gridToScreen(hoveredTile.x, hoveredTile.y);
+      // Rámeček kreslí **celý půdorys**, ne jen dlaždici pod kurzorem — u budovy
+      // 4×4 jinak není poznat, kam se vlastně položí. Pro 1×1 vyjde přesně
+      // diamant dlaždice.
+      const [width, depth] = activeFootprint();
+      const blocked = !placementFits(hoveredTile, width, depth);
+      const color = blocked ? HOVER_BLOCKED_COLOR : HOVER_COLOR;
+
       hover
-        .poly(diamondPoints(origin.x, origin.y))
-        .fill({ color: HOVER_COLOR, alpha: HOVER_FILL_ALPHA })
-        .stroke({ color: HOVER_COLOR, alpha: HOVER_LINE_ALPHA, width: 2 / camera.zoom });
+        .poly(footprintQuad(hoveredTile.x, hoveredTile.y, width, depth))
+        .fill({ color, alpha: HOVER_FILL_ALPHA })
+        .stroke({ color, alpha: HOVER_LINE_ALPHA, width: 2 / camera.zoom });
     }
 
     let poweredBuildings = 0;

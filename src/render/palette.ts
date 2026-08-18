@@ -56,10 +56,13 @@ export const ROAD_COLOR = 0x44454d;
 /** Pozadí mimo mapu. */
 export const BACKGROUND_COLOR = 0x14161a;
 
-/** Zvýraznění dlaždice pod kurzorem. */
+/** Zvýraznění dlaždic pod kurzorem — u větších budov celý půdorys. */
 export const HOVER_COLOR = 0xffffff;
 export const HOVER_FILL_ALPHA = 0.18;
 export const HOVER_LINE_ALPHA = 0.9;
+
+/** Půdorys, kam se stavba nevejde. */
+export const HOVER_BLOCKED_COLOR = 0xff6b52;
 
 /** Násobitel pro hranu dlaždice — jemné odsazení sousedních diamantů. */
 export const TILE_EDGE_SHADE = 0.82;
