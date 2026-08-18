@@ -1,9 +1,9 @@
 import type { BuildingCatalogue } from '../catalogue';
 import type { WorldState } from '../world';
 import { createPowerSystem } from './power';
-import { demandSystem } from './demand';
+import { createDemandSystem } from './demand';
 import { createGrowthSystem } from './growth';
-import { economySystem } from './economy';
+import { createEconomySystem } from './economy';
 
 export interface System {
   readonly name: string;
@@ -24,18 +24,17 @@ export function shouldRun(tick: number, interval: number, offset: number): boole
  * Pořadí registrace je pořadí vyhodnocení v rámci tiku a je součástí
  * determinismu — přeházení změní golden hashe.
  *
- * Elektřina i růst potřebují obsah, takže je registr systémů funkce, ne
- * konstanta. Systém si katalog uzavře do closure a `run(world)` zůstává
- * beze změny.
+ * Všechny systémy potřebují obsah, takže je registr funkce, ne konstanta.
+ * Systém si katalog uzavře do closure a `run(world)` zůstává beze změny.
  */
 export function createDefaultSystems(catalogue: BuildingCatalogue): System[] {
   return [
     createPowerSystem(catalogue),
-    demandSystem,
+    createDemandSystem(catalogue),
     createGrowthSystem(catalogue),
-    economySystem,
+    createEconomySystem(catalogue),
   ];
 }
 
-export { createPowerSystem, demandSystem, economySystem, createGrowthSystem };
+export { createPowerSystem, createDemandSystem, createEconomySystem, createGrowthSystem };
 export type { BuildingCatalogue };

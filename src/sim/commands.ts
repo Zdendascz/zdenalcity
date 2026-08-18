@@ -2,7 +2,8 @@ import { footprintFits, placeBuilding } from './buildings';
 import type { BuildingCatalogue } from './catalogue';
 import { inBounds, index, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
-import { markPowerNetworkDirty, markTileDirty, removeBuilding } from './world';
+import { categoryForZone } from './rci';
+import { MAX_TAX_RATE, MIN_TAX_RATE, markPowerNetworkDirty, markTileDirty, removeBuilding } from './world';
 import type { WorldState } from './world';
 
 /**
@@ -64,8 +65,23 @@ export function placeDefinition(
   if (!definition) return;
   // Zóna se nekontroluje: elektrárna smí stát i na nezónované půdě.
   if (!footprintFits(world, definition, x, y)) return;
+  // Na co nejsou peníze, to se nepostaví. Na rozdíl od budov, které vyrostou
+  // ze zóny samy, tuhle platí hráč.
+  if (world.economy.funds < definition.construction.cost) return;
 
+  world.economy.funds -= definition.construction.cost;
   placeBuilding(world, definition, x, y);
+}
+
+/** Sazba je v procentech a drží se v <0, 20>. Hodnota mimo rozsah se přiřízne. */
+export function setTaxRate(world: WorldState, zone: ZoneType, rate: number): void {
+  const category = categoryForZone(zone);
+  if (!category) return;
+
+  world.economy.taxRates[category] = Math.max(
+    MIN_TAX_RATE,
+    Math.min(MAX_TAX_RATE, Math.round(rate)),
+  );
 }
 
 /**

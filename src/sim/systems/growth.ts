@@ -1,6 +1,7 @@
 import { footprintFits, placeBuilding } from '../buildings';
 import type { BuildingCatalogue } from '../catalogue';
 import { ZONE } from '../layers';
+import { categoryForZone } from '../rci';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
@@ -8,17 +9,6 @@ import type { System } from './index';
 const ATTEMPTS_PER_RUN = 4;
 /** Šance, že se pokus promění ve stavbu. Město tak neroste skokem. */
 const GROWTH_CHANCE = 0.4;
-
-/**
- * Zóna je vazba mezi mřížkou a kategorií obsahu. Konkrétní budovy v kódu
- * nejsou (P5) — kód zná jen kategorii, seznam budov dodá registr.
- */
-function categoryForZone(zone: number): string | null {
-  if (zone === ZONE.residential) return 'residential';
-  if (zone === ZONE.commercial) return 'commercial';
-  if (zone === ZONE.industrial) return 'industrial';
-  return null;
-}
 
 export function createGrowthSystem(catalogue: BuildingCatalogue): System {
   return {
@@ -32,6 +22,10 @@ export function createGrowthSystem(catalogue: BuildingCatalogue): System {
 }
 
 function grow(world: WorldState, catalogue: BuildingCatalogue): void {
+  // Bankrot: dokud je město v minusu, nic nového nevyroste. Jediný důsledek
+  // záporného rozpočtu ve fázi 1 — hráč musí zvednout daně nebo něco zbourat.
+  if (world.economy.funds < 0) return;
+
   const candidates = collectCandidates(world);
   if (candidates.length === 0) return;
 
@@ -68,6 +62,10 @@ function tryBuild(world: WorldState, catalogue: BuildingCatalogue, tile: number)
   const zone = world.layers.zone[tile] ?? ZONE.none;
   const category = categoryForZone(zone);
   if (!category) return;
+
+  // Bez poptávky se nestaví. Tohle je ta vazba, kvůli které §13 funguje:
+  // průmyslová zóna zůstane prázdná, dokud nejsou lidé, kteří chtějí práci.
+  if (world.demand[category] <= 0) return;
 
   const options = catalogue.byCategory(category);
   if (options.length === 0) return;

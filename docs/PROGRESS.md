@@ -159,8 +159,36 @@ Ověřeno (`npm run check`, 11 souborů / 124 testů) a v běžící hře:
   s ním je napojená `#a49653` a odpojená `#964643`; tráva zůstává netknutá,
   protože barvit prázdnou dlaždici by tvrdilo „chybí tu vedení"
 
+- [x] T7 — RCI poptávka, daně, rozpočet, bankrot
+
+Vzniklo:
+- `src/sim/rci.ts` — tři zónové kategorie, `categoryForZone`, `isRciCategory`
+- `src/sim/systems/demand.ts` — RCI poptávka
+- `src/sim/systems/economy.ts` — měsíční rozpočet (30 tiků)
+- `src/sim/systems/growth.ts` — růst podmíněný poptávkou a nezápornou kasou
+- `src/sim/world.ts` — daňové sazby, bilance posledního měsíce, startovní kapitál
+- `src/sim/commands.ts` — `setTaxRate`, `placeDefinition` odečítá cenu
+- `src/render/app.ts` — kasa, bilance, RCI a sazby v overlayi; klávesy `,` a `.`
+
+Ověřeno (`npm run check`, 12 souborů / 141 testů) a v běžící hře — **celá smyčka
+§13 kroky 1–6 se uzavřela a sama se pohání**:
+
+| stav | budov | lidí | práce | RCI | kasa | měsíc |
+|---|---|---|---|---|---|---|
+| start | 0 | 0 | 0 | 20 / 0 / 0 | 20 000 | — |
+| po obytné zóně | 6 | 48 | 0 | −4 / 10 / **24** | 21 128 | +132 / −60 |
+| po průmyslové zóně | 24 | 144 | 72 | **20** / 29 / 0 | 31 652 | +600 / −330 |
+| později | 26 | 152 | 84 | 28 / 30 / −8 | 50 234 | +656 / −365 |
+
+- obyvatelé bez práce vyrobili průmyslovou poptávku 24 (krok 4) a obytná spadla
+  do minusu, takže se přestalo stavět — přesně ta zpětná vazba, o kterou jde
+- po vyznačení průmyslu vyrostly továrny, poptávka po průmyslu spadla na nulu
+  a obytná se vrátila do plusu, načež populace vyskočila z 48 na 152 (kroky 5–6)
+- daně plynou každý měsíc, kasa roste z 20 000 na 50 234
+- klávesy `,` a `.` mění sazbu vybrané zóny: 7/7/7 → 9/7/6
+
 ## Rozpracované
-_(nic — T6 uzavřeno)_
+_(nic — T7 uzavřeno)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -188,6 +216,14 @@ _(nic — T6 uzavřeno)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | Poptávka stojí na jedné myšlence: lidé chtějí práci a práce chce lidi | Obytná poptávka = základ + (místa − pracující), průmyslová = (pracující − místa), komerční = (lidé × koeficient − obchody). Z toho vyjde celá smyčka §13 sama, bez tabulek a bez zvláštních případů. Základ u obytné musí být kladný, jinak by na prázdné mapě nebyla poptávka po ničem a nic by nikdy nevyrostlo. |
+| 2026-08-18 | Růst je podmíněný kladnou poptávkou | Tohle je ta vazba, kvůli které §13 funguje: průmyslová zóna zůstane prázdná, dokud nejsou lidé bez práce. Bez ní by se stavělo všude naráz a kroky 4–5 by neměly smysl. |
+| 2026-08-18 | Bankrot = záporná kasa zastaví růst; žádný nový stav | Důsledek se dá odvodit z `funds < 0`, takže není potřeba flag, který by se musel ukládat a udržovat konzistentní. Hráč to vyřeší zvýšením daní nebo bouráním. |
+| 2026-08-18 | Daň se počítá z populace u obytných budov a z pracovních míst u ostatních | Je to jediný údaj, který budova opravdu drží. Infrastruktura se nedaní (nemá ani populaci, ani smysl ji danit), ale svou údržbu platí — proto je elektrárna trvalá zátěž rozpočtu. |
+| 2026-08-18 | **Elektřina do rozpočtu nezasahuje — koriguje to, co jsem psal u T6** | U T6 jsem tvrdil, že v T7 přestane budova bez proudu platit daně. Při psaní T7 se ukázalo, že to §13 neumožňuje: daně jsou krok 6, elektrárna krok 7, takže kdyby daně vyžadovaly proud, město by nikdy nevydělalo první korunu. `powered` tak zůstává jen vizuální a jeho herní důsledek je otázka pro T10. |
+| 2026-08-18 | Startovní kapitál 20 000, sazba 7 % v rozsahu 0–20, hodnota jednotky 40 | Provizorní balanc, ne výsledek ladění. Vybráno tak, aby vyšla elektrárna za 4 000 a aby malé město bylo mírně v plusu. Ladit se to má v T10. |
+| 2026-08-18 | Cenu platí jen ruční stavba, růst ze zóny je zdarma | Odpovídá SimCity: hráč platí infrastrukturu, ne domy, které si postaví lidé. Silnice zatím taky nic nestojí — nejsou to definice obsahu, takže by cena musela být konstanta v kódu. |
+| 2026-08-18 | Sazby se mění klávesami `,` a `.` u vybrané zóny | Provizorní ovládání, aby šlo T7 vyzkoušet. Skutečný panel s posuvníky je T9. |
 | 2026-08-18 | **Vodičem je silnice a budova, samostatné elektrické vedení nevzniklo** | Architektura §4 vrstvu pro vedení nemá a §6 ho mezi kreslenými prvky nezmiňuje — přidat ho by znamenalo novou vrstvu, nový nástroj a nové auto-tiling pravidlo, tedy práci mimo zadání T6. Proud tak teče po silnicích, což je model, který stačí na smyčku §13. |
 | 2026-08-18 | Kapacita se rozdává vzestupně podle `id` | Musí to být deterministické (P2) a „starší budovy mají přednost" je pravidlo, které jde hráči vysvětlit. Alternativa podle vzdálenosti od elektrárny by byla dražší a stejně arbitrární. |
 | 2026-08-18 | `requiresPower` teď kód respektuje a vanilla R/C/I ho má `false` | V T5 kód ten flag ignoroval, takže data tvrdila něco, co se nedělo. Teď rozhoduje obsah: §13 chce, aby město rostlo dřív než elektrárna (krok 3 je dům, krok 7 elektrárna), takže R/C/I proud k vyrůstání nepotřebují. Kdo chce růst podmíněný proudem, přepne jeden údaj v JSONu, ne v kódu. |
@@ -231,9 +267,15 @@ _(nic — T6 uzavřeno)_
 
 - `vite.config.ts` je mimo `tsc --noEmit` (viz tabulka rozhodnutí).
 - **Elektřina zatím nemá herní důsledek, jen vizuální.** `building.powered` se
-  správně počítá, ale nic se podle něj neděje — budova bez proudu funguje stejně
-  jako s ním. Load-bearing se to stane v T7, kde neosvětlená budova nemá platit
-  daně. Do té doby je to jen overlay.
+  správně počítá, ale nic se podle něj neděje. V T6 jsem čekal, že to vyřeší T7
+  přes daně — nejde to, protože §13 řadí daně (krok 6) před elektrárnu (krok 7),
+  takže město by nikdy nevydělalo první korunu. **Je to otázka na T10:** má být
+  budova bez proudu bez daní, bez růstu, nebo má chátrat?
+- **Zóna musí být tak hluboká jako footprint budovy, a hráč to nepozná.**
+  `industrial_small` má footprint 2×2, takže v jednořadé zóně nevyroste nic —
+  narazil jsem na to sám při ověřování T7 a chvíli hledal chybu v kódu, která
+  tam nebyla. Hra o tom mlčí. Nabízí se ukázat při zónování obrys toho, co se
+  tam vejde, nebo nechat vyrůst menší budovu. Patří to k T9 nebo T10.
 - **`requiresPower` a `power.consumption` se překrývají.** `requiresPower` říká
   „bez proudu nevyrostu", `consumption > 0` říká „beru proud". Zatím to jsou dva
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic

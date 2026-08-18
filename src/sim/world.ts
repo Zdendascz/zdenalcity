@@ -1,5 +1,6 @@
 import { createLayers, inBounds, index, MAP_SIZE } from './layers';
 import type { Layers } from './layers';
+import type { RciCategory } from './rci';
 import { Rng } from './rng';
 import { shouldRun } from './systems';
 import type { System } from './systems';
@@ -20,16 +21,28 @@ export interface Building {
   builtAtTick: number;
 }
 
+/** Výchozí daňová sazba v procentech. */
+export const DEFAULT_TAX_RATE = 7;
+export const MIN_TAX_RATE = 0;
+export const MAX_TAX_RATE = 20;
+
+/** Startovní kapitál. Vyjde tak na elektrárnu a pár kilometrů silnic. */
+export const STARTING_FUNDS = 20000;
+
 export interface EconomyState {
-  /** Rozpočet, daně a měsíční bilance přijdou v T7. */
   funds: number;
+  /** Daňová sazba v procentech pro každou zónovou kategorii. */
+  taxRates: Record<RciCategory, number>;
+  /** Bilance posledního měsíčního rozpočtu. Nulová, dokud první neproběhne. */
+  lastIncome: number;
+  lastExpenses: number;
 }
 
-export interface DemandState {
-  residential: number;
-  commercial: number;
-  industrial: number;
-}
+/**
+ * Poptávka po zónách. Kladná hodnota znamená „tady se chce stavět", záporná
+ * „je toho už dost".
+ */
+export type DemandState = Record<RciCategory, number>;
 
 /** Změny od posledního snímku. Renderer překresluje jen dotčené chunky. */
 export interface DirtySet {
@@ -74,7 +87,16 @@ export function createWorld(seed: number): WorldState {
     layers: createLayers(MAP_SIZE),
     buildings: new Map(),
     nextBuildingId: 1, // 0 ve vrstvě `buildingId` znamená prázdno
-    economy: { funds: 0 },
+    economy: {
+      funds: STARTING_FUNDS,
+      taxRates: {
+        residential: DEFAULT_TAX_RATE,
+        commercial: DEFAULT_TAX_RATE,
+        industrial: DEFAULT_TAX_RATE,
+      },
+      lastIncome: 0,
+      lastExpenses: 0,
+    },
     demand: { residential: 0, commercial: 0, industrial: 0 },
     rng: new Rng(seed),
     // Čerstvý svět renderer ještě neviděl.

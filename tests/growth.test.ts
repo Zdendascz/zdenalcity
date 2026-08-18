@@ -38,6 +38,17 @@ function run(world: WorldState, catalogue: BuildingCatalogue, runs: number): voi
   }
 }
 
+/**
+ * Poptávku počítá `demandSystem` (T7). Tyhle testy zkoumají růst, ne poptávku,
+ * takže ji nastavíme rovnou na kladnou.
+ */
+function saturateDemand(world: WorldState): WorldState {
+  world.demand.residential = 50;
+  world.demand.commercial = 50;
+  world.demand.industrial = 50;
+  return world;
+}
+
 /** Silnice na y = 10, zóna hned pod ní. */
 function cityWithZone(seed = 1, zone: ZoneType = ZONE.residential): WorldState {
   const world = createWorld(seed);
@@ -45,7 +56,7 @@ function cityWithZone(seed = 1, zone: ZoneType = ZONE.residential): WorldState {
     buildRoad(world, x, 10);
   }
   zoneArea(world, 5, 11, 11, 1, zone);
-  return world;
+  return saturateDemand(world);
 }
 
 describe('růst budov', () => {
@@ -74,7 +85,7 @@ describe('růst budov', () => {
   });
 
   it('bez silnice nevyroste nic, když ji definice vyžaduje', () => {
-    const world = createWorld(1);
+    const world = saturateDemand(createWorld(1));
     zoneArea(world, 5, 11, 11, 1, ZONE.residential);
 
     run(world, catalogueOf(HOUSE), 30);
@@ -114,7 +125,7 @@ describe('růst budov', () => {
       population: undefined,
       jobs: { capacity: 12 },
     };
-    const world = createWorld(3);
+    const world = saturateDemand(createWorld(3));
     for (let x = 5; x <= 15; x++) buildRoad(world, x, 10);
     zoneArea(world, 5, 11, 10, 2, ZONE.industrial);
 

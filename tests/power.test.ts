@@ -48,12 +48,18 @@ function tickPower(world: WorldState, catalogue: BuildingCatalogue): void {
   tickWorld(world, [createPowerSystem(catalogue)]);
 }
 
-/** Silnice na y = 10 od x = 5 do x = 25. */
+/**
+ * Silnice na y = 10 od x = 5 do x = 25. Poptávka je nastavená rovnou — tyhle
+ * testy zkoumají elektřinu, ne RCI.
+ */
 function withRoad(seed = 1): WorldState {
   const world = createWorld(seed);
   for (let x = 5; x <= 25; x++) {
     buildRoad(world, x, 10);
   }
+  world.demand.residential = 50;
+  world.demand.commercial = 50;
+  world.demand.industrial = 50;
   return world;
 }
 

@@ -1,5 +1,5 @@
 import type { BuildingCatalogue } from './catalogue';
-import { buildRoad, bulldoze, placeDefinition, zoneArea } from './commands';
+import { buildRoad, bulldoze, placeDefinition, setTaxRate, zoneArea } from './commands';
 import type { Command } from './commands';
 import type { ReadonlyLayers } from './layers';
 import type { System } from './systems';
@@ -76,7 +76,8 @@ class MainThreadSimHost implements SimHost {
         placeDefinition(this.world, this.catalogue, cmd.definitionId, cmd.x, cmd.y);
         break;
       case 'set_tax_rate':
-        break; // T7
+        setTaxRate(this.world, cmd.zone, cmd.rate);
+        break;
       default:
         assertNever(cmd);
     }

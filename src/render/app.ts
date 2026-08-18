@@ -41,7 +41,7 @@ const TOOL_KEYS: Readonly<Record<string, Tool>> = {
   u: 'utility',
 };
 
-const TOOL_ZONE: Readonly<Record<string, ZoneType>> = {
+const TOOL_ZONE: Readonly<Record<'residential' | 'commercial' | 'industrial', ZoneType>> = {
   residential: ZONE.residential,
   commercial: ZONE.commercial,
   industrial: ZONE.industrial,
@@ -147,10 +147,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       }
       return;
     }
-    const zone = TOOL_ZONE[tool];
-    if (zone !== undefined) {
-      host.dispatch({ type: 'zone', x: tile.x, y: tile.y, w: 1, h: 1, zone });
-    }
+    host.dispatch({ type: 'zone', x: tile.x, y: tile.y, w: 1, h: 1, zone: TOOL_ZONE[tool] });
   }
 
   canvas.addEventListener('pointerdown', (event) => {
@@ -234,6 +231,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       return;
     }
 
+    // Daň se mění u zóny, kterou má hráč zrovna vybranou. Pořádný panel je T9.
+    if (key === ',' || key === '.') {
+      if (tool !== 'road' && tool !== 'utility') {
+        host.dispatch({
+          type: 'set_tax_rate',
+          zone: TOOL_ZONE[tool],
+          rate: world.economy.taxRates[tool] + (key === '.' ? 1 : -1),
+        });
+      }
+      return;
+    }
+
     const requestedTool = TOOL_KEYS[key];
     if (requestedTool) {
       // Opakovaný stisk U cykluje mezi dostupnou infrastrukturou.
@@ -293,6 +302,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       `lidí   ${totalPopulation(world.buildings)}`,
       `práce  ${totalJobs(world.buildings)}`,
       `proud  ${poweredBuildings}/${world.buildings.size}${chunkRenderer.isPowerOverlayVisible() ? ' [P]' : ''}`,
+      `kasa   ${world.economy.funds}`,
+      `měsíc  +${world.economy.lastIncome} / -${world.economy.lastExpenses}`,
+      `RCI    ${world.demand.residential} ${world.demand.commercial} ${world.demand.industrial}`,
+      `daně   ${world.economy.taxRates.residential}/${world.economy.taxRates.commercial}/${world.economy.taxRates.industrial} %`,
     ]);
   });
 
