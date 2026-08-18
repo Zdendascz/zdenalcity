@@ -3,7 +3,14 @@ import type { Renderer } from 'pixi.js';
 import { index } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
-import { ROAD_COLOR, shade, TERRAIN_COLORS, TILE_EDGE_SHADE } from './palette';
+import {
+  ROAD_COLOR,
+  shade,
+  TERRAIN_COLORS,
+  TILE_EDGE_SHADE,
+  ZONE_COLOR_BY_VALUE,
+  ZONE_OVERLAY_ALPHA,
+} from './palette';
 import { diamondPoints, gridToScreen, TILE_H, TILE_W } from './projection';
 import { roadMask, roadPolygons } from './roads';
 
@@ -135,6 +142,12 @@ export class ChunkRenderer {
       .poly(points)
       .fill({ color })
       .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
+
+    const zone = this.world.layers.zone[tileIndex] ?? 0;
+    const zoneColor = ZONE_COLOR_BY_VALUE[zone];
+    if (zone !== 0 && zoneColor !== undefined) {
+      graphics.poly(points).fill({ color: zoneColor, alpha: ZONE_OVERLAY_ALPHA });
+    }
 
     if (this.world.layers.road[tileIndex] === 1) {
       const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);

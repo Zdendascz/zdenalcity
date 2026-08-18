@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSimHost, MAX_TICKS_PER_FRAME, SPEEDS, TICK_MS } from '@/sim/simHost';
-import { DEFAULT_SYSTEMS } from '@/sim/systems';
+import { createDefaultSystems } from '@/sim/systems';
 import type { System } from '@/sim/systems';
 import { createWorld, markTileDirty, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
@@ -86,9 +86,8 @@ describe('fázování systémů', () => {
   });
 
   it('registrované systémy mají intervaly a offsety podle architektury §5', () => {
-    expect(
-      DEFAULT_SYSTEMS.map((s) => [s.name, s.interval, s.offset]),
-    ).toEqual([
+    const systems = createDefaultSystems({ byCategory: () => [] });
+    expect(systems.map((s) => [s.name, s.interval, s.offset])).toEqual([
       ['power', 1, 0],
       ['demand', 4, 1],
       ['growth', 12, 2],

@@ -1,7 +1,8 @@
 import type { WorldState } from '../world';
 import { powerSystem } from './power';
 import { demandSystem } from './demand';
-import { growthSystem } from './growth';
+import { createGrowthSystem } from './growth';
+import type { BuildingCatalogue } from './growth';
 import { economySystem } from './economy';
 
 export interface System {
@@ -22,12 +23,13 @@ export function shouldRun(tick: number, interval: number, offset: number): boole
 /**
  * Pořadí registrace je pořadí vyhodnocení v rámci tiku a je součástí
  * determinismu — přeházení změní golden hashe.
+ *
+ * Růst potřebuje obsah, takže je registr systémů funkce, ne konstanta. Systém
+ * si katalog uzavře do closure a `run(world)` zůstává beze změny.
  */
-export const DEFAULT_SYSTEMS: readonly System[] = [
-  powerSystem,
-  demandSystem,
-  growthSystem,
-  economySystem,
-];
+export function createDefaultSystems(catalogue: BuildingCatalogue): System[] {
+  return [powerSystem, demandSystem, createGrowthSystem(catalogue), economySystem];
+}
 
-export { powerSystem, demandSystem, growthSystem, economySystem };
+export { powerSystem, demandSystem, economySystem, createGrowthSystem };
+export type { BuildingCatalogue };

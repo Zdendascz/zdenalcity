@@ -10,7 +10,14 @@ import {
   zoomAt,
 } from '@/render/camera';
 import { pickTile } from '@/render/picking';
-import { diamondPoints, gridToScreen, screenToGrid, TILE_H, TILE_W } from '@/render/projection';
+import {
+  cuboidFaces,
+  diamondPoints,
+  gridToScreen,
+  screenToGrid,
+  TILE_H,
+  TILE_W,
+} from '@/render/projection';
 import { shade, TERRAIN_COLORS } from '@/render/palette';
 import { roadMask, roadPolygons, ROAD_E, ROAD_N, ROAD_S, ROAD_W } from '@/render/roads';
 import { MAP_SIZE } from '@/sim/layers';
@@ -114,6 +121,36 @@ describe('camera', () => {
     const camera = createCamera(10, 20, MAX_ZOOM);
     zoomAt(camera, 2, 0, 0, VIEW_W, VIEW_H);
     expect(camera).toEqual({ x: 10, y: 20, zoom: MAX_ZOOM });
+  });
+});
+
+describe('kvádr budovy', () => {
+  it('při nulové výšce splyne půdorys 1×1 s diamantem dlaždice', () => {
+    const faces = cuboidFaces(0, 0, 1, 1, 0);
+    expect(faces.top).toEqual(diamondPoints(0, 0));
+  });
+
+  it('horní plocha je zvednutá o výšku, spodní hrany zůstávají na zemi', () => {
+    const faces = cuboidFaces(0, 0, 1, 1, 16);
+
+    // Horní plocha = diamant posunutý o 16 px nahoru.
+    expect(faces.top).toEqual([0, -16, 32, 0, 0, 16, -32, 0]);
+    // Pravá stěna: dva zvednuté vrcholy a pod nimi tytéž body na zemi.
+    expect(faces.right).toEqual([32, 0, 0, 16, 0, 32, 32, 16]);
+    // Levá stěna navazuje na pravou v předním rohu.
+    expect(faces.left).toEqual([0, 16, -32, 0, -32, 16, 0, 32]);
+  });
+
+  it('větší půdorys roztáhne kvádr do obou os mřížky', () => {
+    const faces = cuboidFaces(0, 0, 2, 2, 0);
+    // Rohy mřížky (0,0), (2,0), (2,2), (0,2).
+    expect(faces.top).toEqual([0, 0, 64, 32, 0, 64, -64, 32]);
+  });
+
+  it('respektuje pozici budovy v mřížce', () => {
+    const shifted = cuboidFaces(10, 4, 1, 1, 0);
+    const origin = gridToScreen(10, 4);
+    expect(shifted.top.slice(0, 2)).toEqual([origin.x, origin.y]);
   });
 });
 

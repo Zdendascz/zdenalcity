@@ -107,8 +107,35 @@ Ověřeno (`npm run check`, 9 souborů / 91 testů) a v běžící hře:
   `construction`, záporný `upkeep`, barva mimo tvar a `heightLevels` mimo rozsah
 - po neúspěšném načtení zůstal registr **úplně prázdný** — žádné poloviční načtení
 
+- [x] T5 — zóny, růst budov, populace, vykreslení kvádrů
+
+Vzniklo:
+- `src/sim/commands.ts` — `zoneArea` (obdélník, přeskakuje vodu/silnici/budovu)
+  a rozšířené `bulldoze`: boura budovu, jinak silnici, jinak zónu
+- `src/sim/systems/growth.ts` — růstový systém a rozhraní `BuildingCatalogue`
+- `src/sim/world.ts` — `removeBuilding`, `totalPopulation`, `totalJobs`
+- `src/content/` — sekce `population` a `jobs` ve schématu, `byCategory` v registru,
+  kapacity dopsané do všech čtyř vanilla definic
+- `src/render/buildingRenderer.ts` — kvádry ze tří stěn, řazení podle `x + y`
+- `src/render/projection.ts` — `cuboidFaces`
+- `src/render/chunkRenderer.ts` — zónový overlay s alfou
+- `src/render/app.ts` — nástroje na klávesách Q/R/C/I, malování tažením
+
+Ověřeno (`npm run check`, 10 souborů / 111 testů) a v běžící hře:
+- **akceptační smyčka §13 kroky 1–3 prošla**: silnice → obytná zóna vedle ní →
+  z 0 budov vyrostlo za 320 tiků **34 domů a 272 obyvatel** (34 × 8), první
+  v tiku 218, tedy přesně na fázi růstového systému (interval 12, offset 2)
+- barvy stěn kvádru odpovídají §6 na hexu přesně: horní plocha `#8fb4dd` (100 %),
+  levá `#647e9b` (70 %), pravá `#485a6f` (50 %)
+- řazení podle `x + y` funguje: u domu se sousedem vpravo je pravá stěna zakrytá
+  sousedovou horní plochou, u domu na okraji řady je vidět
+- zónový overlay dá nad trávou `#5e9783`, což je přesně 60 % trávy + 40 % modré
+- bez silnice nevyroste nic (`requiresRoad`), v průmyslové zóně nevyroste dům
+- bourání odstraní budovu i její otisk ve `buildingId`, ale **zónu nechá**
+- determinismus: stejný seed dá identické město i stav RNG, jiný seed jiné
+
 ## Rozpracované
-_(nic — T4 uzavřeno)_
+_(nic — T5 uzavřeno)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -136,6 +163,17 @@ _(nic — T4 uzavřeno)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | **Výška kvádru je `level × heightLevels × LEVEL_H`, ne `level × LEVEL_H`** | §6 uvádí `building.level * LEVEL_H`, ale úrovně budov jsou podle §14 až fáze 2, takže `level` je zatím vždy 1 — všechno by bylo 16 px vysoké a `graphics.heightLevels` z §7 by nemělo žádný efekt. Elektrárna s `heightLevels: 2` by byla stejně vysoká jako domek. Pro `level = 1` se vzorec redukuje na `heightLevels × LEVEL_H`. **Odchylka od §6 — ke schválení.** |
+| 2026-08-18 | Registr systémů je funkce `createDefaultSystems(catalogue)`, ne konstanta | Růst potřebuje obsah, ale `System.run(world)` má pevnou signaturu z T1. Systém si katalog uzavře do closure, takže se nemusel rozšiřovat ani `WorldState`, ani rozhraní systému. Vedlejší efekt: `createSimHost` teď systémy vyžaduje explicitně, což je lepší než tichý default. |
+| 2026-08-18 | Simulace čte obsah přes úzké `BuildingCatalogue`, ne přes celý registr | `sim/` tak nezávisí na tom, jak se obsah načítá, a testy mu podstrčí atrapu o třech řádcích. `ContentRegistry` rozhraní splňuje strukturálně, bez deklarace `implements`. |
+| 2026-08-18 | Budovy se nezapékají do chunků | Přesahují dlaždici do výšky i do stran a na hranici chunku by se ořezávaly. Každá je vlastní `Graphics` v kontejneru nad terénem, řazená podle `x + y`. |
+| 2026-08-18 | Úroveň budov zůstává 1 a stavba nic nekostuje | Úrovně jsou podle §14 fáze 2, rozpočet je T7. Do té doby by odečítání peněz nemělo z čeho brát. |
+| 2026-08-18 | `requiresPower` se při růstu ignoruje | Elektřina je T6 a vrstva `power` je zatím všude 0 — kdyby se podmínka respektovala, nevyrostlo by nic a smyčka §13 by nešla ověřit. |
+| 2026-08-18 | Obyvatelé přicházejí s domem naráz | Postupné zabydlování je hezčí, ale zadání T5 chce agregovanou populaci, ne animaci. Budova vzniká s `population` = kapacita z definice. |
+| 2026-08-18 | Malování tažením (nahrazuje rozhodnutí z T3) | V T3 jsem nechal stavbu na klik, protože to zadání T3 říká. U zón je to ale nepoužitelné — vyznačit čtvrť po jedné dlaždici nikdo nechce. Tažení teď platí pro silnice, zóny i bourání. |
+| 2026-08-18 | Bourání budovy nechává zónu | Stejné chování jako v SimCity: na uvolněné parcele může vyrůst něco nového. Kdo chce zónu zrušit, klikne podruhé. |
+| 2026-08-18 | `removeBuilding` hledá footprint průchodem celou vrstvou | Entita svou velikost nenese (§4) a bez definice ji nelze odvodit. Bourání je akce hráče, ne věc tiku, takže 16 384 porovnání nikoho nebolí. Kdyby to začalo vadit, přidá se footprint do entity. |
+| 2026-08-18 | **`id` v manifestu je prostý namespace bez dvojtečky** (`vanilla`, ne `zdendas:industry`) | Architektura si odporuje: §7 má v příkladu `"id": "vanilla"`, §8 uvádí mezi zdroji savu `"id": "zdendas:industry"`. Definice mají podle P6 tvar `namespace:identifier`, takže manifest s dvojtečkou by dal `zdendas:industry:castle` — dvě dvojtečky a rozbitý tvar P6. Autor rozhodl použít výhodnější variantu a držet se jí. Každá definice musí začínat `<manifest.id>:`. |
 | 2026-08-18 | Schéma je ruční validátor, ne knihovna | Nová závislost jde jen po odsouhlasení a `schema.ts` je v architektuře §11 stejně určený. Rozsah kontrol je malý, takže se to vejde do jednoho souboru bez ajv a spol. |
 | 2026-08-18 | `ContentSource` jsou čistá data, čtení souborů je mimo registr | Registr tak nezávisí na tom, jestli obsah přišel z buildu, z disku, ze ZIPu modu nebo z Workshopu. Vanilla používá `import.meta.glob`, ale žádnou privilegovanou cestu nemá (P5) — jen jinou implementaci téhož rozhraní. |
 | 2026-08-18 | Načtení zdroje je všechno, nebo nic | Částečně načtený mod je horší než nenačtený: chyba by vyplavala až po hodině hraní, když hráč sáhne po chybějící budově. Registr proto při jakémkoli problému nezaregistruje ani validní sourozence. |
@@ -160,13 +198,12 @@ _(nic — T4 uzavřeno)_
 ## Známé problémy / technický dluh
 
 - `vite.config.ts` je mimo `tsc --noEmit` (viz tabulka rozhodnutí).
-- **Otázka na autora: jaký tvar má mít `id` v manifestu?** Architektura §7 uvádí
-  v příkladu manifestu `"id": "vanilla"`, ale §8 vyjmenovává mezi zdroji savu
-  `"id": "zdendas:industry"` — tedy s dvojtečkou. Definice mají podle P6 tvar
-  `namespace:identifier`, takže manifest s dvojtečkou by dal `zdendas:industry:castle`.
-  Implementoval jsem manifest `id` jako **prostý namespace bez dvojtečky** a
-  vyžaduji, aby každá definice začínala `<manifest.id>:`. Když má platit §8,
-  je to změna na dvou řádcích ve `schema.ts` a v `registry.ts`.
+- **Sousedící domy 1×1 splývají v jeden hřeben.** Kvádr zabírá přesně svůj
+  footprint, takže dvě budovy vedle sebe nemají mezi sebou mezeru a řada domů
+  vypadá jako dlouhá hradba. V SimCity 2000 se bloky slévají podobně, takže to
+  nemusí být vada — ale kdyby to vadilo, stačí kreslit kvádr o pár pixelů
+  zmenšený proti footprintu. Je to jeden řádek v `buildingRenderer.ts` a čeká
+  na rozhodnutí autora.
 - **Chunkované `RenderTexture` stojí 128 MB VRAM.** Změřeno v běžícím rendereru,
   ne odhadnuto: 64 chunků × 1024×512 px × 4 B. Izometrické diamanty se do sebe
   zaklesávají, takže opsaný obdélník chunku je zhruba dvakrát větší než plocha,

@@ -12,6 +12,20 @@ export const ZONE_COLORS = {
   industrial: 0xd9c34a,
 } as const;
 
+/** Index = hodnota vrstvy `zone`; 0 = bez zóny, proto se nekreslí. */
+export const ZONE_COLOR_BY_VALUE = [
+  0,
+  ZONE_COLORS.residential,
+  ZONE_COLORS.commercial,
+  ZONE_COLORS.industrial,
+] as const;
+
+export const ZONE_OVERLAY_ALPHA = 0.4;
+
+/** Stěny kvádru budovy: horní plocha 100 %, levá 70 %, pravá 50 % jasu (§6). */
+export const WALL_LEFT_SHADE = 0.7;
+export const WALL_RIGHT_SHADE = 0.5;
+
 /** Vozovka. */
 export const ROAD_COLOR = 0x44454d;
 

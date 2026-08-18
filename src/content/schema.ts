@@ -37,6 +37,10 @@ export interface BuildingDefinition {
     allowedTerrain: readonly number[];
   };
   economy: { upkeep: number };
+  /** Kolik obyvatel budova pojme. Chybí u všeho, co se nebydlí. */
+  population?: { capacity: number };
+  /** Kolik pracovních míst budova dává. */
+  jobs?: { capacity: number };
   power?: { production?: number; consumption?: number };
   environment?: { pollution?: number };
   graphics: { color: string; heightLevels: number };
@@ -63,6 +67,8 @@ const DEFINITION_SECTIONS = [
   'footprint',
   'construction',
   'economy',
+  'population',
+  'jobs',
   'power',
   'environment',
   'graphics',
@@ -226,6 +232,8 @@ export function validateDefinition(
   const graphics = validateGraphics(issues, record);
   const power = validatePower(issues, record);
   const environment = validateEnvironment(issues, record);
+  const population = validateCapacity(issues, record, 'population');
+  const jobs = validateCapacity(issues, record, 'jobs');
 
   if (
     issues.length > 0 ||
@@ -251,6 +259,8 @@ export function validateDefinition(
       footprint,
       construction,
       economy,
+      ...(population ? { population } : {}),
+      ...(jobs ? { jobs } : {}),
       ...(power ? { power } : {}),
       ...(environment ? { environment } : {}),
       graphics,
@@ -335,6 +345,19 @@ function validateGraphics(
   const color = requireString(issues, section, 'color', 'graphics.color', COLOR);
   const heightLevels = requireInt(issues, section, 'heightLevels', 'graphics.heightLevels', 1, 15);
   return color !== null && heightLevels !== null ? { color, heightLevels } : null;
+}
+
+/** Sekce `population` a `jobs` mají stejný tvar `{ capacity }`. */
+function validateCapacity(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+  key: 'population' | 'jobs',
+): { capacity: number } | undefined {
+  if (record[key] === undefined) return undefined;
+  const section = requireRecord(issues, record, key, key);
+  if (!section) return undefined;
+  const capacity = requireInt(issues, section, 'capacity', `${key}.capacity`, 0, 65535);
+  return capacity === null ? undefined : { capacity };
 }
 
 function validatePower(

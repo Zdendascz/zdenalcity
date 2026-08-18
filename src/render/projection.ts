@@ -40,6 +40,41 @@ export function screenToGrid(screenX: number, screenY: number): Point {
   };
 }
 
+export interface CuboidFaces {
+  top: number[];
+  left: number[];
+  right: number[];
+}
+
+/**
+ * Tři viditelné stěny kvádru budovy o půdorysu `w × h` dlaždic a výšce
+ * `heightPx`. Zadní dvě stěny jsou vždy zakryté, takže se nekreslí.
+ *
+ * Půdorys je čtyřúhelník přes rohy mřížky (x, y) → (x+w, y) → (x+w, y+h) →
+ * (x, y+h); pro 1×1 vyjde přesně diamant dlaždice.
+ */
+export function cuboidFaces(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  heightPx: number,
+): CuboidFaces {
+  const back = gridToScreen(x, y);
+  const right = gridToScreen(x + w, y);
+  const front = gridToScreen(x + w, y + h);
+  const left = gridToScreen(x, y + h);
+
+  const lifted = (point: Point): [number, number] => [point.x, point.y - heightPx];
+  const ground = (point: Point): [number, number] => [point.x, point.y];
+
+  return {
+    top: [...lifted(back), ...lifted(right), ...lifted(front), ...lifted(left)],
+    right: [...lifted(right), ...lifted(front), ...ground(front), ...ground(right)],
+    left: [...lifted(front), ...lifted(left), ...ground(left), ...ground(front)],
+  };
+}
+
 /**
  * Čtyři vrcholy diamantu jako plochý seznam souřadnic pro `Graphics.poly`.
  * `originX/Y` je horní vrchol.

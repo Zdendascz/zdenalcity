@@ -107,6 +107,14 @@ export class ContentRegistry {
     return [...this.definitions.values()].filter((definition) => definition.type === type);
   }
 
+  /**
+   * Budovy dané kategorie. Simulace si tudy sahá pro obsah, aniž by věděla,
+   * jaké konkrétní budovy existují (P5).
+   */
+  byCategory(category: string): Definition[] {
+    return this.getAll('building').filter((definition) => definition.category === category);
+  }
+
   getLoadedSources(): SourceInfo[] {
     return this.sources.map((source) => ({ ...source }));
   }

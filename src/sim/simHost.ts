@@ -1,7 +1,6 @@
-import { buildRoad, bulldoze } from './commands';
+import { buildRoad, bulldoze, zoneArea } from './commands';
 import type { Command } from './commands';
 import type { ReadonlyLayers } from './layers';
-import { DEFAULT_SYSTEMS } from './systems';
 import type { System } from './systems';
 import { createDirtySet, createWorld, tickWorld } from './world';
 import type { Building, DemandState, DirtySet, EconomyState, WorldState } from './world';
@@ -68,8 +67,10 @@ class MainThreadSimHost implements SimHost {
         bulldoze(this.world, cmd.x, cmd.y);
         break;
       case 'zone':
+        zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone);
+        break;
       case 'place_building':
-        break; // T5
+        break; // ruční stavba budov zatím nemá kdo vyvolat
       case 'set_tax_rate':
         break; // T7
       default:
@@ -106,9 +107,10 @@ class MainThreadSimHost implements SimHost {
   }
 }
 
-export function createSimHost(
-  seed: number,
-  systems: readonly System[] = DEFAULT_SYSTEMS,
-): SimHost {
+/**
+ * Systémy se předávají zvenčí — růst potřebuje katalog obsahu, který `sim/`
+ * sám nesestaví. Prázdné pole dá čistý svět bez simulace, což využívají testy.
+ */
+export function createSimHost(seed: number, systems: readonly System[]): SimHost {
   return new MainThreadSimHost(createWorld(seed), systems);
 }

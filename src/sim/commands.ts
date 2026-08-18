@@ -1,6 +1,6 @@
-import { inBounds, index, TERRAIN } from './layers';
+import { inBounds, index, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
-import { markTileDirty } from './world';
+import { markTileDirty, removeBuilding } from './world';
 import type { WorldState } from './world';
 
 /**
@@ -45,13 +45,64 @@ export function buildRoad(world: WorldState, x: number, y: number): void {
   markRoadNeighbourhoodDirty(world, x, y);
 }
 
-/** Bourání prázdné dlaždice je no-op. Zóny a budovy přijdou na řadu v T5. */
+/**
+ * Vyznačí obdélník zónou. Dlaždice, na které to nejde (voda, silnice, budova),
+ * se přeskočí — hráč nemá důvod řešit, že mu výběr zasahuje do řeky.
+ *
+ * `ZONE.none` zónu ruší.
+ */
+export function zoneArea(
+  world: WorldState,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  zone: ZoneType,
+): void {
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      const tileX = x + dx;
+      const tileY = y + dy;
+      if (!inBounds(tileX, tileY)) continue;
+
+      const tile = index(tileX, tileY);
+      if (world.layers.terrain[tile] === TERRAIN.water) continue;
+      if (world.layers.road[tile] === 1) continue;
+      if (world.layers.buildingId[tile] !== 0) continue;
+      if (world.layers.zone[tile] === zone) continue;
+
+      world.layers.zone[tile] = zone;
+      markTileDirty(world, tileX, tileY);
+    }
+  }
+}
+
+/**
+ * Boura vždycky to nejvrchnější: budovu, jinak silnici, jinak zónu.
+ * Bourání prázdné dlaždice je no-op.
+ *
+ * Zóna po zbourání budovy **zůstává**, aby na ní mohlo vyrůst něco nového —
+ * hráč, který chce zónu zrušit, klikne podruhé.
+ */
 export function bulldoze(world: WorldState, x: number, y: number): void {
   if (!inBounds(x, y)) return;
 
   const tile = index(x, y);
-  if (world.layers.road[tile] === 0) return;
 
-  world.layers.road[tile] = 0;
-  markRoadNeighbourhoodDirty(world, x, y);
+  const buildingId = world.layers.buildingId[tile] ?? 0;
+  if (buildingId !== 0) {
+    removeBuilding(world, buildingId);
+    return;
+  }
+
+  if (world.layers.road[tile] === 1) {
+    world.layers.road[tile] = 0;
+    markRoadNeighbourhoodDirty(world, x, y);
+    return;
+  }
+
+  if (world.layers.zone[tile] !== ZONE.none) {
+    world.layers.zone[tile] = ZONE.none;
+    markTileDirty(world, x, y);
+  }
 }

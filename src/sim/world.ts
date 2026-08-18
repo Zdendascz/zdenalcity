@@ -86,6 +86,50 @@ export function markBuildingDirty(world: WorldState, buildingId: number): void {
 }
 
 /**
+ * Odstraní budovu i její otisk ve vrstvě `buildingId`.
+ *
+ * Footprint se hledá průchodem celou vrstvou, protože entita svou velikost
+ * nenese (architektura §4) a bez definice ji nelze odvodit. Bourání je akce
+ * hráče, ne věc tiku, takže 16 384 porovnání nikoho nebolí.
+ */
+export function removeBuilding(world: WorldState, buildingId: number): boolean {
+  if (!world.buildings.delete(buildingId)) return false;
+
+  const layer = world.layers.buildingId;
+  for (let tile = 0; tile < layer.length; tile++) {
+    if (layer[tile] !== buildingId) continue;
+    layer[tile] = 0;
+    const x = tile % world.size;
+    markTileDirty(world, x, (tile - x) / world.size);
+  }
+
+  markBuildingDirty(world, buildingId);
+  return true;
+}
+
+/**
+ * Populace je agregát přes budovy — obyvatelé nejsou entity (§4).
+ *
+ * Bere rovnou mapu budov, aby funkce fungovala i nad `ReadonlyWorldView`,
+ * ze kterého čte UI.
+ */
+export function totalPopulation(buildings: ReadonlyMap<number, Readonly<Building>>): number {
+  let total = 0;
+  for (const building of buildings.values()) {
+    total += building.population;
+  }
+  return total;
+}
+
+export function totalJobs(buildings: ReadonlyMap<number, Readonly<Building>>): number {
+  let total = 0;
+  for (const building of buildings.values()) {
+    total += building.jobs;
+  }
+  return total;
+}
+
+/**
  * Jeden herní den. `tick` se zvyšuje jako první, takže systémy vidí číslo tiku,
  * který právě probíhá, a po N voláních platí `world.tick === N`.
  */

@@ -14,6 +14,9 @@
   "economy": {
     "upkeep": 15
   },
+  "jobs": {
+    "capacity": 6
+  },
   "power": {
     "consumption": 25
   },
