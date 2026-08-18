@@ -3,7 +3,7 @@ import { buildRoad, bulldoze, placeDefinition, setTaxRate, zoneArea } from './co
 import type { Command } from './commands';
 import type { ReadonlyLayers } from './layers';
 import type { System } from './systems';
-import { createDirtySet, createWorld, tickWorld } from './world';
+import { createDirtySet, tickWorld } from './world';
 import type { Building, DemandState, DirtySet, EconomyState, WorldState } from './world';
 
 export const TICK_MS = 250; // 1 tick = 1 herní den při rychlosti 1×
@@ -113,14 +113,16 @@ class MainThreadSimHost implements SimHost {
 }
 
 /**
- * Systémy i katalog se předávají zvenčí — `sim/` obsah sám nesestaví. Katalog
- * potřebují elektřina, růst a příkaz `place_building`. Prázdné pole systémů dá
- * čistý svět bez simulace, což využívají testy.
+ * Svět, systémy i katalog se předávají zvenčí.
+ *
+ * Host svět **nevytváří** schválně: kdo ho vlastní, může ho dát i save vrstvě,
+ * takže `sim/` nemusí znát formát savu. Prázdné pole systémů dá čistý svět bez
+ * simulace, což využívají testy.
  */
 export function createSimHost(
-  seed: number,
+  world: WorldState,
   systems: readonly System[],
   catalogue: BuildingCatalogue,
 ): SimHost {
-  return new MainThreadSimHost(createWorld(seed), systems, catalogue);
+  return new MainThreadSimHost(world, systems, catalogue);
 }

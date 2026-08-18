@@ -1,12 +1,15 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
+import { applySaveToWorld, collectLoadWarnings, unpackSave } from '@/save/deserialize';
+import { migrate } from '@/save/migrations';
+import { serializeSave } from '@/save/serialize';
 import { MAP_SIZE, ZONE } from '@/sim/layers';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
-import { totalJobs, totalPopulation } from '@/sim/world';
+import { createWorld, totalJobs, totalPopulation } from '@/sim/world';
 import { BuildingRenderer } from './buildingRenderer';
 import type { AppearanceLookup } from './buildingRenderer';
 import { createCamera, pan, zoomAt } from './camera';
@@ -65,8 +68,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const content = new ContentRegistry();
   await content.load(createVanillaSource());
 
-  const host = createSimHost(SEED, createDefaultSystems(content), content);
+  // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
+  // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
+  const simWorld = createWorld(SEED);
+  const host = createSimHost(simWorld, createDefaultSystems(content), content);
   const world = host.getSnapshot();
+
+  const startedAt = Date.now();
+  const createdAt = new Date(startedAt).toISOString();
+  /** Rychlý save drží jen v paměti. Soubory a IndexedDB jsou věc platform vrstvy (§9). */
+  let quickSave: Uint8Array | null = null;
+  let saveInfo = '-';
 
   // Infrastruktura ze zóny nevyroste, staví ji hráč. Seznam jde z obsahu,
   // takže v rendereru není jméno ani jedné budovy (P5).
@@ -218,9 +230,45 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Bez tohohle by pravé tlačítko při bourání otevřelo kontextové menu.
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
+  function quickSaveNow(): void {
+    quickSave = serializeSave(simWorld, {
+      cityName: 'quicksave', // pojmenování města přijde s dialogem nové hry (T9)
+      createdAt,
+      modifiedAt: new Date().toISOString(),
+      playtimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+      sources: content.getLoadedSources(),
+    });
+    saveInfo = `uloženo ${(quickSave.byteLength / 1024).toFixed(1)} kB @ tick ${world.tick}`;
+  }
+
+  function quickLoadNow(): void {
+    if (!quickSave) {
+      saveInfo = 'není co načíst';
+      return;
+    }
+
+    const save = migrate(unpackSave(quickSave));
+    const warnings = collectLoadWarnings(save, content, content.getLoadedSources());
+    applySaveToWorld(simWorld, save);
+
+    const missing = [...warnings.missingSources.map((s) => s.id), ...warnings.missingDefinitions];
+    saveInfo =
+      missing.length > 0
+        ? `načteno @ tick ${world.tick}, chybí: ${missing.join(', ')}`
+        : `načteno @ tick ${world.tick}`;
+  }
+
   window.addEventListener('keydown', (event) => {
     if (event.code === 'Space') {
       spaceDown = true;
+      return;
+    }
+
+    if (event.code === 'F5' || event.code === 'F9') {
+      // Bez tohohle by F5 stránku obnovilo.
+      event.preventDefault();
+      if (event.code === 'F5') quickSaveNow();
+      else quickLoadNow();
       return;
     }
 
@@ -306,6 +354,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       `měsíc  +${world.economy.lastIncome} / -${world.economy.lastExpenses}`,
       `RCI    ${world.demand.residential} ${world.demand.commercial} ${world.demand.industrial}`,
       `daně   ${world.economy.taxRates.residential}/${world.economy.taxRates.commercial}/${world.economy.taxRates.industrial} %`,
+      `save   ${saveInfo}`,
     ]);
   });
 
@@ -319,6 +368,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       chunkRenderer,
       buildingRenderer,
       content,
+      simWorld,
+      quickSaveNow,
+      quickLoadNow,
     };
   }
 

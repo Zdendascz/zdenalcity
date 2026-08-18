@@ -187,8 +187,40 @@ Ověřeno (`npm run check`, 12 souborů / 141 testů) a v běžící hře — **
 - daně plynou každý měsíc, kasa roste z 20 000 na 50 234
 - klávesy `,` a `.` mění sazbu vybrané zóny: 7/7/7 → 9/7/6
 
+- [x] T8 — save/load, ZIP kontejner, migrace, fixtury
+
+Vzniklo:
+- `src/save/format.ts` — `formatVersion`, pořadí vrstev, typy, chybové třídy
+- `src/save/serialize.ts` — `packLayers`, `toSaveData`, `packSave` (ZIP přes fflate)
+- `src/save/deserialize.ts` — validace, `unpackSave`, `readSaveMeta`,
+  `collectLoadWarnings`, `applySaveToWorld`
+- `src/save/migrations/index.ts` — `migrate` jako čistá funkce s řetězem verzí
+- `tests/fixtures/saves/v1.city.base64` — skutečný save verze 1
+- `src/render/app.ts` — F5 uloží, F9 načte
+
+Ověřeno (`npm run check`, 14 souborů / 166 testů) a v běžící hře — **§13 krok 8**:
+
+| stav | tick | budov | lidí | kasa | RNG | součet vrstev |
+|---|---|---|---|---|---|---|
+| před uložením | 1274 | 33 | 200 | 19 481 | 2600649587 | `4f0d38f7` |
+| po rozbourání města | 2074 | 7 | 0 | 21 182 | 2660345281 | `45a691bc` |
+| **po načtení** | **1274** | **33** | **200** | **19 481** | **2600649587** | **`4f0d38f7`** |
+
+- obnova je bitově identická včetně stavu RNG, takže hra po loadu pokračuje
+  stejně jako by nebyla vypnutá; hlídá to i test, který po round-tripu odtiká
+  120 tiků v obou světech a porovná hash
+- `meta.json` je v ZIPu nekomprimovaná — test to ověřuje tím, že hledá surový
+  text `"formatVersion": 1` přímo v bajtech archivu
+- `readSaveMeta` přečte metadata bez rozbalení vrstev a entit
+- hodnota `buildingId` 4242 přežije round-trip, takže endianita je vyřešená
+- rozbité savy: nesmyslné bajty, chybějící soubor, `layers.bin` špatné délky,
+  chybějící pole v entitě i `rngState` mimo uint32 → všechno `SaveFormatError`
+  s uvedením místa, nikdy tichý pád
+- chybějící mod: hlásí zdroj i definici a **budovu nesmaže**, jen se nevykreslí
+- fixtura v1 se načte do aktuální verze a její vrstvy sedí proti snapshotu
+
 ## Rozpracované
-_(nic — T7 uzavřeno)_
+_(nic — T8 uzavřeno)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -216,6 +248,15 @@ _(nic — T7 uzavřeno)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | **`createSimHost` bere svět zvenčí, ne seed** | Save potřebuje zapisovatelný `WorldState`. Kdyby ho vlastnil host, musel by mít metody `save`/`load` a `sim/` by tím začal záviset na formátu savu — obrácený směr, než jaký architektura chce. Teď svět vlastní `app.ts`, dá ho hostovi i save vrstvě a `sim/` o savech neví. |
+| 2026-08-18 | Load **mutuje existující svět**, nevytváří nový | Renderer i UI drží `getSnapshot()` jako živý pohled (rozhodnutí z T2), takže výměna objektu by jim nechala zastaralou referenci a mapa by po loadu zamrzla. Vrstvy se přepíšou na místě, mapa budov se vyprázdní a naplní. |
+| 2026-08-18 | `seed` se při loadu přepisuje přes cílený cast | `readonly seed` v §4 je pojistka proti nechtěnému přepsání za běhu. Load je ta jediná legitimní výjimka — ze světa se stává jiné město — a je označená komentářem přímo na místě. |
+| 2026-08-18 | Čas se do savu předává zvenčí | `createdAt`, `modifiedAt` a `playtimeSeconds` jsou parametry, ne `Date.now()` uvnitř. Save vrstva tak zůstává čistá funkce a fixtury mají přibité hodnoty. |
+| 2026-08-18 | Vrstvy se zapisují explicitně little-endian přes `DataView` | Pohled na buffer typed array by převzal endianitu stroje a save z ARMu by se jinde načetl jako šum. Ověřeno testem s `buildingId = 4242`. |
+| 2026-08-18 | `SAVE_LAYER_ORDER` je vlastní seznam, ne `LAYER_ORDER` ze `sim/layers.ts` | Hashovací pořadí se smí kdykoli změnit, formát savu ne — kdyby save sdílel jedno pole s hashováním, jedna nevinná úprava by rozbila savy potichu. Test hlídá, že oba seznamy pokrývají stejnou sadu vrstev, takže nová vrstva nemůže v savu chybět. |
+| 2026-08-18 | Fixtura savu je base64, ne binárka | Testy nemají typy pro `fs` (`@types/node` není mezi závislostmi a nechtěl jsem přidávat závislost bez odsouhlasení). Base64 se načte přes `import.meta.glob` s `?raw` a dekóduje `atob`. |
+| 2026-08-18 | Migrace se testují falešným řetězem | `formatVersion` je 1 a nic staršího neexistuje, takže skutečná migrace by byla vymyšlená. `migrate` proto bere seznam migrací jako parametr a test mu podstrčí řetěz 1→2→3. Ověřuje se i to, že migrace, která verzi nezvýší, skončí chybou místo nekonečné smyčky. |
+| 2026-08-18 | Rychlý save drží jen v paměti | Soubory a IndexedDB jsou podle §9 věc platform vrstvy, která patří do fáze 4. F5/F9 stačí na to, aby šel round-trip ověřit v běžící hře. |
 | 2026-08-18 | Poptávka stojí na jedné myšlence: lidé chtějí práci a práce chce lidi | Obytná poptávka = základ + (místa − pracující), průmyslová = (pracující − místa), komerční = (lidé × koeficient − obchody). Z toho vyjde celá smyčka §13 sama, bez tabulek a bez zvláštních případů. Základ u obytné musí být kladný, jinak by na prázdné mapě nebyla poptávka po ničem a nic by nikdy nevyrostlo. |
 | 2026-08-18 | Růst je podmíněný kladnou poptávkou | Tohle je ta vazba, kvůli které §13 funguje: průmyslová zóna zůstane prázdná, dokud nejsou lidé bez práce. Bez ní by se stavělo všude naráz a kroky 4–5 by neměly smysl. |
 | 2026-08-18 | Bankrot = záporná kasa zastaví růst; žádný nový stav | Důsledek se dá odvodit z `funds < 0`, takže není potřeba flag, který by se musel ukládat a udržovat konzistentní. Hráč to vyřeší zvýšením daní nebo bouráním. |
@@ -266,6 +307,18 @@ _(nic — T7 uzavřeno)_
 ## Známé problémy / technický dluh
 
 - `vite.config.ts` je mimo `tsc --noEmit` (viz tabulka rozhodnutí).
+- **Save není bajtově reprodukovatelný, jen obsahově.** fflate zapisuje do ZIPu
+  čas modifikace, takže dva savy z téhož stavu se liší v několika bajtech
+  hlavičky. Obsah (`meta.json`, `layers.bin`, entity, stav) je stabilní, takže
+  round-trip i fixtury fungují. Kdyby bylo potřeba bajtově identické savy —
+  třeba na porovnávání v testech — fflate umí `mtime` předat.
+- **`GAME_VERSION` v `save/format.ts` duplikuje `version` z `package.json`.**
+  Hlídá to test, který obojí porovná, takže rozejít se to nemůže potichu.
+  Načítat package.json v runtime kódu by ale bylo čistší.
+- **Rychlý save se ztrácí s obnovením stránky.** Drží v proměnné, ne v IndexedDB.
+  Skutečná persistence je platform vrstva (§9) a patří do fáze 4.
+- **Debug overlay má dvanáct řádků** a na malém okně zabírá půl obrazovky.
+  Nahradí ho HUD v T9.
 - **Elektřina zatím nemá herní důsledek, jen vizuální.** `building.powered` se
   správně počítá, ale nic se podle něj neděje. V T6 jsem čekal, že to vyřeší T7
   přes daně — nejde to, protože §13 řadí daně (krok 6) před elektrárnu (krok 7),

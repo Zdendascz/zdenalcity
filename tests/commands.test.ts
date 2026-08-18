@@ -99,7 +99,7 @@ describe('bulldoze', () => {
 
 describe('cesta přes SimHost.dispatch', () => {
   it('build_road a bulldoze projdou fasádou až do vrstvy', () => {
-    const host = createSimHost(1, [], NO_CONTENT);
+    const host = createSimHost(createWorld(1), [], NO_CONTENT);
 
     host.dispatch({ type: 'build_road', x: 3, y: 7 });
     expect(host.getSnapshot().layers.road[index(3, 7)]).toBe(1);
@@ -109,7 +109,7 @@ describe('cesta přes SimHost.dispatch', () => {
   });
 
   it('změny se objeví v consumeDirty a pak se vyprázdní', () => {
-    const host = createSimHost(1, [], NO_CONTENT);
+    const host = createSimHost(createWorld(1), [], NO_CONTENT);
     host.consumeDirty(); // spolkni úvodní fullRedraw
 
     host.dispatch({ type: 'build_road', x: 3, y: 7 });

@@ -72,7 +72,7 @@ describe('determinismus simulace', () => {
     ];
 
     function play(seed: number): string {
-      const host = createSimHost(seed, [chaosSystem], {
+      const host = createSimHost(createWorld(seed), [chaosSystem], {
         get: () => undefined,
         byCategory: () => [],
       });
