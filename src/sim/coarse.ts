@@ -30,15 +30,19 @@ export function coarseInBounds(cellX: number, cellY: number): boolean {
  */
 export interface CoarseLayers {
   pollution: Uint8Array;
+  landValue: Uint8Array;
 }
 
 /** Pevné pořadí pro hashování. Stejný důvod jako u `LAYER_ORDER` v `layers.ts`. */
-export const COARSE_LAYER_ORDER = ['pollution'] as const satisfies readonly (keyof CoarseLayers)[];
+export const COARSE_LAYER_ORDER = [
+  'pollution',
+  'landValue',
+] as const satisfies readonly (keyof CoarseLayers)[];
 
 export type ReadonlyCoarseLayers = { readonly [K in keyof CoarseLayers]: Readonly<CoarseLayers[K]> };
 
 export function createCoarseLayers(): CoarseLayers {
-  return { pollution: new Uint8Array(COARSE_CELLS) };
+  return { pollution: new Uint8Array(COARSE_CELLS), landValue: new Uint8Array(COARSE_CELLS) };
 }
 
 const FNV_OFFSET_BASIS = 0x811c9dc5;

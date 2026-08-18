@@ -316,8 +316,23 @@ Ověřeno (`npm run check`, 16 souborů / 213 testů) a v běžící hře:
 - difuze je deterministická — dva běhy stejného seedu dají identický hash hrubých vrstev
 - **výkon: medián snímku 16,7 ms, p95 19,9 ms, 60 FPS při 8× včetně difuze**
 
+- [x] T12 — cena půdy, bonus vody, vyhlazení, overlay (fáze 2)
+
+Vzniklo:
+- `src/sim/systems/landValue.ts` — vzorec podle §4, interval 16 / offset 5
+- vrstva `landValue` na hrubé mřížce, overlay na klávese `L`
+- `CoarseOverlay` umí víc vrstev, každou s vlastní barvou
+
+Ověřeno (`npm run check`, 17 souborů / 223 testů) a v běžící hře:
+- **akceptační kritérium §13.2 splněno**: obytná zóna u průmyslu má cenu půdy **0**,
+  vzdálená zóna **14**, nedotčený roh mapy **40** (základ)
+- cena půdy roste postupně, ne skokem — po prvním běhu je pod základem
+- u vody vyjde 65 (základ 40 + bonus 25), bonus dostane i buňka s vodou samotnou
+- těžké znečištění ji srazí na nulu, ale ne pod ni; nepřeteče 255
+- overlaye se přepínají a vždy svítí nejvýš jeden; překreslení 0,6 ms
+
 ## Rozpracované
-_(nic — T11 uzavřeno, dál T12: cena půdy)_
+_(nic — T12 uzavřeno, dál T13: služby a kriminalita)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -459,6 +474,16 @@ _(nic — T11 uzavřeno, dál T12: cena půdy)_
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
   nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
   z nich pravděpodobně zmizí.
+- **Na mapě není ani kapka vody, takže bonus vody nemá kde platit.** Zadání
+  fáze 2 s ním počítá jako s jediným vstupem nezávislým na hráči, „aby mapa
+  nebyla homogenní ještě než hráč cokoli postaví" — jenže fáze 1 žádný generátor
+  terénu nepostavila a mapa je stoprocentně tráva. Mechanismus je hotový
+  a otestovaný (test si vodu do mapy dokreslí), ale ve hře se neprojeví.
+  **Generátor mapy není v žádném úkolu fáze 2** — rozhodnutí patří autorovi.
+- **Cena půdy dnes nepřekročí 65** (základ 40 + bonus vody 25), a bez vody 40.
+  Prahy úrovní budov začínají na 90, takže dokud služby nezačnou do vzorce
+  přispívat (T13–T14), nic se nepovýší. Pořadí úkolů to řeší — T16 přijde až
+  po nich — ale **při T13 se nesmí zapomenout přidat pokrytí do vzorce ceny půdy**.
 - **Co dnes rozhoduje o vzniku budovy** (odpověď na dotaz autora, podklad pro fázi 2):
   nezáporná kasa → systém běží 1× za 12 tiků a udělá 4 pokusy → každý pokus má
   40% šanci → náhodná volná zónovaná dlaždice, rovnoměrně → poptávka kategorie

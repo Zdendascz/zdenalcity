@@ -5,6 +5,7 @@ import { createDemandSystem } from './demand';
 import { createGrowthSystem } from './growth';
 import { createEconomySystem } from './economy';
 import { createPollutionSystem } from './pollution';
+import { createLandValueSystem } from './landValue';
 
 export interface System {
   readonly name: string;
@@ -36,6 +37,7 @@ export function createDefaultSystems(catalogue: BuildingCatalogue): System[] {
     createGrowthSystem(catalogue),
     createEconomySystem(catalogue),
     createPollutionSystem(catalogue),
+    createLandValueSystem(),
   ];
 }
 
@@ -45,5 +47,6 @@ export {
   createEconomySystem,
   createGrowthSystem,
   createPollutionSystem,
+  createLandValueSystem,
 };
 export type { BuildingCatalogue };

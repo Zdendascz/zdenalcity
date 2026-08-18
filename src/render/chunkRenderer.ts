@@ -23,7 +23,7 @@ export const CHUNK_SIZE = 16;
  * Který diagnostický pohled je zapnutý. Vždycky nejvýš jeden — dva překryvy
  * přes sebe by se nedaly přečíst. Skutečný přepínač s ikonami je T21.
  */
-export type OverlayMode = 'none' | 'power' | 'pollution';
+export type OverlayMode = 'none' | 'power';
 
 interface Chunk {
   readonly x0: number;

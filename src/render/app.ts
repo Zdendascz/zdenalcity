@@ -29,6 +29,7 @@ import { createCamera, pan, zoomAt } from './camera';
 import { ChunkRenderer } from './chunkRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
+import type { CoarseOverlayLayer } from './coarseOverlay';
 import { DebugOverlay } from './debugOverlay';
 import { BACKGROUND_COLOR, HOVER_COLOR, HOVER_FILL_ALPHA, HOVER_LINE_ALPHA } from './palette';
 import { pickTile } from './picking';
@@ -275,15 +276,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const overlays = [
     { id: 'power', labelKey: 'ui.overlay.power' },
     { id: 'pollution', labelKey: 'ui.overlay.pollution' },
+    { id: 'landValue', labelKey: 'ui.overlay.landValue' },
   ];
 
-  let overlayMode: OverlayMode = 'none';
+  let overlayMode = 'none';
 
   function toggleOverlay(id: string): void {
-    overlayMode = (overlayMode === id ? 'none' : id) as OverlayMode;
+    overlayMode = overlayMode === id ? 'none' : id;
     // Elektřina se zapéká do chunků, hrubé vrstvy mají vlastní lehkou vrstvu.
-    chunkRenderer.setOverlay(overlayMode === 'power' ? 'power' : 'none');
-    coarseOverlay.setVisible(overlayMode === 'pollution');
+    chunkRenderer.setOverlay(overlayMode === 'power' ? 'power' : ('none' as OverlayMode));
+    coarseOverlay.setLayer(
+      overlayMode === 'pollution' || overlayMode === 'landValue'
+        ? (overlayMode as CoarseOverlayLayer)
+        : 'none',
+    );
   }
 
   const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, {
@@ -469,6 +475,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     if (key === 'o') {
       toggleOverlay('pollution');
+      return;
+    }
+
+    if (key === 'l') {
+      toggleOverlay('landValue');
       return;
     }
 

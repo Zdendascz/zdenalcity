@@ -1,8 +1,22 @@
 import { Container, Graphics } from 'pixi.js';
 import { COARSE_FACTOR, COARSE_SIZE } from '@/sim/coarse';
+import type { CoarseLayers } from '@/sim/coarse';
 import type { ReadonlyWorldView } from '@/sim/simHost';
-import { POLLUTION_COLOR, POLLUTION_MAX_ALPHA } from './palette';
+import {
+  LAND_VALUE_COLOR,
+  LAND_VALUE_MAX_ALPHA,
+  POLLUTION_COLOR,
+  POLLUTION_MAX_ALPHA,
+} from './palette';
 import { footprintQuad } from './projection';
+
+/** Kterou vrstvu hrubé mřížky overlay ukazuje. */
+export type CoarseOverlayLayer = 'none' | keyof CoarseLayers;
+
+const STYLES: Readonly<Record<keyof CoarseLayers, { color: number; maxAlpha: number }>> = {
+  pollution: { color: POLLUTION_COLOR, maxAlpha: POLLUTION_MAX_ALPHA },
+  landValue: { color: LAND_VALUE_COLOR, maxAlpha: LAND_VALUE_MAX_ALPHA },
+};
 
 /**
  * Overlay pro vrstvy na hrubé mřížce.
@@ -12,13 +26,12 @@ import { footprintQuad } from './projection';
  * práce za stejný obrázek. Prakticky: překreslení po každé difuzi stálo 33 ms
  * jako součást chunků, tady je to zlomek.
  *
- * Je to vlastní vrstva nad terénem, takže zapnutí ani přepočet difuze
- * nevyžadují sáhnout na chunky.
+ * Sílu nese průhlednost, ne barva — barevný přechod by se pletl se zónami.
  */
 export class CoarseOverlay {
   private readonly world: ReadonlyWorldView;
   private readonly graphics = new Graphics();
-  private visible = false;
+  private layer: CoarseOverlayLayer = 'none';
 
   constructor(world: ReadonlyWorldView, parent: Container) {
     this.world = world;
@@ -26,29 +39,32 @@ export class CoarseOverlay {
     parent.addChild(this.graphics);
   }
 
-  setVisible(visible: boolean): void {
-    if (this.visible === visible) return;
-    this.visible = visible;
-    this.graphics.visible = visible;
-    if (visible) this.redraw();
+  setLayer(layer: CoarseOverlayLayer): void {
+    if (this.layer === layer) return;
+    this.layer = layer;
+    this.graphics.visible = layer !== 'none';
+    if (layer !== 'none') this.redraw();
   }
 
-  isVisible(): boolean {
-    return this.visible;
+  getLayer(): CoarseOverlayLayer {
+    return this.layer;
   }
 
-  /** Volá se, když difuze ohlásí změnu — mimo zapnutý overlay se nic nekreslí. */
+  /** Volá se, když difuze ohlásí změnu — vypnutý overlay nic nekreslí. */
   update(coarseChanged: boolean): void {
-    if (this.visible && coarseChanged) this.redraw();
+    if (this.layer !== 'none' && coarseChanged) this.redraw();
   }
 
   private redraw(): void {
     this.graphics.clear();
-    const pollution = this.world.coarse.pollution;
+    if (this.layer === 'none') return;
+
+    const values = this.world.coarse[this.layer];
+    const style = STYLES[this.layer];
 
     for (let cellY = 0; cellY < COARSE_SIZE; cellY++) {
       for (let cellX = 0; cellX < COARSE_SIZE; cellX++) {
-        const value = pollution[cellY * COARSE_SIZE + cellX] ?? 0;
+        const value = values[cellY * COARSE_SIZE + cellX] ?? 0;
         if (value === 0) continue;
 
         const quad = footprintQuad(
@@ -57,10 +73,9 @@ export class CoarseOverlay {
           COARSE_FACTOR,
           COARSE_FACTOR,
         );
-        // Sílu nese průhlednost, ne barva — ramp by se pletl s barevnými zónami.
         this.graphics
           .poly(quad)
-          .fill({ color: POLLUTION_COLOR, alpha: (value / 255) * POLLUTION_MAX_ALPHA });
+          .fill({ color: style.color, alpha: (value / 255) * style.maxAlpha });
       }
     }
   }

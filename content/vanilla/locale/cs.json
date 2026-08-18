@@ -104,5 +104,6 @@
 
   "ui.overlay.power": "Elektřina",
   "ui.overlay.pollution": "Znečištění",
+  "ui.overlay.landValue": "Cena půdy",
   "ui.language.label": "Jazyk"
 }

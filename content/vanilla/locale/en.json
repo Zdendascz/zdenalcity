@@ -104,5 +104,6 @@
 
   "ui.overlay.power": "Power",
   "ui.overlay.pollution": "Pollution",
+  "ui.overlay.landValue": "Land value",
   "ui.language.label": "Language"
 }

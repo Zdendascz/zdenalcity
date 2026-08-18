@@ -29,6 +29,10 @@ export const ZONE_OVERLAY_ALPHA = 0.4;
 export const POLLUTION_COLOR = 0x8c4a7a;
 export const POLLUTION_MAX_ALPHA = 0.8;
 
+/** Overlay ceny půdy. Zlatá se nepere se zónami ani s vozovkou. */
+export const LAND_VALUE_COLOR = 0xf0c060;
+export const LAND_VALUE_MAX_ALPHA = 0.75;
+
 /** Overlay elektřiny (klávesa P): vodič s proudem a vodič bez proudu. */
 export const POWER_ON_COLOR = 0xf2d857;
 export const POWER_OFF_COLOR = 0xd9483a;
