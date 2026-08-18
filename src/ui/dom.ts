@@ -14,6 +14,11 @@ export function el<K extends keyof HTMLElementTagNameMap>(
 export function button(className: string, onClick: () => void): HTMLButtonElement {
   const node = el('button', className);
   node.type = 'button';
-  node.addEventListener('click', onClick);
+  node.addEventListener('click', () => {
+    // Bez odebrání fokusu by mezerník mačkal naposledy kliknuté tlačítko
+    // místo toho, aby panoval mapou.
+    node.blur();
+    onClick();
+  });
   return node;
 }

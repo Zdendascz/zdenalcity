@@ -39,6 +39,9 @@ export function createDemandSystem(catalogue: BuildingCatalogue): System {
       let commercialJobs = 0;
 
       for (const building of world.buildings.values()) {
+        // Poptávka počítá s tím, co ve městě stojí, bez ohledu na proud.
+        // Kdyby budova bez proudu poptávku nesytila, hráč by na místě jedné
+        // nefunkční továrny stavěl další a další.
         population += building.population;
         jobs += building.jobs;
         if (catalogue.get(building.definitionId)?.category === 'commercial') {

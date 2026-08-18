@@ -49,6 +49,8 @@
   "ui.save.failed": "Save se nepodařilo přečíst: {reason}",
   "ui.save.missingContent": "Chybí obsah: {list}",
 
+  "ui.cost.spent": "−{amount}",
+
   "ui.overlay.power": "Zobrazit elektřinu",
   "ui.language.label": "Jazyk"
 }

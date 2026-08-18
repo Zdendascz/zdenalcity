@@ -10,6 +10,8 @@ import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld } from '@/sim/world';
+import { CostPopup } from '@/ui/costPopup';
+import { formatNumber } from '@/ui/format';
 import { Hud } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
@@ -131,7 +133,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const worldContainer = new Container();
   app.stage.addChild(worldContainer);
 
-  const chunkRenderer = new ChunkRenderer(app.renderer, world, worldContainer);
+  const chunkRenderer = new ChunkRenderer(world, worldContainer);
   const buildingRenderer = new BuildingRenderer(
     world,
     worldContainer,
@@ -143,6 +145,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   const debug = new DebugOverlay(mount);
   debug.setVisible(false);
+  const costPopup = new CostPopup(mount);
 
   const startedAt = Date.now();
   const createdAt = new Date(startedAt).toISOString();
@@ -274,8 +277,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   /** Veškeré hráčské akce jdou přes dispatch — renderer na WorldState nesahá. */
-  function applyTool(tile: { x: number; y: number }, pointerButton: number): void {
+  function applyTool(
+    tile: { x: number; y: number },
+    pointerButton: number,
+    viewX: number,
+    viewY: number,
+  ): void {
     const action = pointerButton === 2 ? { kind: 'bulldoze' as const } : activeTool.action;
+    const fundsBefore = world.economy.funds;
 
     switch (action.kind) {
       case 'road':
@@ -296,6 +305,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         });
         break;
     }
+
+    // Cena se čte z rozdílu v kase, ne z definice — bublina tak vyskočí u čehokoli,
+    // co kdy začne stát peníze, aniž by se sem muselo sahat.
+    const spent = fundsBefore - world.economy.funds;
+    if (spent > 0) {
+      costPopup.show(viewX, viewY, i18n.t('ui.cost.spent', { amount: formatNumber(spent) }));
+    }
   }
 
   canvas.addEventListener('pointerdown', (event) => {
@@ -314,7 +330,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     paintButton = event.button;
     lastPaintedTile = tile.y * MAP_SIZE + tile.x;
-    applyTool(tile, event.button);
+    applyTool(tile, event.button, event.offsetX, event.offsetY);
   });
 
   canvas.addEventListener('pointermove', (event) => {
@@ -332,7 +348,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const tile = hoveredTile.y * MAP_SIZE + hoveredTile.x;
       if (tile !== lastPaintedTile) {
         lastPaintedTile = tile;
-        applyTool(hoveredTile, paintButton);
+        applyTool(hoveredTile, paintButton, event.offsetX, event.offsetY);
       }
     }
   });
@@ -366,13 +382,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
   window.addEventListener('keydown', (event) => {
-    // Klávesy nesmí zasahovat do psaní ve formulářových prvcích HUDu.
-    if (event.target instanceof HTMLElement && event.target.closest('.hud')) return;
-
     if (event.code === 'Space') {
+      // Řeší se před kontrolou HUDu: mezerník musí panovat i tehdy, když má
+      // fokus tlačítko v panelu. `preventDefault` zabrání tomu, aby tlačítko
+      // mezerník zmáčkl a aby stránka odrolovala.
+      event.preventDefault();
       spaceDown = true;
       return;
     }
+
+    // Ostatní klávesy nesmí zasahovat do ovládání prvků v HUDu.
+    if (event.target instanceof HTMLElement && event.target.closest('.hud')) return;
 
     if (event.code === 'F5' || event.code === 'F9') {
       event.preventDefault(); // jinak by F5 obnovilo stránku

@@ -3,6 +3,7 @@ import { ZONE } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { totalJobs, totalPopulation } from '@/sim/world';
 import { button, el } from './dom';
+import { formatNumber } from './format';
 import type { I18n } from './i18n';
 
 /** 1 tik = 1 den, 30 dní = měsíc, 12 měsíců = rok (§5). */
@@ -312,9 +313,4 @@ export function dateParts(tick: number): { year: number; month: number; day: num
     month: (Math.floor(tick / DAYS_PER_MONTH) % MONTHS_PER_YEAR) + 1,
     day: (tick % DAYS_PER_MONTH) + 1,
   };
-}
-
-function formatNumber(value: number): string {
-  // Oddělovač tisíců je úzká mezera — funguje v češtině i angličtině.
-  return value.toLocaleString('cs-CZ').replace(/\s/g, ' ');
 }

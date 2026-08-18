@@ -18,7 +18,7 @@
     "capacity": 12
   },
   "power": {
-    "consumption": 40
+    "consumption": 300
   },
   "environment": {
     "pollution": 20

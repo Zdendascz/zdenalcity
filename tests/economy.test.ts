@@ -57,6 +57,22 @@ function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
   };
 }
 
+/**
+ * Postaví budovu a rovnou ji připojí k proudu.
+ *
+ * Bez proudu budova nedaní ani nedává práci, což je záměr — ale většina testů
+ * tady zkoumá ekonomiku, ne elektřinu, takže si ji připojí rovnou.
+ */
+function place(
+  world: WorldState,
+  definition: Definition,
+  x: number,
+  y: number,
+  powered = true,
+): void {
+  placeBuilding(world, definition, x, y).powered = powered;
+}
+
 /** Odtiká přesně jeden měsíc, tedy jeden běh economySystemu (interval 30). */
 function tickMonth(world: WorldState, catalogue: BuildingCatalogue): void {
   const economy = createEconomySystem(catalogue);
@@ -85,7 +101,7 @@ describe('RCI poptávka', () => {
   it('obyvatelé bez práce vytvoří průmyslovou poptávku (§13 krok 4)', () => {
     const world = createWorld(1);
     for (let i = 0; i < 6; i++) {
-      placeBuilding(world, HOUSE, 5 + i, 5);
+      place(world, HOUSE, 5 + i, 5);
     }
 
     tickDemand(world, catalogueOf(HOUSE));
@@ -97,8 +113,8 @@ describe('RCI poptávka', () => {
 
   it('práce obytnou poptávku vrátí do plusu', () => {
     const world = createWorld(1);
-    for (let i = 0; i < 6; i++) placeBuilding(world, HOUSE, 5 + i, 5);
-    for (let i = 0; i < 3; i++) placeBuilding(world, FACTORY, 5 + i, 8);
+    for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 5);
+    for (let i = 0; i < 3; i++) place(world, FACTORY, 5 + i, 8);
 
     tickDemand(world, catalogueOf(HOUSE, FACTORY));
 
@@ -109,13 +125,13 @@ describe('RCI poptávka', () => {
 
   it('obchody sytí poptávku po obchodech', () => {
     const world = createWorld(1);
-    for (let i = 0; i < 6; i++) placeBuilding(world, HOUSE, 5 + i, 5);
+    for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 5);
 
     tickDemand(world, catalogueOf(HOUSE, SHOP));
     const bezObchodu = world.demand.commercial;
     expect(bezObchodu).toBeGreaterThan(0);
 
-    placeBuilding(world, SHOP, 5, 8);
+    place(world, SHOP, 5, 8);
     tickDemand(world, catalogueOf(HOUSE, SHOP));
 
     expect(world.demand.commercial).toBeLessThan(bezObchodu);
@@ -138,7 +154,7 @@ describe('poptávka řídí růst', () => {
     expect(world.buildings.size).toBe(0);
 
     // Přistěhuj lidi ručně a průmysl se rozjede.
-    for (let i = 0; i < 6; i++) placeBuilding(world, HOUSE, 5 + i, 8);
+    for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 8);
     for (let tick = 0; tick < 200; tick++) {
       tickWorld(world, [demand, growth]);
     }
@@ -151,7 +167,7 @@ describe('měsíční rozpočet', () => {
   it('vybere daň z populace a zaplatí údržbu', () => {
     const catalogue = catalogueOf(HOUSE);
     const world = createWorld(1);
-    placeBuilding(world, HOUSE, 5, 5);
+    place(world, HOUSE, 5, 5);
 
     tickMonth(world, catalogue);
 
@@ -164,7 +180,7 @@ describe('měsíční rozpočet', () => {
   it('nedaní infrastrukturu, ale její údržbu platí', () => {
     const catalogue = catalogueOf(MONUMENT);
     const world = createWorld(1);
-    placeBuilding(world, MONUMENT, 5, 5);
+    place(world, MONUMENT, 5, 5);
 
     tickMonth(world, catalogue);
 
@@ -176,7 +192,7 @@ describe('měsíční rozpočet', () => {
   it('u neobytné budovy daní pracovní místa', () => {
     const catalogue = catalogueOf(FACTORY);
     const world = createWorld(1);
-    placeBuilding(world, FACTORY, 5, 5);
+    place(world, FACTORY, 5, 5);
 
     tickMonth(world, catalogue);
 
@@ -187,7 +203,7 @@ describe('měsíční rozpočet', () => {
   it('vyšší sazba znamená vyšší příjem', () => {
     const catalogue = catalogueOf(HOUSE);
     const world = createWorld(1);
-    placeBuilding(world, HOUSE, 5, 5);
+    place(world, HOUSE, 5, 5);
     setTaxRate(world, ZONE.residential, 14);
 
     tickMonth(world, catalogue);
@@ -198,7 +214,7 @@ describe('měsíční rozpočet', () => {
   it('proběhne jen raz za 30 tiků', () => {
     const catalogue = catalogueOf(HOUSE);
     const world = createWorld(1);
-    placeBuilding(world, HOUSE, 5, 5);
+    place(world, HOUSE, 5, 5);
     const economy = createEconomySystem(catalogue);
 
     for (let i = 0; i < 29; i++) tickWorld(world, [economy]);
@@ -262,7 +278,7 @@ describe('bankrot', () => {
     const catalogue = catalogueOf(MONUMENT);
     const world = createWorld(1);
     world.economy.funds = 100;
-    placeBuilding(world, MONUMENT, 5, 5);
+    place(world, MONUMENT, 5, 5);
 
     tickMonth(world, catalogue);
 
@@ -296,5 +312,77 @@ describe('stavba za peníze', () => {
 
     expect(world.buildings.size).toBe(0);
     expect(world.economy.funds).toBe(3999);
+  });
+});
+
+describe('důsledek elektřiny', () => {
+  it('budova bez proudu nedaní a nefiguruje ani ve výdajích', () => {
+    const catalogue = catalogueOf(HOUSE);
+    const world = createWorld(1);
+    place(world, HOUSE, 5, 5, false);
+
+    tickMonth(world, catalogue);
+
+    expect(world.economy.lastIncome).toBe(0);
+    expect(world.economy.lastExpenses).toBe(0);
+    expect(world.economy.funds).toBe(STARTING_FUNDS);
+  });
+
+  it('město bez elektrárny nespadne do mínusu, jen nevydělává', () => {
+    // Kdyby temné budovy platily údržbu, město by se dostalo do mínusu
+    // a na elektrárnu by pak nikdy nevydělalo — past bez východiska.
+    const catalogue = catalogueOf(HOUSE, FACTORY);
+    const world = createWorld(1);
+    for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 5, false);
+    for (let i = 0; i < 3; i++) place(world, FACTORY, 5 + i, 8, false);
+
+    for (let month = 0; month < 12; month++) tickMonth(world, catalogue);
+
+    expect(world.economy.funds).toBe(STARTING_FUNDS);
+  });
+
+  it('připojení k proudu rozjede daně (§13 krok 7)', () => {
+    const catalogue = catalogueOf(HOUSE);
+    const world = createWorld(1);
+    const houses = [0, 1, 2].map((i) => placeBuilding(world, HOUSE, 5 + i, 5));
+
+    tickMonth(world, catalogue);
+    expect(world.economy.lastIncome).toBe(0);
+
+    for (const house of houses) house.powered = true;
+    tickMonth(world, catalogue);
+
+    // 3 domy × 8 obyvatel × 40 × 7 % = 67
+    expect(world.economy.lastIncome).toBe(66);
+    expect(world.economy.lastExpenses).toBe(30);
+  });
+
+  it('poptávku sytí i budovy bez proudu, jinak by hráč stavěl další a další', () => {
+    const catalogue = catalogueOf(HOUSE, FACTORY);
+    const world = createWorld(1);
+    for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 5, false);
+    for (let i = 0; i < 3; i++) place(world, FACTORY, 5 + i, 8, false);
+
+    tickDemand(world, catalogue);
+
+    expect(world.demand.industrial).toBeLessThan(0);
+  });
+
+  it('elektrárna utáhne jen omezený počet budov a fabrika žere víc než dům', async () => {
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const house = content.get('vanilla:residential_small');
+    const shop = content.get('vanilla:commercial_small');
+    const factory = content.get('vanilla:industrial_small');
+    const plant = content.get('vanilla:coal_power_plant');
+
+    expect(house?.power?.consumption).toBeLessThan(shop?.power?.consumption ?? 0);
+    expect(shop?.power?.consumption).toBeLessThan(factory?.power?.consumption ?? 0);
+
+    // Jedna elektrárna uživí desítky domů, ale řádově míň fabrik.
+    const production = plant?.power?.production ?? 0;
+    expect(Math.floor(production / (house?.power?.consumption ?? 1))).toBe(60);
+    expect(Math.floor(production / (factory?.power?.consumption ?? 1))).toBe(20);
   });
 });

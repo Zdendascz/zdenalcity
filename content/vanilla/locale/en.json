@@ -49,6 +49,8 @@
   "ui.save.failed": "Save could not be read: {reason}",
   "ui.save.missingContent": "Missing content: {list}",
 
+  "ui.cost.spent": "−{amount}",
+
   "ui.overlay.power": "Power overlay",
   "ui.language.label": "Language"
 }

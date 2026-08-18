@@ -247,8 +247,32 @@ Ověřeno (`npm run check`, 15 souborů / 181 testů) a v běžící hře:
 - chybějící překlad padá na angličtinu, úplně chybějící klíč se vypíše sám,
   aby byl při testování vidět
 
+- [x] Zásahy po T9 na žádost autora (šest bodů)
+
+1. **Odchylka od §6 u výšky kvádru schválena autorem** — `level × heightLevels × LEVEL_H` platí.
+2. **128 MB VRAM vyřešeno.** `RenderTexture` nahrazena retained `Graphics`;
+   chunkování i dirty tracking zůstávají. Změřeno v běžící hře: žádné textury,
+   render při plném oddálení **0,1 ms medián / 0,2 ms maximum** (dřív 0 / 0,1 ms).
+   Za desetinu milisekundy na snímek se ušetřilo prakticky celých 128 MB.
+3. **Elektřina má herní důsledek.** Spotřeba podle velikosti: dům 100,
+   obchod 150, továrna 300 proti výrobě 6 000 — jedna elektrárna uživí
+   60 domů, ale jen 20 továren. **Budova bez proudu nejede: nedaní a ani
+   nefiguruje ve výdajích.** Ověřeno v běžící hře: město o 49 budovách a
+   296 obyvatelích mělo bez elektrárny bilanci +0/−0, po první elektrárně
+   svítilo **43 z 50** budov s bilancí +1032/−755, po druhé **51 z 51**
+   s bilancí +1222/−1070.
+4. **Budovy se vizuálně oddělily** — kvádr je o 0,12 dlaždice menší než půdorys,
+   takže řada domů už není jeden souvislý hřeben.
+5. **Opraveno panování mezerníkem.** Rozbilo se to v T9: po kliknutí na tlačítko
+   HUDu mu zůstal fokus, takže mezerník spadl do větve, která HUD ignoruje.
+   Tlačítka teď po kliknutí fokus vrací a mezerník se řeší před kontrolou HUDu.
+   Ověřeno: tažení o 50/40 px při zoomu 0,25 posune kameru o −200/−160,
+   bez mezerníku o nic.
+6. **Bublina s cenou** vyskočí u kurzoru a do 1,4 s zmizí. Ověřeno: klik na
+   elektrárnu ukázal `−4 000` na pozici kurzoru a kasa šla z 20 000 na 16 000.
+
 ## Rozpracované
-_(nic — T9 uzavřeno)_
+_(nic)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -276,6 +300,12 @@ _(nic — T9 uzavřeno)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | **Chunk je retained `Graphics`, ne `RenderTexture`** — odchylka od §6 | Izometrické diamanty se zaklesávají, takže opsaný obdélník chunku měl 1024×512 px a 64 chunků zabralo 128 MB VRAM, z toho polovina průhledné plochy. `Graphics` se do GPU nahraje jednou a mezi překreslením se jen vykresluje, takže výkonový důvod chunkování platí dál — změřeno 0,1 ms na snímek při plném oddálení. Chunkování ani dirty tracking se neruší, mění se jen nosič. |
+| 2026-08-18 | **Budova bez proudu nedaní, ale ani nestojí údržbu** | První pokus nechal temným budovám údržbu. V běžící hře se ukázalo, že to vytváří past bez východiska: město bez elektrárny mělo nulový příjem a nenulové výdaje, spadlo z 20 000 na −33 325 a pak už na elektrárnu nikdy nevydělalo. Temná budova je proto mimo provoz úplně. |
+| 2026-08-18 | Poptávku sytí i budovy bez proudu | Kdyby nefunkční továrna poptávku po průmyslu nesnižovala, hráč by vedle ní stavěl další a další, všechny stejně temné. Poptávka počítá s tím, co ve městě stojí; proud rozhoduje o penězích, ne o urbanismu. |
+| 2026-08-18 | Kvádr budovy je o 0,12 dlaždice menší než půdorys | Bez odsazení splynuly sousedící domy 1×1 v jeden hřeben a nešlo poznat, kde končí jedna budova. Nula vrátí původní chování. |
+| 2026-08-18 | Cena bubliny se čte z rozdílu v kase, ne z definice | Bublina tak vyskočí u čehokoli, co kdy začne stát peníze, aniž by se do UI muselo sahat. Dnes stojí peníze jen ruční stavba; silnice a zóny jsou zdarma. |
+| 2026-08-18 | Tlačítka HUDu po kliknutí vracejí fokus | Jinak mezerník mačkal naposledy kliknuté tlačítko místo panování mapou. Mezerník se navíc vyhodnocuje před kontrolou, jestli událost přišla z HUDu. |
 | 2026-08-18 | **Texty UI jsou v locale souborech obsahu, ne v samostatných souborech hry** | §10 říká, že mody a DLC přidávají vlastní locale soubory, které se slévají do stejného registru. Kdyby měla hra vlastní kanál pro `ui.*` klíče, existovaly by dvě cesty k témuž a mod by nemohl přepsat text hry. Takhle je cesta jedna a pozdější zdroj smí text přepsat. |
 | 2026-08-18 | Popisek nástroje infrastruktury je `name` z definice | Tlačítko tak pojmenuje obsah, ne kód. Přidání budovy do JSONu rovnou přidá tlačítko s překladem, bez zásahu do UI. |
 | 2026-08-18 | Chybějící klíč se vypíše jako sám sebe | §10 to vyžaduje a je to záměr: prázdný text nebo tichý fallback na jiný jazyk by se v testování přehlédl, `ui.hud.funds` uprostřed panelu ne. |
@@ -357,11 +387,11 @@ _(nic — T9 uzavřeno)_
   kompaktní režim — panely na ikony a poptávku jen jako tři proužky.
 - **Město se dá pojmenovat jen v kódu.** Save ukládá `cityName: 'quicksave'`,
   protože dialog nové hry neexistuje. Formát na jméno připravený je.
-- **Elektřina zatím nemá herní důsledek, jen vizuální.** `building.powered` se
-  správně počítá, ale nic se podle něj neděje. V T6 jsem čekal, že to vyřeší T7
-  přes daně — nejde to, protože §13 řadí daně (krok 6) před elektrárnu (krok 7),
-  takže město by nikdy nevydělalo první korunu. **Je to otázka na T10:** má být
-  budova bez proudu bez daní, bez růstu, nebo má chátrat?
+- **Druhá elektrárna se dnes finančně nevyplatí.** Změřeno: s jednou byla
+  bilance +1032/−755 (čistých 277), se dvěma +1222/−1070 (čistých 152).
+  Rozsvícené budovy začnou platit údržbu a elektrárna má svých 200, takže
+  se dosvícení zbytku města prodělá. Je to balanc, tedy věc T10 — nabízí se
+  buď levnější provoz elektrárny, nebo vyšší daňový výnos.
 - **Zóna musí být tak hluboká jako footprint budovy, a hráč to nepozná.**
   `industrial_small` má footprint 2×2, takže v jednořadé zóně nevyroste nic —
   narazil jsem na to sám při ověřování T7 a chvíli hledal chybu v kódu, která
@@ -372,20 +402,11 @@ _(nic — T9 uzavřeno)_
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
   nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
   z nich pravděpodobně zmizí.
-- **Sousedící domy 1×1 splývají v jeden hřeben.** Kvádr zabírá přesně svůj
-  footprint, takže dvě budovy vedle sebe nemají mezi sebou mezeru a řada domů
-  vypadá jako dlouhá hradba. V SimCity 2000 se bloky slévají podobně, takže to
-  nemusí být vada — ale kdyby to vadilo, stačí kreslit kvádr o pár pixelů
-  zmenšený proti footprintu. Je to jeden řádek v `buildingRenderer.ts` a čeká
-  na rozhodnutí autora.
-- **Chunkované `RenderTexture` stojí 128 MB VRAM.** Změřeno v běžícím rendereru,
-  ne odhadnuto: 64 chunků × 1024×512 px × 4 B. Izometrické diamanty se do sebe
-  zaklesávají, takže opsaný obdélník chunku je zhruba dvakrát větší než plocha,
-  kterou dlaždice reálně pokryjí — polovina každé textury je průhledná.
-  Architektura §6 chunkování do `RenderTexture` předepisuje, takže jsem to tak
-  postavil, ale cena je vysoká. Možnosti, až to začne vadit: alokovat textury
-  jen pro viditelné chunky, nebo svázat jejich rozlišení s maximálním zoomem.
-  **Rozhodnutí patří autorovi.**
+- **Elektrárna se nevejde do zastavěné čtvrti a hra to neřekne.** Půdorys 4×4
+  potřebuje šestnáct volných dlaždic a jednu stranu u silnice; když to nevyjde,
+  klik prostě nic neudělá. Narazil jsem na to dvakrát za sebou při ověřování.
+  Souvisí to s tím samým, co u zóny mělké na footprint — chce to ukazovat obrys
+  a důvod odmítnutí.
 - Starý Node 20.11.1 zůstal nainstalovaný v `C:\Program Files\nodejs\`, jen už není
   v PATH. Reinstalace Node.js z MSI by ho tam vrátila a konflikt by se obnovil —
   příznaky a oprava v `docs/SETUP.md`.

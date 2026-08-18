@@ -17,6 +17,14 @@ export interface BuildingAppearance {
 export type AppearanceLookup = (definitionId: string) => BuildingAppearance | undefined;
 
 /**
+ * O kolik dlaždice se kvádr zmenší proti svému půdorysu, na každé straně.
+ *
+ * Bez odsazení se sousedící domy 1×1 slily v jeden dlouhý hřeben a nešlo poznat,
+ * kde končí jedna budova a začíná druhá. Nula vrátí původní chování.
+ */
+const BUILDING_INSET = 0.12;
+
+/**
  * Budovy se **nezapékají do chunků**: přesahují dlaždici do výšky i do stran
  * a musely by se ořezávat na hranici chunku. Každá je vlastní `Graphics`
  * a řadí se back-to-front podle `x + y`.
@@ -70,7 +78,13 @@ export class BuildingRenderer {
 
     const [width, depth] = appearance.footprint;
     const height = building.level * appearance.heightLevels * LEVEL_H;
-    const faces = cuboidFaces(building.x, building.y, width, depth, height);
+    const faces = cuboidFaces(
+      building.x + BUILDING_INSET,
+      building.y + BUILDING_INSET,
+      width - BUILDING_INSET * 2,
+      depth - BUILDING_INSET * 2,
+      height,
+    );
 
     view.clear();
     view

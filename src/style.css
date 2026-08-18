@@ -287,6 +287,41 @@ body {
   font-size: 10px;
 }
 
+/* --- bublina s cenou ---------------------------------------------------- */
+
+.cost-popup {
+  position: absolute;
+  z-index: 20;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 72%);
+  color: #ff9d8a;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  animation: cost-float 1400ms ease-out forwards;
+}
+
+@keyframes cost-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -70%);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -190%);
+  }
+}
+
 /* --- ladicí výpis ------------------------------------------------------- */
 
 .debug-overlay {
