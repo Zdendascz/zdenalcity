@@ -29,6 +29,12 @@ export interface Building {
    * a dolů každý běh systému úrovní.
    */
   levelChangedAtTick: number;
+  /**
+   * Opuštěná budova: stojí, ale nic nedělá. Nedaní, nestojí údržbu, nemá
+   * obyvatele ani práci a přispívá do kriminality. **Sama nezmizí** — hráč ji
+   * musí zbourat (§8 zadání fáze 2).
+   */
+  abandoned: boolean;
 }
 
 export const MIN_TAX_RATE = 0;
@@ -115,6 +121,16 @@ export interface WorldState {
   coverageDirty: boolean;
 
   /**
+   * Kolikrát po sobě vyšla budově cena půdy pod prahem její úrovně.
+   *
+   * **Neukládá se.** Je to jen hystereze proti kmitání na hranici prahu; po
+   * načtení savu se počítá znovu, takže se snížení nanejvýš o pár vyhodnocení
+   * odloží. Uložený stav by naopak musel držet krok s obsahem, který se mezi
+   * savem a načtením mohl změnit.
+   */
+  downgradeStreak: Map<number, number>;
+
+  /**
    * Změnila se od posledního přepočtu topologie elektrické sítě?
    * `powerSystem` běží každý tik, ale flood fill pouští jen při tomhle flagu (§5).
    * Runtime-only — po loadu se síť přepočítá znovu.
@@ -154,6 +170,7 @@ export function createWorld(
     coverage: new Map(),
     serviceFunding: new Map(),
     coverageDirty: false,
+    downgradeStreak: new Map(),
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
   };
 }
@@ -196,6 +213,7 @@ export function markBuildingDirty(world: WorldState, buildingId: number): void {
  */
 export function removeBuilding(world: WorldState, buildingId: number): boolean {
   if (!world.buildings.delete(buildingId)) return false;
+  world.downgradeStreak.delete(buildingId);
 
   const layer = world.layers.buildingId;
   for (let tile = 0; tile < layer.length; tile++) {

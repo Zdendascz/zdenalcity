@@ -4,11 +4,12 @@ import { ContentRegistry } from '@/content/registry';
 import type { Definition } from '@/content/schema';
 import { placeBuilding } from '@/sim/buildings';
 import type { BuildingCatalogue } from '@/sim/catalogue';
-import { buildRoad, zoneArea } from '@/sim/commands';
-import { coarseIndex } from '@/sim/coarse';
+import { buildRoad, bulldoze, zoneArea } from '@/sim/commands';
+import { COARSE_CELLS, coarseIndex } from '@/sim/coarse';
 import { index, ZONE } from '@/sim/layers';
 import { definitionsFor, pickDefinition, seedDefinitions, tryUpgrade } from '@/sim/levels';
-import { createGrowthSystem, createLevelSystem } from '@/sim/systems';
+import { createCrimeSystem, createGrowthSystem, createHealthSystem, createLevelSystem } from '@/sim/systems';
+import { computeBudget } from '@/sim/systems/economy';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { Building, WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
@@ -46,7 +47,9 @@ const ROW_L2 = definition('row_l2', 'residential', [2, 1], 2, 28);
 const BLOCK = definition('block', 'residential', [2, 2], 1, 32);
 const SHOP = definition('shop', 'commercial', [1, 1], 1, 6);
 
-const LADDER = [HOUSE, HOUSE_L2, ROW, ROW_L2, BLOCK, SHOP];
+const TOWER = definition('tower', 'residential', [2, 2], 3, 64);
+
+const LADDER = [HOUSE, HOUSE_L2, ROW, ROW_L2, BLOCK, TOWER, SHOP];
 
 function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
   return {
@@ -317,6 +320,202 @@ describe('systém úrovní', () => {
     for (let i = 0; i < utilities.interval * 2; i++) tickWorld(world, [utilities]);
 
     expect(building.definitionId).toBe(service.id);
+  });
+});
+
+describe('snížení a opuštění', () => {
+  const catalogue = catalogueOf(...LADDER);
+  const balance = VANILLA_BALANCE;
+  const levels = createLevelSystem(catalogue, balance);
+
+  /** Cena půdy, při které budova dané úrovně padá pod práh i s hysterezí. */
+  function belowFloor(level: number): number {
+    return Math.max(0, (balance.levels.thresholds[level] ?? 0) - balance.levels.hysteresis - 1);
+  }
+
+  /** Odtiká cooldown a k tomu tolik vyhodnocení, kolik snížení potřebuje. */
+  function run(world: WorldState, evaluations = balance.levels.downgradeConfirm): void {
+    const ticks = balance.levels.cooldown + levels.interval * (evaluations + 1);
+    for (let i = 0; i < ticks; i++) tickWorld(world, [levels]);
+  }
+
+  it('jeden výkyv budovu neshodí, teprve několik za sebou', () => {
+    const world = zonedWorld();
+    const building = placeBuilding(world, HOUSE_L2, 6, 6);
+    setLandValue(world, 6, 6, belowFloor(2));
+
+    // O jedno vyhodnocení míň, než kolik potvrzení vyžaduje.
+    run(world, balance.levels.downgradeConfirm - 2);
+    expect(building.definitionId).toBe(HOUSE_L2.id);
+
+    run(world);
+    expect(building.definitionId).toBe(HOUSE.id);
+    expect(building.level).toBe(1);
+  });
+
+  it('hystereze drží budovu těsně pod prahem', () => {
+    const world = zonedWorld();
+    const building = placeBuilding(world, HOUSE_L2, 6, 6);
+    // Pod prahem úrovně 2, ale ne o víc než hystereze.
+    setLandValue(world, 6, 6, (balance.levels.thresholds[2] ?? 0) - 1);
+
+    run(world);
+
+    expect(building.definitionId).toBe(HOUSE_L2.id);
+  });
+
+  it('bez definice pro stejný půdorys se budova scvrkne a uvolní parcely', () => {
+    const world = zonedWorld();
+    const building = placeBuilding(world, TOWER, 6, 6);
+    setLandValue(world, 6, 6, belowFloor(3));
+
+    run(world);
+
+    // Pro 2×2 na úrovni 2 definice není, takže zbyde největší, co se vejde.
+    expect(building.definitionId).toBe(ROW_L2.id);
+    expect(at(world, 6, 6)?.id).toBe(building.id);
+    expect(at(world, 7, 6)?.id).toBe(building.id);
+    // Uvolněné dlaždice zůstanou prázdné, ale pořád zónované.
+    expect(at(world, 6, 7)).toBeUndefined();
+    expect(world.layers.zone[index(6, 7)]).toBe(ZONE.residential);
+  });
+
+  it('pod úrovní 1 budova zůstane stát jako ruina', () => {
+    const world = zonedWorld();
+    const building = placeBuilding(world, HOUSE, 6, 6);
+    setLandValue(world, 6, 6, belowFloor(1));
+    // Práh úrovně 1 je nula, takže sama o sobě cena půdy dům nesloží.
+    // Ruinu z něj udělá až zanedbanost: starý dům v neobsloužené buňce.
+    world.tick = balance.levels.decayAge + 1;
+
+    run(world);
+
+    expect(building.abandoned).toBe(true);
+    expect(building.population).toBe(0);
+    expect(building.jobs).toBe(0);
+    // Stojí dál — hráč ji musí zbourat.
+    expect(world.buildings.has(building.id)).toBe(true);
+    expect(at(world, 6, 6)?.id).toBe(building.id);
+  });
+
+  it('ruina se dál nepovyšuje ani nesnižuje', () => {
+    const world = zonedWorld();
+    const building = placeBuilding(world, HOUSE, 6, 6);
+    building.abandoned = true;
+    setLandValue(world, 6, 6, 255);
+
+    run(world);
+
+    expect(building.definitionId).toBe(HOUSE.id);
+    expect(building.abandoned).toBe(true);
+  });
+
+  it('rostoucí soused ruinu nepohltí — uklidit ji musí hráč', () => {
+    const world = zonedWorld();
+    const upper = placeBuilding(world, HOUSE_L2, 6, 6);
+    const ruin = placeBuilding(world, HOUSE, 7, 6);
+    ruin.abandoned = true;
+
+    tryUpgrade(world, catalogue, upper);
+
+    expect(world.buildings.has(ruin.id)).toBe(true);
+    expect(upper.x).toBe(5); // uhnul doleva
+  });
+
+  it('zbourat ruinu jde', () => {
+    const world = zonedWorld();
+    const building = placeBuilding(world, HOUSE, 6, 6);
+    building.abandoned = true;
+
+    expect(bulldoze(world, 6, 6).ok).toBe(true);
+    expect(world.buildings.has(building.id)).toBe(false);
+  });
+
+  it('stará budova v neobsloužené buňce chátrá, mladá ne', () => {
+    const landValue = (balance.levels.thresholds[2] ?? 0) - balance.levels.hysteresis + 1;
+
+    const young = zonedWorld();
+    const youngBuilding = placeBuilding(young, HOUSE_L2, 6, 6);
+    setLandValue(young, 6, 6, landValue);
+    run(young);
+    expect(youngBuilding.definitionId).toBe(HOUSE_L2.id);
+
+    const old = zonedWorld();
+    old.tick = balance.levels.decayAge + 1;
+    const oldBuilding = placeBuilding(old, HOUSE_L2, 6, 6);
+    oldBuilding.builtAtTick = 0; // stojí od začátku hry
+    setLandValue(old, 6, 6, landValue);
+    run(old);
+
+    // Stejná cena půdy, jiný osud: penalizace za zanedbanost ji stlačí pod práh.
+    expect(oldBuilding.definitionId).toBe(HOUSE.id);
+  });
+
+  it('obsloužená čtvrť nechátrá, ani když je stará', () => {
+    const world = zonedWorld();
+    world.tick = balance.levels.decayAge + 1;
+    const building = placeBuilding(world, HOUSE_L2, 6, 6);
+    building.builtAtTick = 0;
+    setLandValue(world, 6, 6, (balance.levels.thresholds[2] ?? 0) - balance.levels.hysteresis + 1);
+
+    // Plné pokrytí jediné třídy, kterou město má.
+    world.coverage.set('police', new Uint8Array(COARSE_CELLS).fill(255));
+
+    run(world);
+
+    expect(building.definitionId).toBe(HOUSE_L2.id);
+  });
+});
+
+describe('důsledky opuštění', () => {
+  const catalogue = catalogueOf(...LADDER);
+  const balance = VANILLA_BALANCE;
+
+  it('ruina nedaní a nestojí údržbu', () => {
+    const world = zonedWorld();
+    const building = placeBuilding(world, HOUSE, 6, 6);
+    building.powered = true;
+
+    const before = computeBudget(world, catalogue, balance);
+    expect(before.income).toBeGreaterThan(0);
+
+    // Populace se schválně nenuluje: rozpočet musí ruinu vynechat sám o sobě,
+    // ne jen proto, že v ní náhodou nikdo nebydlí.
+    building.abandoned = true;
+    const after = computeBudget(world, catalogue, balance);
+
+    expect(after.income).toBe(0);
+    expect(after.expenses).toBe(0);
+    expect(after.lines[0]?.upkeepCount).toBe(0);
+  });
+
+  it('ruina zvedá kriminalitu', () => {
+    const clean = zonedWorld();
+    const dirty = zonedWorld();
+    const ruin = placeBuilding(dirty, HOUSE, 6, 6);
+    ruin.abandoned = true;
+
+    const crime = createCrimeSystem(balance);
+    for (let i = 0; i < crime.interval * 4; i++) {
+      tickWorld(clean, [crime]);
+      tickWorld(dirty, [crime]);
+    }
+
+    const cell = coarseIndex(6, 6);
+    expect(dirty.coarse.crime[cell] ?? 0).toBeGreaterThan(clean.coarse.crime[cell] ?? 0);
+  });
+
+  it('do ruiny se nikdo nenastěhuje zpátky', () => {
+    const world = zonedWorld();
+    const building = placeBuilding(world, HOUSE, 6, 6);
+    building.abandoned = true;
+    building.population = 0;
+    world.coverage.set('health', new Uint8Array(COARSE_CELLS).fill(255));
+
+    const health = createHealthSystem(catalogue, balance);
+    for (let i = 0; i < health.interval * 4; i++) tickWorld(world, [health]);
+
+    expect(building.population).toBe(0);
   });
 });
 

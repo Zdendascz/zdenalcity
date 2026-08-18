@@ -52,7 +52,8 @@
     "cooldown": 60,
     "downgradeConfirm": 3,
     "decayAge": 3600,
-    "decayCoverageThreshold": 20
+    "decayCoverageThreshold": 20,
+    "decayPenalty": 25
   },
 
   "growth": {

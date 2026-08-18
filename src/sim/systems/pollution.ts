@@ -32,6 +32,9 @@ export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Bal
       let wasteCapacity = 0;
 
       for (const building of world.buildings.values()) {
+        // Opuštěná budova nevyrábí, netopí ani neodváží odpad — nekouří,
+        // ale ani nic nezpracuje.
+        if (building.abandoned) continue;
         population += building.population;
 
         const definition = catalogue.get(building.definitionId);

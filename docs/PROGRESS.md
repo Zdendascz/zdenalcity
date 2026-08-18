@@ -491,8 +491,46 @@ Save v1 `levelChangedAtTick` nenese — podle §11 se při migraci nuluje a ukl�
 ho začne formát v2 v T20. Round-trip test to pojmenovává, ať se ztráta nerozšíří
 tiše na další pole.
 
+- [x] T17 — snížení úrovně, chátrání, opuštěné budovy (fáze 2)
+
+Vzniklo:
+- snížení a opuštění v `src/sim/levels.ts`, vyhodnocení v `systems/levels.ts`
+- `abandoned` na entitě a `downgradeStreak` ve světě (runtime, do savu nepatří)
+- `levels.decayPenalty` v balancu — **doplněk zadání**, které chátrání věkem
+  popisuje, ale výši penalizace neurčuje
+
+Jak to funguje:
+- budova klesne, když cena půdy spadne pod `thresholds[L] − hysteresis`, a to
+  **třikrát po sobě**. Jednorázový výkyv ji shodit nesmí
+- snížení hledá definici pro `L−1` se stejným půdorysem; když není, vezme
+  největší menší a uvolněné dlaždice vrátí jako prázdné zónované parcely
+- pod úrovní 1 je opuštění. Ruina **stojí dál**: nedaní, nestojí údržbu, nemá
+  obyvatele ani práci, nekouří, nebere proud — ale zvedá kriminalitu a přes ni
+  sráží cenu půdy v okolí. Zbourat ji musí hráč
+- rostoucí soused ji **nepohltí**. Kdyby ji uklidil, přestala by být problémem
+- chátrání věkem se počítá jen při podfinancování: budova starší než `decayAge`
+  v buňce, kde je průměrné pokrytí pod prahem, dostane penalizaci k efektivní
+  ceně půdy. Plně obsloužená budova nechátrá nikdy
+- opuštěná budova sráží cenu půdy **přes kriminalitu**, ne vlastním kanálem —
+  ten by znamenal čtvrtou hrubou vrstvu a ta se do savu podle §11 nevejde
+
+Opravena i výška budov: kreslila se jako `úroveň × heightLevels`, takže by
+věžák úrovně 3 měl patnáct pater. Výšku určuje definice, úroveň už je v ní.
+
+Ověřeno ve hře (§13 kroky 6 a 7): čtvrť s parky, policií a klinikou vyrostla na
+`residential_terrace` při ceně půdy 118–149. Po zbourání služeb a čtyřech
+skládkách u silnice spadla cena půdy na nulu, budovy klesly zpátky na
+`residential_row` a po překročení věku chátrání jich 21 zůstalo stát jako ruiny:
+populace 0, příjem 0, kriminalita v místě 90 proti nule předtím. Renderer je
+kreslí `#6a6a6a` s pravidelnými stěnami 70 % a 50 %, buldozer je odstraní.
+
+Testy: 35 v `tests/levels.test.ts`. Že koušou, ověřeno rozbitím: bez penalizace
+za zanedbanost padnou dva, bez potvrzování snížení jeden, bez vynechání ruiny
+v rozpočtu jeden.
+
 ## Rozpracované
-_(nic — T16 uzavřeno, dál T17: snížení úrovně, chátrání, opuštěné budovy)_
+_(nic — T17 uzavřeno, dál T18: přepis růstu — skóre parcely, dosah silnice,
+faktor daně, poptávka jako rychlost)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

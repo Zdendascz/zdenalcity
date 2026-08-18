@@ -18,7 +18,10 @@ import type { System } from './index';
  * nízká cena půdy plodila kriminalitu a kriminalita srážela cenu půdy, každá
  * čtvrť, která jednou klesne, už by se nikdy nezvedla.
  *
- * Opuštěné budovy do vzorce přibudou v T17, do té doby žádné neexistují.
+ * Opuštěná budova je zdroj sama o sobě: ruina táhne čtvrť dolů bez ohledu na
+ * to, kolik v ní kdysi bydlelo lidí. Cenu půdy sráží právě přes kriminalitu —
+ * vlastní kanál by znamenal další hrubou vrstvu a ta se do savu podle §11
+ * nevejde.
  *
  * Konstanty jdou z `balance.json` (§10).
  */
@@ -30,17 +33,23 @@ export function createCrimeSystem(balance: Balance): System {
     offset: 11,
     run(world: WorldState) {
       const density = new Float32Array(COARSE_SIZE * COARSE_SIZE);
+      const ruins = new Float32Array(COARSE_SIZE * COARSE_SIZE);
       let population = 0;
       let jobs = 0;
 
       // Hustota populace se počítá při stejném průchodu — vlastní vrstva
       // pro ni nevzniká.
       for (const building of world.buildings.values()) {
+        const at = coarseIndex(building.x, building.y);
+        if (building.abandoned) {
+          ruins[at] = (ruins[at] ?? 0) + 1;
+          continue;
+        }
+
         population += building.population;
         jobs += building.jobs;
         if (building.population === 0) continue;
 
-        const at = coarseIndex(building.x, building.y);
         density[at] = (density[at] ?? 0) + building.population;
       }
 
@@ -57,6 +66,7 @@ export function createCrimeSystem(balance: Balance): System {
       for (let cell = 0; cell < crime.length; cell++) {
         const raw =
           (density[cell] ?? 0) * balance.crime.population +
+          (ruins[cell] ?? 0) * balance.crime.abandoned +
           unemploymentTerm -
           (police?.[cell] ?? 0) * balance.crime.police;
 

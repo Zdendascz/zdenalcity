@@ -118,7 +118,9 @@ function distributeCapacity(
     const connected = isConnected(world, building.x, building.y, definition?.footprint);
 
     let powered = false;
-    if (connected) {
+    // Ruina proud nebere a ani se za připojenou nepovažuje — jinak by prázdné
+    // domy ukrajovaly kapacitu živým. Vodičem přes pozemek zůstává.
+    if (connected && !building.abandoned) {
       if (consumption === 0) {
         powered = true; // elektrárny a budovy bez spotřeby
       } else if (remaining >= consumption) {

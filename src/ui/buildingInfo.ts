@@ -53,6 +53,7 @@ export class BuildingInfo {
     const rows: [string, string][] = [
       ['ui.info.position', `${building.x}, ${building.y}`],
       ['ui.info.footprint', `${definition.footprint[0]} × ${definition.footprint[1]}`],
+      ['ui.info.level', String(building.level)],
       ['ui.info.built', t('ui.hud.date', dateParts(building.builtAtTick))],
       ['ui.info.cost', formatNumber(definition.construction.cost)],
     ];
@@ -86,7 +87,9 @@ export class BuildingInfo {
     }
     this.root.appendChild(list);
 
-    if (!building.powered && consumption > 0) {
+    if (building.abandoned) {
+      this.root.appendChild(el('p', 'sheet__warning', t('ui.info.abandonedWarning')));
+    } else if (!building.powered && consumption > 0) {
       this.root.appendChild(el('p', 'sheet__warning', t('ui.info.noPowerWarning')));
     }
   }

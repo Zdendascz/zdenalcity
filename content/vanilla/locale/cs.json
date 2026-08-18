@@ -128,6 +128,7 @@
 
   "ui.info.position": "Pozice",
   "ui.info.footprint": "Půdorys",
+  "ui.info.level": "Úroveň",
   "ui.info.built": "Postaveno",
   "ui.info.cost": "Pořizovací cena",
   "ui.info.powerProduction": "Výroba elektřiny",
@@ -140,6 +141,7 @@
   "ui.info.monthlyNet": "Čistě za měsíc",
   "ui.info.pollution": "Znečištění",
   "ui.info.unknownDefinition": "Tuhle budovu neumí žádný načtený obsah popsat — nejspíš chybí mod.",
+  "ui.info.abandonedWarning": "Budova je opuštěná. Nic nevydělává, nic nestojí a kazí okolí — sama nezmizí, musíš ji zbourat.",
   "ui.info.noPowerWarning": "Bez proudu je budova mimo provoz: nevydělává, ale ani nic nestojí.",
 
   "error.outOfBounds": "Mimo mapu.",

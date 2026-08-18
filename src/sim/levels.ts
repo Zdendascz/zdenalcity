@@ -109,7 +109,7 @@ export function tryUpgrade(
   building: Building,
 ): boolean {
   const definition = catalogue.get(building.definitionId);
-  if (!definition) return false;
+  if (!definition || building.abandoned) return false;
 
   const widen = planWiden(world, catalogue, definition, building);
   const upgrade = widen ?? planTaller(world, catalogue, definition, building);
@@ -188,6 +188,9 @@ function claimable(
       const neighbour = world.buildings.get(occupant);
       const neighbourDefinition = neighbour && catalogue.get(neighbour.definitionId);
       if (!neighbour || !neighbourDefinition) return null;
+      // Opuštěnou budovu musí zbourat hráč (§8). Kdyby ji pohltil rostoucí
+      // soused, uklidila by se sama a z ruiny by přestal být problém.
+      if (neighbour.abandoned) return null;
       if (neighbourDefinition.category !== candidate.category) return null;
       if (neighbour.level >= building.level) return null;
 
@@ -216,6 +219,85 @@ function planTaller(
     building.level + 1,
   );
   return taller ? { definition: taller, x: building.x, y: building.y, absorbed: [] } : null;
+}
+
+/**
+ * Sníží budovu o úroveň. Vrací `true`, když se něco stalo.
+ *
+ * Hledá definici pro `L − 1` se **stejným půdorysem**; když neexistuje, spokojí
+ * se s menším a uvolněné dlaždice vrátí jako prázdné zónované parcely. Pod
+ * úrovní 1 nastává opuštění (§8).
+ */
+export function tryDowngrade(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  building: Building,
+): boolean {
+  const definition = catalogue.get(building.definitionId);
+  if (!definition || building.abandoned) return false;
+
+  const lower = building.level - 1;
+  if (lower < 1) {
+    abandon(world, building);
+    return true;
+  }
+
+  const [width, depth] = definition.footprint;
+  const smaller = pickShrunk(world, catalogue, definition.category, width, depth, lower);
+  if (!smaller) return false;
+
+  apply(world, definition, building, {
+    definition: smaller,
+    x: building.x,
+    y: building.y,
+    absorbed: [],
+  });
+  return true;
+}
+
+/**
+ * Největší definice úrovně `level`, která se vejde do stávajícího půdorysu.
+ *
+ * Stejný půdorys má přednost — teprve když pro nižší úroveň neexistuje, budova
+ * se scvrkne a zbytek parcely se uvolní.
+ */
+function pickShrunk(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  category: string,
+  width: number,
+  depth: number,
+  level: number,
+): Definition | undefined {
+  const fitting = catalogue
+    .byCategory(category)
+    .filter(
+      (candidate) =>
+        candidate.level === level &&
+        candidate.footprint[0] <= width &&
+        candidate.footprint[1] <= depth,
+    );
+  if (fitting.length === 0) return undefined;
+
+  const largest = fitting.reduce((max, candidate) => Math.max(max, area(candidate)), 0);
+  const options = fitting.filter((candidate) => area(candidate) === largest);
+  return options[world.rng.int(options.length)];
+}
+
+/**
+ * Opuštění. Budova zůstane stát i s půdorysem, ale přestane městu sloužit.
+ *
+ * Definice se nemění: ruina je pořád ten dům, jen prázdný. Renderer si ji
+ * podle příznaku vykreslí jinak, ekonomika ji přeskočí a kriminalita ji
+ * započítá.
+ */
+function abandon(world: WorldState, building: Building): void {
+  building.abandoned = true;
+  building.population = 0;
+  building.jobs = 0;
+  building.levelChangedAtTick = world.tick;
+  markBuildingDirty(world, building.id);
+  markPowerNetworkDirty(world); // prázdná budova přestává být spotřebičem
 }
 
 /**

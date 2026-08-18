@@ -128,6 +128,7 @@
 
   "ui.info.position": "Position",
   "ui.info.footprint": "Footprint",
+  "ui.info.level": "Level",
   "ui.info.built": "Built",
   "ui.info.cost": "Construction cost",
   "ui.info.powerProduction": "Power production",
@@ -140,6 +141,7 @@
   "ui.info.monthlyNet": "Monthly net",
   "ui.info.pollution": "Pollution",
   "ui.info.unknownDefinition": "No loaded content describes this building — a mod is probably missing.",
+  "ui.info.abandonedWarning": "This building is abandoned. It earns nothing, costs nothing and drags the area down — it will not go away on its own, you have to bulldoze it.",
   "ui.info.noPowerWarning": "Without power the building is idle: it earns nothing and costs nothing.",
 
   "error.outOfBounds": "Outside the map.",

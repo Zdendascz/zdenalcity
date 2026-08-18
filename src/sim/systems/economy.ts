@@ -78,7 +78,7 @@ export function buildingMonthlyTax(
   balance: Balance,
 ): number {
   const category = definition.category;
-  if (!isRciCategory(category) || !building.powered) return 0;
+  if (!isRciCategory(category) || !building.powered || building.abandoned) return 0;
 
   const taxable = category === 'residential' ? building.population : building.jobs;
   return taxFrom(taxable, world.economy.taxRates[category], balance.economy.taxableValuePerUnit);
@@ -96,6 +96,7 @@ export function buildingMonthlyUpkeep(
   definition: Definition,
   building: Building,
 ): number {
+  if (building.abandoned) return 0; // ruina nikoho nestojí, jen kazí okolí
   if (isRciCategory(definition.category) && !building.powered) return 0;
 
   const serviceClass = definition.service?.class;
@@ -124,8 +125,8 @@ export function computeBudget(
 
     const category = definition.category;
     const taxedAs = isRciCategory(category) ? category : null;
-    /** Temná budova je mimo provoz: nedaní a neplatí údržbu. */
-    const operating = taxedAs === null || building.powered;
+    /** Temná i opuštěná budova je mimo provoz: nedaní a neplatí údržbu. */
+    const operating = !building.abandoned && (taxedAs === null || building.powered);
 
     let line = byDefinition.get(definition.id);
     if (!line) {

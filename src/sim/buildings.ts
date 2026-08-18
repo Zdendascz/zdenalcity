@@ -138,6 +138,7 @@ export function placeBuilding(
     powered: false, // dořeší powerSystem v nejbližším tiku
     builtAtTick: world.tick,
     levelChangedAtTick: world.tick,
+    abandoned: false,
   };
 
   world.buildings.set(building.id, building);

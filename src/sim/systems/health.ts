@@ -35,6 +35,7 @@ export function createHealthSystem(catalogue: BuildingCatalogue, balance: Balanc
       const coverage = coverageOf(world, 'health');
 
       for (const building of world.buildings.values()) {
+        if (building.abandoned) continue; // do ruiny se nikdo nenastěhuje
         const capacity = catalogue.get(building.definitionId)?.population?.capacity ?? 0;
         if (capacity === 0) continue;
 

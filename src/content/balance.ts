@@ -59,6 +59,11 @@ export interface Balance {
     downgradeConfirm: number;
     decayAge: number;
     decayCoverageThreshold: number;
+    /**
+     * O kolik klesne efektivní cena půdy staré budovy v nedostatečně obsloužené
+     * buňce. Doplněk zadání — to chátrání věkem popisuje, ale výši neurčuje.
+     */
+    decayPenalty: number;
   };
 
   /** Čte se od T18 (přepis růstu). */
@@ -221,6 +226,7 @@ export function validateBalance(raw: unknown): {
         0,
         255,
       ),
+      decayPenalty: num(issues, levels, 'decayPenalty', 'levels.decayPenalty', 0, 255),
     },
     growth: {
       exponent: num(issues, growth, 'exponent', 'growth.exponent', 0, 10),

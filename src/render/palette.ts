@@ -64,6 +64,12 @@ export const HOVER_LINE_ALPHA = 0.9;
 /** Půdorys, kam se stavba nevejde. */
 export const HOVER_BLOCKED_COLOR = 0xff6b52;
 
+/**
+ * Opuštěná budova. Šedý kvádr snížený na jednu úroveň (§8 zadání fáze 2) —
+ * ruinu musí být poznat na první pohled, ne až z detailu.
+ */
+export const ABANDONED_COLOR = 0x6a6a6a;
+
 /** Symbol na střeše budovy. Světlé budovy dostanou tmavý, ostatní tenhle. */
 export const ICON_COLOR = 0xffffff;
 export const ICON_ALPHA = 0.9;

@@ -2,7 +2,15 @@ import { Container, Graphics } from 'pixi.js';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import { iconShape } from './icons';
-import { ICON_ALPHA, ICON_COLOR, luminance, shade, WALL_LEFT_SHADE, WALL_RIGHT_SHADE } from './palette';
+import {
+  ABANDONED_COLOR,
+  ICON_ALPHA,
+  ICON_COLOR,
+  luminance,
+  shade,
+  WALL_LEFT_SHADE,
+  WALL_RIGHT_SHADE,
+} from './palette';
 import { cuboidFaces, gridToScreen, LEVEL_H } from './projection';
 
 /**
@@ -69,8 +77,14 @@ export class BuildingRenderer {
       return;
     }
 
-    const appearance = this.appearance(building.definitionId);
-    if (!appearance) return; // chybějící definice řeší content registry, ne renderer
+    const found = this.appearance(building.definitionId);
+    if (!found) return; // chybějící definice řeší content registry, ne renderer
+
+    // Ruina si drží půdorys, ale ne vzhled: šedý kvádr o jedné úrovni, bez
+    // symbolu. Vzhled je vlastnost entity, ne definice — proto až tady.
+    const appearance: BuildingAppearance = building.abandoned
+      ? { color: ABANDONED_COLOR, heightLevels: 1, footprint: found.footprint }
+      : found;
 
     let view = this.views.get(id);
     if (!view) {
@@ -80,7 +94,10 @@ export class BuildingRenderer {
     }
 
     const [width, depth] = appearance.footprint;
-    const height = building.level * appearance.heightLevels * LEVEL_H;
+    // Výšku určuje **definice**, ne úroveň entity. Násobit obojím by od T16
+    // znamenalo patnáctipatrový věžák, protože vyšší úroveň už má vyšší
+    // `heightLevels` sama.
+    const height = appearance.heightLevels * LEVEL_H;
     const faces = cuboidFaces(
       building.x + BUILDING_INSET,
       building.y + BUILDING_INSET,
