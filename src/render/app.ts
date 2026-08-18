@@ -155,7 +155,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
-  const simWorld = createWorld(SEED);
+  const simWorld = createWorld(SEED, content.getBalance().economy);
   const host = createSimHost(
     simWorld,
     createDefaultSystems(content, content.getBalance()),
@@ -207,7 +207,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const costPopup = new CostPopup(mount);
   const notifications = new Notifications(mount);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
-  const buildingInfo = new BuildingInfo(mount, i18n);
+  const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance());
 
   /**
    * Hra nesmí mlčet. Odmítnutý příkaz i spadlý kód se musí objevit na obrazovce —
@@ -644,7 +644,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     // Rozpočet se počítá jen když se na něj někdo dívá.
     if (budgetPanel.isVisible()) {
-      budgetPanel.update(computeBudget(simWorld, content), simWorld.economy.funds);
+      budgetPanel.update(computeBudget(simWorld, content, content.getBalance()), simWorld.economy.funds);
     }
 
     // Ladicí výpis je vývojářský nástroj, ne herní UI — proto nejde přes i18n.

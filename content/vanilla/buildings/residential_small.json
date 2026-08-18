@@ -12,7 +12,7 @@
     "allowedTerrain": [0, 2]
   },
   "economy": {
-    "upkeep": 10
+    "upkeep": 6
   },
   "population": {
     "capacity": 8

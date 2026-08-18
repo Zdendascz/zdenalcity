@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -15,20 +16,11 @@ import type { System } from './index';
  * Čísla jsou provizorní balanc, ne výsledek ladění — na to je T10.
  */
 
-/** Kolik z populace chodí do práce. */
-const WORKER_RATIO = 0.5;
-/** Bez základu by na prázdné mapě nebyla poptávka po ničem a nic by nevyrostlo. */
-const BASE_RESIDENTIAL_DEMAND = 20;
-/** Kolik pracovních míst v obchodech si vyžádá jeden obyvatel. */
-const COMMERCE_PER_CAPITA = 0.2;
-/** Poptávka se drží v <−100, 100>, aby čísla nerostla do nesmyslů. */
-const DEMAND_LIMIT = 100;
+export function createDemandSystem(catalogue: BuildingCatalogue, balance: Balance): System {
+  const { workerRatio, baseResidential, commercePerCapita, limit } = balance.demand;
+  const clampDemand = (value: number): number =>
+    Math.max(-limit, Math.min(limit, Math.round(value)));
 
-function clampDemand(value: number): number {
-  return Math.max(-DEMAND_LIMIT, Math.min(DEMAND_LIMIT, Math.round(value)));
-}
-
-export function createDemandSystem(catalogue: BuildingCatalogue): System {
   return {
     name: 'demand',
     interval: 4,
@@ -49,11 +41,11 @@ export function createDemandSystem(catalogue: BuildingCatalogue): System {
         }
       }
 
-      const workers = population * WORKER_RATIO;
+      const workers = population * workerRatio;
 
-      world.demand.residential = clampDemand(BASE_RESIDENTIAL_DEMAND + (jobs - workers));
+      world.demand.residential = clampDemand(baseResidential + (jobs - workers));
       world.demand.industrial = clampDemand(workers - jobs);
-      world.demand.commercial = clampDemand(population * COMMERCE_PER_CAPITA - commercialJobs);
+      world.demand.commercial = clampDemand(population * commercePerCapita - commercialJobs);
     },
   };
 }

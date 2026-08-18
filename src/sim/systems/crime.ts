@@ -23,9 +23,6 @@ import type { System } from './index';
  * Konstanty jdou z `balance.json` (§10).
  */
 
-/** Kolik z populace chodí do práce. Musí sedět s `demand.ts` — balanc fáze 1. */
-const WORKER_RATIO = 0.5;
-
 export function createCrimeSystem(balance: Balance): System {
   return {
     name: 'crime',
@@ -49,7 +46,8 @@ export function createCrimeSystem(balance: Balance): System {
 
       // Jediný neprostorový vstup, a to schválně: město s masovou
       // nezaměstnaností má problém všude, ne jen v jedné čtvrti.
-      const workers = population * WORKER_RATIO;
+      // Podíl pracujících sdílí s poptávkou — jedna hodnota v balancu, ne dvě v kódu.
+      const workers = population * balance.demand.workerRatio;
       const unemployment = workers > 0 ? Math.max(0, Math.min(1, (workers - jobs) / workers)) : 0;
       const unemploymentTerm = unemployment * balance.crime.unemployment;
 

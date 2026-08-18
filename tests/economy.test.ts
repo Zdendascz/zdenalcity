@@ -7,9 +7,29 @@ import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, placeDefinition, setTaxRate, zoneArea } from '@/sim/commands';
 import { ZONE } from '@/sim/layers';
 import { createDemandSystem, createEconomySystem, createGrowthSystem } from '@/sim/systems';
-import { computeBudget } from '@/sim/systems/economy';
-import { createWorld, MAX_TAX_RATE, STARTING_FUNDS, tickWorld } from '@/sim/world';
+import { computeBudget, taxFrom } from '@/sim/systems/economy';
+import {
+  createWorld,
+  DEFAULT_TAX_RATE,
+  MAX_TAX_RATE,
+  STARTING_FUNDS,
+  tickWorld,
+} from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { VANILLA_BALANCE } from './support/balance';
+import type { Balance } from '@/content/balance';
+
+/**
+ * Balanc pro testy vzorců. Vychází z vanilly, ale daňovou jednotku drží na
+ * kulaté čtyřicítce — zdejší testy zkoumají vzorec a zapojení, ne vyladěná
+ * čísla, takže je přeladění ekonomiky nemá co rozbít.
+ *
+ * Že vanilla čísla dávají smysl, hlídá zvlášť test „vanilla balanc".
+ */
+const BALANCE: Balance = {
+  ...VANILLA_BALANCE,
+  economy: { ...VANILLA_BALANCE.economy, taxableValuePerUnit: 40 },
+};
 
 const HOUSE: Definition = {
   id: 'test:house',
@@ -76,14 +96,14 @@ function place(
 
 /** Odtiká přesně jeden měsíc, tedy jeden běh economySystemu (interval 30). */
 function tickMonth(world: WorldState, catalogue: BuildingCatalogue): void {
-  const economy = createEconomySystem(catalogue);
+  const economy = createEconomySystem(catalogue, BALANCE);
   for (let i = 0; i < economy.interval; i++) {
     tickWorld(world, [economy]);
   }
 }
 
 function tickDemand(world: WorldState, catalogue: BuildingCatalogue): void {
-  const demand = createDemandSystem(catalogue);
+  const demand = createDemandSystem(catalogue, BALANCE);
   for (let i = 0; i <= demand.offset + demand.interval; i++) {
     tickWorld(world, [demand]);
   }
@@ -147,7 +167,7 @@ describe('poptávka řídí růst', () => {
     zoneArea(world, 5, 11, 10, 1, ZONE.industrial);
 
     const growth = createGrowthSystem(catalogue);
-    const demand = createDemandSystem(catalogue);
+    const demand = createDemandSystem(catalogue, BALANCE);
     for (let tick = 0; tick < 200; tick++) {
       tickWorld(world, [demand, growth]);
     }
@@ -216,7 +236,7 @@ describe('měsíční rozpočet', () => {
     const catalogue = catalogueOf(HOUSE);
     const world = createWorld(1);
     place(world, HOUSE, 5, 5);
-    const economy = createEconomySystem(catalogue);
+    const economy = createEconomySystem(catalogue, BALANCE);
 
     for (let i = 0; i < 29; i++) tickWorld(world, [economy]);
     expect(world.economy.funds).toBe(STARTING_FUNDS);
@@ -324,7 +344,7 @@ describe('rozpad rozpočtu', () => {
     place(world, HOUSE, 9, 5, false); // temný dům
     place(world, FACTORY, 5, 8);
 
-    const budget = computeBudget(world, catalogue);
+    const budget = computeBudget(world, catalogue, BALANCE);
     const domy = budget.lines.find((line) => line.definitionId === 'test:house');
     const tovarna = budget.lines.find((line) => line.definitionId === 'test:factory');
 
@@ -350,7 +370,7 @@ describe('rozpad rozpočtu', () => {
     const world = createWorld(1);
     place(world, MONUMENT, 5, 5);
 
-    const line = computeBudget(world, catalogue).lines[0];
+    const line = computeBudget(world, catalogue, BALANCE).lines[0];
 
     expect(line?.taxRate).toBeNull();
     expect(line?.taxUnitKey).toBeNull();
@@ -370,7 +390,7 @@ describe('rozpad rozpočtu', () => {
     const world = createWorld(1);
     place(world, STATION, 5, 5);
 
-    expect(computeBudget(world, catalogue).lines[0]).toMatchObject({
+    expect(computeBudget(world, catalogue, BALANCE).lines[0]).toMatchObject({
       upkeep: 120,
       upkeepEach: 120,
     });
@@ -378,7 +398,7 @@ describe('rozpad rozpočtu', () => {
     world.serviceFunding.set('health', 0.5);
 
     // Rozpis musí sedět: 1 × 60 = 60, ne 1 × 120 = 60.
-    expect(computeBudget(world, catalogue).lines[0]).toMatchObject({
+    expect(computeBudget(world, catalogue, BALANCE).lines[0]).toMatchObject({
       upkeep: 60,
       upkeepEach: 60,
       upkeepCount: 1,
@@ -393,7 +413,7 @@ describe('rozpad rozpočtu', () => {
     place(world, FACTORY, 5, 8);
     place(world, MONUMENT, 9, 8);
 
-    const budget = computeBudget(world, catalogue);
+    const budget = computeBudget(world, catalogue, BALANCE);
 
     expect(budget.lines.reduce((sum, line) => sum + line.income, 0)).toBe(budget.income);
     expect(budget.lines.reduce((sum, line) => sum + line.upkeep, 0)).toBe(budget.expenses);
@@ -469,5 +489,42 @@ describe('důsledek elektřiny', () => {
     const production = plant?.power?.production ?? 0;
     expect(Math.floor(production / (house?.power?.consumption ?? 1))).toBe(60);
     expect(Math.floor(production / (factory?.power?.consumption ?? 1))).toBe(20);
+  });
+});
+
+describe('vanilla balanc', () => {
+  it('výchozí hodnoty světa se neliší od balance.json', () => {
+    // `createWorld` má konstanty jen jako záložní hodnotu pro testy. Kdyby se
+    // rozešly s obsahem, hráč by hrál jinou hru než ta, kterou testujeme.
+    expect(STARTING_FUNDS).toBe(VANILLA_BALANCE.economy.startingFunds);
+    expect(DEFAULT_TAX_RATE).toBe(VANILLA_BALANCE.economy.defaultTaxRate);
+
+    const world = createWorld(1, VANILLA_BALANCE.economy);
+    expect(world.economy.funds).toBe(VANILLA_BALANCE.economy.startingFunds);
+    expect(world.economy.taxRates.residential).toBe(VANILLA_BALANCE.economy.defaultTaxRate);
+  });
+
+  it('každá RCI budova při výchozí dani utáhne aspoň dvojnásobek své údržby', async () => {
+    // Kdyby se dům sotva zaplatil, město by nikdy nevydělalo na policii ani
+    // školu a hráč by při 7 % neufinancoval nic — přesně to se stalo před
+    // přeladěním, kdy byl poměr 1,1× u obchodu.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    const { taxableValuePerUnit: unit, defaultTaxRate: rate } = VANILLA_BALANCE.economy;
+
+    const cases: [string, (d: Definition) => number][] = [
+      ['vanilla:residential_small', (d) => d.population?.capacity ?? 0],
+      ['vanilla:commercial_small', (d) => d.jobs?.capacity ?? 0],
+      ['vanilla:industrial_small', (d) => d.jobs?.capacity ?? 0],
+    ];
+
+    for (const [id, base] of cases) {
+      const definition = content.get(id);
+      expect(definition, id).toBeDefined();
+      if (!definition) continue;
+
+      const tax = taxFrom(base(definition), rate, unit);
+      expect(tax / definition.economy.upkeep, id).toBeGreaterThanOrEqual(2);
+    }
   });
 });

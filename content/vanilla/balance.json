@@ -1,4 +1,17 @@
 {
+  "economy": {
+    "taxableValuePerUnit": 70,
+    "startingFunds": 20000,
+    "defaultTaxRate": 7
+  },
+
+  "demand": {
+    "workerRatio": 0.5,
+    "baseResidential": 20,
+    "commercePerCapita": 0.2,
+    "limit": 100
+  },
+
   "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },
 
   "landValue": {

@@ -23,13 +23,23 @@ export interface Building {
   builtAtTick: number;
 }
 
-/** Výchozí daňová sazba v procentech. */
-export const DEFAULT_TAX_RATE = 7;
 export const MIN_TAX_RATE = 0;
 export const MAX_TAX_RATE = 20;
 
-/** Startovní kapitál. Vyjde tak na elektrárnu a pár kilometrů silnic. */
+/**
+ * Výchozí sazba a startovní kapitál, když se svět tvoří bez balancu.
+ *
+ * Slouží testům; hra vždycky předá `balance.economy`. Že se obojí neshoduje,
+ * hlídá test — jinak by se tichý default rozešel s obsahem.
+ */
+export const DEFAULT_TAX_RATE = 7;
 export const STARTING_FUNDS = 20000;
+
+/** Ekonomické počáteční hodnoty světa. Bere se z `balance.economy`. */
+export interface WorldEconomyDefaults {
+  startingFunds: number;
+  defaultTaxRate: number;
+}
 
 export interface EconomyState {
   funds: number;
@@ -104,7 +114,13 @@ export interface WorldState {
   powerNetworkDirty: boolean;
 }
 
-export function createWorld(seed: number): WorldState {
+export function createWorld(
+  seed: number,
+  economy: WorldEconomyDefaults = {
+    startingFunds: STARTING_FUNDS,
+    defaultTaxRate: DEFAULT_TAX_RATE,
+  },
+): WorldState {
   return {
     size: MAP_SIZE,
     seed: seed >>> 0,
@@ -114,11 +130,11 @@ export function createWorld(seed: number): WorldState {
     buildings: new Map(),
     nextBuildingId: 1, // 0 ve vrstvě `buildingId` znamená prázdno
     economy: {
-      funds: STARTING_FUNDS,
+      funds: economy.startingFunds,
       taxRates: {
-        residential: DEFAULT_TAX_RATE,
-        commercial: DEFAULT_TAX_RATE,
-        industrial: DEFAULT_TAX_RATE,
+        residential: economy.defaultTaxRate,
+        commercial: economy.defaultTaxRate,
+        industrial: economy.defaultTaxRate,
       },
       lastIncome: 0,
       lastExpenses: 0,

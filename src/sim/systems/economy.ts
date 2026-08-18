@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '../catalogue';
 import { isRciCategory } from '../rci';
@@ -20,8 +21,6 @@ import type { System } from './index';
  * a už by na elektrárnu nikdy nevydělalo — past, ze které není cesty ven.
  */
 
-/** Kolik peněz za měsíc vynese jeden obyvatel nebo jedno pracovní místo při 100 %. */
-export const TAXABLE_VALUE_PER_UNIT = 40;
 
 /**
  * Jeden řádek rozpočtu — jedna definice budovy.
@@ -54,14 +53,16 @@ export interface Budget {
   lines: BudgetLine[];
   income: number;
   expenses: number;
+  /** Kolik vynese jedna jednotka základu při 100 %. Do rozpisu v UI. */
+  valuePerUnit: number;
 }
 
 /**
  * Daň ze zdaňovaného základu. Jediný daňový vzorec v celé hře — používá ho
  * rozpočet i detail budovy, takže se výpis nemůže rozejít se skutečností.
  */
-export function taxFrom(base: number, ratePercent: number): number {
-  return Math.round((base * TAXABLE_VALUE_PER_UNIT * ratePercent) / 100);
+export function taxFrom(base: number, ratePercent: number, valuePerUnit: number): number {
+  return Math.round((base * valuePerUnit * ratePercent) / 100);
 }
 
 /**
@@ -74,12 +75,13 @@ export function buildingMonthlyTax(
   world: WorldState,
   definition: Definition,
   building: Building,
+  balance: Balance,
 ): number {
   const category = definition.category;
   if (!isRciCategory(category) || !building.powered) return 0;
 
   const taxable = category === 'residential' ? building.population : building.jobs;
-  return taxFrom(taxable, world.economy.taxRates[category]);
+  return taxFrom(taxable, world.economy.taxRates[category], balance.economy.taxableValuePerUnit);
 }
 
 /**
@@ -107,7 +109,11 @@ export function buildingMonthlyUpkeep(
  * Sdílí ho `economySystem` i tabulka v UI, aby daňový vzorec existoval jen
  * na jednom místě — jinak by se výpis a skutečnost dřív nebo později rozešly.
  */
-export function computeBudget(world: WorldState, catalogue: BuildingCatalogue): Budget {
+export function computeBudget(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  balance: Balance,
+): Budget {
   const byDefinition = new Map<string, BudgetLine>();
   let income = 0;
   let expenses = 0;
@@ -165,7 +171,7 @@ export function computeBudget(world: WorldState, catalogue: BuildingCatalogue): 
   // v UI tvrdil něco jiného, než kolik ve sloupci opravdu stojí.
   for (const line of byDefinition.values()) {
     if (line.taxRate === null) continue;
-    line.income = taxFrom(line.taxBase, line.taxRate);
+    line.income = taxFrom(line.taxBase, line.taxRate, balance.economy.taxableValuePerUnit);
     income += line.income;
   }
 
@@ -174,16 +180,17 @@ export function computeBudget(world: WorldState, catalogue: BuildingCatalogue): 
     lines: [...byDefinition.values()].sort((a, b) => a.definitionId.localeCompare(b.definitionId)),
     income,
     expenses,
+    valuePerUnit: balance.economy.taxableValuePerUnit,
   };
 }
 
-export function createEconomySystem(catalogue: BuildingCatalogue): System {
+export function createEconomySystem(catalogue: BuildingCatalogue, balance: Balance): System {
   return {
     name: 'economy',
     interval: 30,
     offset: 0,
     run(world: WorldState) {
-      const budget = computeBudget(world, catalogue);
+      const budget = computeBudget(world, catalogue, balance);
       world.economy.lastIncome = budget.income;
       world.economy.lastExpenses = budget.expenses;
       world.economy.funds += budget.income - budget.expenses;

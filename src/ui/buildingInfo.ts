@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
 import { buildingMonthlyTax, buildingMonthlyUpkeep } from '@/sim/systems/economy';
 import type { Building, WorldState } from '@/sim/world';
@@ -16,9 +17,11 @@ import type { I18n } from './i18n';
 export class BuildingInfo {
   private readonly root: HTMLElement;
   private readonly i18n: I18n;
+  private readonly balance: Balance;
 
-  constructor(parent: HTMLElement, i18n: I18n) {
+  constructor(parent: HTMLElement, i18n: I18n, balance: Balance) {
     this.i18n = i18n;
+    this.balance = balance;
     this.root = el('div', 'sheet sheet--info is-hidden');
     parent.appendChild(this.root);
   }
@@ -66,7 +69,7 @@ export class BuildingInfo {
       building.powered ? t('ui.info.poweredYes') : t('ui.info.poweredNo'),
     ]);
 
-    const tax = buildingMonthlyTax(world, definition, building);
+    const tax = buildingMonthlyTax(world, definition, building, this.balance);
     const upkeep = buildingMonthlyUpkeep(world, definition, building);
     rows.push(['ui.info.monthlyIncome', `+${formatNumber(tax)}`]);
     rows.push(['ui.info.monthlyUpkeep', `−${formatNumber(upkeep)}`]);

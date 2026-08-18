@@ -8,6 +8,19 @@ import type { ValidationIssue } from './schema';
  * z rozbitého modu dostal město, které se chová jinak, než balanc popisuje.
  */
 export interface Balance {
+  /**
+   * Ekonomika. Původně konstanty fáze 1 v kódu — přesunuty sem, aby šel balanc
+   * ladit bez zásahu do kódu.
+   */
+  economy: { taxableValuePerUnit: number; startingFunds: number; defaultTaxRate: number };
+
+  demand: {
+    workerRatio: number;
+    baseResidential: number;
+    commercePerCapita: number;
+    limit: number;
+  };
+
   diffusion: { spread: number; decay: number; passes: number };
 
   landValue: {
@@ -101,6 +114,8 @@ export function validateBalance(raw: unknown): {
     return { balance: null, issues: [{ field: '', message: 'balance musí být objekt' }] };
   }
 
+  const economy = section(issues, root, 'economy');
+  const demand = section(issues, root, 'demand');
   const diffusion = section(issues, root, 'diffusion');
   const landValue = section(issues, root, 'landValue');
   const crime = section(issues, root, 'crime');
@@ -139,6 +154,31 @@ export function validateBalance(raw: unknown): {
   }
 
   const balance: Balance = {
+    economy: {
+      taxableValuePerUnit: num(
+        issues,
+        economy,
+        'taxableValuePerUnit',
+        'economy.taxableValuePerUnit',
+        0,
+        10000,
+      ),
+      startingFunds: num(issues, economy, 'startingFunds', 'economy.startingFunds', 0, 100000000),
+      defaultTaxRate: num(issues, economy, 'defaultTaxRate', 'economy.defaultTaxRate', 0, 100),
+    },
+    demand: {
+      workerRatio: num(issues, demand, 'workerRatio', 'demand.workerRatio', 0, 1),
+      baseResidential: num(issues, demand, 'baseResidential', 'demand.baseResidential', 0, 1000),
+      commercePerCapita: num(
+        issues,
+        demand,
+        'commercePerCapita',
+        'demand.commercePerCapita',
+        0,
+        100,
+      ),
+      limit: num(issues, demand, 'limit', 'demand.limit', 1, 1000),
+    },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),
       decay: num(issues, diffusion, 'decay', 'diffusion.decay', 0, 1),

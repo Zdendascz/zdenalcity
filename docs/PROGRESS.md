@@ -424,8 +424,32 @@ teď nese symbol na střeše: kříž, štít, plamen, kniha, strom, popelnice, 
 Ověřeno čtením pixelů: klinika má na střeše `#66686a` proti vlastní `#dfe4ea`,
 park `#edf5ee` proti `#4a9b5a`.
 
+- [x] Přeladění ekonomiky (na žádost autora)
+
+Při 7 % daně město neufinancovalo ani jednu službu. Poměr daň/údržba byl 2,2×
+u domu, **1,1× u obchodu** a 1,3× u dílny — sto budov vydělalo 260 měsíčně
+proti 1080 za údržbu služeb.
+
+- daňová jednotka 40 → 70, údržba: dům 10 → 6, obchod 15 → 8, dílna 25 → 14;
+  poměry jsou teď 6,5× / 3,7× / 4,2×
+- konstanty fáze 1 se přestěhovaly do `balance.json`: sekce `economy`
+  (`taxableValuePerUnit`, `startingFunds`, `defaultTaxRate`) a `demand`
+  (`workerRatio`, `baseResidential`, `commercePerCapita`, `limit`)
+- `TAXABLE_VALUE_PER_UNIT` v kódu zanikl; `computeBudget` nese daňovou jednotku
+  v `Budget.valuePerUnit`, aby ji rozpis v UI nemusel znát odjinud
+- kriminalita si podíl pracujících bere ze stejné hodnoty jako poptávka —
+  jedna konstanta v balancu místo dvou v kódu
+- `STARTING_FUNDS` a `DEFAULT_TAX_RATE` zůstávají jako záloha pro testy a hlídá
+  je test proti `balance.json`, aby se nerozešly s obsahem
+- testy ekonomiky běží na pevné testovací jednotce 40, ne na vanilla čísle —
+  přeladění balancu nemá rozbíjet testy vzorců
+
+Ověřeno ve hře: město se 168 obyvateli, policií, hasiči, klinikou, školou,
+parkem a dvěma elektrárnami má +215 měsíčně a jmění roste. Nový test „každá RCI
+budova utáhne aspoň dvojnásobek své údržby" na staré údržbě obchodu padá (1,93×).
+
 ## Rozpracované
-_(nic — T15 uzavřeno, dál T16: úrovně budov)_
+_(nic — T15 a přeladění uzavřeno, dál T16: úrovně budov)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

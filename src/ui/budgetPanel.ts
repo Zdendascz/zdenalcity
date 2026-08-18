@@ -1,5 +1,4 @@
 import type { Definition } from '@/content/schema';
-import { TAXABLE_VALUE_PER_UNIT } from '@/sim/systems/economy';
 import type { Budget, BudgetLine } from '@/sim/systems/economy';
 import { button, el } from './dom';
 import { formatNumber } from './format';
@@ -87,7 +86,7 @@ export class BudgetPanel {
       table.appendChild(row);
 
       // Pod řádkem rozpis, ze kterého je vidět, odkud se čísla vzala.
-      const breakdown = line ? this.describe(line) : '';
+      const breakdown = line ? this.describe(line, budget.valuePerUnit) : '';
       if (breakdown) {
         const note = el('tr', 'sheet__breakdown');
         const cell = el('td', undefined, breakdown);
@@ -115,7 +114,7 @@ export class BudgetPanel {
   }
 
   /** Slovní rozpis jednoho řádku: odkud se vzal příjem a odkud údržba. */
-  private describe(line: BudgetLine): string {
+  private describe(line: BudgetLine, valuePerUnit: number): string {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     const parts: string[] = [];
 
@@ -124,7 +123,7 @@ export class BudgetPanel {
         t('ui.budget.formula.tax', {
           base: formatNumber(line.taxBase),
           unit: t(line.taxUnitKey),
-          value: TAXABLE_VALUE_PER_UNIT,
+          value: valuePerUnit,
           rate: line.taxRate,
           income: formatNumber(line.income),
         }),

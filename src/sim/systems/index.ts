@@ -39,9 +39,9 @@ export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Bala
     createPowerSystem(catalogue),
     // Pokrytí se musí přepočítat dřív, než z něj čte cena půdy a kriminalita.
     createServiceSystem(catalogue),
-    createDemandSystem(catalogue),
+    createDemandSystem(catalogue, balance),
     createGrowthSystem(catalogue),
-    createEconomySystem(catalogue),
+    createEconomySystem(catalogue, balance),
     createPollutionSystem(catalogue, balance),
     createCrimeSystem(balance),
     createHealthSystem(catalogue, balance),
