@@ -244,6 +244,33 @@ describe('vanilla policejní stanice', () => {
     const content = new ContentRegistry();
     await content.load(createVanillaSource());
 
-    expect(content.byCategory('service').map((d) => d.id)).toEqual(['vanilla:police_small']);
+    expect(content.byCategory('service').map((d) => d.id)).toContain('vanilla:police_small');
+  });
+
+  it('vanilla nabízí všech pět tříd služeb plus odpady', async () => {
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const classes = [
+      ...new Set(
+        content
+          .getAll('building')
+          .map((d) => d.service?.class)
+          .filter((c): c is string => c !== undefined),
+      ),
+    ].sort();
+
+    expect(classes).toEqual(['education', 'fire', 'health', 'parks', 'police']);
+
+    const waste = content.getAll('building').filter((d) => d.waste !== undefined);
+    expect(waste.map((d) => d.id).sort()).toEqual(['vanilla:incinerator', 'vanilla:landfill']);
+    // Skládka je levnější, ale znečišťuje víc a pobere míň.
+    const landfill = content.get('vanilla:landfill');
+    const incinerator = content.get('vanilla:incinerator');
+    expect(landfill?.construction.cost).toBeLessThan(incinerator?.construction.cost ?? 0);
+    expect(landfill?.waste?.capacity).toBeLessThan(incinerator?.waste?.capacity ?? 0);
+    expect(landfill?.environment?.pollution).toBeGreaterThan(
+      incinerator?.environment?.pollution ?? 0,
+    );
   });
 });

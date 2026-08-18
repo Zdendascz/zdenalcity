@@ -46,6 +46,11 @@ export interface BuildingDefinition {
    * Třídy jsou obsah, ne kód — mechanismus je obecný (§6 zadání fáze 2).
    */
   service?: { class: string; radius: number; strength: number };
+  /**
+   * Zpracování odpadu. Nemá pokrytí ani dosah — jen kapacitu, která se sčítá
+   * celoměstsky (§6 zadání fáze 2).
+   */
+  waste?: { capacity: number };
   power?: { production?: number; consumption?: number };
   environment?: { pollution?: number };
   graphics: { color: string; heightLevels: number };
@@ -75,6 +80,7 @@ const DEFINITION_SECTIONS = [
   'population',
   'jobs',
   'service',
+  'waste',
   'power',
   'environment',
   'graphics',
@@ -241,6 +247,7 @@ export function validateDefinition(
   const population = validateCapacity(issues, record, 'population');
   const jobs = validateCapacity(issues, record, 'jobs');
   const service = validateService(issues, record);
+  const waste = validateWaste(issues, record);
 
   if (
     issues.length > 0 ||
@@ -269,6 +276,7 @@ export function validateDefinition(
       ...(population ? { population } : {}),
       ...(jobs ? { jobs } : {}),
       ...(service ? { service } : {}),
+      ...(waste ? { waste } : {}),
       ...(power ? { power } : {}),
       ...(environment ? { environment } : {}),
       graphics,
@@ -384,6 +392,18 @@ function validateService(
   return serviceClass !== null && radius !== null && strength !== null
     ? { class: serviceClass, radius, strength }
     : undefined;
+}
+
+function validateWaste(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['waste'] {
+  if (record['waste'] === undefined) return undefined;
+  const section = requireRecord(issues, record, 'waste', 'waste');
+  if (!section) return undefined;
+
+  const capacity = requireInt(issues, section, 'capacity', 'waste.capacity', 1, 65535);
+  return capacity === null ? undefined : { capacity };
 }
 
 function validatePower(

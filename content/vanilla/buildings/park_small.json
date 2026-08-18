@@ -1,0 +1,26 @@
+{
+  "id": "vanilla:park_small",
+  "type": "building",
+  "category": "service",
+  "name": "building.park_small.name",
+  "description": "building.park_small.desc",
+  "footprint": [1, 1],
+  "construction": {
+    "cost": 100,
+    "requiresRoad": false,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 20
+  },
+  "service": {
+    "class": "parks",
+    "radius": 5,
+    "strength": 90
+  },
+  "graphics": {
+    "color": "#4a9b5a",
+    "heightLevels": 1
+  }
+}

@@ -8,6 +8,7 @@ import { createPollutionSystem } from './pollution';
 import { createLandValueSystem } from './landValue';
 import { createServiceSystem } from './services';
 import { createCrimeSystem } from './crime';
+import { createHealthSystem } from './health';
 
 export interface System {
   readonly name: string;
@@ -42,6 +43,7 @@ export function createDefaultSystems(catalogue: BuildingCatalogue): System[] {
     createEconomySystem(catalogue),
     createPollutionSystem(catalogue),
     createCrimeSystem(),
+    createHealthSystem(catalogue),
     createLandValueSystem(),
   ];
 }
@@ -55,5 +57,6 @@ export {
   createLandValueSystem,
   createServiceSystem,
   createCrimeSystem,
+  createHealthSystem,
 };
 export type { BuildingCatalogue };

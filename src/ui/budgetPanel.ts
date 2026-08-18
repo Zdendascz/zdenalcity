@@ -141,7 +141,9 @@ export class BudgetPanel {
       );
     }
 
-    const idle = line.count - line.poweredCount;
+    // Nečinné jsou ty, které neplatí ani údržbu — u služeb je proud nezajímá,
+    // takže se u nich hláška „mimo provoz" nesmí objevit.
+    const idle = line.count - line.upkeepCount;
     if (idle > 0) parts.push(t('ui.budget.formula.idle', { count: idle }));
 
     return parts.join('  ·  ');

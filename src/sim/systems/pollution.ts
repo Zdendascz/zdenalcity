@@ -11,9 +11,10 @@ import type { System } from './index';
  * Zdroje jsou dva:
  * 1. **Budovy** — každá přičte svou hodnotu `environment.pollution` do buňky,
  *    ve které leží její přední roh.
- * 2. **Odpad** — populace ho vyrábí a nepokrytý zbytek jde do vzduchu
- *    **celoměstsky**, tedy rovnoměrně do každé buňky. Skládky a spalovny, které
- *    kapacitu poskytnou, přijdou v T14; do té doby končí ve vzduchu všechen.
+ * 2. **Odpad** — populace ho vyrábí, skládky a spalovny mají kapacitu a
+ *    nepokrytý zbytek jde do vzduchu **celoměstsky**, tedy rovnoměrně do každé
+ *    buňky. Skládka je levná a sama silně znečišťuje své okolí, spalovna je
+ *    drahá a znečišťuje méně — čistý prostorový kompromis bez nové vrstvy.
  *
  * Difuzní konstanty tady zatím žijí v kódu. Do `balance.json` se stěhují v T15,
  * spolu s celým balancem fáze 2 — konstanty odpadu tam přibudou, v ukázkovém
@@ -38,13 +39,18 @@ export function createPollutionSystem(catalogue: BuildingCatalogue): System {
       // souběžné světy si nemůžou přepsat zdroje.
       const sources = new Float32Array(COARSE_CELLS);
       let population = 0;
+      let wasteCapacity = 0;
 
       for (const building of world.buildings.values()) {
         population += building.population;
 
         const definition = catalogue.get(building.definitionId);
-        const emitted = definition?.environment?.pollution ?? 0;
-        if (!definition || emitted <= 0) continue;
+        if (!definition) continue;
+
+        wasteCapacity += definition.waste?.capacity ?? 0;
+
+        const emitted = definition.environment?.pollution ?? 0;
+        if (emitted <= 0) continue;
 
         const [width, depth] = definition.footprint;
         const cornerX = Math.min(building.x + width - 1, MAP_SIZE - 1);
@@ -53,7 +59,8 @@ export function createPollutionSystem(catalogue: BuildingCatalogue): System {
         sources[at] = (sources[at] ?? 0) + emitted;
       }
 
-      const unhandledWaste = population * WASTE_PER_CITIZEN;
+      const generatedWaste = population * WASTE_PER_CITIZEN;
+      const unhandledWaste = Math.max(0, generatedWaste - wasteCapacity);
       const cityWide = unhandledWaste * WASTE_TO_POLLUTION;
       if (cityWide > 0) {
         for (let cell = 0; cell < sources.length; cell++) {

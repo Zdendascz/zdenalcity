@@ -8,6 +8,7 @@ import type { CommandResult } from './result';
 import {
   MAX_TAX_RATE,
   MIN_TAX_RATE,
+  markCoverageDirty,
   markPowerNetworkDirty,
   markTileDirty,
   removeBuilding,
@@ -26,6 +27,7 @@ export type Command =
   | { type: 'zone'; x: number; y: number; w: number; h: number; zone: ZoneType }
   | { type: 'place_building'; definitionId: string; x: number; y: number }
   | { type: 'set_tax_rate'; zone: ZoneType; rate: number }
+  | { type: 'set_service_funding'; serviceClass: string; funding: number }
   | { type: 'set_speed'; speed: number };
 
 /**
@@ -171,6 +173,22 @@ export function bulldoze(world: WorldState, x: number, y: number): CommandResult
   }
 
   return reject('error.nothingToBulldoze');
+}
+
+/**
+ * Financování třídy služeb, 0–1. Mění dosah, sílu i skutečnou údržbu naráz —
+ * hráč musí vidět, na čem šetří.
+ */
+export function setServiceFunding(
+  world: WorldState,
+  serviceClass: string,
+  funding: number,
+): CommandResult {
+  if (!Number.isFinite(funding)) return reject('error.invalidFunding');
+
+  world.serviceFunding.set(serviceClass, Math.max(0, Math.min(1, funding)));
+  markCoverageDirty(world);
+  return OK;
 }
 
 /** Sazba je v procentech a drží se v <0, 20>. Hodnota mimo rozsah se přiřízne. */

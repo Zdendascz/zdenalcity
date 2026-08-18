@@ -1,0 +1,30 @@
+{
+  "id": "vanilla:incinerator",
+  "type": "building",
+  "category": "service",
+  "name": "building.incinerator.name",
+  "description": "building.incinerator.desc",
+  "footprint": [3, 3],
+  "construction": {
+    "cost": 1500,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 250
+  },
+  "jobs": {
+    "capacity": 12
+  },
+  "waste": {
+    "capacity": 60
+  },
+  "environment": {
+    "pollution": 25
+  },
+  "graphics": {
+    "color": "#6a6a72",
+    "heightLevels": 2
+  }
+}

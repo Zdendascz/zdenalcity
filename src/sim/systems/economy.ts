@@ -1,6 +1,7 @@
 import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '../catalogue';
 import { isRciCategory } from '../rci';
+import { serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
 import type { System } from './index';
 
@@ -81,10 +82,23 @@ export function buildingMonthlyTax(
   return taxFrom(taxable, world.economy.taxRates[category]);
 }
 
-/** Platí budova údržbu? Temná budova je mimo provoz, takže ne. */
-export function buildingMonthlyUpkeep(definition: Definition, building: Building): number {
+/**
+ * Údržba budovy za měsíc.
+ *
+ * Temná budova je mimo provoz, takže neplatí nic. U služeb se údržba škáluje
+ * financováním třídy — kdo šetří na policii, platí za ni míň, ale i dosah
+ * je menší (§6 zadání fáze 2).
+ */
+export function buildingMonthlyUpkeep(
+  world: WorldState,
+  definition: Definition,
+  building: Building,
+): number {
   if (isRciCategory(definition.category) && !building.powered) return 0;
-  return definition.economy.upkeep;
+
+  const serviceClass = definition.service?.class;
+  const funding = serviceClass === undefined ? 1 : serviceFunding(world, serviceClass);
+  return Math.round(definition.economy.upkeep * funding);
 }
 
 /**
@@ -139,7 +153,10 @@ export function computeBudget(world: WorldState, catalogue: BuildingCatalogue): 
       line.taxBase += taxedAs === 'residential' ? building.population : building.jobs;
     }
 
-    const upkeep = buildingMonthlyUpkeep(definition, building);
+    const upkeep = buildingMonthlyUpkeep(world, definition, building);
+    // Skutečná částka za kus, ne ta z definice — u služeb ji škáluje financování
+    // a rozpis v UI by jinak tvrdil „1 × 120 = 60".
+    line.upkeepEach = upkeep;
     line.upkeep += upkeep;
     expenses += upkeep;
   }

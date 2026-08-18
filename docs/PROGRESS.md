@@ -362,8 +362,24 @@ Ověřeno (`npm run check`, 18 souborů / 239 testů) a v běžící hře na mě
 - policejní stanice cenu půdy zvedne, kriminalita ji srazí
 - celá sestava je deterministická
 
+- [x] T14 — zbývající třídy služeb, financování, zapojení do rozpočtu (fáze 2)
+
+Vzniklo:
+- šest definic: hasičská zbrojnice, klinika, škola, park, skládka, spalovna
+- sekce `waste` ve schématu — kapacita bez pokrytí a bez dosahu
+- `src/sim/systems/health.ts` — bez zdravotní péče obyvatel v budovách ubývá
+- příkaz `set_service_funding`, posuvník na třídu v HUDu
+- `buildingMonthlyUpkeep` škáluje údržbu financováním
+
+Ověřeno (`npm run check`, 18 souborů / 241 testů) a v běžící hře:
+- **akceptační kritérium §13.3 splněno**: po postavení parku a kliniky vyskočila
+  cena půdy z **1 na 56** a populace se ze 40 vrátila na 96
+- financování 50 % srazilo výdaje na služby ze **140 na 70**
+- skládka je levnější, pobere míň odpadu a znečišťuje víc než spalovna
+- pokus postavit skládku mimo silnici skončil hláškou „musí sousedit se silnicí"
+
 ## Rozpracované
-_(nic — T13 uzavřeno, dál T14: zbývající třídy služeb a financování)_
+_(nic — T14 uzavřeno, dál T15: balance.json)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -395,6 +411,9 @@ _(nic — T13 uzavřeno, dál T14: zbývající třídy služeb a financování)
 | 2026-08-18 | **Overlay hrubých vrstev je vlastní vrstva, ne součást chunků** | Znečištění je konstantní přes blok 4×4, ale zapečené do chunků se kreslilo po dlaždicích — šestnáctkrát víc polygonů za stejný obrázek. Změřeno: překreslení po každé difuzi stálo **33,3 ms**, tedy dva zahozené snímky každých 250 ms při 8×. Jako samostatná vrstva s jedním čtyřúhelníkem na buňku to stojí **0,9 ms**. Elektřina zůstává v chuncích, protože je to veličina po dlaždicích. |
 | 2026-08-18 | Difuzní a odpadové konstanty zatím žijí v kódu | Zadání je chce v `balance.json`, ale ten je úkol T15. Do té doby jsou v `pollution.ts` v jednom bloku s poznámkou. Konstanty odpadu jsem musel zvolit sám — ukázkový `balance.json` v zadání sekci `waste` nemá, takže v T15 přibude. |
 | 2026-08-18 | Load savu verze 1 vynuluje hrubé vrstvy | Save v1 je nenese a systémy si je do pár tiků dopočítají. Ukládat je začne formát verze 2 v T20. |
+| 2026-08-18 | **Populace bez zdravotní péče klesá jen na polovinu kapacity, ne na nulu** | Zadání říká „bez pokrytí populace v budovách pomalu klesá", ale bez podlahy město bez kliniky vymřelo úplně — a protože na začátku hry žádná klinika nestojí, byl by to nevyhnutelný konec. Odhalil to test savu, kterému po 600 ticích vyšla nulová populace. Zdravotnictví je tak pobídka k růstu, ne past. **Doplněk zadání, ke schválení.** |
+| 2026-08-18 | Odpad má vlastní sekci `waste` s kapacitou, ne `service` s dosahem | Podle §6 odpady pokrytí nemají — kapacita se sčítá celoměstsky. Skládka je levná, pobere málo a silně znečišťuje své okolí; spalovna je drahá, pobere trojnásobek a znečišťuje méně. Prostorový kompromis bez nové vrstvy. |
+| 2026-08-18 | Rozpis údržby ukazuje **skutečnou** částku za kus, ne tu z definice | U služeb ji škáluje financování, takže rozpis tvrdil „1 × 120 = 60". Odhalilo se to až na obrazovce, ne v testu. Stejnou opravou zmizela i hláška „mimo provoz (bez proudu)" u služeb, kterých se proud netýká. |
 | 2026-08-18 | **Hloubka budovy se řídí předním rohem půdorysu, ne počátkem** | Podle `x + y` se jednodlaždicový obchod dostal před dvoudlaždicovou továrnu, která sahá o dvě dlaždice dál dopředu. Autor to nahlásil ze screenshotu. Nově `(x + w) + (y + h)`. |
 | 2026-08-18 | **Příkazy vracejí `CommandResult`, ne `void`** | Hra nesmí mlčet: klik, který nic neudělá, musí říct proč. Důvod je lokalizační klíč, takže v `sim/` pořád není ani jedno uživatelsky viditelné slovo (§10). Růstový systém důvody ignoruje — zkusí příště jiné místo. |
 | 2026-08-18 | Stejné hlášky se v bublinách nehromadí, jen si přičtou počet | Malování silnice přes vodu by jinak vysypalo padesát bublin přes celou obrazovku. |

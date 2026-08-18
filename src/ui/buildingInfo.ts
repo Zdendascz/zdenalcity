@@ -67,7 +67,7 @@ export class BuildingInfo {
     ]);
 
     const tax = buildingMonthlyTax(world, definition, building);
-    const upkeep = buildingMonthlyUpkeep(definition, building);
+    const upkeep = buildingMonthlyUpkeep(world, definition, building);
     rows.push(['ui.info.monthlyIncome', `+${formatNumber(tax)}`]);
     rows.push(['ui.info.monthlyUpkeep', `−${formatNumber(upkeep)}`]);
     rows.push(['ui.info.monthlyNet', formatNumber(tax - upkeep)]);

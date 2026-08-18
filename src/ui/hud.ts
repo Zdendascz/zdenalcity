@@ -19,6 +19,7 @@ export interface HudCallbacks {
   onOpenFile(file: File): void;
   onToggleOverlay(id: string): void;
   onToggleBudget(): void;
+  onFundingChange(serviceClass: string, funding: number): void;
   onLanguageChange(language: string): void;
 }
 
@@ -34,6 +35,8 @@ export interface HudState {
   overlay: string;
   budgetVisible: boolean;
   poweredBuildings: number;
+  /** Financování podle třídy služby, 0–1. */
+  funding: ReadonlyMap<string, number>;
   /** Už přeložená hláška o uložení či načtení. Prázdná = nic nezobrazovat. */
   message: string;
 }
@@ -73,11 +76,14 @@ export class Hud {
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
   private readonly overlays: readonly OverlayOption[];
+  private readonly serviceClasses: readonly string[];
+  private readonly fundingInputs = new Map<string, HTMLInputElement>();
   private lastState: HudState = {
     speedIndex: 1,
     overlay: 'none',
     budgetVisible: false,
     poweredBuildings: 0,
+    funding: new Map(),
     message: '',
   };
 
@@ -87,12 +93,14 @@ export class Hud {
     view: ReadonlyWorldView,
     speeds: readonly number[],
     overlays: readonly OverlayOption[],
+    serviceClasses: readonly string[],
     callbacks: HudCallbacks,
   ) {
     this.i18n = i18n;
     this.view = view;
     this.speeds = speeds;
     this.overlays = overlays;
+    this.serviceClasses = serviceClasses;
     this.callbacks = callbacks;
 
     this.top = el('div', 'hud__top');
@@ -144,6 +152,13 @@ export class Hud {
     this.speedButtons.forEach((node, index) => {
       node.classList.toggle('is-active', index === state.speedIndex);
     });
+    for (const [serviceClass, input] of this.fundingInputs) {
+      const percent = Math.round((state.funding.get(serviceClass) ?? 1) * 100);
+      // Posuvník se nepřepisuje, když s ním hráč zrovna hýbe.
+      if (document.activeElement !== input) input.value = String(percent);
+      this.setValue(`funding-${serviceClass}`, `${percent} %`);
+    }
+
     for (const [id, node] of this.overlayButtons) {
       node.classList.toggle('is-active', id === state.overlay);
     }
@@ -166,11 +181,13 @@ export class Hud {
     this.values.clear();
     this.speedButtons.length = 0;
     this.overlayButtons.clear();
+    this.fundingInputs.clear();
 
     this.buildStats();
     this.buildDemand();
     this.buildSpeed();
     this.buildTaxes();
+    this.buildFunding();
     this.buildSave();
     this.buildMisc();
   }
@@ -258,6 +275,41 @@ export class Hud {
 
       line.append(minus, value, plus);
       panel.appendChild(line);
+    }
+
+    this.panels.appendChild(panel);
+  }
+
+  /**
+   * Financování služeb. Posuvník mění dosah, sílu i údržbu naráz, takže hráč
+   * na overlayi hned vidí, na čem šetří.
+   */
+  private buildFunding(): void {
+    if (this.serviceClasses.length === 0) return;
+
+    const panel = el('div', 'panel');
+    panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.funding.title')));
+
+    for (const serviceClass of this.serviceClasses) {
+      const row = el('div', 'panel__row');
+      row.appendChild(el('span', 'panel__label', this.i18n.t(`ui.service.${serviceClass}`)));
+
+      const slider = el('input', 'slider');
+      slider.type = 'range';
+      slider.min = '0';
+      slider.max = '100';
+      slider.step = '5';
+      slider.value = '100';
+      slider.addEventListener('input', () => {
+        this.callbacks.onFundingChange(serviceClass, Number(slider.value) / 100);
+      });
+      this.fundingInputs.set(serviceClass, slider);
+
+      const value = el('span', 'panel__value', '100 %');
+      this.values.set(`funding-${serviceClass}`, value);
+
+      row.append(slider, value);
+      panel.appendChild(row);
     }
 
     this.panels.appendChild(panel);

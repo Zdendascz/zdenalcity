@@ -358,6 +358,34 @@ describe('rozpad rozpočtu', () => {
     expect(line?.upkeep).toBe(200);
   });
 
+  it('financování škáluje údržbu služby i částku za kus', () => {
+    const STATION: Definition = {
+      ...MONUMENT,
+      id: 'test:station',
+      category: 'service',
+      economy: { upkeep: 120 },
+      service: { class: 'health', radius: 5, strength: 50 },
+    };
+    const catalogue = catalogueOf(STATION);
+    const world = createWorld(1);
+    place(world, STATION, 5, 5);
+
+    expect(computeBudget(world, catalogue).lines[0]).toMatchObject({
+      upkeep: 120,
+      upkeepEach: 120,
+    });
+
+    world.serviceFunding.set('health', 0.5);
+
+    // Rozpis musí sedět: 1 × 60 = 60, ne 1 × 120 = 60.
+    expect(computeBudget(world, catalogue).lines[0]).toMatchObject({
+      upkeep: 60,
+      upkeepEach: 60,
+      upkeepCount: 1,
+      count: 1,
+    });
+  });
+
   it('součet řádků sedí s celkem', () => {
     const catalogue = catalogueOf(HOUSE, FACTORY, MONUMENT);
     const world = createWorld(1);

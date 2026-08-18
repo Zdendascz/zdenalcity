@@ -1,0 +1,29 @@
+{
+  "id": "vanilla:school",
+  "type": "building",
+  "category": "service",
+  "name": "building.school.name",
+  "description": "building.school.desc",
+  "footprint": [3, 3],
+  "construction": {
+    "cost": 800,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 150
+  },
+  "jobs": {
+    "capacity": 15
+  },
+  "service": {
+    "class": "education",
+    "radius": 10,
+    "strength": 80
+  },
+  "graphics": {
+    "color": "#c8a86a",
+    "heightLevels": 1
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "vanilla:clinic",
+  "type": "building",
+  "category": "service",
+  "name": "building.clinic.name",
+  "description": "building.clinic.desc",
+  "footprint": [2, 2],
+  "construction": {
+    "cost": 600,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 120
+  },
+  "jobs": {
+    "capacity": 12
+  },
+  "service": {
+    "class": "health",
+    "radius": 10,
+    "strength": 70
+  },
+  "graphics": {
+    "color": "#dfe4ea",
+    "heightLevels": 1
+  }
+}

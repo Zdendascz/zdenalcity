@@ -1,0 +1,29 @@
+{
+  "id": "vanilla:fire_station",
+  "type": "building",
+  "category": "service",
+  "name": "building.fire_station.name",
+  "description": "building.fire_station.desc",
+  "footprint": [2, 2],
+  "construction": {
+    "cost": 500,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 100
+  },
+  "jobs": {
+    "capacity": 8
+  },
+  "service": {
+    "class": "fire",
+    "radius": 10,
+    "strength": 60
+  },
+  "graphics": {
+    "color": "#c05a4a",
+    "heightLevels": 1
+  }
+}

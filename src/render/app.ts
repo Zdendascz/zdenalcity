@@ -331,7 +331,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     coarseOverlay.setActive(overlayMode === 'power' ? 'none' : overlayMode);
   }
 
-  const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, {
+  /** Třídy služeb, které vůbec existují v obsahu. Pořadí je stabilní. */
+  const serviceClasses = [
+    ...new Set(
+      content
+        .getAll('building')
+        .map((definition) => definition.service?.class)
+        .filter((serviceClass): serviceClass is string => serviceClass !== undefined),
+    ),
+  ].sort();
+
+  const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, serviceClasses, {
     onSpeed: setSpeed,
     onTaxChange: changeTax,
     onQuickSave: quickSaveNow,
@@ -346,6 +356,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     },
     onToggleOverlay: toggleOverlay,
     onToggleBudget: () => budgetPanel.toggle(),
+    onFundingChange: (serviceClass, funding) =>
+      dispatch({ type: 'set_service_funding', serviceClass, funding }),
     onLanguageChange: (language) => i18n.setLanguage(language),
   });
 
@@ -594,6 +606,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       overlay: overlayMode,
       budgetVisible: budgetPanel.isVisible(),
       poweredBuildings,
+      funding: simWorld.serviceFunding,
       message: message ? i18n.t(message.key, message.params) : '',
     });
 

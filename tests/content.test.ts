@@ -56,11 +56,17 @@ describe('vanilla obsah', () => {
 
     const buildings = registry.getAll('building');
     expect(buildings.map((b) => b.id).sort()).toEqual([
+      'vanilla:clinic',
       'vanilla:coal_power_plant',
       'vanilla:commercial_small',
+      'vanilla:fire_station',
+      'vanilla:incinerator',
       'vanilla:industrial_small',
+      'vanilla:landfill',
+      'vanilla:park_small',
       'vanilla:police_small',
       'vanilla:residential_small',
+      'vanilla:school',
     ]);
   });
 
