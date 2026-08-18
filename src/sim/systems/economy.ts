@@ -20,9 +20,14 @@ import type { System } from './index';
  */
 
 /** Kolik peněz za měsíc vynese jeden obyvatel nebo jedno pracovní místo při 100 %. */
-const TAXABLE_VALUE_PER_UNIT = 40;
+export const TAXABLE_VALUE_PER_UNIT = 40;
 
-/** Jeden řádek rozpočtu — jedna definice budovy. */
+/**
+ * Jeden řádek rozpočtu — jedna definice budovy.
+ *
+ * Kromě výsledků nese i vstupy, ze kterých se spočítal, aby UI mohlo ukázat
+ * **z čeho se příjem a náklad skládá**, a ne jen hotové číslo.
+ */
 export interface BudgetLine {
   definitionId: string;
   /** Lokalizační klíč jména budovy. */
@@ -31,6 +36,17 @@ export interface BudgetLine {
   poweredCount: number;
   income: number;
   upkeep: number;
+
+  /** Zdaňovaná veličina za všechny vydělávající budovy: obyvatelé, nebo místa. */
+  taxBase: number;
+  /** Lokalizační klíč jednotky základu; `null` u budov, které se nedaní. */
+  taxUnitKey: string | null;
+  /** Sazba v procentech; `null` u budov, které se nedaní. */
+  taxRate: number | null;
+  /** Údržba jedné budovy podle definice. */
+  upkeepEach: number;
+  /** Kolik budov údržbu opravdu platí — temné jsou mimo provoz. */
+  upkeepCount: number;
 }
 
 export interface Budget {
@@ -40,8 +56,18 @@ export interface Budget {
 }
 
 /**
- * Kolik daně odvede jedna budova za měsíc. Sdílí to rozpočet i detail budovy
- * v UI, aby daňový vzorec existoval jen na jednom místě.
+ * Daň ze zdaňovaného základu. Jediný daňový vzorec v celé hře — používá ho
+ * rozpočet i detail budovy, takže se výpis nemůže rozejít se skutečností.
+ */
+export function taxFrom(base: number, ratePercent: number): number {
+  return Math.round((base * TAXABLE_VALUE_PER_UNIT * ratePercent) / 100);
+}
+
+/**
+ * Kolik daně odvede jedna budova za měsíc.
+ *
+ * Rozpočet zaokrouhluje až celý řádek, takže součet jednotlivých budov se od
+ * řádku může lišit o jednotky — tohle je podíl budovy, ne účetní doklad.
  */
 export function buildingMonthlyTax(
   world: WorldState,
@@ -52,7 +78,7 @@ export function buildingMonthlyTax(
   if (!isRciCategory(category) || !building.powered) return 0;
 
   const taxable = category === 'residential' ? building.population : building.jobs;
-  return Math.round((taxable * TAXABLE_VALUE_PER_UNIT * world.economy.taxRates[category]) / 100);
+  return taxFrom(taxable, world.economy.taxRates[category]);
 }
 
 /** Platí budova údržbu? Temná budova je mimo provoz, takže ne. */
@@ -76,6 +102,11 @@ export function computeBudget(world: WorldState, catalogue: BuildingCatalogue): 
     const definition = catalogue.get(building.definitionId);
     if (!definition) continue;
 
+    const category = definition.category;
+    const taxedAs = isRciCategory(category) ? category : null;
+    /** Temná budova je mimo provoz: nedaní a neplatí údržbu. */
+    const operating = taxedAs === null || building.powered;
+
     let line = byDefinition.get(definition.id);
     if (!line) {
       line = {
@@ -85,20 +116,40 @@ export function computeBudget(world: WorldState, catalogue: BuildingCatalogue): 
         poweredCount: 0,
         income: 0,
         upkeep: 0,
+        taxBase: 0,
+        taxUnitKey:
+          taxedAs === null
+            ? null
+            : taxedAs === 'residential'
+              ? 'ui.budget.unit.population'
+              : 'ui.budget.unit.jobs',
+        taxRate: taxedAs === null ? null : world.economy.taxRates[taxedAs],
+        upkeepEach: definition.economy.upkeep,
+        upkeepCount: 0,
       };
       byDefinition.set(definition.id, line);
     }
 
     line.count++;
     if (building.powered) line.poweredCount++;
+    if (!operating) continue;
+
+    line.upkeepCount++;
+    if (taxedAs !== null) {
+      line.taxBase += taxedAs === 'residential' ? building.population : building.jobs;
+    }
 
     const upkeep = buildingMonthlyUpkeep(definition, building);
-    const tax = buildingMonthlyTax(world, definition, building);
-
     line.upkeep += upkeep;
-    line.income += tax;
     expenses += upkeep;
-    income += tax;
+  }
+
+  // Daň se zaokrouhluje **jednou za řádek**, ne u každé budovy. Jinak by rozpis
+  // v UI tvrdil něco jiného, než kolik ve sloupci opravdu stojí.
+  for (const line of byDefinition.values()) {
+    if (line.taxRate === null) continue;
+    line.income = taxFrom(line.taxBase, line.taxRate);
+    income += line.income;
   }
 
   return {

@@ -1,5 +1,6 @@
 import type { Definition } from '@/content/schema';
-import type { Budget } from '@/sim/systems/economy';
+import { TAXABLE_VALUE_PER_UNIT } from '@/sim/systems/economy';
+import type { Budget, BudgetLine } from '@/sim/systems/economy';
 import { button, el } from './dom';
 import { formatNumber } from './format';
 import type { I18n } from './i18n';
@@ -84,6 +85,16 @@ export class BudgetPanel {
       const netCell = el('td', net < 0 ? 'is-negative' : undefined, formatNumber(net));
       row.appendChild(netCell);
       table.appendChild(row);
+
+      // Pod řádkem rozpis, ze kterého je vidět, odkud se čísla vzala.
+      const breakdown = line ? this.describe(line) : '';
+      if (breakdown) {
+        const note = el('tr', 'sheet__breakdown');
+        const cell = el('td', undefined, breakdown);
+        cell.colSpan = 7;
+        note.appendChild(cell);
+        table.appendChild(note);
+      }
     }
 
     const total = el('tr', 'sheet__total');
@@ -98,6 +109,41 @@ export class BudgetPanel {
     table.appendChild(total);
 
     this.root.appendChild(table);
-    this.root.appendChild(el('p', 'sheet__note', t('ui.budget.funds', { funds: formatNumber(funds) })));
+    this.root.appendChild(
+      el('p', 'sheet__note', t('ui.budget.funds', { funds: formatNumber(funds) })),
+    );
+  }
+
+  /** Slovní rozpis jednoho řádku: odkud se vzal příjem a odkud údržba. */
+  private describe(line: BudgetLine): string {
+    const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
+    const parts: string[] = [];
+
+    if (line.taxUnitKey !== null && line.taxRate !== null) {
+      parts.push(
+        t('ui.budget.formula.tax', {
+          base: formatNumber(line.taxBase),
+          unit: t(line.taxUnitKey),
+          value: TAXABLE_VALUE_PER_UNIT,
+          rate: line.taxRate,
+          income: formatNumber(line.income),
+        }),
+      );
+    }
+
+    if (line.upkeepCount > 0) {
+      parts.push(
+        t('ui.budget.formula.upkeep', {
+          count: line.upkeepCount,
+          each: formatNumber(line.upkeepEach),
+          total: formatNumber(line.upkeep),
+        }),
+      );
+    }
+
+    const idle = line.count - line.poweredCount;
+    if (idle > 0) parts.push(t('ui.budget.formula.idle', { count: idle }));
+
+    return parts.join('  ·  ');
   }
 }

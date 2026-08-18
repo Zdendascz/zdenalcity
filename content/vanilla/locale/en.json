@@ -62,6 +62,11 @@
   "ui.budget.net": "Net",
   "ui.budget.total": "Monthly total",
   "ui.budget.funds": "Funds: {funds}. An unpowered building earns nothing and costs nothing.",
+  "ui.budget.unit.population": "residents",
+  "ui.budget.unit.jobs": "jobs",
+  "ui.budget.formula.tax": "tax: {base} {unit} × {value} × {rate} % = {income}",
+  "ui.budget.formula.upkeep": "upkeep: {count} × {each} = {total}",
+  "ui.budget.formula.idle": "{count} idle (no power)",
 
   "ui.info.position": "Position",
   "ui.info.footprint": "Footprint",

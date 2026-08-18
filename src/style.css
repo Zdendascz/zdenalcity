@@ -389,6 +389,13 @@ body {
   text-align: left;
 }
 
+.sheet__breakdown td {
+  padding: 0 0 6px 12px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: left;
+}
+
 .sheet__total td {
   padding-top: 6px;
   border-top: 1px solid var(--panel-border);

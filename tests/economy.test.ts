@@ -7,6 +7,7 @@ import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, placeDefinition, setTaxRate, zoneArea } from '@/sim/commands';
 import { ZONE } from '@/sim/layers';
 import { createDemandSystem, createEconomySystem, createGrowthSystem } from '@/sim/systems';
+import { computeBudget } from '@/sim/systems/economy';
 import { createWorld, MAX_TAX_RATE, STARTING_FUNDS, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 
@@ -315,6 +316,62 @@ describe('stavba za peníze', () => {
   });
 });
 
+describe('rozpad rozpočtu', () => {
+  it('nese vstupy, ze kterých se příjem a údržba spočítaly', () => {
+    const catalogue = catalogueOf(HOUSE, FACTORY);
+    const world = createWorld(1);
+    for (let i = 0; i < 3; i++) place(world, HOUSE, 5 + i, 5);
+    place(world, HOUSE, 9, 5, false); // temný dům
+    place(world, FACTORY, 5, 8);
+
+    const budget = computeBudget(world, catalogue);
+    const domy = budget.lines.find((line) => line.definitionId === 'test:house');
+    const tovarna = budget.lines.find((line) => line.definitionId === 'test:factory');
+
+    // Tři svítící domy po osmi obyvatelích; temný se do základu nepočítá.
+    expect(domy).toMatchObject({
+      count: 4,
+      poweredCount: 3,
+      taxBase: 24,
+      taxUnitKey: 'ui.budget.unit.population',
+      taxRate: 7,
+      upkeepEach: 10,
+      upkeepCount: 3,
+    });
+    // 24 × 40 × 7 % = 67,2 → 67. Údržba 3 × 10.
+    expect(domy?.income).toBe(67);
+    expect(domy?.upkeep).toBe(30);
+
+    expect(tovarna).toMatchObject({ taxBase: 12, taxUnitKey: 'ui.budget.unit.jobs' });
+  });
+
+  it('u infrastruktury nevykazuje daň, jen údržbu', () => {
+    const catalogue = catalogueOf(MONUMENT);
+    const world = createWorld(1);
+    place(world, MONUMENT, 5, 5);
+
+    const line = computeBudget(world, catalogue).lines[0];
+
+    expect(line?.taxRate).toBeNull();
+    expect(line?.taxUnitKey).toBeNull();
+    expect(line?.upkeepCount).toBe(1);
+    expect(line?.upkeep).toBe(200);
+  });
+
+  it('součet řádků sedí s celkem', () => {
+    const catalogue = catalogueOf(HOUSE, FACTORY, MONUMENT);
+    const world = createWorld(1);
+    for (let i = 0; i < 5; i++) place(world, HOUSE, 5 + i, 5);
+    place(world, FACTORY, 5, 8);
+    place(world, MONUMENT, 9, 8);
+
+    const budget = computeBudget(world, catalogue);
+
+    expect(budget.lines.reduce((sum, line) => sum + line.income, 0)).toBe(budget.income);
+    expect(budget.lines.reduce((sum, line) => sum + line.upkeep, 0)).toBe(budget.expenses);
+  });
+});
+
 describe('důsledek elektřiny', () => {
   it('budova bez proudu nedaní a nefiguruje ani ve výdajích', () => {
     const catalogue = catalogueOf(HOUSE);
@@ -352,8 +409,8 @@ describe('důsledek elektřiny', () => {
     for (const house of houses) house.powered = true;
     tickMonth(world, catalogue);
 
-    // 3 domy × 8 obyvatel × 40 × 7 % = 67
-    expect(world.economy.lastIncome).toBe(66);
+    // 24 obyvatel × 40 × 7 % = 67
+    expect(world.economy.lastIncome).toBe(67);
     expect(world.economy.lastExpenses).toBe(30);
   });
 

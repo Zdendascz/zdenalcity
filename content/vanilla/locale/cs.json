@@ -62,6 +62,11 @@
   "ui.budget.net": "Čistě",
   "ui.budget.total": "Celkem za měsíc",
   "ui.budget.funds": "Stav kasy: {funds}. Temná budova nevydělává ani nestojí údržbu.",
+  "ui.budget.unit.population": "obyvatel",
+  "ui.budget.unit.jobs": "prac. míst",
+  "ui.budget.formula.tax": "daň: {base} {unit} × {value} × {rate} % = {income}",
+  "ui.budget.formula.upkeep": "údržba: {count} × {each} = {total}",
+  "ui.budget.formula.idle": "{count} mimo provoz (bez proudu)",
 
   "ui.info.position": "Pozice",
   "ui.info.footprint": "Půdorys",

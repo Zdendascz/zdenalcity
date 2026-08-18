@@ -290,6 +290,9 @@ Ověřeno (`npm run check`, 15 souborů / 181 testů) a v běžící hře:
   kolik jich je pod proudem, příjem, údržbu a čistý výnos po budovách plus
   celkový součet. Čísla počítá `computeBudget` v simulaci — ta samá funkce,
   ze které žije měsíční rozpočet, aby se výpis nemohl rozejít se skutečností.
+- **Pod každým řádkem je rozpis, z čeho se číslo skládá**: `daň: 264 obyvatel
+  × 40 × 7 % = 739 · údržba: 33 × 10 = 330 · 2 mimo provoz (bez proudu)`.
+  Ověřeno v běžící hře, že sedí do jedničky včetně součtů.
 - **Detail budovy pravým tlačítkem**: pozice, půdorys, datum postavení, cena,
   populace, práce, výroba a spotřeba elektřiny, připojení, daně a údržba za
   měsíc, znečištění. Bourání se tím přesunulo výhradně na nástroj (`X`).
@@ -328,6 +331,8 @@ _(nic)_
 | 2026-08-18 | Stejné hlášky se v bublinách nehromadí, jen si přičtou počet | Malování silnice přes vodu by jinak vysypalo padesát bublin přes celou obrazovku. |
 | 2026-08-18 | `error.occupied` rozděleno na dva klíče | Jeden klíč sloužil silnici (bez parametrů) i půdorysu budovy (s `{width} × {depth}`), takže se hráči u silnice vypsaly složené závorky. Odhalilo se to až v běžící hře, ne v testech — proto teď existuje test, který hlídá, že se hláška se zástupným symbolem nikdy neodmítá bez parametrů. |
 | 2026-08-18 | Detail budovy je na pravém tlačítku, bourání jen na nástroji | T3 dalo bourání na pravé tlačítko, ale autor si vyžádal na něm info o budově. Bourání zůstává jako nástroj pod `X` a v paletě. |
+| 2026-08-18 | **Daň se zaokrouhluje jednou za řádek rozpočtu, ne u každé budovy** | Vyplynulo z požadavku ukázat rozpis: při zaokrouhlování po budovách vycházelo třem domům 66, ale rozpis by tvrdil `24 × 40 × 7 % = 67`. Buď rozpis lže, nebo se zaokrouhluje jinak — vybráno druhé. Cena: podíl jedné budovy v jejím detailu se od řádku může lišit o jednotky, což je v komentáři funkce napsané. |
+| 2026-08-18 | `BudgetLine` nese i vstupy, nejen výsledky | Základ daně, sazba, údržba za kus a počet platících budov. UI si tak nic nedopočítává a rozpis nemůže tvrdit něco jiného než sloupec vedle. |
 | 2026-08-18 | Rozpočet i tabulka počítají jednou funkcí `computeBudget` | Kdyby si UI daně dopočítávalo samo, výpis a skutečnost by se dřív nebo později rozešly. |
 | 2026-08-18 | **Chunk je retained `Graphics`, ne `RenderTexture`** — odchylka od §6 | Izometrické diamanty se zaklesávají, takže opsaný obdélník chunku měl 1024×512 px a 64 chunků zabralo 128 MB VRAM, z toho polovina průhledné plochy. `Graphics` se do GPU nahraje jednou a mezi překreslením se jen vykresluje, takže výkonový důvod chunkování platí dál — změřeno 0,1 ms na snímek při plném oddálení. Chunkování ani dirty tracking se neruší, mění se jen nosič. |
 | 2026-08-18 | **Budova bez proudu nedaní, ale ani nestojí údržbu** | První pokus nechal temným budovám údržbu. V běžící hře se ukázalo, že to vytváří past bez východiska: město bez elektrárny mělo nulový příjem a nenulové výdaje, spadlo z 20 000 na −33 325 a pak už na elektrárnu nikdy nevydělalo. Temná budova je proto mimo provoz úplně. |
