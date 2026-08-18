@@ -23,6 +23,7 @@ export function createVanillaSource(): ContentSource {
   });
 
   let manifest: unknown = undefined;
+  let balance: unknown = undefined;
   const definitions: RawFile[] = [];
   const locales: Record<string, unknown> = {};
 
@@ -33,6 +34,8 @@ export function createVanillaSource(): ContentSource {
 
     if (path === 'manifest.json') {
       manifest = data;
+    } else if (path === 'balance.json') {
+      balance = data;
     } else if (path.startsWith('buildings/')) {
       definitions.push({ path, data });
     } else if (path.startsWith('locale/')) {
@@ -40,5 +43,5 @@ export function createVanillaSource(): ContentSource {
     }
   }
 
-  return { label: SOURCE_ROOT.replace(/\/$/, ''), manifest, definitions, locales };
+  return { label: SOURCE_ROOT.replace(/\/$/, ''), manifest, balance, definitions, locales };
 }

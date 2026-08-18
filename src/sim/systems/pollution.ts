@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { COARSE_CELLS, coarseIndex } from '../coarse';
 import { diffuse } from '../diffusion';
@@ -16,20 +17,9 @@ import type { System } from './index';
  *    buňky. Skládka je levná a sama silně znečišťuje své okolí, spalovna je
  *    drahá a znečišťuje méně — čistý prostorový kompromis bez nové vrstvy.
  *
- * Difuzní konstanty tady zatím žijí v kódu. Do `balance.json` se stěhují v T15,
- * spolu s celým balancem fáze 2 — konstanty odpadu tam přibudou, v ukázkovém
- * `balance.json` v zadání totiž sekci `waste` nemají.
+ * Všechny konstanty jdou z `balance.json` (§10) — v kódu není ani jedna.
  */
-const SPREAD = 0.4;
-const DECAY = 0.94;
-const PASSES = 2;
-
-/** Kolik odpadu vyrobí jeden obyvatel za jeden běh systému. */
-const WASTE_PER_CITIZEN = 0.1;
-/** Kolik znečištění přidá do každé buňky jednotka nepokrytého odpadu. */
-const WASTE_TO_POLLUTION = 0.02;
-
-export function createPollutionSystem(catalogue: BuildingCatalogue): System {
+export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Balance): System {
   return {
     name: 'pollution',
     interval: 8,
@@ -59,16 +49,17 @@ export function createPollutionSystem(catalogue: BuildingCatalogue): System {
         sources[at] = (sources[at] ?? 0) + emitted;
       }
 
-      const generatedWaste = population * WASTE_PER_CITIZEN;
+      const generatedWaste = population * balance.waste.perCitizen;
       const unhandledWaste = Math.max(0, generatedWaste - wasteCapacity);
-      const cityWide = unhandledWaste * WASTE_TO_POLLUTION;
+      const cityWide = unhandledWaste * balance.waste.toPollution;
       if (cityWide > 0) {
         for (let cell = 0; cell < sources.length; cell++) {
           sources[cell] = (sources[cell] ?? 0) + cityWide;
         }
       }
 
-      diffuse(world.coarse.pollution, sources, SPREAD, DECAY, PASSES);
+      const { spread, decay, passes } = balance.diffusion;
+      diffuse(world.coarse.pollution, sources, spread, decay, passes);
       world.dirty.coarseChanged = true;
     },
   };

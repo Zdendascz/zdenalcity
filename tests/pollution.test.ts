@@ -17,6 +17,7 @@ import { MAP_SIZE } from '@/sim/layers';
 import { createPollutionSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { VANILLA_BALANCE } from './support/balance';
 
 const FACTORY: Definition = {
   id: 'test:factory',
@@ -50,7 +51,7 @@ function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
 
 /** Odtiká tolik tiků, aby difuze proběhla `runs`krát (interval 8, offset 3). */
 function runPollution(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
-  const system = createPollutionSystem(catalogue);
+  const system = createPollutionSystem(catalogue, VANILLA_BALANCE);
   for (let tick = 0; tick < runs * system.interval + system.offset; tick++) {
     tickWorld(world, [system]);
   }

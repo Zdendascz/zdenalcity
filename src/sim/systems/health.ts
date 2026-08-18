@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
 import { coverageOf, markBuildingDirty } from '../world';
@@ -14,29 +15,18 @@ import type { System } from './index';
  * Ubývá pomalu schválně: hráč má mít čas si problému všimnout dřív, než mu
  * čtvrť vymře.
  *
- * Konstanty se v T15 stěhují do `balance.json`.
+ * `unservedRatio` je podlaha poklesu. Bez ní by město bez kliniky vymřelo na
+ * nulu, a protože na začátku hry žádná klinika nestojí, byl by to nevyhnutelný
+ * konec. Odhalil to test savu, kterému po 600 ticích vyšla nulová populace.
+ * Zdravotnictví je tak pobídka k růstu, ne past.
+ *
+ * Konstanty jdou z `balance.json` (§10).
  */
 const INTERVAL = 16;
 /** Offset mimo cenu půdy (5) i kriminalitu (11). */
 const OFFSET = 13;
 
-/** Pod tímhle pokrytím začnou lidé odcházet. */
-const COVERAGE_THRESHOLD = 20;
-/** Kolik obyvatel budova ztratí, respektive získá, za jeden běh. */
-const DECLINE_STEP = 1;
-const RECOVERY_STEP = 1;
-
-/**
- * Kam až populace bez zdravotní péče klesne — polovina kapacity.
- *
- * Bez podlahy by město bez kliniky vymřelo na nulu, a protože na začátku hry
- * žádná klinika nestojí, byl by to nevyhnutelný konec. Odhalil to test savu,
- * kterému po 600 ticích vyšla nulová populace. Zdravotnictví je tak pobídka
- * k růstu, ne past.
- */
-const UNSERVED_RATIO = 0.5;
-
-export function createHealthSystem(catalogue: BuildingCatalogue): System {
+export function createHealthSystem(catalogue: BuildingCatalogue, balance: Balance): System {
   return {
     name: 'health',
     interval: INTERVAL,
@@ -48,12 +38,13 @@ export function createHealthSystem(catalogue: BuildingCatalogue): System {
         const capacity = catalogue.get(building.definitionId)?.population?.capacity ?? 0;
         if (capacity === 0) continue;
 
-        const covered = (coverage?.[coarseIndex(building.x, building.y)] ?? 0) >= COVERAGE_THRESHOLD;
-        const floor = Math.ceil(capacity * UNSERVED_RATIO);
+        const covered =
+          (coverage?.[coarseIndex(building.x, building.y)] ?? 0) >= balance.health.coverageThreshold;
+        const floor = Math.ceil(capacity * balance.health.unservedRatio);
 
         const next = covered
-          ? Math.min(capacity, building.population + RECOVERY_STEP)
-          : Math.max(floor, building.population - DECLINE_STEP);
+          ? Math.min(capacity, building.population + balance.health.recoveryStep)
+          : Math.max(floor, building.population - balance.health.declineStep);
 
         if (next === building.population) continue;
         building.population = next;

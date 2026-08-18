@@ -1,0 +1,52 @@
+{
+  "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },
+
+  "landValue": {
+    "base": 40,
+    "smoothing": 0.25,
+    "waterBonus": 25,
+    "weights": {
+      "pollution": 0.8,
+      "crime": 0.7,
+      "police": 0.2,
+      "fire": 0.2,
+      "health": 0.3,
+      "education": 0.4,
+      "parks": 0.5
+    }
+  },
+
+  "crime": {
+    "smoothing": 0.25,
+    "population": 0.6,
+    "unemployment": 40,
+    "abandoned": 30,
+    "police": 0.9
+  },
+
+  "waste": { "perCitizen": 0.1, "toPollution": 0.02 },
+
+  "health": {
+    "coverageThreshold": 20,
+    "declineStep": 1,
+    "recoveryStep": 1,
+    "unservedRatio": 0.5
+  },
+
+  "levels": {
+    "thresholds": [0, 0, 90, 130, 170, 210],
+    "hysteresis": 15,
+    "cooldown": 60,
+    "downgradeConfirm": 3,
+    "decayAge": 3600,
+    "decayCoverageThreshold": 20
+  },
+
+  "growth": {
+    "exponent": 1.5,
+    "demandPerAttempt": 8,
+    "maxAttempts": 12,
+    "neutralTaxRate": 7,
+    "taxRange": 20
+  }
+}

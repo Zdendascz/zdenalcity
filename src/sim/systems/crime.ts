@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import { COARSE_SIZE, coarseIndex } from '../coarse';
 import { coverageOf } from '../world';
 import type { WorldState } from '../world';
@@ -19,17 +20,13 @@ import type { System } from './index';
  *
  * Opuštěné budovy do vzorce přibudou v T17, do té doby žádné neexistují.
  *
- * Konstanty se v T15 stěhují do `balance.json`.
+ * Konstanty jdou z `balance.json` (§10).
  */
-const SMOOTHING = 0.25;
-const POPULATION_WEIGHT = 0.6;
-const UNEMPLOYMENT_WEIGHT = 40;
-const POLICE_WEIGHT = 0.9;
 
-/** Kolik z populace chodí do práce. Musí sedět s `demand.ts`. */
+/** Kolik z populace chodí do práce. Musí sedět s `demand.ts` — balanc fáze 1. */
 const WORKER_RATIO = 0.5;
 
-export function createCrimeSystem(): System {
+export function createCrimeSystem(balance: Balance): System {
   return {
     name: 'crime',
     interval: 16,
@@ -54,20 +51,20 @@ export function createCrimeSystem(): System {
       // nezaměstnaností má problém všude, ne jen v jedné čtvrti.
       const workers = population * WORKER_RATIO;
       const unemployment = workers > 0 ? Math.max(0, Math.min(1, (workers - jobs) / workers)) : 0;
-      const unemploymentTerm = unemployment * UNEMPLOYMENT_WEIGHT;
+      const unemploymentTerm = unemployment * balance.crime.unemployment;
 
       const police = coverageOf(world, 'police');
       const crime = world.coarse.crime;
 
       for (let cell = 0; cell < crime.length; cell++) {
         const raw =
-          (density[cell] ?? 0) * POPULATION_WEIGHT +
+          (density[cell] ?? 0) * balance.crime.population +
           unemploymentTerm -
-          (police?.[cell] ?? 0) * POLICE_WEIGHT;
+          (police?.[cell] ?? 0) * balance.crime.police;
 
         const current = crime[cell] ?? 0;
         const delta = raw - current;
-        const next = current + delta * SMOOTHING;
+        const next = current + delta * balance.crime.smoothing;
 
         // Zaokrouhlení ve směru pohybu — stejný důvod jako u ceny půdy.
         const stepped = delta > 0 ? Math.ceil(next) : Math.floor(next);

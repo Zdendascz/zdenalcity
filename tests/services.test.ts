@@ -8,6 +8,7 @@ import { COARSE_FACTOR, coarseIndex, hashCoarseLayers } from '@/sim/coarse';
 import { createCrimeSystem, createLandValueSystem, createServiceSystem } from '@/sim/systems';
 import { createWorld, removeBuilding, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { VANILLA_BALANCE } from './support/balance';
 
 const STATION: Definition = {
   id: 'test:station',
@@ -136,7 +137,7 @@ describe('pokrytí službami', () => {
 describe('kriminalita', () => {
   /** Odtiká tolik tiků, aby kriminalita proběhla `runs`krát (interval 16, offset 11). */
   function runCrime(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
-    const systems = [createServiceSystem(catalogue), createCrimeSystem()];
+    const systems = [createServiceSystem(catalogue), createCrimeSystem(VANILLA_BALANCE)];
     for (let tick = 0; tick < runs * 16 + 11; tick++) tickWorld(world, systems);
   }
 
@@ -179,14 +180,14 @@ describe('kriminalita', () => {
   });
 
   it('běží každých 16 tiků s offsetem 11', () => {
-    const system = createCrimeSystem();
+    const system = createCrimeSystem(VANILLA_BALANCE);
     expect([system.name, system.interval, system.offset]).toEqual(['crime', 16, 11]);
   });
 });
 
 describe('vazba na cenu půdy', () => {
   function runAll(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
-    const systems = [createServiceSystem(catalogue), createCrimeSystem(), createLandValueSystem()];
+    const systems = [createServiceSystem(catalogue), createCrimeSystem(VANILLA_BALANCE), createLandValueSystem(VANILLA_BALANCE)];
     for (let tick = 0; tick < runs * 16 + 11; tick++) tickWorld(world, systems);
   }
 

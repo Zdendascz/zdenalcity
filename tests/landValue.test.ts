@@ -7,6 +7,7 @@ import { index, TERRAIN } from '@/sim/layers';
 import { createLandValueSystem, createPollutionSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { VANILLA_BALANCE } from './support/balance';
 
 const FACTORY: Definition = {
   id: 'test:factory',
@@ -30,8 +31,8 @@ const catalogue: BuildingCatalogue = {
 /** Odtiká tolik tiků, aby cena půdy proběhla `runs`krát (interval 16, offset 5). */
 function runLandValue(world: WorldState, runs: number, withPollution = false): void {
   const systems = withPollution
-    ? [createPollutionSystem(catalogue), createLandValueSystem()]
-    : [createLandValueSystem()];
+    ? [createPollutionSystem(catalogue, VANILLA_BALANCE), createLandValueSystem(VANILLA_BALANCE)]
+    : [createLandValueSystem(VANILLA_BALANCE)];
   const total = runs * 16 + 5;
   for (let tick = 0; tick < total; tick++) tickWorld(world, systems);
 }
@@ -144,7 +145,7 @@ describe('cena půdy', () => {
   });
 
   it('běží každých 16 tiků s offsetem 5', () => {
-    const system = createLandValueSystem();
+    const system = createLandValueSystem(VANILLA_BALANCE);
     expect([system.name, system.interval, system.offset]).toEqual(['landValue', 16, 5]);
   });
 });

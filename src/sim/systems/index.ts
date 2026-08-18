@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import type { WorldState } from '../world';
 import { createPowerSystem } from './power';
@@ -32,7 +33,7 @@ export function shouldRun(tick: number, interval: number, offset: number): boole
  * Všechny systémy potřebují obsah, takže je registr funkce, ne konstanta.
  * Systém si katalog uzavře do closure a `run(world)` zůstává beze změny.
  */
-export function createDefaultSystems(catalogue: BuildingCatalogue): System[] {
+export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Balance): System[] {
   // Pořadí podle tabulky v architektuře §5: systémy fáze 2 jsou za těmi z fáze 1.
   return [
     createPowerSystem(catalogue),
@@ -41,10 +42,10 @@ export function createDefaultSystems(catalogue: BuildingCatalogue): System[] {
     createDemandSystem(catalogue),
     createGrowthSystem(catalogue),
     createEconomySystem(catalogue),
-    createPollutionSystem(catalogue),
-    createCrimeSystem(),
-    createHealthSystem(catalogue),
-    createLandValueSystem(),
+    createPollutionSystem(catalogue, balance),
+    createCrimeSystem(balance),
+    createHealthSystem(catalogue, balance),
+    createLandValueSystem(balance),
   ];
 }
 

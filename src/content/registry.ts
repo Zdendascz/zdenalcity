@@ -1,3 +1,5 @@
+import { validateBalance } from './balance';
+import type { Balance } from './balance';
 import { validateDefinition, validateManifest } from './schema';
 import type { Definition, ValidationIssue } from './schema';
 
@@ -19,6 +21,11 @@ export interface ContentSource {
   readonly definitions: readonly RawFile[];
   /** Klíč = kód jazyka (`cs`, `en`). Hodnota = plochý objekt klíč → text. */
   readonly locales: Readonly<Record<string, unknown>>;
+  /**
+   * Balanc. Zdroj ho mít nemusí; když ho má, musí být úplný a přepíše ten
+   * dosavadní — tak mod přeladí hru bez zásahu do definic.
+   */
+  readonly balance?: unknown;
 }
 
 export interface SourceInfo {
@@ -47,6 +54,7 @@ export class ContentRegistry {
   private readonly sources: SourceInfo[] = [];
   /** jazyk → klíč → text, slito přes všechny zdroje (§10). */
   private readonly locales = new Map<string, Map<string, string>>();
+  private balance: Balance | null = null;
 
   /**
    * Načte zdroj. Buď projde celý, nebo se nezaregistruje nic — částečně
@@ -66,6 +74,13 @@ export class ContentRegistry {
       throw new ContentValidationError(source.label, [
         `manifest.json: id — zdroj "${manifest.id}" už je načtený`,
       ]);
+    }
+
+    let incomingBalance: Balance | null = null;
+    if (source.balance !== undefined) {
+      const result = validateBalance(source.balance);
+      problems.push(...describe('balance.json', result.issues));
+      incomingBalance = result.balance;
     }
 
     const incomingLocales = collectLocales(source, problems);
@@ -103,6 +118,8 @@ export class ContentRegistry {
       this.definitions.set(id, definition);
     }
 
+    if (incomingBalance) this.balance = incomingBalance;
+
     // Pozdější zdroj smí text přepsat — tak se překládají nebo přejmenovávají
     // cizí budovy, aniž by se sahalo na jejich definici.
     for (const [language, table] of incomingLocales) {
@@ -112,6 +129,17 @@ export class ContentRegistry {
     }
 
     this.sources.push({ id: manifest.id, name: manifest.name, version: manifest.version });
+  }
+
+  /**
+   * Balanc posledního zdroje, který ho dodal. Bez něj hra běžet nemůže —
+   * tichý default by znamenal, že se hra chová jinak, než balanc popisuje.
+   */
+  getBalance(): Balance {
+    if (!this.balance) {
+      throw new ContentValidationError('balance', ['žádný načtený zdroj nedodal balance.json']);
+    }
+    return this.balance;
   }
 
   /** Jazyky, ke kterým existuje aspoň jeden text. Seřazené, ať je pořadí stabilní. */

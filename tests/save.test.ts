@@ -54,7 +54,7 @@ async function builtCity(seed = 483928492): Promise<{ world: WorldState; content
   placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 41);
   setTaxRate(world, ZONE.residential, 9);
 
-  const systems = createDefaultSystems(content);
+  const systems = createDefaultSystems(content, content.getBalance());
   for (let tick = 0; tick < 600; tick++) tickWorld(world, systems);
 
   return { world, content };
@@ -142,7 +142,7 @@ describe('round-trip', () => {
     expect(restored.seed).toBe(before.seed);
 
     // A hlavně: pokračování hry se nesmí rozejít.
-    const systems = createDefaultSystems(content);
+    const systems = createDefaultSystems(content, content.getBalance());
     for (let tick = 0; tick < 120; tick++) {
       tickWorld(world, systems);
       tickWorld(restored, systems);

@@ -5,6 +5,7 @@ import type { System } from '@/sim/systems';
 import { createWorld, markTileDirty, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { index } from '@/sim/layers';
+import { VANILLA_BALANCE } from './support/balance';
 
 /** Prázdný katalog — tyhle testy se obsahu netýkají. */
 const NO_CONTENT = { get: () => undefined, byCategory: () => [] };
@@ -89,7 +90,7 @@ describe('fázování systémů', () => {
   });
 
   it('registrované systémy mají intervaly a offsety podle architektury §5', () => {
-    const systems = createDefaultSystems(NO_CONTENT);
+    const systems = createDefaultSystems(NO_CONTENT, VANILLA_BALANCE);
     expect(systems.map((s) => [s.name, s.interval, s.offset])).toEqual([
       ['power', 1, 0],
       ['services', 1, 0],

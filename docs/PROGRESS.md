@@ -389,8 +389,29 @@ Ověřeno v běžící hře čtením pixelů: volné místo dá `#85ad6a` (tráv
 místo překrývající policejní stanici `#85934b` (tráva + červená). U nástroje
 silnice zůstává zvýrazněná jedna dlaždice, u elektrárny šestnáct.
 
+- [x] T15 — `balance.json`, schéma, validace (fáze 2)
+
+Vzniklo:
+- `content/vanilla/balance.json` — všechny konstanty fáze 2 podle §10 zadání
+- `src/content/balance.ts` — typy a validace, desetinná čísla s rozsahy
+- `ContentRegistry.getBalance()`, `ContentSource.balance`
+- difuze, cena půdy, kriminalita a zdravotnictví berou konstanty odtud
+
+Ověřeno (`npm run check`, 19 souborů / 251 testů) a v běžící hře:
+- **v kódu nezůstala ani jedna konstanta fáze 2** — hlídá to test, který spustí
+  cenu půdy s upraveným balancem (základ 100, bonus vody 50) a čeká 150 a 100
+  místo vanilla 65 a 40; kdyby konstanty zůstaly v kódu, vyšlo by pořád 65 a 40
+- chybějící sekce je chyba, ne tichý default; hodnota mimo rozsah hlásí pole
+- váhy musí obsahovat znečištění i kriminalitu, zbytek jsou třídy služeb a ty
+  jsou otevřený seznam, protože třídy jsou obsah
+- mod s vlastním balancem ten stávající přepíše, mod bez něj ho nesmaže
+- bez balancu registr rovnou řekne, že chybí
+
+Sekce `levels` a `growth` se validují, ale zatím je nikdo nečte — patří k T16
+a T18. Jsou v souboru proto, že je tak zadání §10 definuje.
+
 ## Rozpracované
-_(nic — T14 uzavřeno, dál T15: balance.json)_
+_(nic — T15 uzavřeno, dál T16: úrovně budov)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -535,10 +556,11 @@ _(nic — T14 uzavřeno, dál T15: balance.json)_
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
   nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
   z nich pravděpodobně zmizí.
-- **Financování služeb zatím nemá ovládání ani dopad na rozpočet.** Stav
-  `serviceFunding` existuje a vzorec pokrytí s ním počítá (ověřeno testem
-  i v běžící hře), ale posuvník a `skutečnáÚdržba = upkeep × financování`
-  patří podle zadání do T14.
+- **Konstanty fáze 1 zůstávají v kódu.** `balance.json` je podle zadání balanc
+  fáze 2, takže hodnota daňové jednotky, startovní kapitál, váhy poptávky
+  a podíl pracujících jsou pořád v `demand.ts`, `economy.ts` a `world.ts`.
+  Podíl pracujících navíc existuje na dvou místech — v `demand.ts` a v `crime.ts`,
+  kde musí sedět. Sjednotit by to chtělo, až se bude ladit balanc fáze 1.
 - **Kriminalita zatím nepočítá s opuštěnými budovami** — ty vznikají až v T17.
 - **Na mapě není ani kapka vody, takže bonus vody nemá kde platit.** Zadání
   fáze 2 s ním počítá jako s jediným vstupem nezávislým na hráči, „aby mapa

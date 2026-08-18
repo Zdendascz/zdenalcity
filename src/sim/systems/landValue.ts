@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import { COARSE_FACTOR, COARSE_SIZE, coarseInBounds } from '../coarse';
 import { index, TERRAIN } from '../layers';
 import type { WorldState } from '../world';
@@ -21,24 +22,10 @@ import type { System } from './index';
  * Vyhlazení existuje proto, aby cena půdy nereagovala skokem — jinak by hráč
  * postavil park a celá čtvrť by okamžitě přeskočila o dvě úrovně.
  *
- * Konstanty se v T15 stěhují do `balance.json`.
+ * Všechny konstanty i váhy jdou z `balance.json` (§10). Váhy tříd služeb jsou
+ * otevřený seznam, protože třídy jsou obsah — mod si přidá vlastní.
  */
-const BASE = 40;
-const SMOOTHING = 0.25;
-const WATER_BONUS = 25;
-const POLLUTION_WEIGHT = 0.8;
-const CRIME_WEIGHT = 0.7;
-
-/** Váhy pokrytí podle třídy služby. Třída bez váhy cenu půdy neovlivní. */
-const SERVICE_WEIGHTS: Readonly<Record<string, number>> = {
-  police: 0.2,
-  fire: 0.2,
-  health: 0.3,
-  education: 0.4,
-  parks: 0.5,
-};
-
-export function createLandValueSystem(): System {
+export function createLandValueSystem(balance: Balance): System {
   return {
     name: 'landValue',
     interval: 16,
@@ -47,10 +34,12 @@ export function createLandValueSystem(): System {
       const water = waterProximity(world);
       const { landValue, pollution, crime } = world.coarse;
 
-      // Jen třídy, které ve městě opravdu jsou a mají váhu.
+      const { base, smoothing, waterBonus, weights } = balance.landValue;
+
+      // Jen třídy, které ve městě opravdu jsou a mají v balancu váhu.
       const services: [Uint8Array, number][] = [];
       for (const [serviceClass, coverage] of world.coverage) {
-        const weight = SERVICE_WEIGHTS[serviceClass];
+        const weight = weights[serviceClass];
         if (weight !== undefined) services.push([coverage, weight]);
       }
 
@@ -61,15 +50,15 @@ export function createLandValueSystem(): System {
         }
 
         const raw =
-          BASE +
+          base +
           services_ +
-          (water[cell] === 1 ? WATER_BONUS : 0) -
-          (pollution[cell] ?? 0) * POLLUTION_WEIGHT -
-          (crime[cell] ?? 0) * CRIME_WEIGHT;
+          (water[cell] === 1 ? waterBonus : 0) -
+          (pollution[cell] ?? 0) * (weights['pollution'] ?? 0) -
+          (crime[cell] ?? 0) * (weights['crime'] ?? 0);
 
         const current = landValue[cell] ?? 0;
         const delta = raw - current;
-        const next = current + delta * SMOOTHING;
+        const next = current + delta * smoothing;
 
         // Zaokrouhluje se **ve směru pohybu**. Se symetrickým zaokrouhlením by
         // se hodnota zasekla krok před cílem: rozdíl menší než dvě jednotky

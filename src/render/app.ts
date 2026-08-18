@@ -154,7 +154,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
   const simWorld = createWorld(SEED);
-  const host = createSimHost(simWorld, createDefaultSystems(content), content);
+  const host = createSimHost(
+    simWorld,
+    createDefaultSystems(content, content.getBalance()),
+    content,
+  );
   const world = host.getSnapshot();
 
   const app = new Application();
