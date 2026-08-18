@@ -1,8 +1,9 @@
 import { Container, Graphics } from 'pixi.js';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
-import { shade, WALL_LEFT_SHADE, WALL_RIGHT_SHADE } from './palette';
-import { cuboidFaces, LEVEL_H } from './projection';
+import { iconShape } from './icons';
+import { ICON_ALPHA, ICON_COLOR, luminance, shade, WALL_LEFT_SHADE, WALL_RIGHT_SHADE } from './palette';
+import { cuboidFaces, gridToScreen, LEVEL_H } from './projection';
 
 /**
  * Co renderer potřebuje vědět o definici budovy. Úzké rozhraní, aby `render/`
@@ -12,6 +13,8 @@ export interface BuildingAppearance {
   color: number;
   heightLevels: number;
   footprint: readonly [number, number];
+  /** Jméno symbolu na střeše, pokud ho definice má. */
+  icon?: string;
 }
 
 export type AppearanceLookup = (definitionId: string) => BuildingAppearance | undefined;
@@ -95,10 +98,48 @@ export class BuildingRenderer {
       .poly(faces.top)
       .fill({ color: appearance.color });
 
+    this.drawIcon(view, appearance, building.x + BUILDING_INSET, building.y + BUILDING_INSET, {
+      width: width - BUILDING_INSET * 2,
+      depth: depth - BUILDING_INSET * 2,
+      height,
+    });
+
     // Hloubka se řídí **předním rohem** půdorysu, ne počátkem. Kdyby se řadilo
     // podle `x + y`, dvoudlaždicová továrna by se schovala za jednodlaždicový
     // obchod, který stojí za ní — právě tak vypadala nahlášená chyba.
     view.zIndex = building.x + width + (building.y + depth);
+  }
+
+  /**
+   * Symbol na horní plochu. Kreslí se v jednotkovém čtverci a promítne se přes
+   * `gridToScreen`, takže sedí na půdorysu jakékoli velikosti a sám se naklopí
+   * do izometrie.
+   */
+  private drawIcon(
+    view: Graphics,
+    appearance: BuildingAppearance,
+    originX: number,
+    originY: number,
+    size: { width: number; depth: number; height: number },
+  ): void {
+    const shape = iconShape(appearance.icon);
+    if (!shape) return;
+
+    // Světlá budova potřebuje tmavý symbol a naopak, jinak splyne.
+    const color = luminance(appearance.color) > 0.55 ? shade(appearance.color, 0.45) : ICON_COLOR;
+
+    for (const polygon of shape) {
+      const points: number[] = [];
+      for (const [u, v] of polygon) {
+        // Symbol zabírá prostřední polovinu střechy, ať nelepí na hrany.
+        const point = gridToScreen(
+          originX + (0.25 + u * 0.5) * size.width,
+          originY + (0.25 + v * 0.5) * size.depth,
+        );
+        points.push(point.x, point.y - size.height);
+      }
+      view.poly(points).fill({ color, alpha: ICON_ALPHA });
+    }
   }
 
   private remove(id: number): void {

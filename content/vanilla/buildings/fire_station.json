@@ -24,6 +24,7 @@
   },
   "graphics": {
     "color": "#c05a4a",
-    "heightLevels": 1
+    "heightLevels": 1,
+    "icon": "flame"
   }
 }

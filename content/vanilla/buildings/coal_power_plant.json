@@ -25,6 +25,7 @@
   },
   "graphics": {
     "color": "#5a5a62",
-    "heightLevels": 2
+    "heightLevels": 2,
+    "icon": "bolt"
   }
 }

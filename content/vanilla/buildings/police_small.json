@@ -24,6 +24,7 @@
   },
   "graphics": {
     "color": "#6f7fa8",
-    "heightLevels": 1
+    "heightLevels": 1,
+    "icon": "shield"
   }
 }

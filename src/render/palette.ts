@@ -64,6 +64,21 @@ export const HOVER_LINE_ALPHA = 0.9;
 /** Půdorys, kam se stavba nevejde. */
 export const HOVER_BLOCKED_COLOR = 0xff6b52;
 
+/** Symbol na střeše budovy. Světlé budovy dostanou tmavý, ostatní tenhle. */
+export const ICON_COLOR = 0xffffff;
+export const ICON_ALPHA = 0.9;
+
+/**
+ * Vnímaný jas barvy v rozsahu 0–1. Používá se k rozhodnutí, jestli na budovu
+ * patří světlý, nebo tmavý symbol — jinak by na bílé klinice zmizel.
+ */
+export function luminance(color: number): number {
+  const r = ((color >> 16) & 0xff) / 255;
+  const g = ((color >> 8) & 0xff) / 255;
+  const b = (color & 0xff) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
 /** Násobitel pro hranu dlaždice — jemné odsazení sousedních diamantů. */
 export const TILE_EDGE_SHADE = 0.82;
 

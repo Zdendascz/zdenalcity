@@ -21,6 +21,7 @@
   },
   "graphics": {
     "color": "#4a9b5a",
-    "heightLevels": 1
+    "heightLevels": 1,
+    "icon": "tree"
   }
 }

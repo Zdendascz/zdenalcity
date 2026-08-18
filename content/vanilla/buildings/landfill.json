@@ -25,6 +25,7 @@
   },
   "graphics": {
     "color": "#7a6a4a",
-    "heightLevels": 1
+    "heightLevels": 1,
+    "icon": "bin"
   }
 }

@@ -66,10 +66,12 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
   return (definitionId) => {
     const definition = content.get(definitionId);
     if (!definition) return undefined;
+    const icon = definition.graphics.icon;
     return {
       color: Number.parseInt(definition.graphics.color.slice(1), 16),
       heightLevels: definition.graphics.heightLevels,
       footprint: definition.footprint,
+      ...(icon === undefined ? {} : { icon }),
     };
   };
 }

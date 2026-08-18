@@ -410,6 +410,20 @@ Ověřeno (`npm run check`, 19 souborů / 251 testů) a v běžící hře:
 Sekce `levels` a `growth` se validují, ale zatím je nikdo nečte — patří k T16
 a T18. Jsou v souboru proto, že je tak zadání §10 definuje.
 
+- [x] Symboly na střechách budov (na žádost autora)
+
+Služby a infrastruktura se v mapě pletly, protože se lišily jen barvou. Každá
+teď nese symbol na střeše: kříž, štít, plamen, kniha, strom, popelnice, blesk.
+
+- kreslí se **procedurálně z polygonů**, ne ze spritů (§6)
+- souřadnice jsou v jednotkovém čtverci a promítají se přes `gridToScreen`,
+  takže symbol sedí na půdorysu jakékoli velikosti a sám se naklopí do izometrie
+- který symbol budova nese, určuje obsah (`graphics.icon`); kód zná jen sadu tvarů
+- na světlé budově je symbol tmavý, jinak bílý — jinak by na bílé klinice zmizel
+
+Ověřeno čtením pixelů: klinika má na střeše `#66686a` proti vlastní `#dfe4ea`,
+park `#edf5ee` proti `#4a9b5a`.
+
 ## Rozpracované
 _(nic — T15 uzavřeno, dál T16: úrovně budov)_
 

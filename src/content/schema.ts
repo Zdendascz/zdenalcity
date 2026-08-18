@@ -53,7 +53,12 @@ export interface BuildingDefinition {
   waste?: { capacity: number };
   power?: { production?: number; consumption?: number };
   environment?: { pollution?: number };
-  graphics: { color: string; heightLevels: number };
+  graphics: {
+    color: string;
+    heightLevels: number;
+    /** Jméno symbolu na střeše. Sadu tvarů zná renderer, výběr dělá obsah. */
+    icon?: string;
+  };
 }
 
 export type Definition = BuildingDefinition;
@@ -360,7 +365,14 @@ function validateGraphics(
   if (!section) return null;
   const color = requireString(issues, section, 'color', 'graphics.color', COLOR);
   const heightLevels = requireInt(issues, section, 'heightLevels', 'graphics.heightLevels', 1, 15);
-  return color !== null && heightLevels !== null ? { color, heightLevels } : null;
+
+  let icon: string | undefined;
+  if (section['icon'] !== undefined) {
+    icon = requireString(issues, section, 'icon', 'graphics.icon', NAMESPACE) ?? undefined;
+  }
+
+  if (color === null || heightLevels === null) return null;
+  return icon === undefined ? { color, heightLevels } : { color, heightLevels, icon };
 }
 
 /** Sekce `population` a `jobs` mají stejný tvar `{ capacity }`. */
