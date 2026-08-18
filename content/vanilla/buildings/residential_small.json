@@ -1,0 +1,27 @@
+{
+  "id": "vanilla:residential_small",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_small.name",
+  "description": "building.residential_small.desc",
+  "footprint": [1, 1],
+  "construction": {
+    "cost": 100,
+    "requiresRoad": true,
+    "requiresPower": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 10
+  },
+  "power": {
+    "consumption": 20
+  },
+  "environment": {
+    "pollution": 2
+  },
+  "graphics": {
+    "color": "#8fb4dd",
+    "heightLevels": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "vanilla:industrial_small",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_small.name",
+  "description": "building.industrial_small.desc",
+  "footprint": [2, 2],
+  "construction": {
+    "cost": 200,
+    "requiresRoad": true,
+    "requiresPower": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 25
+  },
+  "power": {
+    "consumption": 40
+  },
+  "environment": {
+    "pollution": 20
+  },
+  "graphics": {
+    "color": "#d9c07f",
+    "heightLevels": 1
+  }
+}

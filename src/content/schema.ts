@@ -1,0 +1,367 @@
+import { TERRAIN } from '@/sim/layers';
+
+/**
+ * Ruční validátor definic. Schéma je záměrně bez knihovny — projekt má mít
+ * minimum závislostí a rozsah kontrol je malý.
+ *
+ * Validátor **sbírá všechny chyby**, ne jen první. Kdo ladí mod s deseti
+ * překlepy, nechce deset kol opakovaného spuštění.
+ */
+
+export interface ValidationIssue {
+  /** Cesta k poli uvnitř souboru, např. `construction.cost`. */
+  field: string;
+  message: string;
+}
+
+export interface Manifest {
+  id: string;
+  name: string;
+  version: string;
+  gameVersion: string;
+  dependencies: readonly string[];
+}
+
+export interface BuildingDefinition {
+  id: string;
+  type: 'building';
+  category: string;
+  /** Lokalizační klíč, nikdy text (§10). */
+  name: string;
+  description: string;
+  footprint: readonly [number, number];
+  construction: {
+    cost: number;
+    requiresRoad: boolean;
+    requiresPower: boolean;
+    allowedTerrain: readonly number[];
+  };
+  economy: { upkeep: number };
+  power?: { production?: number; consumption?: number };
+  environment?: { pollution?: number };
+  graphics: { color: string; heightLevels: number };
+}
+
+export type Definition = BuildingDefinition;
+
+/** `namespace` bez dvojtečky — viz `id` v manifestu. */
+const NAMESPACE = /^[a-z][a-z0-9_]*$/;
+/** `namespace:identifier` — P6. */
+const DEFINITION_ID = /^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/;
+const VERSION = /^\d+\.\d+\.\d+$/;
+const COLOR = /^#[0-9a-f]{6}$/i;
+const LOCALE_KEY = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+
+const TERRAIN_VALUES = new Set<number>(Object.values(TERRAIN));
+
+const DEFINITION_SECTIONS = [
+  'id',
+  'type',
+  'category',
+  'name',
+  'description',
+  'footprint',
+  'construction',
+  'economy',
+  'power',
+  'environment',
+  'graphics',
+];
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function requireRecord(
+  issues: ValidationIssue[],
+  container: Record<string, unknown>,
+  key: string,
+  field: string,
+): Record<string, unknown> | null {
+  const record = asRecord(container[key]);
+  if (!record) {
+    issues.push({ field, message: 'musí být objekt' });
+    return null;
+  }
+  return record;
+}
+
+function requireString(
+  issues: ValidationIssue[],
+  container: Record<string, unknown>,
+  key: string,
+  field: string,
+  pattern?: RegExp,
+): string | null {
+  const value = container[key];
+  if (typeof value !== 'string' || value.length === 0) {
+    issues.push({ field, message: 'musí být neprázdný řetězec' });
+    return null;
+  }
+  if (pattern && !pattern.test(value)) {
+    issues.push({ field, message: `nemá očekávaný tvar ${String(pattern)}` });
+    return null;
+  }
+  return value;
+}
+
+function requireInt(
+  issues: ValidationIssue[],
+  container: Record<string, unknown>,
+  key: string,
+  field: string,
+  min: number,
+  max = Number.MAX_SAFE_INTEGER,
+): number | null {
+  const value = container[key];
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    issues.push({ field, message: `musí být celé číslo v rozsahu ${min}–${max}` });
+    return null;
+  }
+  return value;
+}
+
+function optionalInt(
+  issues: ValidationIssue[],
+  container: Record<string, unknown>,
+  key: string,
+  field: string,
+  min: number,
+  max?: number,
+): number | undefined {
+  if (container[key] === undefined) return undefined;
+  return requireInt(issues, container, key, field, min, max) ?? undefined;
+}
+
+function requireBoolean(
+  issues: ValidationIssue[],
+  container: Record<string, unknown>,
+  key: string,
+  field: string,
+): boolean | null {
+  const value = container[key];
+  if (typeof value !== 'boolean') {
+    issues.push({ field, message: 'musí být true nebo false' });
+    return null;
+  }
+  return value;
+}
+
+export function validateManifest(raw: unknown): {
+  manifest: Manifest | null;
+  issues: ValidationIssue[];
+} {
+  const issues: ValidationIssue[] = [];
+  const record = asRecord(raw);
+  if (!record) {
+    return { manifest: null, issues: [{ field: '', message: 'manifest musí být objekt' }] };
+  }
+
+  const id = requireString(issues, record, 'id', 'id', NAMESPACE);
+  const name = requireString(issues, record, 'name', 'name');
+  const version = requireString(issues, record, 'version', 'version', VERSION);
+  const gameVersion = requireString(issues, record, 'gameVersion', 'gameVersion');
+
+  const rawDependencies = record['dependencies'];
+  let dependencies: string[] | null = null;
+  if (!Array.isArray(rawDependencies)) {
+    issues.push({ field: 'dependencies', message: 'musí být pole (klidně prázdné)' });
+  } else {
+    dependencies = [];
+    rawDependencies.forEach((entry, i) => {
+      if (typeof entry !== 'string' || entry.length === 0) {
+        issues.push({ field: `dependencies[${i}]`, message: 'musí být neprázdný řetězec' });
+      } else {
+        dependencies?.push(entry);
+      }
+    });
+  }
+
+  if (issues.length > 0 || !id || !name || !version || !gameVersion || !dependencies) {
+    return { manifest: null, issues };
+  }
+  return { manifest: { id, name, version, gameVersion, dependencies }, issues };
+}
+
+/**
+ * `expectedNamespace` je `id` z manifestu zdroje. Definice musí patřit svému
+ * zdroji — jinak by mod mohl nechtěně přepsat cizí obsah.
+ */
+export function validateDefinition(
+  raw: unknown,
+  expectedNamespace: string,
+): { definition: Definition | null; issues: ValidationIssue[] } {
+  const issues: ValidationIssue[] = [];
+  const record = asRecord(raw);
+  if (!record) {
+    return { definition: null, issues: [{ field: '', message: 'definice musí být objekt' }] };
+  }
+
+  for (const key of Object.keys(record).sort()) {
+    if (!DEFINITION_SECTIONS.includes(key)) {
+      issues.push({ field: key, message: 'neznámá sekce — překlep?' });
+    }
+  }
+
+  const id = requireString(issues, record, 'id', 'id', DEFINITION_ID);
+  if (id && !id.startsWith(`${expectedNamespace}:`)) {
+    issues.push({
+      field: 'id',
+      message: `musí začínat namespace zdroje "${expectedNamespace}:"`,
+    });
+  }
+
+  if (record['type'] !== 'building') {
+    issues.push({ field: 'type', message: 'zatím je podporován jen "building"' });
+  }
+
+  const category = requireString(issues, record, 'category', 'category', NAMESPACE);
+  const name = requireString(issues, record, 'name', 'name', LOCALE_KEY);
+  const description = requireString(issues, record, 'description', 'description', LOCALE_KEY);
+
+  const footprint = validateFootprint(issues, record['footprint']);
+  const construction = validateConstruction(issues, record);
+  const economy = validateEconomy(issues, record);
+  const graphics = validateGraphics(issues, record);
+  const power = validatePower(issues, record);
+  const environment = validateEnvironment(issues, record);
+
+  if (
+    issues.length > 0 ||
+    !id ||
+    !category ||
+    !name ||
+    !description ||
+    !footprint ||
+    !construction ||
+    !economy ||
+    !graphics
+  ) {
+    return { definition: null, issues };
+  }
+
+  return {
+    definition: {
+      id,
+      type: 'building',
+      category,
+      name,
+      description,
+      footprint,
+      construction,
+      economy,
+      ...(power ? { power } : {}),
+      ...(environment ? { environment } : {}),
+      graphics,
+    },
+    issues,
+  };
+}
+
+function validateFootprint(
+  issues: ValidationIssue[],
+  raw: unknown,
+): readonly [number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 2) {
+    issues.push({ field: 'footprint', message: 'musí být pole [šířka, výška]' });
+    return null;
+  }
+  const holder = { w: raw[0], h: raw[1] };
+  const w = requireInt(issues, holder, 'w', 'footprint[0]', 1, 16);
+  const h = requireInt(issues, holder, 'h', 'footprint[1]', 1, 16);
+  return w !== null && h !== null ? [w, h] : null;
+}
+
+function validateConstruction(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['construction'] | null {
+  const section = requireRecord(issues, record, 'construction', 'construction');
+  if (!section) return null;
+
+  const cost = requireInt(issues, section, 'cost', 'construction.cost', 0);
+  const requiresRoad = requireBoolean(issues, section, 'requiresRoad', 'construction.requiresRoad');
+  const requiresPower = requireBoolean(
+    issues,
+    section,
+    'requiresPower',
+    'construction.requiresPower',
+  );
+
+  const rawTerrain = section['allowedTerrain'];
+  let allowedTerrain: number[] | null = null;
+  if (!Array.isArray(rawTerrain) || rawTerrain.length === 0) {
+    issues.push({
+      field: 'construction.allowedTerrain',
+      message: 'musí být neprázdné pole hodnot vrstvy terrain',
+    });
+  } else {
+    allowedTerrain = [];
+    rawTerrain.forEach((value, i) => {
+      if (typeof value !== 'number' || !TERRAIN_VALUES.has(value)) {
+        issues.push({
+          field: `construction.allowedTerrain[${i}]`,
+          message: 'není platná hodnota vrstvy terrain',
+        });
+      } else {
+        allowedTerrain?.push(value);
+      }
+    });
+  }
+
+  if (cost === null || requiresRoad === null || requiresPower === null || !allowedTerrain) {
+    return null;
+  }
+  return { cost, requiresRoad, requiresPower, allowedTerrain };
+}
+
+function validateEconomy(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['economy'] | null {
+  const section = requireRecord(issues, record, 'economy', 'economy');
+  if (!section) return null;
+  const upkeep = requireInt(issues, section, 'upkeep', 'economy.upkeep', 0);
+  return upkeep === null ? null : { upkeep };
+}
+
+function validateGraphics(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['graphics'] | null {
+  const section = requireRecord(issues, record, 'graphics', 'graphics');
+  if (!section) return null;
+  const color = requireString(issues, section, 'color', 'graphics.color', COLOR);
+  const heightLevels = requireInt(issues, section, 'heightLevels', 'graphics.heightLevels', 1, 15);
+  return color !== null && heightLevels !== null ? { color, heightLevels } : null;
+}
+
+function validatePower(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['power'] {
+  if (record['power'] === undefined) return undefined;
+  const section = requireRecord(issues, record, 'power', 'power');
+  if (!section) return undefined;
+  const production = optionalInt(issues, section, 'production', 'power.production', 0);
+  const consumption = optionalInt(issues, section, 'consumption', 'power.consumption', 0);
+  if (production === undefined && consumption === undefined) {
+    issues.push({ field: 'power', message: 'musí mít production nebo consumption' });
+  }
+  return {
+    ...(production !== undefined ? { production } : {}),
+    ...(consumption !== undefined ? { consumption } : {}),
+  };
+}
+
+function validateEnvironment(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['environment'] {
+  if (record['environment'] === undefined) return undefined;
+  const section = requireRecord(issues, record, 'environment', 'environment');
+  if (!section) return undefined;
+  const pollution = optionalInt(issues, section, 'pollution', 'environment.pollution', 0, 255);
+  return pollution !== undefined ? { pollution } : {};
+}

@@ -1,0 +1,27 @@
+{
+  "id": "vanilla:commercial_small",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_small.name",
+  "description": "building.commercial_small.desc",
+  "footprint": [1, 1],
+  "construction": {
+    "cost": 150,
+    "requiresRoad": true,
+    "requiresPower": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 15
+  },
+  "power": {
+    "consumption": 25
+  },
+  "environment": {
+    "pollution": 3
+  },
+  "graphics": {
+    "color": "#7fcfa0",
+    "heightLevels": 1
+  }
+}

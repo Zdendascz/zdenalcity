@@ -1,4 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
+import { createVanillaSource } from '@/content/loader';
+import { ContentRegistry } from '@/content/registry';
 import { MAP_SIZE } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
@@ -24,6 +26,11 @@ const ZOOM_STEP = 1.15;
 const DEFAULT_SPEED_INDEX = 1;
 
 export async function startApp(mount: HTMLElement): Promise<SimHost> {
+  // Obsah se načítá první. Nevalidní definice má spadnout dřív, než se objeví
+  // plátno — tichý pád s polovinou obsahu je horší než hlasitá chyba.
+  const content = new ContentRegistry();
+  await content.load(createVanillaSource());
+
   const host = createSimHost(SEED);
   const world = host.getSnapshot();
 
@@ -174,13 +181,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       `speed  ${SPEEDS[speedIndex] ?? 0}x`,
       `tick   ${world.tick}`,
       `fps    ${app.ticker.FPS.toFixed(0)}`,
+      `defs   ${content.getAll('building').length}`,
     ]);
   });
 
   if (import.meta.env.DEV) {
     // Ladicí přístup k běžící hře z konzole prohlížeče. Pouze ve vývojovém
     // buildu — v produkci se tahle větev odstraní při tree-shakingu.
-    (globalThis as Record<string, unknown>).__city = { app, camera, host, chunkRenderer };
+    (globalThis as Record<string, unknown>).__city = { app, camera, host, chunkRenderer, content };
   }
 
   return host;

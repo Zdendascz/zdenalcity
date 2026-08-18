@@ -1,0 +1,27 @@
+{
+  "id": "vanilla:coal_power_plant",
+  "type": "building",
+  "category": "utility",
+  "name": "building.coal_power_plant.name",
+  "description": "building.coal_power_plant.desc",
+  "footprint": [4, 4],
+  "construction": {
+    "cost": 4000,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 200
+  },
+  "power": {
+    "production": 6000
+  },
+  "environment": {
+    "pollution": 30
+  },
+  "graphics": {
+    "color": "#5a5a62",
+    "heightLevels": 2
+  }
+}

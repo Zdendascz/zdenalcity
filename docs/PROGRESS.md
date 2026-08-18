@@ -88,11 +88,29 @@ Ověřeno (`npm run check`, 8 souborů / 74 testů) a měřením v běžícím r
 - golden test: 45 dlaždic se silnicí (21 vodorovných + 31 svislých − 1 průsečík
   − 6 zbouraných), 500 tiků, hash proti snapshotu
 
+- [x] T4 — content registry, JSON schéma, vanilla definice
+
+Vzniklo:
+- `content/vanilla/` — `manifest.json`, čtyři definice budov, `locale/cs.json` a `en.json`
+- `src/content/schema.ts` — ruční validátor definic i manifestu, sbírá všechny chyby najednou
+- `src/content/registry.ts` — `ContentRegistry`, `ContentSource`, `ContentValidationError`
+- `src/content/loader.ts` — složí vanilla zdroj z repozitáře přes `import.meta.glob`
+- napojeno do `app.ts`: obsah se načítá dřív, než vznikne plátno
+
+Ověřeno (`npm run check`, 9 souborů / 91 testů) a v běžící hře:
+- všechny čtyři vanilla definice projdou schématem a zaregistrují se
+- `getLoadedSources()` vrací `vanilla 0.1.0` — přesně to, co půjde do `meta.json` savu
+- žádná definice nemá text natvrdo, `name` i `description` jsou lokalizační klíče
+- nevalidní zdroj v prohlížeči skončil `ContentValidationError` se **jménem zdroje,
+  souboru i pole** a vypsal všech šest problémů najednou:
+  neznámá sekce (překlep `construcion`), cizí namespace v `id`, chybějící
+  `construction`, záporný `upkeep`, barva mimo tvar a `heightLevels` mimo rozsah
+- po neúspěšném načtení zůstal registr **úplně prázdný** — žádné poloviční načtení
+
 ## Rozpracované
-_(nic — T3 uzavřeno, bootstrap kompletní)_
+_(nic — T4 uzavřeno)_
 
 ## Backlog
-- [ ] T4 — content registry, JSON schéma, vanilla definice
 - [ ] T5 — zóny, růst budov, populace
 - [ ] T6 — elektřina
 - [ ] T7 — RCI poptávka, daně, rozpočet
@@ -118,6 +136,14 @@ _(nic — T3 uzavřeno, bootstrap kompletní)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | Schéma je ruční validátor, ne knihovna | Nová závislost jde jen po odsouhlasení a `schema.ts` je v architektuře §11 stejně určený. Rozsah kontrol je malý, takže se to vejde do jednoho souboru bez ajv a spol. |
+| 2026-08-18 | `ContentSource` jsou čistá data, čtení souborů je mimo registr | Registr tak nezávisí na tom, jestli obsah přišel z buildu, z disku, ze ZIPu modu nebo z Workshopu. Vanilla používá `import.meta.glob`, ale žádnou privilegovanou cestu nemá (P5) — jen jinou implementaci téhož rozhraní. |
+| 2026-08-18 | Načtení zdroje je všechno, nebo nic | Částečně načtený mod je horší než nenačtený: chyba by vyplavala až po hodině hraní, když hráč sáhne po chybějící budově. Registr proto při jakémkoli problému nezaregistruje ani validní sourozence. |
+| 2026-08-18 | Neznámá sekce v definici je chyba | Překlep typu `construcion` by se jinak tiše ignoroval a budova by se chovala divně bez zjevné příčiny. Cena: DLC nesmí přidat sekci, kterou starší verze hry nezná. |
+| 2026-08-18 | `category` je volný řetězec, ne výčet | Výčet kategorií v kódu by byl obsah v kódu (P5). Validuje se jen tvar, ne konkrétní hodnoty. |
+| 2026-08-18 | Lokalizační klíč musí mít překlad aspoň v jednom jazyce zdroje | §10 říká, že chybějící překlad padá na angličtinu a pak na samotný klíč — takže chybějící čeština chyba není. Klíč bez jediného překladu ale skoro jistě znamená překlep, a ten se vyplatí chytit hned. |
+| 2026-08-18 | `locale/cs.json` a `en.json` vznikly, i když i18n je až T9 | Bez nich by lokalizační klíče v definicích neukazovaly nikam a validace klíčů by neměla co kontrolovat. Jde o data, ne o kód do zásoby — T9 je jen napojí na `t()`. |
+| 2026-08-18 | Duplicitní `id` je chyba, ne přepis | Přepisování obsahu mezi mody patří k fázi 3. Do té doby je hlasitá chyba lepší než tiché vítězství posledního načteného. |
 | 2026-08-18 | **Pravé tlačítko bourá, panuje se prostředním nebo mezerníkem + levým** | T2 dalo panování i na pravé tlačítko, ale T3 přiřazuje pravému tlačítku bourání. Panování zůstalo na prostředním a na mezerníku s levým, jak zadání T2 také připouští. |
 | 2026-08-18 | Silnice se staví klikem, ne tažením | Zadání T3 mluví o kliknutí. Malování tažením je v city builderech obvyklé, ale je to funkce navíc, kterou zadání nechce — snadno se doplní později. |
 | 2026-08-18 | 16 variant silnic se skládá, nedeklaruje | Středový kus plus jedno rameno na každý připojený směr dá všech 16 kombinací bez tabulky, kterou by šlo překlepnout. Ramena sahají až na hranu diamantu, takže sousedé navazují bez mezery. |
@@ -134,6 +160,13 @@ _(nic — T3 uzavřeno, bootstrap kompletní)_
 ## Známé problémy / technický dluh
 
 - `vite.config.ts` je mimo `tsc --noEmit` (viz tabulka rozhodnutí).
+- **Otázka na autora: jaký tvar má mít `id` v manifestu?** Architektura §7 uvádí
+  v příkladu manifestu `"id": "vanilla"`, ale §8 vyjmenovává mezi zdroji savu
+  `"id": "zdendas:industry"` — tedy s dvojtečkou. Definice mají podle P6 tvar
+  `namespace:identifier`, takže manifest s dvojtečkou by dal `zdendas:industry:castle`.
+  Implementoval jsem manifest `id` jako **prostý namespace bez dvojtečky** a
+  vyžaduji, aby každá definice začínala `<manifest.id>:`. Když má platit §8,
+  je to změna na dvou řádcích ve `schema.ts` a v `registry.ts`.
 - **Chunkované `RenderTexture` stojí 128 MB VRAM.** Změřeno v běžícím rendereru,
   ne odhadnuto: 64 chunků × 1024×512 px × 4 B. Izometrické diamanty se do sebe
   zaklesávají, takže opsaný obdélník chunku je zhruba dvakrát větší než plocha,

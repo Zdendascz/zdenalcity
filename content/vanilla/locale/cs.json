@@ -1,0 +1,10 @@
+{
+  "building.residential_small.name": "Malý dům",
+  "building.residential_small.desc": "Skromné bydlení pro hrstku obyvatel.",
+  "building.commercial_small.name": "Obchod",
+  "building.commercial_small.desc": "Malá prodejna pro okolní čtvrť.",
+  "building.industrial_small.name": "Dílna",
+  "building.industrial_small.desc": "Lehký průmysl. Dává práci, trochu znečišťuje.",
+  "building.coal_power_plant.name": "Uhelná elektrárna",
+  "building.coal_power_plant.desc": "Levná elektřina za cenu velkého znečištění."
+}

@@ -1,0 +1,10 @@
+{
+  "building.residential_small.name": "Small House",
+  "building.residential_small.desc": "A modest home for a handful of residents.",
+  "building.commercial_small.name": "Corner Shop",
+  "building.commercial_small.desc": "A small store serving the neighbourhood.",
+  "building.industrial_small.name": "Workshop",
+  "building.industrial_small.desc": "Light industry. Provides jobs, produces some pollution.",
+  "building.coal_power_plant.name": "Coal Power Plant",
+  "building.coal_power_plant.desc": "Cheap electricity at the cost of heavy pollution."
+}
