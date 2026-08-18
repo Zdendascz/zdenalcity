@@ -331,8 +331,39 @@ Ověřeno (`npm run check`, 17 souborů / 223 testů) a v běžící hře:
 - těžké znečištění ji srazí na nulu, ale ne pod ni; nepřeteče 255
 - overlaye se přepínají a vždy svítí nejvýš jeden; překreslení 0,6 ms
 
+- [x] T13 — služby, pokrytí, kriminalita (fáze 2)
+
+Vzniklo:
+- `src/sim/systems/services.ts` — obecný mechanismus pokrytí, běží při `coverageDirty`
+- `src/sim/systems/crime.ts` — kriminalita podle §5, interval 16 / offset 11
+- `src/sim/systems/landValue.ts` — do vzorce přibylo pokrytí a kriminalita
+- `content/vanilla/buildings/police_small.json`, sekce `service` ve schématu
+- vrstva `crime`, overlaye kriminality (`K`) a dosahu policie
+- `world.coverage`, `world.serviceFunding`, `coverageDirty`
+
+Ověřeno (`npm run check`, 18 souborů / 239 testů) a v běžící hře na městě o 72 obyvatelích:
+
+| | kriminalita | cena půdy | pokrytí policií |
+|---|---|---|---|
+| bez policie | 40 | 12 | 0 |
+| s policejní stanicí | **0** | **45** | 35 |
+| daleko od stanice | 25 | — | 10 |
+
+**Akceptační kritérium §13.4** (podfinancování) ověřeno přímo na stavu:
+
+| financování | u stanice | střed | okraj | kriminalita | cena půdy |
+|---|---|---|---|---|---|
+| 100 % | 55 | 35 | 10 | 0 | 45 |
+| 30 % | 13 | 0 | 0 | 29 | 18 |
+
+- pokrytí je nejsilnější u stanice a se vzdáleností klesá, za dosahem je nula
+- dvě stanice vedle sebe pokrývají víc než jedna
+- po zbourání stanice pokrytí zmizí; bez `coverageDirty` se nepřepočítává
+- policejní stanice cenu půdy zvedne, kriminalita ji srazí
+- celá sestava je deterministická
+
 ## Rozpracované
-_(nic — T12 uzavřeno, dál T13: služby a kriminalita)_
+_(nic — T13 uzavřeno, dál T14: zbývající třídy služeb a financování)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -474,6 +505,11 @@ _(nic — T12 uzavřeno, dál T13: služby a kriminalita)_
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
   nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
   z nich pravděpodobně zmizí.
+- **Financování služeb zatím nemá ovládání ani dopad na rozpočet.** Stav
+  `serviceFunding` existuje a vzorec pokrytí s ním počítá (ověřeno testem
+  i v běžící hře), ale posuvník a `skutečnáÚdržba = upkeep × financování`
+  patří podle zadání do T14.
+- **Kriminalita zatím nepočítá s opuštěnými budovami** — ty vznikají až v T17.
 - **Na mapě není ani kapka vody, takže bonus vody nemá kde platit.** Zadání
   fáze 2 s ním počítá jako s jediným vstupem nezávislým na hráči, „aby mapa
   nebyla homogenní ještě než hráč cokoli postaví" — jenže fáze 1 žádný generátor

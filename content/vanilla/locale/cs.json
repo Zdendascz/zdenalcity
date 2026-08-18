@@ -7,6 +7,8 @@
   "building.industrial_small.desc": "Lehký průmysl. Dává práci, trochu znečišťuje.",
   "building.coal_power_plant.name": "Uhelná elektrárna",
   "building.coal_power_plant.desc": "Levná elektřina za cenu velkého znečištění.",
+  "building.police_small.name": "Policejní stanice",
+  "building.police_small.desc": "Sráží kriminalitu v okolí a zvedá cenu půdy.",
 
   "ui.tool.road": "Silnice",
   "ui.tool.bulldoze": "Bourání",
@@ -16,6 +18,7 @@
   "ui.tool.group.build": "Stavba",
   "ui.tool.group.zones": "Zóny",
   "ui.tool.group.utility": "Infrastruktura",
+  "ui.tool.group.service": "Služby",
 
   "ui.hud.funds": "Kasa",
   "ui.hud.population": "Obyvatel",
@@ -105,5 +108,7 @@
   "ui.overlay.power": "Elektřina",
   "ui.overlay.pollution": "Znečištění",
   "ui.overlay.landValue": "Cena půdy",
+  "ui.overlay.crime": "Kriminalita",
+  "ui.overlay.coverage.police": "Dosah policie",
   "ui.language.label": "Jazyk"
 }

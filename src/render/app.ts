@@ -29,9 +29,21 @@ import { createCamera, pan, zoomAt } from './camera';
 import { ChunkRenderer } from './chunkRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
-import type { CoarseOverlayLayer } from './coarseOverlay';
 import { DebugOverlay } from './debugOverlay';
-import { BACKGROUND_COLOR, HOVER_COLOR, HOVER_FILL_ALPHA, HOVER_LINE_ALPHA } from './palette';
+import {
+  BACKGROUND_COLOR,
+  COVERAGE_COLOR,
+  COVERAGE_MAX_ALPHA,
+  CRIME_COLOR,
+  CRIME_MAX_ALPHA,
+  HOVER_COLOR,
+  HOVER_FILL_ALPHA,
+  HOVER_LINE_ALPHA,
+  LAND_VALUE_COLOR,
+  LAND_VALUE_MAX_ALPHA,
+  POLLUTION_COLOR,
+  POLLUTION_MAX_ALPHA,
+} from './palette';
 import { pickTile } from './picking';
 import { diamondPoints, gridToScreen } from './projection';
 
@@ -100,15 +112,24 @@ function createTools(content: ContentRegistry): ToolOption[] {
     },
   ];
 
-  content.byCategory('utility').forEach((definition, order) => {
-    tools.push({
-      id: `place:${definition.id}`,
-      labelKey: definition.name, // popisek pojmenuje obsah, ne kód
-      hotkey: order === 0 ? 'u' : undefined,
-      groupKey: 'ui.tool.group.utility',
-      action: { kind: 'place', definitionId: definition.id },
+  // Vše, co nevyroste ze zóny, staví hráč ručně. Kategorie jde z obsahu,
+  // takže nová třída budov přidá tlačítko bez zásahu do kódu (P5).
+  const manual: [string, string][] = [
+    ['utility', 'ui.tool.group.utility'],
+    ['service', 'ui.tool.group.service'],
+  ];
+
+  for (const [category, groupKey] of manual) {
+    content.byCategory(category).forEach((definition, order) => {
+      tools.push({
+        id: `place:${definition.id}`,
+        labelKey: definition.name, // popisek pojmenuje obsah, ne kód
+        hotkey: order === 0 && category === 'utility' ? 'u' : undefined,
+        groupKey,
+        action: { kind: 'place', definitionId: definition.id },
+      });
     });
-  });
+  }
 
   return tools;
 }
@@ -148,7 +169,27 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     createAppearanceLookup(content),
   );
 
-  const coarseOverlay = new CoarseOverlay(world, worldContainer);
+  const coarseOverlay = new CoarseOverlay(worldContainer, [
+    {
+      id: 'pollution',
+      color: POLLUTION_COLOR,
+      maxAlpha: POLLUTION_MAX_ALPHA,
+      values: () => world.coarse.pollution,
+    },
+    {
+      id: 'landValue',
+      color: LAND_VALUE_COLOR,
+      maxAlpha: LAND_VALUE_MAX_ALPHA,
+      values: () => world.coarse.landValue,
+    },
+    { id: 'crime', color: CRIME_COLOR, maxAlpha: CRIME_MAX_ALPHA, values: () => world.coarse.crime },
+    {
+      id: 'coverage:police',
+      color: COVERAGE_COLOR,
+      maxAlpha: COVERAGE_MAX_ALPHA,
+      values: () => simWorld.coverage.get('police'),
+    },
+  ]);
 
   const hover = new Graphics();
   worldContainer.addChild(hover);
@@ -277,19 +318,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     { id: 'power', labelKey: 'ui.overlay.power' },
     { id: 'pollution', labelKey: 'ui.overlay.pollution' },
     { id: 'landValue', labelKey: 'ui.overlay.landValue' },
+    { id: 'crime', labelKey: 'ui.overlay.crime' },
+    { id: 'coverage:police', labelKey: 'ui.overlay.coverage.police' },
   ];
 
   let overlayMode = 'none';
 
   function toggleOverlay(id: string): void {
     overlayMode = overlayMode === id ? 'none' : id;
-    // Elektřina se zapéká do chunků, hrubé vrstvy mají vlastní lehkou vrstvu.
+    // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu.
     chunkRenderer.setOverlay(overlayMode === 'power' ? 'power' : ('none' as OverlayMode));
-    coarseOverlay.setLayer(
-      overlayMode === 'pollution' || overlayMode === 'landValue'
-        ? (overlayMode as CoarseOverlayLayer)
-        : 'none',
-    );
+    coarseOverlay.setActive(overlayMode === 'power' ? 'none' : overlayMode);
   }
 
   const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, {
@@ -480,6 +519,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     if (key === 'l') {
       toggleOverlay('landValue');
+      return;
+    }
+
+    if (key === 'k') {
+      toggleOverlay('crime');
       return;
     }
 

@@ -6,6 +6,8 @@ import { createGrowthSystem } from './growth';
 import { createEconomySystem } from './economy';
 import { createPollutionSystem } from './pollution';
 import { createLandValueSystem } from './landValue';
+import { createServiceSystem } from './services';
+import { createCrimeSystem } from './crime';
 
 export interface System {
   readonly name: string;
@@ -33,10 +35,13 @@ export function createDefaultSystems(catalogue: BuildingCatalogue): System[] {
   // Pořadí podle tabulky v architektuře §5: systémy fáze 2 jsou za těmi z fáze 1.
   return [
     createPowerSystem(catalogue),
+    // Pokrytí se musí přepočítat dřív, než z něj čte cena půdy a kriminalita.
+    createServiceSystem(catalogue),
     createDemandSystem(catalogue),
     createGrowthSystem(catalogue),
     createEconomySystem(catalogue),
     createPollutionSystem(catalogue),
+    createCrimeSystem(),
     createLandValueSystem(),
   ];
 }
@@ -48,5 +53,7 @@ export {
   createGrowthSystem,
   createPollutionSystem,
   createLandValueSystem,
+  createServiceSystem,
+  createCrimeSystem,
 };
 export type { BuildingCatalogue };

@@ -41,6 +41,11 @@ export interface BuildingDefinition {
   population?: { capacity: number };
   /** Kolik pracovních míst budova dává. */
   jobs?: { capacity: number };
+  /**
+   * Služba: třída, dosah v buňkách hrubé mřížky a síla v centru.
+   * Třídy jsou obsah, ne kód — mechanismus je obecný (§6 zadání fáze 2).
+   */
+  service?: { class: string; radius: number; strength: number };
   power?: { production?: number; consumption?: number };
   environment?: { pollution?: number };
   graphics: { color: string; heightLevels: number };
@@ -69,6 +74,7 @@ const DEFINITION_SECTIONS = [
   'economy',
   'population',
   'jobs',
+  'service',
   'power',
   'environment',
   'graphics',
@@ -234,6 +240,7 @@ export function validateDefinition(
   const environment = validateEnvironment(issues, record);
   const population = validateCapacity(issues, record, 'population');
   const jobs = validateCapacity(issues, record, 'jobs');
+  const service = validateService(issues, record);
 
   if (
     issues.length > 0 ||
@@ -261,6 +268,7 @@ export function validateDefinition(
       economy,
       ...(population ? { population } : {}),
       ...(jobs ? { jobs } : {}),
+      ...(service ? { service } : {}),
       ...(power ? { power } : {}),
       ...(environment ? { environment } : {}),
       graphics,
@@ -358,6 +366,24 @@ function validateCapacity(
   if (!section) return undefined;
   const capacity = requireInt(issues, section, 'capacity', `${key}.capacity`, 0, 65535);
   return capacity === null ? undefined : { capacity };
+}
+
+function validateService(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['service'] {
+  if (record['service'] === undefined) return undefined;
+  const section = requireRecord(issues, record, 'service', 'service');
+  if (!section) return undefined;
+
+  const serviceClass = requireString(issues, section, 'class', 'service.class', NAMESPACE);
+  // Dosah je v buňkách hrubé mřížky, ta má 32 buněk na stranu.
+  const radius = requireInt(issues, section, 'radius', 'service.radius', 1, 32);
+  const strength = requireInt(issues, section, 'strength', 'service.strength', 1, 255);
+
+  return serviceClass !== null && radius !== null && strength !== null
+    ? { class: serviceClass, radius, strength }
+    : undefined;
 }
 
 function validatePower(

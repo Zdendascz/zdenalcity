@@ -2,7 +2,7 @@ import type { Definition } from '@/content/schema';
 import { inBounds, index } from './layers';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
-import { markBuildingDirty, markPowerNetworkDirty, markTileDirty } from './world';
+import { markBuildingDirty, markCoverageDirty, markPowerNetworkDirty, markTileDirty } from './world';
 import type { Building, WorldState } from './world';
 
 /**
@@ -151,5 +151,6 @@ export function placeBuilding(
 
   markBuildingDirty(world, building.id);
   markPowerNetworkDirty(world); // budova je vodič, síť se mění
+  if (definition.service) markCoverageDirty(world);
   return building;
 }

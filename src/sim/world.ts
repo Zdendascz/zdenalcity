@@ -83,6 +83,20 @@ export interface WorldState {
   dirty: DirtySet;
 
   /**
+   * Pokrytí službami: klíč je třída, hodnota mřížka 32×32.
+   *
+   * **Neukládá se** — dá se spočítat z rozmístění budov a financování, takže by
+   * se v savu mohlo rozejít se skutečností (§2 zadání fáze 2).
+   */
+  coverage: Map<string, Uint8Array>;
+
+  /** Financování služeb v procentech (0–1) podle třídy. Chybějící klíč = plné. */
+  serviceFunding: Map<string, number>;
+
+  /** Změnilo se rozmístění služeb nebo jejich financování? */
+  coverageDirty: boolean;
+
+  /**
    * Změnila se od posledního přepočtu topologie elektrické sítě?
    * `powerSystem` běží každý tik, ale flood fill pouští jen při tomhle flagu (§5).
    * Runtime-only — po loadu se síť přepočítá znovu.
@@ -113,6 +127,9 @@ export function createWorld(seed: number): WorldState {
     rng: new Rng(seed),
     // Čerstvý svět renderer ještě neviděl.
     dirty: { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true },
+    coverage: new Map(),
+    serviceFunding: new Map(),
+    coverageDirty: false,
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
   };
 }
@@ -120,6 +137,20 @@ export function createWorld(seed: number): WorldState {
 /** Vodiče (silnice, budovy) se změnily — síť se musí přepočítat. */
 export function markPowerNetworkDirty(world: WorldState): void {
   world.powerNetworkDirty = true;
+}
+
+/** Přibyla nebo zmizela služba, případně se změnilo financování. */
+export function markCoverageDirty(world: WorldState): void {
+  world.coverageDirty = true;
+}
+
+/** Financování třídy v rozsahu 0–1. Neznámá třída je plně financovaná. */
+export function serviceFunding(world: WorldState, serviceClass: string): number {
+  return world.serviceFunding.get(serviceClass) ?? 1;
+}
+
+export function coverageOf(world: WorldState, serviceClass: string): Uint8Array | undefined {
+  return world.coverage.get(serviceClass);
 }
 
 export function markTileDirty(world: WorldState, x: number, y: number): void {
@@ -152,6 +183,8 @@ export function removeBuilding(world: WorldState, buildingId: number): boolean {
 
   markBuildingDirty(world, buildingId);
   markPowerNetworkDirty(world); // budova byla vodič i možný zdroj
+  // Zbouraná budova mohla být služba; přepočet je levný, rozlišovat se nevyplatí.
+  markCoverageDirty(world);
   return true;
 }
 

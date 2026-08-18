@@ -33,6 +33,14 @@ export const POLLUTION_MAX_ALPHA = 0.8;
 export const LAND_VALUE_COLOR = 0xf0c060;
 export const LAND_VALUE_MAX_ALPHA = 0.75;
 
+/** Overlay kriminality. */
+export const CRIME_COLOR = 0xd94f4f;
+export const CRIME_MAX_ALPHA = 0.8;
+
+/** Overlay pokrytí službami. */
+export const COVERAGE_COLOR = 0x5fb6d9;
+export const COVERAGE_MAX_ALPHA = 0.7;
+
 /** Overlay elektřiny (klávesa P): vodič s proudem a vodič bez proudu. */
 export const POWER_ON_COLOR = 0xf2d857;
 export const POWER_OFF_COLOR = 0xd9483a;

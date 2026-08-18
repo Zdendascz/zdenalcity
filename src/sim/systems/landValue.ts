@@ -11,8 +11,8 @@ import type { System } from './index';
  * cena   = lerp(cena, surová, VYHLAZENÍ)
  * ```
  *
- * Pokrytí službami a kriminalita do vzorce přibudou v T13 a T14 — dokud
- * neexistují, nemá smysl je do součtu psát.
+ * Váhy tříd služeb pokrývají celou sadu ze zadání; službu, která ve městě
+ * není, prostě není z čeho počítat.
  *
  * **Zástavba do vzorce nevstupuje** (rozhodnutí R2 v zadání). Kdyby vstupovala,
  * vznikla by utržená smyčka: vyšší úroveň → hustší zástavba → vyšší cena půdy
@@ -27,6 +27,16 @@ const BASE = 40;
 const SMOOTHING = 0.25;
 const WATER_BONUS = 25;
 const POLLUTION_WEIGHT = 0.8;
+const CRIME_WEIGHT = 0.7;
+
+/** Váhy pokrytí podle třídy služby. Třída bez váhy cenu půdy neovlivní. */
+const SERVICE_WEIGHTS: Readonly<Record<string, number>> = {
+  police: 0.2,
+  fire: 0.2,
+  health: 0.3,
+  education: 0.4,
+  parks: 0.5,
+};
 
 export function createLandValueSystem(): System {
   return {
@@ -35,11 +45,27 @@ export function createLandValueSystem(): System {
     offset: 5,
     run(world: WorldState) {
       const water = waterProximity(world);
-      const { landValue, pollution } = world.coarse;
+      const { landValue, pollution, crime } = world.coarse;
+
+      // Jen třídy, které ve městě opravdu jsou a mají váhu.
+      const services: [Uint8Array, number][] = [];
+      for (const [serviceClass, coverage] of world.coverage) {
+        const weight = SERVICE_WEIGHTS[serviceClass];
+        if (weight !== undefined) services.push([coverage, weight]);
+      }
 
       for (let cell = 0; cell < landValue.length; cell++) {
+        let services_ = 0;
+        for (const [coverage, weight] of services) {
+          services_ += (coverage[cell] ?? 0) * weight;
+        }
+
         const raw =
-          BASE + (water[cell] === 1 ? WATER_BONUS : 0) - (pollution[cell] ?? 0) * POLLUTION_WEIGHT;
+          BASE +
+          services_ +
+          (water[cell] === 1 ? WATER_BONUS : 0) -
+          (pollution[cell] ?? 0) * POLLUTION_WEIGHT -
+          (crime[cell] ?? 0) * CRIME_WEIGHT;
 
         const current = landValue[cell] ?? 0;
         const delta = raw - current;

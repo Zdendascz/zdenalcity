@@ -92,10 +92,12 @@ describe('fázování systémů', () => {
     const systems = createDefaultSystems(NO_CONTENT);
     expect(systems.map((s) => [s.name, s.interval, s.offset])).toEqual([
       ['power', 1, 0],
+      ['services', 1, 0],
       ['demand', 4, 1],
       ['growth', 12, 2],
       ['economy', 30, 0],
       ['pollution', 8, 3],
+      ['crime', 16, 11],
       ['landValue', 16, 5],
     ]);
   });

@@ -59,6 +59,7 @@ describe('vanilla obsah', () => {
       'vanilla:coal_power_plant',
       'vanilla:commercial_small',
       'vanilla:industrial_small',
+      'vanilla:police_small',
       'vanilla:residential_small',
     ]);
   });

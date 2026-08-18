@@ -7,6 +7,8 @@
   "building.industrial_small.desc": "Light industry. Provides jobs, produces some pollution.",
   "building.coal_power_plant.name": "Coal Power Plant",
   "building.coal_power_plant.desc": "Cheap electricity at the cost of heavy pollution.",
+  "building.police_small.name": "Police Station",
+  "building.police_small.desc": "Cuts crime nearby and lifts land value.",
 
   "ui.tool.road": "Road",
   "ui.tool.bulldoze": "Bulldoze",
@@ -16,6 +18,7 @@
   "ui.tool.group.build": "Build",
   "ui.tool.group.zones": "Zones",
   "ui.tool.group.utility": "Utilities",
+  "ui.tool.group.service": "Services",
 
   "ui.hud.funds": "Funds",
   "ui.hud.population": "Population",
@@ -105,5 +108,7 @@
   "ui.overlay.power": "Power",
   "ui.overlay.pollution": "Pollution",
   "ui.overlay.landValue": "Land value",
+  "ui.overlay.crime": "Crime",
+  "ui.overlay.coverage.police": "Police reach",
   "ui.language.label": "Language"
 }
