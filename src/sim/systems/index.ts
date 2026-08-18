@@ -4,6 +4,7 @@ import { createPowerSystem } from './power';
 import { createDemandSystem } from './demand';
 import { createGrowthSystem } from './growth';
 import { createEconomySystem } from './economy';
+import { createPollutionSystem } from './pollution';
 
 export interface System {
   readonly name: string;
@@ -28,13 +29,21 @@ export function shouldRun(tick: number, interval: number, offset: number): boole
  * Systém si katalog uzavře do closure a `run(world)` zůstává beze změny.
  */
 export function createDefaultSystems(catalogue: BuildingCatalogue): System[] {
+  // Pořadí podle tabulky v architektuře §5: systémy fáze 2 jsou za těmi z fáze 1.
   return [
     createPowerSystem(catalogue),
     createDemandSystem(catalogue),
     createGrowthSystem(catalogue),
     createEconomySystem(catalogue),
+    createPollutionSystem(catalogue),
   ];
 }
 
-export { createPowerSystem, createDemandSystem, createEconomySystem, createGrowthSystem };
+export {
+  createPowerSystem,
+  createDemandSystem,
+  createEconomySystem,
+  createGrowthSystem,
+  createPollutionSystem,
+};
 export type { BuildingCatalogue };

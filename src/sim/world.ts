@@ -1,3 +1,5 @@
+import { createCoarseLayers } from './coarse';
+import type { CoarseLayers } from './coarse';
 import { createLayers, inBounds, index, MAP_SIZE } from './layers';
 import type { Layers } from './layers';
 import type { RciCategory } from './rci';
@@ -49,10 +51,17 @@ export interface DirtySet {
   tiles: Set<number>;
   buildings: Set<number>;
   fullRedraw: boolean;
+  /**
+   * Změnila se některá vrstva na hrubé mřížce?
+   *
+   * Vlastní příznak, ne 16 384 položek v `tiles`: difuze mění celou mapu naráz
+   * a překreslit se to musí jen tehdy, když je zrovna zapnutý příslušný overlay.
+   */
+  coarseChanged: boolean;
 }
 
 export function createDirtySet(): DirtySet {
-  return { tiles: new Set(), buildings: new Set(), fullRedraw: false };
+  return { tiles: new Set(), buildings: new Set(), fullRedraw: false, coarseChanged: false };
 }
 
 export interface WorldState {
@@ -61,6 +70,8 @@ export interface WorldState {
   tick: number; // monotónní počítadlo od začátku hry
 
   layers: Layers;
+  /** Difuzní vrstvy na hrubé mřížce 32×32 (fáze 2). */
+  coarse: CoarseLayers;
   buildings: Map<number, Building>;
   nextBuildingId: number;
 
@@ -85,6 +96,7 @@ export function createWorld(seed: number): WorldState {
     seed: seed >>> 0,
     tick: 0,
     layers: createLayers(MAP_SIZE),
+    coarse: createCoarseLayers(),
     buildings: new Map(),
     nextBuildingId: 1, // 0 ve vrstvě `buildingId` znamená prázdno
     economy: {
@@ -100,7 +112,7 @@ export function createWorld(seed: number): WorldState {
     demand: { residential: 0, commercial: 0, industrial: 0 },
     rng: new Rng(seed),
     // Čerstvý svět renderer ještě neviděl.
-    dirty: { tiles: new Set(), buildings: new Set(), fullRedraw: true },
+    dirty: { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true },
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
   };
 }

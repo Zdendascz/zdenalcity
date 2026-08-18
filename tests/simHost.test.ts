@@ -95,6 +95,7 @@ describe('fázování systémů', () => {
       ['demand', 4, 1],
       ['growth', 12, 2],
       ['economy', 30, 0],
+      ['pollution', 8, 3],
     ]);
   });
 });

@@ -297,8 +297,27 @@ Ověřeno (`npm run check`, 15 souborů / 181 testů) a v běžící hře:
   populace, práce, výroba a spotřeba elektřiny, připojení, daně a údržba za
   měsíc, znečištění. Bourání se tím přesunulo výhradně na nástroj (`X`).
 
+- [x] T11 — hrubá mřížka, difuze, znečištění, overlay (fáze 2)
+
+Vzniklo:
+- `src/sim/coarse.ts` — mřížka 32×32, `coarseIndex`, `CoarseLayers`, `hashCoarseLayers`
+- `src/sim/diffusion.ts` — difuzní jádro podle §3 zadání fáze 2
+- `src/sim/systems/pollution.ts` — zdroje z budov a z nepokrytého odpadu, interval 8/offset 3
+- `src/render/coarseOverlay.ts` — overlay hrubých vrstev jako vlastní lehká vrstva
+- `DirtySet.coarseChanged`, overlay jako režim (`none` / `power` / `pollution`), klávesa `O`
+
+Ověřeno (`npm run check`, 16 souborů / 213 testů) a v běžící hře:
+- **akceptační kritérium §13.1 splněno**: u průmyslu 153, o 8 dlaždic dál 27,
+  o 20 dlaždic 6, u kraje mapy 1 — klesá se vzdáleností a u kraje mizí
+- maximum 167, tedy pod 255 i po 400 tikách
+- odpad bez skládek zamoří město rovnoměrně: i roh mapy má nenulovou hodnotu
+- zdroj sedí na **předním rohu** půdorysu, ověřeno budovou přesahující hranici buňky
+- bez zdroje znečištění úplně odezní
+- difuze je deterministická — dva běhy stejného seedu dají identický hash hrubých vrstev
+- **výkon: medián snímku 16,7 ms, p95 19,9 ms, 60 FPS při 8× včetně difuze**
+
 ## Rozpracované
-_(nic)_
+_(nic — T11 uzavřeno, dál T12: cena půdy)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -326,6 +345,10 @@ _(nic)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | **Difuze ořezává dolů, ne zaokrouhluje** | Se zaokrouhlováním je hodnota 1 pevným bodem — `round(1 × 0,94)` je zase 1 — takže by mapa navždy zůstala pokrytá slabým znečištěním bez zdroje. Odhalil to test „bez zdroje odezní". Cena: velmi slabé znečištění zmizí úplně místo aby se drželo na jedničce, což je spíš žádoucí. |
+| 2026-08-18 | **Overlay hrubých vrstev je vlastní vrstva, ne součást chunků** | Znečištění je konstantní přes blok 4×4, ale zapečené do chunků se kreslilo po dlaždicích — šestnáctkrát víc polygonů za stejný obrázek. Změřeno: překreslení po každé difuzi stálo **33,3 ms**, tedy dva zahozené snímky každých 250 ms při 8×. Jako samostatná vrstva s jedním čtyřúhelníkem na buňku to stojí **0,9 ms**. Elektřina zůstává v chuncích, protože je to veličina po dlaždicích. |
+| 2026-08-18 | Difuzní a odpadové konstanty zatím žijí v kódu | Zadání je chce v `balance.json`, ale ten je úkol T15. Do té doby jsou v `pollution.ts` v jednom bloku s poznámkou. Konstanty odpadu jsem musel zvolit sám — ukázkový `balance.json` v zadání sekci `waste` nemá, takže v T15 přibude. |
+| 2026-08-18 | Load savu verze 1 vynuluje hrubé vrstvy | Save v1 je nenese a systémy si je do pár tiků dopočítají. Ukládat je začne formát verze 2 v T20. |
 | 2026-08-18 | **Hloubka budovy se řídí předním rohem půdorysu, ne počátkem** | Podle `x + y` se jednodlaždicový obchod dostal před dvoudlaždicovou továrnu, která sahá o dvě dlaždice dál dopředu. Autor to nahlásil ze screenshotu. Nově `(x + w) + (y + h)`. |
 | 2026-08-18 | **Příkazy vracejí `CommandResult`, ne `void`** | Hra nesmí mlčet: klik, který nic neudělá, musí říct proč. Důvod je lokalizační klíč, takže v `sim/` pořád není ani jedno uživatelsky viditelné slovo (§10). Růstový systém důvody ignoruje — zkusí příště jiné místo. |
 | 2026-08-18 | Stejné hlášky se v bublinách nehromadí, jen si přičtou počet | Malování silnice přes vodu by jinak vysypalo padesát bublin přes celou obrazovku. |

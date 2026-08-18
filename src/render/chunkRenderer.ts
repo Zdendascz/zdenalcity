@@ -19,6 +19,12 @@ import { roadMask, roadPolygons } from './roads';
 /** Chunk = 16×16 dlaždic. Změna jedné dlaždice invaliduje jeden chunk, ne mapu. */
 export const CHUNK_SIZE = 16;
 
+/**
+ * Který diagnostický pohled je zapnutý. Vždycky nejvýš jeden — dva překryvy
+ * přes sebe by se nedaly přečíst. Skutečný přepínač s ikonami je T21.
+ */
+export type OverlayMode = 'none' | 'power' | 'pollution';
+
 interface Chunk {
   readonly x0: number;
   readonly y0: number;
@@ -40,7 +46,7 @@ export class ChunkRenderer {
   private readonly world: ReadonlyWorldView;
   private readonly chunksPerAxis: number;
   private readonly chunks: Chunk[] = [];
-  private powerOverlay = false;
+  private overlay: OverlayMode = 'none';
 
   constructor(world: ReadonlyWorldView, container: Container) {
     this.world = world;
@@ -56,19 +62,23 @@ export class ChunkRenderer {
   }
 
   /**
-   * Přepne overlay elektřiny. Překreslí všechny chunky, ale je to reakce na
-   * stisk klávesy, ne věc snímku.
+   * Přepne overlay. Překreslí všechny chunky, ale je to reakce na stisk
+   * klávesy, ne věc snímku.
    */
-  setPowerOverlay(enabled: boolean): void {
-    if (this.powerOverlay === enabled) return;
-    this.powerOverlay = enabled;
+  setOverlay(mode: OverlayMode): void {
+    if (this.overlay === mode) return;
+    this.overlay = mode;
+    this.redrawAll();
+  }
+
+  getOverlay(): OverlayMode {
+    return this.overlay;
+  }
+
+  private redrawAll(): void {
     for (let chunkIndex = 0; chunkIndex < this.chunks.length; chunkIndex++) {
       this.redraw(chunkIndex);
     }
-  }
-
-  isPowerOverlayVisible(): boolean {
-    return this.powerOverlay;
   }
 
   /** Index chunku, do kterého spadá dlaždice. */
@@ -142,7 +152,9 @@ export class ChunkRenderer {
       }
     }
 
-    if (this.powerOverlay) {
+    // Elektřina je veličina po dlaždicích, takže patří do chunku. Vrstvy
+    // na hrubé mřížce kreslí `CoarseOverlay` — ty do chunků nepatří.
+    if (this.overlay === 'power') {
       this.drawPowerOverlay(graphics, points, tileIndex);
     }
   }

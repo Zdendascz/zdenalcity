@@ -17,14 +17,21 @@ export interface HudCallbacks {
   onQuickLoad(): void;
   onDownload(): void;
   onOpenFile(file: File): void;
-  onTogglePowerOverlay(): void;
+  onToggleOverlay(id: string): void;
   onToggleBudget(): void;
   onLanguageChange(language: string): void;
 }
 
+/** Diagnostický pohled nabízený v HUDu. Popisek je lokalizační klíč. */
+export interface OverlayOption {
+  id: string;
+  labelKey: string;
+}
+
 export interface HudState {
   speedIndex: number;
-  powerOverlay: boolean;
+  /** Id zapnutého overlaye, nebo `'none'`. */
+  overlay: string;
   budgetVisible: boolean;
   poweredBuildings: number;
   /** Už přeložená hláška o uložení či načtení. Prázdná = nic nezobrazovat. */
@@ -61,13 +68,14 @@ export class Hud {
 
   private readonly values = new Map<string, HTMLElement>();
   private readonly speedButtons: HTMLButtonElement[] = [];
-  private powerButton: HTMLButtonElement | null = null;
+  private readonly overlayButtons = new Map<string, HTMLButtonElement>();
   private budgetButton: HTMLButtonElement | null = null;
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
+  private readonly overlays: readonly OverlayOption[];
   private lastState: HudState = {
     speedIndex: 1,
-    powerOverlay: false,
+    overlay: 'none',
     budgetVisible: false,
     poweredBuildings: 0,
     message: '',
@@ -78,11 +86,13 @@ export class Hud {
     i18n: I18n,
     view: ReadonlyWorldView,
     speeds: readonly number[],
+    overlays: readonly OverlayOption[],
     callbacks: HudCallbacks,
   ) {
     this.i18n = i18n;
     this.view = view;
     this.speeds = speeds;
+    this.overlays = overlays;
     this.callbacks = callbacks;
 
     this.top = el('div', 'hud__top');
@@ -134,7 +144,9 @@ export class Hud {
     this.speedButtons.forEach((node, index) => {
       node.classList.toggle('is-active', index === state.speedIndex);
     });
-    this.powerButton?.classList.toggle('is-active', state.powerOverlay);
+    for (const [id, node] of this.overlayButtons) {
+      node.classList.toggle('is-active', id === state.overlay);
+    }
     this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
 
     if (this.messageNode) {
@@ -153,6 +165,7 @@ export class Hud {
     this.panels.replaceChildren();
     this.values.clear();
     this.speedButtons.length = 0;
+    this.overlayButtons.clear();
 
     this.buildStats();
     this.buildDemand();
@@ -289,9 +302,13 @@ export class Hud {
   private buildMisc(): void {
     const panel = el('div', 'panel');
 
-    const power = button('chip', () => this.callbacks.onTogglePowerOverlay());
-    power.textContent = this.i18n.t('ui.overlay.power');
-    this.powerButton = power;
+    const overlayRow = el('div', 'panel__row');
+    for (const overlay of this.overlays) {
+      const node = button('chip', () => this.callbacks.onToggleOverlay(overlay.id));
+      node.textContent = this.i18n.t(overlay.labelKey);
+      overlayRow.appendChild(node);
+      this.overlayButtons.set(overlay.id, node);
+    }
 
     const budget = button('chip', () => this.callbacks.onToggleBudget());
     budget.textContent = this.i18n.t('ui.budget.toggle');
@@ -311,7 +328,7 @@ export class Hud {
     select.addEventListener('change', () => this.callbacks.onLanguageChange(select.value));
     languageRow.appendChild(select);
 
-    panel.append(power, budget, languageRow);
+    panel.append(overlayRow, budget, languageRow);
     this.panels.appendChild(panel);
   }
 }

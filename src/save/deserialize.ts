@@ -264,7 +264,11 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   }
   world.nextBuildingId = save.entities.nextBuildingId;
 
+  // Difuzní vrstvy save verze 1 nenese. Vynulují se a systémy si je dopočítají —
+  // ukládat je začne až formát verze 2 (T20).
+  world.coarse.pollution.fill(0);
+
   // Po loadu se kreslí všechno a síť se přepočítá znovu.
-  world.dirty = { tiles: new Set(), buildings: new Set(), fullRedraw: true };
+  world.dirty = { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true };
   world.powerNetworkDirty = true;
 }

@@ -40,6 +40,18 @@ export function screenToGrid(screenX: number, screenY: number): Point {
   };
 }
 
+/**
+ * Obdélníková oblast mřížky `w × h` od `(x, y)` jako čtyřúhelník na zemi.
+ * Pro 1×1 vyjde přesně diamant dlaždice.
+ */
+export function footprintQuad(x: number, y: number, w: number, h: number): number[] {
+  const back = gridToScreen(x, y);
+  const right = gridToScreen(x + w, y);
+  const front = gridToScreen(x + w, y + h);
+  const left = gridToScreen(x, y + h);
+  return [back.x, back.y, right.x, right.y, front.x, front.y, left.x, left.y];
+}
+
 export interface CuboidFaces {
   top: number[];
   left: number[];

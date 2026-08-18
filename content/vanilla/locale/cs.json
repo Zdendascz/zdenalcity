@@ -102,6 +102,7 @@
   "error.unknownSpeed": "Neznámá rychlost {speed}.",
   "error.crash": "Chyba v běhu hry: {message}",
 
-  "ui.overlay.power": "Zobrazit elektřinu",
+  "ui.overlay.power": "Elektřina",
+  "ui.overlay.pollution": "Znečištění",
   "ui.language.label": "Jazyk"
 }

@@ -27,6 +27,8 @@ import { BuildingRenderer } from './buildingRenderer';
 import type { AppearanceLookup } from './buildingRenderer';
 import { createCamera, pan, zoomAt } from './camera';
 import { ChunkRenderer } from './chunkRenderer';
+import type { OverlayMode } from './chunkRenderer';
+import { CoarseOverlay } from './coarseOverlay';
 import { DebugOverlay } from './debugOverlay';
 import { BACKGROUND_COLOR, HOVER_COLOR, HOVER_FILL_ALPHA, HOVER_LINE_ALPHA } from './palette';
 import { pickTile } from './picking';
@@ -144,6 +146,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     worldContainer,
     createAppearanceLookup(content),
   );
+
+  const coarseOverlay = new CoarseOverlay(world, worldContainer);
 
   const hover = new Graphics();
   worldContainer.addChild(hover);
@@ -267,7 +271,22 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     buildingInfo.show(simWorld, building, content.get(building.definitionId));
   }
 
-  const hud = new Hud(hudRoot, i18n, world, SPEEDS, {
+  /** Diagnostické pohledy. Skutečný přepínač s ikonami je T21. */
+  const overlays = [
+    { id: 'power', labelKey: 'ui.overlay.power' },
+    { id: 'pollution', labelKey: 'ui.overlay.pollution' },
+  ];
+
+  let overlayMode: OverlayMode = 'none';
+
+  function toggleOverlay(id: string): void {
+    overlayMode = (overlayMode === id ? 'none' : id) as OverlayMode;
+    // Elektřina se zapéká do chunků, hrubé vrstvy mají vlastní lehkou vrstvu.
+    chunkRenderer.setOverlay(overlayMode === 'power' ? 'power' : 'none');
+    coarseOverlay.setVisible(overlayMode === 'pollution');
+  }
+
+  const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, {
     onSpeed: setSpeed,
     onTaxChange: changeTax,
     onQuickSave: quickSaveNow,
@@ -280,9 +299,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onOpenFile: (file) => {
       void readFileBytes(file).then(loadFromBytes);
     },
-    onTogglePowerOverlay: () => {
-      chunkRenderer.setPowerOverlay(!chunkRenderer.isPowerOverlayVisible());
-    },
+    onToggleOverlay: toggleOverlay,
     onToggleBudget: () => budgetPanel.toggle(),
     onLanguageChange: (language) => i18n.setLanguage(language),
   });
@@ -446,7 +463,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const key = event.key.toLowerCase();
 
     if (key === 'p') {
-      chunkRenderer.setPowerOverlay(!chunkRenderer.isPowerOverlayVisible());
+      toggleOverlay('power');
+      return;
+    }
+
+    if (key === 'o') {
+      toggleOverlay('pollution');
       return;
     }
 
@@ -490,6 +512,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const dirty = host.consumeDirty();
     chunkRenderer.update(dirty);
     buildingRenderer.update(dirty);
+    coarseOverlay.update(dirty.coarseChanged);
 
     worldContainer.scale.set(camera.zoom);
     worldContainer.position.set(
@@ -513,7 +536,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     hud.update({
       speedIndex,
-      powerOverlay: chunkRenderer.isPowerOverlayVisible(),
+      overlay: overlayMode,
       budgetVisible: budgetPanel.isVisible(),
       poweredBuildings,
       message: message ? i18n.t(message.key, message.params) : '',
@@ -544,6 +567,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       host,
       chunkRenderer,
       buildingRenderer,
+      coarseOverlay,
       content,
       simWorld,
       i18n,

@@ -1,4 +1,5 @@
 import type { BuildingCatalogue } from './catalogue';
+import type { ReadonlyCoarseLayers } from './coarse';
 import { buildRoad, bulldoze, placeDefinition, setTaxRate, zoneArea } from './commands';
 import type { Command } from './commands';
 import type { ReadonlyLayers } from './layers';
@@ -26,6 +27,7 @@ export interface ReadonlyWorldView {
   readonly seed: number;
   readonly tick: number;
   readonly layers: ReadonlyLayers;
+  readonly coarse: ReadonlyCoarseLayers;
   readonly buildings: ReadonlyMap<number, Readonly<Building>>;
   readonly economy: Readonly<EconomyState>;
   readonly demand: Readonly<DemandState>;

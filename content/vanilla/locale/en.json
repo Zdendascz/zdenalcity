@@ -102,6 +102,7 @@
   "error.unknownSpeed": "Unknown speed {speed}.",
   "error.crash": "Runtime error: {message}",
 
-  "ui.overlay.power": "Power overlay",
+  "ui.overlay.power": "Power",
+  "ui.overlay.pollution": "Pollution",
   "ui.language.label": "Language"
 }
