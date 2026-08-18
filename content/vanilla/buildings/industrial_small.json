@@ -4,7 +4,7 @@
   "category": "industrial",
   "name": "building.industrial_small.name",
   "description": "building.industrial_small.desc",
-  "footprint": [2, 2],
+  "footprint": [1, 1],
   "construction": {
     "cost": 200,
     "requiresRoad": true,

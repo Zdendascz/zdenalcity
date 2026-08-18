@@ -436,6 +436,16 @@ _(nic)_
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
   nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
   z nich pravděpodobně zmizí.
+- **Co dnes rozhoduje o vzniku budovy** (odpověď na dotaz autora, podklad pro fázi 2):
+  nezáporná kasa → systém běží 1× za 12 tiků a udělá 4 pokusy → každý pokus má
+  40% šanci → náhodná volná zónovaná dlaždice, rovnoměrně → poptávka kategorie
+  musí být kladná → náhodná definice z kategorie → půdorys volný, povolený terén,
+  sousedící silnice. **Nic jiného vliv nemá.** Z toho plynou tři slabiny:
+  - **Poptávka je vypínač, ne váha.** Poptávka 1 a 100 stavějí stejně rychle.
+  - **Daně na růst nemají vliv vůbec.** Chybí vazba „vysoké daně odrazují".
+  - **Silnice se vyhodnocuje jako přímé sousedství**, ne dosah. Dlaždice o dvě
+    pole dál je nedosažitelná napořád, a co hůř: takové dlaždice pořád padají
+    do losu, takže velká zóna daleko od silnic zpomaluje růst i tam, kde stavět jde.
 - **Elektrárna se nevejde do zastavěné čtvrti a hra to neřekne.** Půdorys 4×4
   potřebuje šestnáct volných dlaždic a jednu stranu u silnice; když to nevyjde,
   klik prostě nic neudělá. Narazil jsem na to dvakrát za sebou při ověřování.
