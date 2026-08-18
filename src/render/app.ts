@@ -31,13 +31,14 @@ const ZOOM_STEP = 1.15;
 const DEFAULT_SPEED_INDEX = 1;
 
 /** Nástroj na levém tlačítku. Bourání je vždycky na pravém. */
-type Tool = 'road' | 'residential' | 'commercial' | 'industrial';
+type Tool = 'road' | 'residential' | 'commercial' | 'industrial' | 'utility';
 
 const TOOL_KEYS: Readonly<Record<string, Tool>> = {
   q: 'road',
   r: 'residential',
   c: 'commercial',
   i: 'industrial',
+  u: 'utility',
 };
 
 const TOOL_ZONE: Readonly<Record<string, ZoneType>> = {
@@ -64,8 +65,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const content = new ContentRegistry();
   await content.load(createVanillaSource());
 
-  const host = createSimHost(SEED, createDefaultSystems(content));
+  const host = createSimHost(SEED, createDefaultSystems(content), content);
   const world = host.getSnapshot();
+
+  // Infrastruktura ze zóny nevyroste, staví ji hráč. Seznam jde z obsahu,
+  // takže v rendereru není jméno ani jedné budovy (P5).
+  const utilities = content.byCategory('utility');
 
   const app = new Application();
   await app.init({
@@ -105,6 +110,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let speedIndex = DEFAULT_SPEED_INDEX;
   let paintButton: number | null = null;
   let lastPaintedTile = -1;
+  let utilityIndex = 0;
 
   const canvas = app.canvas;
 
@@ -132,6 +138,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
     if (tool === 'road') {
       host.dispatch({ type: 'build_road', x: tile.x, y: tile.y });
+      return;
+    }
+    if (tool === 'utility') {
+      const definition = utilities[utilityIndex];
+      if (definition) {
+        host.dispatch({ type: 'place_building', definitionId: definition.id, x: tile.x, y: tile.y });
+      }
       return;
     }
     const zone = TOOL_ZONE[tool];
@@ -214,8 +227,19 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       return;
     }
 
-    const requestedTool = TOOL_KEYS[event.key.toLowerCase()];
+    const key = event.key.toLowerCase();
+
+    if (key === 'p') {
+      chunkRenderer.setPowerOverlay(!chunkRenderer.isPowerOverlayVisible());
+      return;
+    }
+
+    const requestedTool = TOOL_KEYS[key];
     if (requestedTool) {
+      // Opakovaný stisk U cykluje mezi dostupnou infrastrukturou.
+      if (requestedTool === 'utility' && tool === 'utility' && utilities.length > 0) {
+        utilityIndex = (utilityIndex + 1) % utilities.length;
+      }
       tool = requestedTool;
       return;
     }
@@ -253,8 +277,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         .stroke({ color: HOVER_COLOR, alpha: HOVER_LINE_ALPHA, width: 2 / camera.zoom });
     }
 
+    let poweredBuildings = 0;
+    for (const building of world.buildings.values()) {
+      if (building.powered) poweredBuildings++;
+    }
+
     overlay.update([
-      `tool   ${tool}`,
+      `tool   ${tool === 'utility' ? (utilities[utilityIndex]?.id ?? 'utility: nic') : tool}`,
       `tile   ${hoveredTile ? `${hoveredTile.x}, ${hoveredTile.y}` : '-'}`,
       `zoom   ${camera.zoom.toFixed(2)}x`,
       `speed  ${SPEEDS[speedIndex] ?? 0}x`,
@@ -263,6 +292,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       `budov  ${world.buildings.size}`,
       `lidí   ${totalPopulation(world.buildings)}`,
       `práce  ${totalJobs(world.buildings)}`,
+      `proud  ${poweredBuildings}/${world.buildings.size}${chunkRenderer.isPowerOverlayVisible() ? ' [P]' : ''}`,
     ]);
   });
 

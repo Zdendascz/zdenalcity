@@ -14,7 +14,7 @@ import { createSimHost } from '@/sim/simHost';
 describe('golden: silniční síť', () => {
   it('pevná sekvence příkazů a 500 tiků dá stabilní hash vrstev', () => {
     // Bez systémů: tenhle test hlídá silnice a příkazy, ne růst města.
-    const host = createSimHost(483928492, []);
+    const host = createSimHost(483928492, [], { get: () => undefined, byCategory: () => [] });
 
     for (let x = 20; x <= 40; x++) {
       host.dispatch({ type: 'build_road', x, y: 64 });

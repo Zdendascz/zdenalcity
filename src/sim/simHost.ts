@@ -1,4 +1,5 @@
-import { buildRoad, bulldoze, zoneArea } from './commands';
+import type { BuildingCatalogue } from './catalogue';
+import { buildRoad, bulldoze, placeDefinition, zoneArea } from './commands';
 import type { Command } from './commands';
 import type { ReadonlyLayers } from './layers';
 import type { System } from './systems';
@@ -42,12 +43,14 @@ export interface SimHost {
 class MainThreadSimHost implements SimHost {
   private readonly world: WorldState;
   private readonly systems: readonly System[];
+  private readonly catalogue: BuildingCatalogue;
   private accumulator = 0;
   private speedIndex = 1; // 1×
 
-  constructor(world: WorldState, systems: readonly System[]) {
+  constructor(world: WorldState, systems: readonly System[], catalogue: BuildingCatalogue) {
     this.world = world;
     this.systems = systems;
+    this.catalogue = catalogue;
   }
 
   dispatch(cmd: Command): void {
@@ -70,7 +73,8 @@ class MainThreadSimHost implements SimHost {
         zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone);
         break;
       case 'place_building':
-        break; // ruční stavba budov zatím nemá kdo vyvolat
+        placeDefinition(this.world, this.catalogue, cmd.definitionId, cmd.x, cmd.y);
+        break;
       case 'set_tax_rate':
         break; // T7
       default:
@@ -108,9 +112,14 @@ class MainThreadSimHost implements SimHost {
 }
 
 /**
- * Systémy se předávají zvenčí — růst potřebuje katalog obsahu, který `sim/`
- * sám nesestaví. Prázdné pole dá čistý svět bez simulace, což využívají testy.
+ * Systémy i katalog se předávají zvenčí — `sim/` obsah sám nesestaví. Katalog
+ * potřebují elektřina, růst a příkaz `place_building`. Prázdné pole systémů dá
+ * čistý svět bez simulace, což využívají testy.
  */
-export function createSimHost(seed: number, systems: readonly System[]): SimHost {
-  return new MainThreadSimHost(createWorld(seed), systems);
+export function createSimHost(
+  seed: number,
+  systems: readonly System[],
+  catalogue: BuildingCatalogue,
+): SimHost {
+  return new MainThreadSimHost(createWorld(seed), systems, catalogue);
 }

@@ -6,6 +6,9 @@ import { createWorld, markTileDirty, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { index } from '@/sim/layers';
 
+/** Prázdný katalog — tyhle testy se obsahu netýkají. */
+const NO_CONTENT = { get: () => undefined, byCategory: () => [] };
+
 /** Systém, který si pamatuje, na kterých ticích běžel. */
 function recorder(interval: number, offset: number): System & { ticks: number[] } {
   const ticks: number[] = [];
@@ -22,13 +25,13 @@ function recorder(interval: number, offset: number): System & { ticks: number[] 
 
 describe('akumulátor', () => {
   it('step(1000) při 1× odsimuluje přesně 4 tiky', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
     host.step(1000);
     expect(host.getSnapshot().tick).toBe(1000 / TICK_MS);
   });
 
   it('zbytek se přenáší mezi voláními', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
     host.step(300); // 1 tick, zbývá 50 ms
     expect(host.getSnapshot().tick).toBe(1);
     host.step(200); // 50 + 200 = 250 → 1 tick
@@ -36,21 +39,21 @@ describe('akumulátor', () => {
   });
 
   it('pauza (rychlost 0) netiká', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
     host.dispatch({ type: 'set_speed', speed: 0 });
     host.step(10_000);
     expect(host.getSnapshot().tick).toBe(0);
   });
 
   it('při 8× je jeden snímek zastropován na MAX_TICKS_PER_FRAME', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
     host.dispatch({ type: 'set_speed', speed: 4 }); // index 4 = 8×
     host.step(1000); // 8000 ms herního času = 32 tiků, kdyby se nestropovalo
     expect(host.getSnapshot().tick).toBe(MAX_TICKS_PER_FRAME);
   });
 
   it('po zastropování se skluz zahodí, ne dohání', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
     host.dispatch({ type: 'set_speed', speed: 4 });
     host.step(1000);
     host.dispatch({ type: 'set_speed', speed: 1 }); // 1×
@@ -59,7 +62,7 @@ describe('akumulátor', () => {
   });
 
   it('ignoruje nesmyslný index rychlosti', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
     host.dispatch({ type: 'set_speed', speed: SPEEDS.length }); // mimo rozsah
     host.step(1000);
     expect(host.getSnapshot().tick).toBe(4); // zůstala výchozí 1×
@@ -86,7 +89,7 @@ describe('fázování systémů', () => {
   });
 
   it('registrované systémy mají intervaly a offsety podle architektury §5', () => {
-    const systems = createDefaultSystems({ byCategory: () => [] });
+    const systems = createDefaultSystems(NO_CONTENT);
     expect(systems.map((s) => [s.name, s.interval, s.offset])).toEqual([
       ['power', 1, 0],
       ['demand', 4, 1],
@@ -98,7 +101,7 @@ describe('fázování systémů', () => {
 
 describe('dirty tracking', () => {
   it('čerstvý svět vyžaduje plné překreslení, po odebrání už ne', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
 
     const first = host.consumeDirty();
     expect(first.fullRedraw).toBe(true);
@@ -116,7 +119,7 @@ describe('dirty tracking', () => {
       offset: 0,
       run: (world) => markTileDirty(world, 3, 4),
     };
-    const host = createSimHost(1, [marker]);
+    const host = createSimHost(1, [marker], NO_CONTENT);
     host.consumeDirty();
 
     host.step(TICK_MS);
@@ -127,14 +130,14 @@ describe('dirty tracking', () => {
 
 describe('snapshot', () => {
   it('je živý pohled, ne kopie', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
     const snapshot = host.getSnapshot();
     host.step(1000);
     expect(snapshot.tick).toBe(4);
   });
 
   it('je typově read-only', () => {
-    const snapshot = createSimHost(1, []).getSnapshot();
+    const snapshot = createSimHost(1, [], NO_CONTENT).getSnapshot();
     // @ts-expect-error P1: renderer do simulace nezapisuje
     snapshot.layers.terrain[0] = 1;
     // @ts-expect-error P1: renderer do simulace nezapisuje

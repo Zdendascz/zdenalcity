@@ -8,7 +8,7 @@
   "construction": {
     "cost": 150,
     "requiresRoad": true,
-    "requiresPower": true,
+    "requiresPower": false,
     "allowedTerrain": [0, 2]
   },
   "economy": {

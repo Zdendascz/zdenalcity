@@ -1,0 +1,134 @@
+import type { Definition } from '@/content/schema';
+import { inBounds, index } from './layers';
+import { markBuildingDirty, markPowerNetworkDirty, markTileDirty } from './world';
+import type { Building, WorldState } from './world';
+
+/**
+ * Stavba a testování místa pro budovu. Sdílí to růstový systém (staví sám)
+ * i příkaz `place_building` (staví hráč) — pravidla musí být na jednom místě,
+ * jinak by se rozešla.
+ */
+
+export interface FitOptions {
+  /** Když je zadáno, všechny dlaždice footprintu musí mít právě tuhle zónu. */
+  requireZone?: number;
+}
+
+export function footprintFits(
+  world: WorldState,
+  definition: Definition,
+  x: number,
+  y: number,
+  options: FitOptions = {},
+): boolean {
+  const [width, depth] = definition.footprint;
+
+  for (let dy = 0; dy < depth; dy++) {
+    for (let dx = 0; dx < width; dx++) {
+      const tileX = x + dx;
+      const tileY = y + dy;
+      if (!inBounds(tileX, tileY)) return false;
+
+      const tile = index(tileX, tileY);
+      if (options.requireZone !== undefined && world.layers.zone[tile] !== options.requireZone) {
+        return false;
+      }
+      if (world.layers.road[tile] !== 0) return false;
+      if (world.layers.buildingId[tile] !== 0) return false;
+
+      const terrain = world.layers.terrain[tile] ?? 0;
+      if (!definition.construction.allowedTerrain.includes(terrain)) return false;
+    }
+  }
+
+  if (definition.construction.requiresRoad && !touchesRoad(world, definition, x, y)) return false;
+  if (definition.construction.requiresPower && !touchesPower(world, definition, x, y)) return false;
+
+  return true;
+}
+
+/** Sousedí footprint aspoň jednou stranou se silnicí? */
+export function touchesRoad(
+  world: WorldState,
+  definition: Definition,
+  x: number,
+  y: number,
+): boolean {
+  return touchesLayerValue(world.layers.road, definition, x, y);
+}
+
+/**
+ * Sousedí footprint s dlaždicí, kam vede proud? Vlastní dlaždice se nepočítají —
+ * budova ještě nestojí, takže vodičem není.
+ */
+export function touchesPower(
+  world: WorldState,
+  definition: Definition,
+  x: number,
+  y: number,
+): boolean {
+  return touchesLayerValue(world.layers.power, definition, x, y);
+}
+
+function touchesLayerValue(
+  layer: Uint8Array,
+  definition: Definition,
+  x: number,
+  y: number,
+): boolean {
+  const [width, depth] = definition.footprint;
+
+  for (let dy = 0; dy < depth; dy++) {
+    for (let dx = 0; dx < width; dx++) {
+      const tileX = x + dx;
+      const tileY = y + dy;
+      if (
+        isSet(layer, tileX, tileY - 1) ||
+        isSet(layer, tileX + 1, tileY) ||
+        isSet(layer, tileX, tileY + 1) ||
+        isSet(layer, tileX - 1, tileY)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function isSet(layer: Uint8Array, x: number, y: number): boolean {
+  return inBounds(x, y) && layer[index(x, y)] === 1;
+}
+
+export function placeBuilding(
+  world: WorldState,
+  definition: Definition,
+  x: number,
+  y: number,
+): Building {
+  const building: Building = {
+    id: world.nextBuildingId++,
+    definitionId: definition.id,
+    x,
+    y,
+    level: 1, // úrovně budov jsou podle §14 až fáze 2
+    population: definition.population?.capacity ?? 0,
+    jobs: definition.jobs?.capacity ?? 0,
+    powered: false, // dořeší powerSystem v nejbližším tiku
+    builtAtTick: world.tick,
+  };
+
+  world.buildings.set(building.id, building);
+
+  const [width, depth] = definition.footprint;
+  for (let dy = 0; dy < depth; dy++) {
+    for (let dx = 0; dx < width; dx++) {
+      world.layers.buildingId[index(x + dx, y + dy)] = building.id;
+      markTileDirty(world, x + dx, y + dy);
+    }
+  }
+
+  markBuildingDirty(world, building.id);
+  markPowerNetworkDirty(world); // budova je vodič, síť se mění
+  return building;
+}

@@ -17,14 +17,17 @@ const HOUSE: Definition = {
   name: 'building.house.name',
   description: 'building.house.desc',
   footprint: [1, 1],
-  construction: { cost: 100, requiresRoad: true, requiresPower: true, allowedTerrain: [0] },
+  construction: { cost: 100, requiresRoad: true, requiresPower: false, allowedTerrain: [0] },
   economy: { upkeep: 10 },
   population: { capacity: 8 },
   graphics: { color: '#8fb4dd', heightLevels: 1 },
 };
 
 function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
-  return { byCategory: (category) => definitions.filter((d) => d.category === category) };
+  return {
+    get: (id) => definitions.find((d) => d.id === id),
+    byCategory: (category) => definitions.filter((d) => d.category === category),
+  };
 }
 
 /** Odtiká tolik tiků, aby růstový systém (interval 12) proběhl `runs`krát. */

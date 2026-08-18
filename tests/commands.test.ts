@@ -5,6 +5,9 @@ import { createSimHost } from '@/sim/simHost';
 import { createWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 
+/** Prázdný katalog — silnice ani zóny obsah nepotřebují. */
+const NO_CONTENT = { get: () => undefined, byCategory: () => [] };
+
 /** Čerstvý svět má `fullRedraw`, což by u testů dirty trackingu překáželo. */
 function worldWithCleanDirty(): WorldState {
   const world = createWorld(1);
@@ -96,7 +99,7 @@ describe('bulldoze', () => {
 
 describe('cesta přes SimHost.dispatch', () => {
   it('build_road a bulldoze projdou fasádou až do vrstvy', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
 
     host.dispatch({ type: 'build_road', x: 3, y: 7 });
     expect(host.getSnapshot().layers.road[index(3, 7)]).toBe(1);
@@ -106,7 +109,7 @@ describe('cesta přes SimHost.dispatch', () => {
   });
 
   it('změny se objeví v consumeDirty a pak se vyprázdní', () => {
-    const host = createSimHost(1, []);
+    const host = createSimHost(1, [], NO_CONTENT);
     host.consumeDirty(); // spolkni úvodní fullRedraw
 
     host.dispatch({ type: 'build_road', x: 3, y: 7 });

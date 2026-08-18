@@ -1,6 +1,8 @@
+import { footprintFits, placeBuilding } from './buildings';
+import type { BuildingCatalogue } from './catalogue';
 import { inBounds, index, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
-import { markTileDirty, removeBuilding } from './world';
+import { markPowerNetworkDirty, markTileDirty, removeBuilding } from './world';
 import type { WorldState } from './world';
 
 /**
@@ -43,6 +45,27 @@ export function buildRoad(world: WorldState, x: number, y: number): void {
 
   world.layers.road[tile] = 1;
   markRoadNeighbourhoodDirty(world, x, y);
+  markPowerNetworkDirty(world); // silnice je vodič
+}
+
+/**
+ * Ruční stavba konkrétní budovy. Používá se na to, co nevyroste ze zóny —
+ * typicky infrastruktura. Definici hledá v katalogu, takže v kódu není ani
+ * jedna budova (P5).
+ */
+export function placeDefinition(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  definitionId: string,
+  x: number,
+  y: number,
+): void {
+  const definition = catalogue.get(definitionId);
+  if (!definition) return;
+  // Zóna se nekontroluje: elektrárna smí stát i na nezónované půdě.
+  if (!footprintFits(world, definition, x, y)) return;
+
+  placeBuilding(world, definition, x, y);
 }
 
 /**
@@ -98,6 +121,7 @@ export function bulldoze(world: WorldState, x: number, y: number): void {
   if (world.layers.road[tile] === 1) {
     world.layers.road[tile] = 0;
     markRoadNeighbourhoodDirty(world, x, y);
+    markPowerNetworkDirty(world);
     return;
   }
 

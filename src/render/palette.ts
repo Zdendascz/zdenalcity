@@ -22,6 +22,11 @@ export const ZONE_COLOR_BY_VALUE = [
 
 export const ZONE_OVERLAY_ALPHA = 0.4;
 
+/** Overlay elektřiny (klávesa P): vodič s proudem a vodič bez proudu. */
+export const POWER_ON_COLOR = 0xf2d857;
+export const POWER_OFF_COLOR = 0xd9483a;
+export const POWER_OVERLAY_ALPHA = 0.55;
+
 /** Stěny kvádru budovy: horní plocha 100 %, levá 70 %, pravá 50 % jasu (§6). */
 export const WALL_LEFT_SHADE = 0.7;
 export const WALL_RIGHT_SHADE = 0.5;

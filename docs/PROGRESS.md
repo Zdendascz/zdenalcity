@@ -134,8 +134,33 @@ Ověřeno (`npm run check`, 10 souborů / 111 testů) a v běžící hře:
 - bourání odstraní budovu i její otisk ve `buildingId`, ale **zónu nechá**
 - determinismus: stejný seed dá identické město i stav RNG, jiný seed jiné
 
+- [x] T6 — elektřina
+
+Vzniklo:
+- `src/sim/systems/power.ts` — flood fill z elektráren po vodičích a rozdělení kapacity
+- `src/sim/catalogue.ts` — `BuildingCatalogue` (rozšířeno o `get`) na jednom místě
+- `src/sim/buildings.ts` — `footprintFits`, `touchesRoad`, `touchesPower`, `placeBuilding`
+  sdílené růstem i ruční stavbou
+- `src/sim/commands.ts` — `placeDefinition`, tedy příkaz `place_building`
+- `src/sim/world.ts` — `powerNetworkDirty` a `markPowerNetworkDirty`
+- `src/render/chunkRenderer.ts` — overlay elektřiny (klávesa P)
+- `src/render/app.ts` — nástroj infrastruktury (klávesa U, cykluje obsahem)
+
+Ověřeno (`npm run check`, 11 souborů / 124 testů) a v běžící hře:
+- **akceptační smyčka §13 krok 7 prošla**: 11 domů u silnice mělo 0 pod proudem,
+  po postavení uhelné elektrárny je pod proudem všech 12 budov
+- proud se šíří po silnici na druhý konec, ale **prázdná dlaždice proud nevede**
+  a odpojený ostrov silnice zůstal na 0
+- přerušení silnice bulldozerem odřízne zbytek sítě od proudu
+- kapacita se dělí: elektrárna 50, dům 20 → utáhne dva domy, třetí zůstane bez
+  proudu; přednost má nižší `id`, tedy starší budova
+- flag sítě: stavba silnice ho zapne, přepočet zhasne, zónování se ho netýká
+- overlay: bez něj jsou napojená i odpojená silnice stejně tmavé `#44454d`,
+  s ním je napojená `#a49653` a odpojená `#964643`; tráva zůstává netknutá,
+  protože barvit prázdnou dlaždici by tvrdilo „chybí tu vedení"
+
 ## Rozpracované
-_(nic — T5 uzavřeno)_
+_(nic — T6 uzavřeno)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -163,6 +188,13 @@ _(nic — T5 uzavřeno)_
 | 2026-08-14 | `world.tick` se inkrementuje **před** během systémů | Systém tak vidí číslo právě probíhajícího tiku a po N voláních platí `world.tick === N`. Fázování z §5 (`interval 12, offset 2` → tiky 2, 14, 26) tím sedí. |
 | 2026-08-14 | Determinismus test registruje vlastní testovací systém | Ostré systémy jsou v T1 prázdné, takže test se samotnými `DEFAULT_SYSTEMS` by porovnával dvě netknuté mapy a prošel by i s úplně rozbitým RNG. Testovací systém mapu přepisuje přes `world.rng`. |
 | 2026-08-14 | `hashLayers` hashuje i jména vrstev a rozkládá bajty ručně | Jméno v hashi znamená, že přejmenování nebo přeházení pořadí vrstev změní hash (žádoucí signál v golden testech). Ruční rozklad podle `BYTES_PER_ELEMENT` místo pohledu na buffer drží hash nezávislý na endianitě stroje. |
+| 2026-08-18 | **Vodičem je silnice a budova, samostatné elektrické vedení nevzniklo** | Architektura §4 vrstvu pro vedení nemá a §6 ho mezi kreslenými prvky nezmiňuje — přidat ho by znamenalo novou vrstvu, nový nástroj a nové auto-tiling pravidlo, tedy práci mimo zadání T6. Proud tak teče po silnicích, což je model, který stačí na smyčku §13. |
+| 2026-08-18 | Kapacita se rozdává vzestupně podle `id` | Musí to být deterministické (P2) a „starší budovy mají přednost" je pravidlo, které jde hráči vysvětlit. Alternativa podle vzdálenosti od elektrárny by byla dražší a stejně arbitrární. |
+| 2026-08-18 | `requiresPower` teď kód respektuje a vanilla R/C/I ho má `false` | V T5 kód ten flag ignoroval, takže data tvrdila něco, co se nedělo. Teď rozhoduje obsah: §13 chce, aby město rostlo dřív než elektrárna (krok 3 je dům, krok 7 elektrárna), takže R/C/I proud k vyrůstání nepotřebují. Kdo chce růst podmíněný proudem, přepne jeden údaj v JSONu, ne v kódu. |
+| 2026-08-18 | `place_building` implementován v T6, i když ho zadání nezmiňuje | Elektrárna je kategorie `utility` a ze zóny nevyroste — bez ručního příkazu by ji nešlo postavit a T6 by nebylo jak ověřit. |
+| 2026-08-18 | `createSimHost` bere katalog obsahu | `place_building` musí validovat proti definici a validace patří do simulace (§5), ne do UI. Katalog už předtím potřebovaly dva systémy, takže je to jen dotažení téhož. |
+| 2026-08-18 | Nástroj infrastruktury je řízen obsahem, ne jménem budovy | Klávesa U vybírá z `byCategory('utility')` a opakovaný stisk cykluje. V rendereru tak není jméno ani jedné budovy (P5). Skutečný toolbar přijde v T9. |
+| 2026-08-18 | Overlay elektřiny se zapéká do chunků | Přepnutí překreslí všech 64 chunků, ale je to reakce na stisk klávesy, ne věc snímku — a znovu se tím využije existující dirty mechanika místo nové vrstvy grafiky. |
 | 2026-08-18 | **Výška kvádru je `level × heightLevels × LEVEL_H`, ne `level × LEVEL_H`** | §6 uvádí `building.level * LEVEL_H`, ale úrovně budov jsou podle §14 až fáze 2, takže `level` je zatím vždy 1 — všechno by bylo 16 px vysoké a `graphics.heightLevels` z §7 by nemělo žádný efekt. Elektrárna s `heightLevels: 2` by byla stejně vysoká jako domek. Pro `level = 1` se vzorec redukuje na `heightLevels × LEVEL_H`. **Odchylka od §6 — ke schválení.** |
 | 2026-08-18 | Registr systémů je funkce `createDefaultSystems(catalogue)`, ne konstanta | Růst potřebuje obsah, ale `System.run(world)` má pevnou signaturu z T1. Systém si katalog uzavře do closure, takže se nemusel rozšiřovat ani `WorldState`, ani rozhraní systému. Vedlejší efekt: `createSimHost` teď systémy vyžaduje explicitně, což je lepší než tichý default. |
 | 2026-08-18 | Simulace čte obsah přes úzké `BuildingCatalogue`, ne přes celý registr | `sim/` tak nezávisí na tom, jak se obsah načítá, a testy mu podstrčí atrapu o třech řádcích. `ContentRegistry` rozhraní splňuje strukturálně, bez deklarace `implements`. |
@@ -198,6 +230,15 @@ _(nic — T5 uzavřeno)_
 ## Známé problémy / technický dluh
 
 - `vite.config.ts` je mimo `tsc --noEmit` (viz tabulka rozhodnutí).
+- **Elektřina zatím nemá herní důsledek, jen vizuální.** `building.powered` se
+  správně počítá, ale nic se podle něj neděje — budova bez proudu funguje stejně
+  jako s ním. Load-bearing se to stane v T7, kde neosvětlená budova nemá platit
+  daně. Do té doby je to jen overlay.
+- **`requiresPower` a `power.consumption` se překrývají.** `requiresPower` říká
+  „bez proudu nevyrostu", `consumption > 0` říká „beru proud". Zatím to jsou dva
+  nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
+  nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
+  z nich pravděpodobně zmizí.
 - **Sousedící domy 1×1 splývají v jeden hřeben.** Kvádr zabírá přesně svůj
   footprint, takže dvě budovy vedle sebe nemají mezi sebou mezeru a řada domů
   vypadá jako dlouhá hradba. V SimCity 2000 se bloky slévají podobně, takže to

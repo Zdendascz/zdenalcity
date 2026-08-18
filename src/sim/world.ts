@@ -57,6 +57,13 @@ export interface WorldState {
 
   /** Runtime-only, do savu nepatří — po loadu se stejně překresluje všechno. */
   dirty: DirtySet;
+
+  /**
+   * Změnila se od posledního přepočtu topologie elektrické sítě?
+   * `powerSystem` běží každý tik, ale flood fill pouští jen při tomhle flagu (§5).
+   * Runtime-only — po loadu se síť přepočítá znovu.
+   */
+  powerNetworkDirty: boolean;
 }
 
 export function createWorld(seed: number): WorldState {
@@ -72,7 +79,13 @@ export function createWorld(seed: number): WorldState {
     rng: new Rng(seed),
     // Čerstvý svět renderer ještě neviděl.
     dirty: { tiles: new Set(), buildings: new Set(), fullRedraw: true },
+    powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
   };
+}
+
+/** Vodiče (silnice, budovy) se změnily — síť se musí přepočítat. */
+export function markPowerNetworkDirty(world: WorldState): void {
+  world.powerNetworkDirty = true;
 }
 
 export function markTileDirty(world: WorldState, x: number, y: number): void {
@@ -104,6 +117,7 @@ export function removeBuilding(world: WorldState, buildingId: number): boolean {
   }
 
   markBuildingDirty(world, buildingId);
+  markPowerNetworkDirty(world); // budova byla vodič i možný zdroj
   return true;
 }
 

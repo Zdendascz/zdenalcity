@@ -4,6 +4,9 @@ import { index } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import {
+  POWER_OFF_COLOR,
+  POWER_ON_COLOR,
+  POWER_OVERLAY_ALPHA,
   ROAD_COLOR,
   shade,
   TERRAIN_COLORS,
@@ -56,6 +59,7 @@ export class ChunkRenderer {
   private readonly world: ReadonlyWorldView;
   private readonly chunksPerAxis: number;
   private readonly chunks: Chunk[] = [];
+  private powerOverlay = false;
 
   constructor(renderer: Renderer, world: ReadonlyWorldView, container: Container) {
     this.renderer = renderer;
@@ -85,6 +89,22 @@ export class ChunkRenderer {
   /** Index chunku, do kterého spadá dlaždice. */
   private chunkIndexFor(x: number, y: number): number {
     return Math.floor(y / CHUNK_SIZE) * this.chunksPerAxis + Math.floor(x / CHUNK_SIZE);
+  }
+
+  /**
+   * Přepne overlay elektřiny. Překreslí všechny chunky, ale je to reakce na
+   * stisk klávesy, ne věc snímku.
+   */
+  setPowerOverlay(enabled: boolean): void {
+    if (this.powerOverlay === enabled) return;
+    this.powerOverlay = enabled;
+    for (let chunkIndex = 0; chunkIndex < this.chunks.length; chunkIndex++) {
+      this.redraw(chunkIndex);
+    }
+  }
+
+  isPowerOverlayVisible(): boolean {
+    return this.powerOverlay;
   }
 
   update(dirty: DirtySet): void {
@@ -155,6 +175,23 @@ export class ChunkRenderer {
         graphics.poly(polygon).fill({ color: ROAD_COLOR });
       }
     }
+
+    if (this.powerOverlay) {
+      this.drawPowerOverlay(graphics, points, tileIndex);
+    }
+  }
+
+  /**
+   * Barví se jen vodiče — silnice a budovy. Prázdná dlaždice proud vést nemůže,
+   * takže by červená znamenala „chybí tu vedení", což by mátlo.
+   */
+  private drawPowerOverlay(graphics: Graphics, points: number[], tileIndex: number): void {
+    const isConductor =
+      this.world.layers.road[tileIndex] === 1 || this.world.layers.buildingId[tileIndex] !== 0;
+    if (!isConductor) return;
+
+    const color = this.world.layers.power[tileIndex] === 1 ? POWER_ON_COLOR : POWER_OFF_COLOR;
+    graphics.poly(points).fill({ color, alpha: POWER_OVERLAY_ALPHA });
   }
 
   /** Mimo mapu silnice nikdy není — okraj mapy se tak chová jako slepý konec. */

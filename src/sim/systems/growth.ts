@@ -1,16 +1,8 @@
-import type { Definition } from '@/content/schema';
-import { inBounds, index, ZONE } from '../layers';
-import { markBuildingDirty, markTileDirty } from '../world';
-import type { Building, WorldState } from '../world';
+import { footprintFits, placeBuilding } from '../buildings';
+import type { BuildingCatalogue } from '../catalogue';
+import { ZONE } from '../layers';
+import type { WorldState } from '../world';
 import type { System } from './index';
-
-/**
- * Co simulace potřebuje z obsahu. Úzké rozhraní místo celého registru, aby
- * `sim/` nezávisel na tom, jak se obsah načítá, a šel testovat s atrapou.
- */
-export interface BuildingCatalogue {
-  byCategory(category: string): readonly Definition[];
-}
 
 /** Kolik pokusů o stavbu proběhne za jeden běh systému. */
 const ATTEMPTS_PER_RUN = 4;
@@ -81,85 +73,10 @@ function tryBuild(world: WorldState, catalogue: BuildingCatalogue, tile: number)
   if (options.length === 0) return;
 
   const definition = options[world.rng.int(options.length)];
-  if (!definition || !fits(world, definition, x, y, zone)) return;
+  if (!definition) return;
+
+  // Celý footprint musí ležet ve stejné zóně — dům nepřeteče do sousední čtvrti.
+  if (!footprintFits(world, definition, x, y, { requireZone: zone })) return;
 
   placeBuilding(world, definition, x, y);
-}
-
-function fits(
-  world: WorldState,
-  definition: Definition,
-  x: number,
-  y: number,
-  zone: number,
-): boolean {
-  const [width, height] = definition.footprint;
-
-  for (let dy = 0; dy < height; dy++) {
-    for (let dx = 0; dx < width; dx++) {
-      const tileX = x + dx;
-      const tileY = y + dy;
-      if (!inBounds(tileX, tileY)) return false;
-
-      const tile = index(tileX, tileY);
-      if (world.layers.zone[tile] !== zone) return false;
-      if (world.layers.road[tile] !== 0) return false;
-      if (world.layers.buildingId[tile] !== 0) return false;
-
-      const terrain = world.layers.terrain[tile] ?? 0;
-      if (!definition.construction.allowedTerrain.includes(terrain)) return false;
-    }
-  }
-
-  // `requiresPower` se zatím neřeší — elektřina je T6 a do té doby by nic
-  // nevyrostlo.
-  return !definition.construction.requiresRoad || touchesRoad(world, x, y, width, height);
-}
-
-function touchesRoad(world: WorldState, x: number, y: number, width: number, height: number): boolean {
-  for (let dy = 0; dy < height; dy++) {
-    for (let dx = 0; dx < width; dx++) {
-      const tileX = x + dx;
-      const tileY = y + dy;
-      if (
-        isRoad(world, tileX, tileY - 1) ||
-        isRoad(world, tileX + 1, tileY) ||
-        isRoad(world, tileX, tileY + 1) ||
-        isRoad(world, tileX - 1, tileY)
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function isRoad(world: WorldState, x: number, y: number): boolean {
-  return inBounds(x, y) && world.layers.road[index(x, y)] === 1;
-}
-
-function placeBuilding(world: WorldState, definition: Definition, x: number, y: number): void {
-  const building: Building = {
-    id: world.nextBuildingId++,
-    definitionId: definition.id,
-    x,
-    y,
-    level: 1, // úrovně budov jsou podle §14 až fáze 2
-    population: definition.population?.capacity ?? 0,
-    jobs: definition.jobs?.capacity ?? 0,
-    powered: false, // T6
-    builtAtTick: world.tick,
-  };
-
-  world.buildings.set(building.id, building);
-
-  const [width, height] = definition.footprint;
-  for (let dy = 0; dy < height; dy++) {
-    for (let dx = 0; dx < width; dx++) {
-      world.layers.buildingId[index(x + dx, y + dy)] = building.id;
-      markTileDirty(world, x + dx, y + dy);
-    }
-  }
-
-  markBuildingDirty(world, building.id);
 }
