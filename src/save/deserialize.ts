@@ -105,6 +105,9 @@ function parseEntities(raw: Record<string, unknown>): SaveEntities {
       jobs: int(building, 'jobs', where),
       powered: bool(building, 'powered', where),
       builtAtTick: int(building, 'builtAtTick', where),
+      // Save v1 tohle pole nenese; podle §11 zadání fáze 2 se při migraci
+      // nuluje. Ukládat ho začne formát verze 2 v T20.
+      levelChangedAtTick: 0,
     };
   });
 

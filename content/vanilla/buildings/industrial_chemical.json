@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:industrial_chemical",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_chemical.name",
+  "description": "building.industrial_chemical.desc",
+  "footprint": [2, 2],
+  "level": 3,
+  "construction": {
+    "cost": 2400,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 152
+  },
+  "jobs": {
+    "capacity": 132
+  },
+  "power": {
+    "consumption": 3120
+  },
+  "environment": {
+    "pollution": 168
+  },
+  "graphics": {
+    "color": "#bfa35f",
+    "heightLevels": 4
+  }
+}

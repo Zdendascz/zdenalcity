@@ -26,7 +26,7 @@ import { buildRoad, placeDefinition, setTaxRate, zoneArea } from '@/sim/commands
 import { hashLayers, index, LAYER_ORDER, MAP_SIZE, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
-import type { WorldState } from '@/sim/world';
+import type { Building, WorldState } from '@/sim/world';
 
 const OPTIONS: SaveOptions = {
   cityName: 'Nový Brod',
@@ -135,7 +135,19 @@ describe('round-trip', () => {
     expect(hashLayers(restored.layers)).toBe(before.hash);
     expect(restored.rng.getState()).toBe(before.rng);
     expect(restored.tick).toBe(before.tick);
-    expect([...restored.buildings.values()]).toEqual(before.buildings);
+    // `levelChangedAtTick` save verze 1 nenese — podle §11 zadání fáze 2 se při
+    // migraci nuluje a ukládat ho začne až formát v2 v T20. Jediné pole, které
+    // round-trip nepřežije; kdyby jich přibylo víc, tenhle test to řekne.
+    const withoutLevelClock = (buildings: readonly Building[]): Partial<Building>[] =>
+      buildings.map((building) => {
+        const copy: Partial<Building> = { ...building };
+        delete copy.levelChangedAtTick;
+        return copy;
+      });
+    expect(withoutLevelClock([...restored.buildings.values()])).toEqual(
+      withoutLevelClock(before.buildings),
+    );
+    expect([...restored.buildings.values()].every((b) => b.levelChangedAtTick === 0)).toBe(true);
     expect(restored.nextBuildingId).toBe(before.nextBuildingId);
     expect(restored.economy).toEqual(before.economy);
     expect(restored.demand).toEqual(before.demand);

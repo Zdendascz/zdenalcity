@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:industrial_medium",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_medium.name",
+  "description": "building.industrial_medium.desc",
+  "footprint": [1, 1],
+  "level": 2,
+  "construction": {
+    "cost": 360,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 25
+  },
+  "jobs": {
+    "capacity": 21
+  },
+  "power": {
+    "consumption": 520
+  },
+  "environment": {
+    "pollution": 30
+  },
+  "graphics": {
+    "color": "#cfb471",
+    "heightLevels": 2
+  }
+}

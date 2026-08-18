@@ -17,6 +17,7 @@ const TOWER: Definition = {
   name: 'building.tower.name',
   description: 'building.tower.desc',
   footprint: [2, 2],
+  level: 1,
   construction: { cost: 500, requiresRoad: true, requiresPower: false, allowedTerrain: [0] },
   economy: { upkeep: 20 },
   graphics: { color: '#5a5a62', heightLevels: 2 },

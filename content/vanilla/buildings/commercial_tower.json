@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:commercial_tower",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_tower.name",
+  "description": "building.commercial_tower.desc",
+  "footprint": [2, 2],
+  "level": 3,
+  "construction": {
+    "cost": 1800,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 84
+  },
+  "jobs": {
+    "capacity": 68
+  },
+  "power": {
+    "consumption": 1560
+  },
+  "environment": {
+    "pollution": 20
+  },
+  "graphics": {
+    "color": "#55b180",
+    "heightLevels": 5
+  }
+}

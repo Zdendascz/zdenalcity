@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:industrial_large",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_large.name",
+  "description": "building.industrial_large.desc",
+  "footprint": [1, 1],
+  "level": 3,
+  "construction": {
+    "cost": 600,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 38
+  },
+  "jobs": {
+    "capacity": 33
+  },
+  "power": {
+    "consumption": 780
+  },
+  "environment": {
+    "pollution": 42
+  },
+  "graphics": {
+    "color": "#c5a964",
+    "heightLevels": 3
+  }
+}

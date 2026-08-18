@@ -16,11 +16,19 @@ export interface Building {
   definitionId: string; // "vanilla:residential_small" — P6
   x: number; // levý horní roh footprintu
   y: number;
+  /** Úroveň 1–5. Jaký půdorys a kapacitu k ní patří, říká definice (§8 fáze 2). */
   level: number;
   population: number;
   jobs: number;
   powered: boolean;
   builtAtTick: number;
+  /**
+   * Kdy budova naposledy změnila úroveň nebo půdorys.
+   *
+   * Cooldown proti blikání: bez něj by budova na hraně prahu skákala nahoru
+   * a dolů každý běh systému úrovní.
+   */
+  levelChangedAtTick: number;
 }
 
 export const MIN_TAX_RATE = 0;

@@ -30,6 +30,12 @@ export interface BuildingDefinition {
   name: string;
   description: string;
   footprint: readonly [number, number];
+  /**
+   * Úroveň 1–5. Vlastnost **definice**, ne entity — entita nese jen `level`
+   * a `definitionId` (§8 zadání fáze 2). Chybí-li, je to úroveň 1, protože
+   * drtivá většina budov je bez žebříčku.
+   */
+  level: number;
   construction: {
     cost: number;
     requiresRoad: boolean;
@@ -73,6 +79,9 @@ const LOCALE_KEY = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
 const TERRAIN_VALUES = new Set<number>(Object.values(TERRAIN));
 
+/** Nejvyšší úroveň budovy (§8 zadání fáze 2). Kam až se dojde, řídí balanc. */
+export const MAX_LEVEL = 5;
+
 const DEFINITION_SECTIONS = [
   'id',
   'type',
@@ -80,6 +89,7 @@ const DEFINITION_SECTIONS = [
   'name',
   'description',
   'footprint',
+  'level',
   'construction',
   'economy',
   'population',
@@ -244,6 +254,7 @@ export function validateDefinition(
   const description = requireString(issues, record, 'description', 'description', LOCALE_KEY);
 
   const footprint = validateFootprint(issues, record['footprint']);
+  const level = record['level'] === undefined ? 1 : requireInt(issues, record, 'level', 'level', 1, MAX_LEVEL);
   const construction = validateConstruction(issues, record);
   const economy = validateEconomy(issues, record);
   const graphics = validateGraphics(issues, record);
@@ -261,6 +272,7 @@ export function validateDefinition(
     !name ||
     !description ||
     !footprint ||
+    level === null ||
     !construction ||
     !economy ||
     !graphics
@@ -276,6 +288,7 @@ export function validateDefinition(
       name,
       description,
       footprint,
+      level,
       construction,
       economy,
       ...(population ? { population } : {}),

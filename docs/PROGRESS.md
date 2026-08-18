@@ -448,8 +448,51 @@ Ověřeno ve hře: město se 168 obyvateli, policií, hasiči, klinikou, školou
 parkem a dvěma elektrárnami má +215 měsíčně a jmění roste. Nový test „každá RCI
 budova utáhne aspoň dvojnásobek své údržby" na staré údržbě obchodu padá (1,93×).
 
+- [x] T16 — úrovně 1–5, rozšiřování a slučování, vanilla žebříček (fáze 2)
+
+Vzniklo:
+- `src/sim/levels.ts` — vyhledání definice podle trojice (kategorie, půdorys,
+  úroveň), plán rozšíření a výměna definice pod entitou
+- `src/sim/systems/levels.ts` — systém 20/9, který vyhodnocuje podmínky povýšení
+- `level` v definici (výchozí 1, rozsah 1–5) a `levelChangedAtTick` na entitě
+- 18 nových vanilla definic: sedm na každou zónovou kategorii
+
+Jak to funguje:
+- **šířka má přednost před výškou** (zadání autora): budova nejdřív zkusí
+  rozšíření do směrů `+x, +y, −x, −y` v pevném pořadí, teprve pak patro
+- rozšíření drží úroveň a mění jen půdorys; pohltit smí jen souseda **stejné
+  kategorie s nižší úrovní** nebo prázdnou zónovanou parcelu (R1)
+- povýšení chce naráz: cenu půdy nad prahem `thresholds[L+1]`, kladnou poptávku
+  po kategorii a uplynulý cooldown od poslední změny
+- entita si po povýšení drží `id` i `builtAtTick` — pro město je to pořád ten
+  samý dům. Populace a místa se nesčítají, určuje je nová definice (§8)
+- chybějící kombinace v katalogu není chyba, jen nedostupná cesta (R5) — vanilla
+  třeba nemá půdorys 1×2, takže se roste do šířky, ne do hloubky
+- růst staví jen **nejmenší definici první úrovně**; bez toho by na volné
+  parcele rovnou vyrostl věžák. Kód přitom žádnou velikost nezná, plyne to
+  z obsahu (P5)
+
+Vanilla žebříček na kategorii: 1×1 L1 → 2×1 L1 → 2×1 L2 → 2×2 L2 → 2×2 L3,
+plus 1×1 L2 a L3 pro sevřené parcely, kde se do šířky růst nedá. Cesta je
+navržená tak, aby se dvoupatrová řadovka **měla kam rozšířit** — jinak by
+k pohlcení souseda nikdy nedošlo.
+
+Ověřeno ve hře: čtvrť se třemi parky a policií drží cenu půdy 109–135 a domky
+se samy povýšily na `residential_row` a `residential_terrace`. Práh úrovně 3
+(130) zatím většina buněk nedosáhne, což je záměr — vyšší patra si hráč musí
+zasloužit službami.
+
+Testy: `tests/levels.test.ts` (23), z toho §13 krok 5 nad vanilla obsahem —
+dvoupatrová řada pohltí dva čerstvé domky a stojí na čtyřech parcelách.
+Že testy koušou, ověřeno záměrným rozbitím: obrácené pořadí směrů shodí čtyři
+testy, vypnutá kontrola úrovně souseda dva.
+
+Save v1 `levelChangedAtTick` nenese — podle §11 se při migraci nuluje a ukládat
+ho začne formát v2 v T20. Round-trip test to pojmenovává, ať se ztráta nerozšíří
+tiše na další pole.
+
 ## Rozpracované
-_(nic — T15 a přeladění uzavřeno, dál T16: úrovně budov)_
+_(nic — T16 uzavřeno, dál T17: snížení úrovně, chátrání, opuštěné budovy)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

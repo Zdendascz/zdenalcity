@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:residential_court",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_court.name",
+  "description": "building.residential_court.desc",
+  "footprint": [2, 2],
+  "level": 2,
+  "construction": {
+    "cost": 720,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 40
+  },
+  "population": {
+    "capacity": 56
+  },
+  "power": {
+    "consumption": 680
+  },
+  "environment": {
+    "pollution": 12
+  },
+  "graphics": {
+    "color": "#74a0d1",
+    "heightLevels": 3
+  }
+}

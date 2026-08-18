@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:commercial_row",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_row.name",
+  "description": "building.commercial_row.desc",
+  "footprint": [2, 1],
+  "level": 1,
+  "construction": {
+    "cost": 300,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 16
+  },
+  "jobs": {
+    "capacity": 12
+  },
+  "power": {
+    "consumption": 300
+  },
+  "environment": {
+    "pollution": 6
+  },
+  "graphics": {
+    "color": "#84d3a6",
+    "heightLevels": 1
+  }
+}

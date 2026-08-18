@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:residential_large",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_large.name",
+  "description": "building.residential_large.desc",
+  "footprint": [1, 1],
+  "level": 3,
+  "construction": {
+    "cost": 300,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 15
+  },
+  "population": {
+    "capacity": 22
+  },
+  "power": {
+    "consumption": 260
+  },
+  "environment": {
+    "pollution": 4
+  },
+  "graphics": {
+    "color": "#6f9ccf",
+    "heightLevels": 3
+  }
+}

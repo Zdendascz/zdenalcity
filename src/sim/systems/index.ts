@@ -10,6 +10,7 @@ import { createLandValueSystem } from './landValue';
 import { createServiceSystem } from './services';
 import { createCrimeSystem } from './crime';
 import { createHealthSystem } from './health';
+import { createLevelSystem } from './levels';
 
 export interface System {
   readonly name: string;
@@ -41,6 +42,9 @@ export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Bala
     createServiceSystem(catalogue),
     createDemandSystem(catalogue, balance),
     createGrowthSystem(catalogue),
+    // Úrovně až za růstem: čerstvě postavená budova má na povýšení čekat
+    // cooldown, ne ho dostat ve stejném tiku.
+    createLevelSystem(catalogue, balance),
     createEconomySystem(catalogue, balance),
     createPollutionSystem(catalogue, balance),
     createCrimeSystem(balance),
@@ -59,5 +63,6 @@ export {
   createServiceSystem,
   createCrimeSystem,
   createHealthSystem,
+  createLevelSystem,
 };
 export type { BuildingCatalogue };

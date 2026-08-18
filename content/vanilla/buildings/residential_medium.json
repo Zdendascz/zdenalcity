@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:residential_medium",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_medium.name",
+  "description": "building.residential_medium.desc",
+  "footprint": [1, 1],
+  "level": 2,
+  "construction": {
+    "cost": 180,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 10
+  },
+  "population": {
+    "capacity": 14
+  },
+  "power": {
+    "consumption": 170
+  },
+  "environment": {
+    "pollution": 3
+  },
+  "graphics": {
+    "color": "#7fa8d6",
+    "heightLevels": 2
+  }
+}

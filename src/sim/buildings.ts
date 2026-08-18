@@ -132,11 +132,12 @@ export function placeBuilding(
     definitionId: definition.id,
     x,
     y,
-    level: 1, // úrovně budov jsou podle §14 až fáze 2
+    level: definition.level, // úroveň je vlastnost definice, entita ji jen nese
     population: definition.population?.capacity ?? 0,
     jobs: definition.jobs?.capacity ?? 0,
     powered: false, // dořeší powerSystem v nejbližším tiku
     builtAtTick: world.tick,
+    levelChangedAtTick: world.tick,
   };
 
   world.buildings.set(building.id, building);

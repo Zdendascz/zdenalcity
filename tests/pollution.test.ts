@@ -26,6 +26,7 @@ const FACTORY: Definition = {
   name: 'building.factory.name',
   description: 'building.factory.desc',
   footprint: [1, 1],
+  level: 1,
   construction: { cost: 200, requiresRoad: false, requiresPower: false, allowedTerrain: [0] },
   economy: { upkeep: 25 },
   jobs: { capacity: 12 },

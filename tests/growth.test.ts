@@ -17,6 +17,7 @@ const HOUSE: Definition = {
   name: 'building.house.name',
   description: 'building.house.desc',
   footprint: [1, 1],
+  level: 1,
   construction: { cost: 100, requiresRoad: true, requiresPower: false, allowedTerrain: [0] },
   economy: { upkeep: 10 },
   population: { capacity: 8 },

@@ -1,6 +1,7 @@
 import { checkFootprint, placeBuilding } from '../buildings';
 import type { BuildingCatalogue } from '../catalogue';
 import { ZONE } from '../layers';
+import { seedDefinitions } from '../levels';
 import { categoryForZone } from '../rci';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -67,7 +68,10 @@ function tryBuild(world: WorldState, catalogue: BuildingCatalogue, tile: number)
   // průmyslová zóna zůstane prázdná, dokud nejsou lidé, kteří chtějí práci.
   if (world.demand[category] <= 0) return;
 
-  const options = catalogue.byCategory(category);
+  // Na prázdné parcele vyroste vždycky ta nejmenší budova první úrovně. Vyšší
+  // úrovně a větší půdorysy se dají jen povýšením (§8), jinak by se na volném
+  // poli objevil rovnou věžák.
+  const options = seedDefinitions(catalogue, category);
   if (options.length === 0) return;
 
   const definition = options[world.rng.int(options.length)];

@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:industrial_works",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_works.name",
+  "description": "building.industrial_works.desc",
+  "footprint": [2, 2],
+  "level": 2,
+  "construction": {
+    "cost": 1440,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 100
+  },
+  "jobs": {
+    "capacity": 84
+  },
+  "power": {
+    "consumption": 2080
+  },
+  "environment": {
+    "pollution": 120
+  },
+  "graphics": {
+    "color": "#caaf6d",
+    "heightLevels": 3
+  }
+}

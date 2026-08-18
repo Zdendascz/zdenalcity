@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:commercial_arcade",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_arcade.name",
+  "description": "building.commercial_arcade.desc",
+  "footprint": [2, 1],
+  "level": 2,
+  "construction": {
+    "cost": 540,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 28
+  },
+  "jobs": {
+    "capacity": 22
+  },
+  "power": {
+    "consumption": 520
+  },
+  "environment": {
+    "pollution": 8
+  },
+  "graphics": {
+    "color": "#77c99b",
+    "heightLevels": 2
+  }
+}

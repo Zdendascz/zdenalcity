@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:residential_terrace",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_terrace.name",
+  "description": "building.residential_terrace.desc",
+  "footprint": [2, 1],
+  "level": 2,
+  "construction": {
+    "cost": 360,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 20
+  },
+  "population": {
+    "capacity": 28
+  },
+  "power": {
+    "consumption": 340
+  },
+  "environment": {
+    "pollution": 6
+  },
+  "graphics": {
+    "color": "#86aed9",
+    "heightLevels": 2
+  }
+}

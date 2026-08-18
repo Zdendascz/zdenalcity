@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:industrial_yard",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_yard.name",
+  "description": "building.industrial_yard.desc",
+  "footprint": [2, 1],
+  "level": 2,
+  "construction": {
+    "cost": 720,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 50
+  },
+  "jobs": {
+    "capacity": 42
+  },
+  "power": {
+    "consumption": 1040
+  },
+  "environment": {
+    "pollution": 60
+  },
+  "graphics": {
+    "color": "#d4bc7b",
+    "heightLevels": 2
+  }
+}

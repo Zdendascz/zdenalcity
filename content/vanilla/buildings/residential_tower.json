@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:residential_tower",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_tower.name",
+  "description": "building.residential_tower.desc",
+  "footprint": [2, 2],
+  "level": 3,
+  "construction": {
+    "cost": 1200,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 60
+  },
+  "population": {
+    "capacity": 88
+  },
+  "power": {
+    "consumption": 1040
+  },
+  "environment": {
+    "pollution": 16
+  },
+  "graphics": {
+    "color": "#6291c9",
+    "heightLevels": 5
+  }
+}

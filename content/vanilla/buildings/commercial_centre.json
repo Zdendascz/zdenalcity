@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:commercial_centre",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_centre.name",
+  "description": "building.commercial_centre.desc",
+  "footprint": [2, 2],
+  "level": 2,
+  "construction": {
+    "cost": 1080,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 56
+  },
+  "jobs": {
+    "capacity": 44
+  },
+  "power": {
+    "consumption": 1040
+  },
+  "environment": {
+    "pollution": 16
+  },
+  "graphics": {
+    "color": "#66bd8d",
+    "heightLevels": 3
+  }
+}

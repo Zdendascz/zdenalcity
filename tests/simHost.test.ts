@@ -96,6 +96,7 @@ describe('fázování systémů', () => {
       ['services', 1, 0],
       ['demand', 4, 1],
       ['growth', 12, 2],
+      ['levels', 20, 9],
       ['economy', 30, 0],
       ['pollution', 8, 3],
       ['crime', 16, 11],
