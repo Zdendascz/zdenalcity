@@ -1,0 +1,145 @@
+import { describe, expect, it } from 'vitest';
+import {
+  clampZoom,
+  createCamera,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  pan,
+  viewportToWorld,
+  worldToViewport,
+  zoomAt,
+} from '@/render/camera';
+import { pickTile } from '@/render/picking';
+import { diamondPoints, gridToScreen, screenToGrid, TILE_H, TILE_W } from '@/render/projection';
+import { shade, TERRAIN_COLORS } from '@/render/palette';
+import { MAP_SIZE } from '@/sim/layers';
+
+const VIEW_W = 1280;
+const VIEW_H = 720;
+
+/** Střed diamantu dlaždice — `gridToScreen` vrací její horní vrchol. */
+function tileCenter(x: number, y: number): { x: number; y: number } {
+  const origin = gridToScreen(x, y);
+  return { x: origin.x, y: origin.y + TILE_H / 2 };
+}
+
+describe('projection', () => {
+  it('používá konstanty z architektury §3', () => {
+    expect([TILE_W, TILE_H]).toEqual([64, 32]);
+  });
+
+  it('gridToScreen odpovídá vzorcům ze specifikace', () => {
+    expect(gridToScreen(0, 0)).toEqual({ x: 0, y: 0 });
+    expect(gridToScreen(1, 0)).toEqual({ x: 32, y: 16 });
+    expect(gridToScreen(0, 1)).toEqual({ x: -32, y: 16 });
+    expect(gridToScreen(1, 1)).toEqual({ x: 0, y: 32 });
+  });
+
+  it('elevation posouvá dlaždici nahoru o LEVEL_H', () => {
+    expect(gridToScreen(0, 0, 2).y).toBe(-32);
+  });
+
+  it('screenToGrid je inverzní ke gridToScreen na ploché mapě', () => {
+    for (let y = 0; y < MAP_SIZE; y += 7) {
+      for (let x = 0; x < MAP_SIZE; x += 7) {
+        const center = tileCenter(x, y);
+        expect(screenToGrid(center.x, center.y), `${x},${y}`).toEqual({ x, y });
+      }
+    }
+  });
+
+  it('diamondPoints vrací čtyři vrcholy kolem horního rohu', () => {
+    expect(diamondPoints(0, 0)).toEqual([0, 0, 32, 16, 0, 32, -32, 16]);
+  });
+});
+
+describe('palette', () => {
+  it('shade ztmavuje i zesvětluje a drží se v rozsahu kanálu', () => {
+    expect(shade(0x804020, 0.5)).toBe(0x402010);
+    expect(shade(0x804020, 2)).toBe(0xff8040);
+    expect(shade(0x000000, 0.5)).toBe(0x000000);
+  });
+
+  it('má barvu pro každou hodnotu vrstvy terrain', () => {
+    expect(TERRAIN_COLORS).toHaveLength(4);
+  });
+});
+
+describe('camera', () => {
+  it('clampuje zoom na 0.25–4', () => {
+    expect(clampZoom(0.01)).toBe(MIN_ZOOM);
+    expect(clampZoom(100)).toBe(MAX_ZOOM);
+    expect(clampZoom(1.5)).toBe(1.5);
+  });
+
+  it('worldToViewport a viewportToWorld jsou navzájem inverzní', () => {
+    const camera = createCamera(120, -340, 2.5);
+    const view = worldToViewport(camera, 42, 17, VIEW_W, VIEW_H);
+    const world = viewportToWorld(camera, view.x, view.y, VIEW_W, VIEW_H);
+    expect(world.x).toBeCloseTo(42);
+    expect(world.y).toBeCloseTo(17);
+  });
+
+  it('střed viewportu odpovídá pozici kamery', () => {
+    const camera = createCamera(500, 900, 1.75);
+    const world = viewportToWorld(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H);
+    expect(world).toEqual({ x: 500, y: 900 });
+  });
+
+  it('pan posouvá o stejný počet světových jednotek nezávisle na zoomu', () => {
+    const near = createCamera(0, 0, 2);
+    pan(near, 100, 0);
+    expect(near.x).toBe(-50);
+
+    const far = createCamera(0, 0, 0.5);
+    pan(far, 100, 0);
+    expect(far.x).toBe(-200);
+  });
+
+  it('zoom drží bod pod kurzorem na místě, ne střed obrazovky', () => {
+    const camera = createCamera(0, 0, 1);
+    const cursor = { x: 320, y: 180 };
+    const before = viewportToWorld(camera, cursor.x, cursor.y, VIEW_W, VIEW_H);
+
+    zoomAt(camera, 2, cursor.x, cursor.y, VIEW_W, VIEW_H);
+
+    const after = viewportToWorld(camera, cursor.x, cursor.y, VIEW_W, VIEW_H);
+    expect(after.x).toBeCloseTo(before.x);
+    expect(after.y).toBeCloseTo(before.y);
+    expect(camera.zoom).toBe(2);
+  });
+
+  it('na zastropovaném zoomu se kamera nehne', () => {
+    const camera = createCamera(10, 20, MAX_ZOOM);
+    zoomAt(camera, 2, 0, 0, VIEW_W, VIEW_H);
+    expect(camera).toEqual({ x: 10, y: 20, zoom: MAX_ZOOM });
+  });
+});
+
+describe('picking', () => {
+  it('trefí dlaždici, na kterou se kamera dívá', () => {
+    const target = { x: 40, y: 90 };
+    const center = tileCenter(target.x, target.y);
+    const camera = createCamera(center.x, center.y, 1);
+
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toEqual(target);
+  });
+
+  it('funguje i mimo jednotkový zoom', () => {
+    const target = { x: 7, y: 3 };
+    const center = tileCenter(target.x, target.y);
+    const camera = createCamera(center.x, center.y, 3.5);
+
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toEqual(target);
+  });
+
+  it('vrací null mimo mapu', () => {
+    const outside = tileCenter(-3, -3);
+    const camera = createCamera(outside.x, outside.y, 1);
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toBeNull();
+
+    const beyond = tileCenter(MAP_SIZE + 2, MAP_SIZE + 2);
+    const far = createCamera(beyond.x, beyond.y, 1);
+    expect(pickTile(far, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toBeNull();
+  });
+});
