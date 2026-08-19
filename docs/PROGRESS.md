@@ -649,6 +649,22 @@ Hlídají to dva testy v `tests/pollution.test.ts`: čtvrť bez průmyslu musí
 zůstat pod čtvrtinou znečištění průmyslové, a jedna skládka musí pobrat odpad
 aspoň tisícovky lidí.
 
+- [x] Temná budova je poznat na mapě (nahlásil autor)
+
+Že budova nemá proud, se hráč dozvěděl jen z detailu, jednu po druhé — overlay
+elektřiny barví dlaždice, ne budovy, a pod budovou ho není vidět.
+
+Budova, která proud **bere a nedostává**, se teď kreslí na poloviční jas a nese
+na střeše červený blesk. Je to stav entity, ne definice, takže si ho renderer
+skládá až při kreslení, stejně jako u ruiny.
+
+Ověřeno ve hře čtením instrukcí rendereru: temný dům `#485a6f` + blesk
+`#d9483a`, připojený `#8fb4dd` bez symbolu.
+
+Vyplavalo přitom najevo, co model elektřiny znamená v praxi: proud vede po
+silnicích **a po budovách**, takže dům uprostřed bloku bez souvislé řady sousedů
+zůstane temný, i když silnice vede o dvě dlaždice dál. Teď je to vidět.
+
 ## Rozpracované
 _(nic — T18 uzavřeno, dál T19: prerekvizity v růstu i ruční stavbě)_
 

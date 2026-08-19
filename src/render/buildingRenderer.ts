@@ -7,7 +7,9 @@ import {
   ICON_ALPHA,
   ICON_COLOR,
   luminance,
+  POWER_OFF_COLOR,
   shade,
+  UNPOWERED_SHADE,
   WALL_LEFT_SHADE,
   WALL_RIGHT_SHADE,
 } from './palette';
@@ -23,6 +25,10 @@ export interface BuildingAppearance {
   footprint: readonly [number, number];
   /** Jméno symbolu na střeše, pokud ho definice má. */
   icon?: string;
+  /** Barva symbolu; bez ní se volí podle jasu budovy. */
+  iconColor?: number;
+  /** Bere budova proud? Bez něj se kreslí jako odstavená. */
+  consumesPower?: boolean;
 }
 
 export type AppearanceLookup = (definitionId: string) => BuildingAppearance | undefined;
@@ -82,9 +88,21 @@ export class BuildingRenderer {
 
     // Ruina si drží půdorys, ale ne vzhled: šedý kvádr o jedné úrovni, bez
     // symbolu. Vzhled je vlastnost entity, ne definice — proto až tady.
+    //
+    // Temná budova je taky stav entity: ztmavne a dostane na střechu červený
+    // blesk, aby bylo na první pohled vidět, kam proud nedošel. Bez toho se to
+    // hráč dozvěděl jen z detailu budovy, jednu po druhé.
+    const unpowered = !building.abandoned && found.consumesPower === true && !building.powered;
     const appearance: BuildingAppearance = building.abandoned
       ? { color: ABANDONED_COLOR, heightLevels: 1, footprint: found.footprint }
-      : found;
+      : unpowered
+        ? {
+            ...found,
+            color: shade(found.color, UNPOWERED_SHADE),
+            icon: 'bolt',
+            iconColor: POWER_OFF_COLOR,
+          }
+        : found;
 
     let view = this.views.get(id);
     if (!view) {
@@ -143,7 +161,9 @@ export class BuildingRenderer {
     if (!shape) return;
 
     // Světlá budova potřebuje tmavý symbol a naopak, jinak splyne.
-    const color = luminance(appearance.color) > 0.55 ? shade(appearance.color, 0.45) : ICON_COLOR;
+    const color =
+      appearance.iconColor ??
+      (luminance(appearance.color) > 0.55 ? shade(appearance.color, 0.45) : ICON_COLOR);
 
     for (const polygon of shape) {
       const points: number[] = [];

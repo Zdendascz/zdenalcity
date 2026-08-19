@@ -70,6 +70,12 @@ export const HOVER_BLOCKED_COLOR = 0xff6b52;
  */
 export const ABANDONED_COLOR = 0x6a6a6a;
 
+/**
+ * Ztmavení budovy, která bere proud a nedostává ho. Ke střeše k tomu přibude
+ * blesk v `POWER_OFF_COLOR` — jinak hráč pozná temnou budovu jen z detailu.
+ */
+export const UNPOWERED_SHADE = 0.5;
+
 /** Symbol na střeše budovy. Světlé budovy dostanou tmavý, ostatní tenhle. */
 export const ICON_COLOR = 0xffffff;
 export const ICON_ALPHA = 0.9;

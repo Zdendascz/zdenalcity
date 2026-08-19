@@ -71,6 +71,7 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
       color: Number.parseInt(definition.graphics.color.slice(1), 16),
       heightLevels: definition.graphics.heightLevels,
       footprint: definition.footprint,
+      consumesPower: (definition.power?.consumption ?? 0) > 0,
       ...(icon === undefined ? {} : { icon }),
     };
   };
