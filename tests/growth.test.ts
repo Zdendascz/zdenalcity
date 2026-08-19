@@ -6,6 +6,7 @@ import { buildRoad, bulldoze, setTaxRate, zoneArea } from '@/sim/commands';
 import { coarseIndex } from '@/sim/coarse';
 import { hashLayers, index, TERRAIN, ZONE } from '@/sim/layers';
 import type { ZoneType } from '@/sim/layers';
+import { tryUpgrade } from '@/sim/levels';
 import { createGrowthSystem } from '@/sim/systems';
 import type { BuildingCatalogue } from '@/sim/systems';
 import { createWorld, tickWorld, totalJobs, totalPopulation } from '@/sim/world';
@@ -201,6 +202,40 @@ describe('skóre parcely (§9)', () => {
       expect(building.y, `budova na ${building.x},${building.y}`).toBeLessThanOrEqual(13);
     }
     expect(world.buildings.size).toBeGreaterThan(5);
+  });
+
+  it('dosah je věc balancu, ne kódu', () => {
+    // Delší tabulka = hlubší zástavba. Kdyby dosah zůstal v kódu, tenhle
+    // případ by šel jen přepsáním zdrojáku.
+    const far = {
+      ...VANILLA_BALANCE,
+      growth: { ...VANILLA_BALANCE.growth, roadFactors: [1, 1, 0.8, 0.6, 0.4, 0.2] },
+    };
+    const world = deepZone();
+    const growth = createGrowthSystem(catalogueOf(HOUSE), far);
+    for (let tick = 0; tick < 60 * growth.interval; tick++) tickWorld(world, [growth]);
+
+    const rows = [...world.buildings.values()].map((b) => b.y);
+    expect(Math.max(...rows)).toBe(15); // silnice na y = 10, pátá dlaždice
+  });
+
+  it('rozšiřování dosahem omezené není — budova smí přesáhnout', () => {
+    // Dosah řeší jen to, kde smí vzniknout **první** dlaždice zástavby.
+    // Půdorys až 5×5 je proto podle §8 v pořádku i v hlubokém bloku.
+    const world = deepZone();
+    const seed: Definition = { ...HOUSE, id: 'test:seed' };
+    const deep: Definition = { ...HOUSE, id: 'test:deep', footprint: [1, 2] };
+
+    run(world, catalogueOf(seed), 60);
+    const building = [...world.buildings.values()].find((b) => b.y === 13);
+    expect(building, 'na kraji dosahu má stát budova').toBeDefined();
+    if (!building) return;
+
+    // Vpravo i vlevo stojí sousedi téže úrovně, takže zbývá jen směr do hloubky.
+    expect(tryUpgrade(world, catalogueOf(seed, deep), building)).toBe(true);
+    expect(building.definitionId).toBe(deep.id);
+    // Druhá dlaždice leží čtyři pole od silnice, tedy za dosahem růstu.
+    expect(world.layers.buildingId[index(building.x, 14)]).toBe(building.id);
   });
 
   it('drahá půda se zastaví dřív než levná', () => {

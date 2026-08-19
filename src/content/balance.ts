@@ -73,6 +73,12 @@ export interface Balance {
     maxAttempts: number;
     neutralTaxRate: number;
     taxRange: number;
+    /**
+     * Násobitel skóre podle vzdálenosti k nejbližší silnici; index = vzdálenost
+     * v dlaždicích. Délka pole určuje, jak daleko od vozovky se ještě staví —
+     * za posledním prvkem parcela z losu vypadne úplně (§9).
+     */
+    roadFactors: number[];
   };
 }
 
@@ -158,6 +164,23 @@ export function validateBalance(raw: unknown): {
     });
   }
 
+  const roadFactors: number[] = [];
+  const rawRoadFactors = growth?.['roadFactors'];
+  if (!Array.isArray(rawRoadFactors) || rawRoadFactors.length < 2) {
+    issues.push({
+      field: 'growth.roadFactors',
+      message: 'musí být pole aspoň o dvou prvcích (index = vzdálenost k silnici)',
+    });
+  } else {
+    rawRoadFactors.forEach((value, i) => {
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+        issues.push({ field: `growth.roadFactors[${i}]`, message: 'musí být číslo v rozsahu 0–1' });
+      } else {
+        roadFactors.push(value);
+      }
+    });
+  }
+
   const balance: Balance = {
     economy: {
       taxableValuePerUnit: num(
@@ -234,6 +257,7 @@ export function validateBalance(raw: unknown): {
       maxAttempts: num(issues, growth, 'maxAttempts', 'growth.maxAttempts', 1, 1000),
       neutralTaxRate: num(issues, growth, 'neutralTaxRate', 'growth.neutralTaxRate', 0, 100),
       taxRange: num(issues, growth, 'taxRange', 'growth.taxRange', 1, 100),
+      roadFactors,
     },
   };
 

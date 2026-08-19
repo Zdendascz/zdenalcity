@@ -27,11 +27,6 @@ import type { System } from './index';
  * zpomalovaly růst i tam, kde stavět šlo.
  */
 
-/** Násobitel skóre podle vzdálenosti k nejbližší silnici. Index = vzdálenost. */
-const ROAD_FACTOR = [1, 1, 0.6, 0.3] as const;
-/** Za tímhle dosahem parcela z losu vypadne. */
-const ROAD_REACH = ROAD_FACTOR.length - 1;
-
 /** Jedna parcela v losu. `weight` nula znamená „vyřazena". */
 interface Candidate {
   tile: number;
@@ -54,7 +49,8 @@ function grow(world: WorldState, catalogue: BuildingCatalogue, balance: Balance)
   // daně nebo něco zbourat.
   if (world.economy.funds < 0) return;
 
-  const reach = roadReach(world);
+  // Kam až od silnice se staví, říká balanc — délka tabulky je dosah.
+  const reach = roadReach(world, balance.growth.roadFactors.length - 1);
 
   // Pevné pořadí kategorií, ne pořadí nějaké mapy — jinak by determinismus
   // závisel na historii vkládání (P2).
@@ -120,7 +116,7 @@ function collectCandidates(
     if (categoryForZone(zone[tile] ?? ZONE.none) !== category) continue;
 
     const distance = reach[tile] ?? 255;
-    const roadFactor = ROAD_FACTOR[distance] ?? 0;
+    const roadFactor = balance.growth.roadFactors[distance] ?? 0;
     if (roadFactor === 0) continue; // mimo dosah silnice se nestaví vůbec
 
     const x = tile % MAP_SIZE;
@@ -154,7 +150,7 @@ function pick(candidates: readonly Candidate[], roll: number): Candidate | undef
  * Průchod do šířky ze všech silnic naráz: jeden průchod mapou místo prohledávání
  * okolí u každé z tisíců parcel.
  */
-function roadReach(world: WorldState): Uint8Array {
+function roadReach(world: WorldState, maxDistance: number): Uint8Array {
   const { road } = world.layers;
   const distance = new Uint8Array(road.length).fill(255);
   let frontier: number[] = [];
@@ -166,7 +162,7 @@ function roadReach(world: WorldState): Uint8Array {
     }
   }
 
-  for (let step = 1; step <= ROAD_REACH && frontier.length > 0; step++) {
+  for (let step = 1; step <= maxDistance && frontier.length > 0; step++) {
     const next: number[] = [];
     for (const tile of frontier) {
       const x = tile % MAP_SIZE;
