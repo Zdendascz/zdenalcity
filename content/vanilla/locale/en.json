@@ -68,6 +68,14 @@
   "ui.tool.group.utility": "Utilities",
   "ui.tool.group.service": "Services",
 
+  "ui.newGame.title": "New city",
+  "ui.newGame.cityName": "City name",
+  "ui.newGame.defaultCityName": "Newbridge",
+  "ui.newGame.seed": "Map seed",
+  "ui.newGame.reroll": "Another map",
+  "ui.newGame.start": "Found the city",
+  "ui.newGame.stats": "Land {land} %, generated in {ms} ms.",
+
   "ui.hud.funds": "Funds",
   "ui.hud.population": "Population",
   "ui.hud.jobs": "Jobs",

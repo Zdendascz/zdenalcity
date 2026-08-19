@@ -24,6 +24,7 @@ import { Hud } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
 import { downloadBytes, readFileBytes } from '@/ui/saveFile';
+import { showNewGameDialog } from '@/ui/newGameDialog';
 import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
 import { BuildingRenderer } from './buildingRenderer';
@@ -50,9 +51,6 @@ import {
 } from './palette';
 import { pickTile } from './picking';
 import { footprintQuad, gridToScreen } from './projection';
-
-/** Seed mapy i simulace. Dialog nové hry ho zpřístupní hráči v T23. */
-const SEED = 483928492;
 
 /** Jeden krok kolečka = násobitel zoomu. */
 const ZOOM_STEP = 1.15;
@@ -156,12 +154,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     pickLanguage([...navigator.languages], content.getLanguages()),
   );
 
+  // Hra začíná dialogem: hráč si vybere jméno města a seed a rovnou vidí, jakou
+  // mapu dostane (§3 fáze 3). Teprve pak vzniká svět.
+  const newGame = await showNewGameDialog(mount, i18n, content.getBalance());
+
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
-  const simWorld = createWorld(SEED, content.getBalance().economy);
-  // Mapa se generuje ze seedu (§2 fáze 3). Dialog nové hry, ve kterém si hráč
-  // seed vybere a uvidí náhled, přijde v T23 — do té doby je pevný.
-  applyGeneratedMap(simWorld.layers, generateTerrain(SEED, content.getBalance()));
+  const simWorld = createWorld(newGame.seed, content.getBalance().economy);
+  applyGeneratedMap(simWorld.layers, generateTerrain(newGame.seed, content.getBalance()));
   const host = createSimHost(
     simWorld,
     createDefaultSystems(content, content.getBalance()),
@@ -253,7 +253,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   function saveOptions() {
     return {
-      cityName: 'quicksave', // pojmenování města přijde s dialogem nové hry
+      cityName: newGame.cityName,
       createdAt,
       modifiedAt: new Date().toISOString(),
       playtimeSeconds: Math.round((Date.now() - startedAt) / 1000),

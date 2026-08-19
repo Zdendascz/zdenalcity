@@ -798,8 +798,48 @@ Testy: 7 v `tests/mapgen.test.ts`, mimo jiné souvislost souše na 200 seedech
 a golden hash mapy. Generování jedné mapy trvá ~25 ms, takže přegenerování
 náhledu v dialogu nové hry (T23) bude okamžité.
 
+- [x] Dodělávka T22 — terén něco dělá
+
+Šest typů terénu by bez efektů byla dekorace, a zadání §2 výslovně říká opak.
+
+- **les** zvedá cenu půdy (váha 18 na podíl buňky) a **pohlcuje polovinu
+  znečištění**, dokud stojí. Pohlcení se počítá až za difuzí, aby filtrovalo
+  i to, co přiteče od sousedů — jinak by les chránil jen před vlastní továrnou
+- **písek** cenu půdy mírně sráží
+- **vykácení** stojí peníze a je to volba: buldozer na lese sebere 12 a uvolní
+  místo (akceptační kritérium 3a č. 4)
+- mokřad ani skálu buldozer nespraví — to je terraforming ve 3b
+
+Podíly terénu se počítají na hrubou mřížku jednou za běh systému a předávají
+do vzorce ceny půdy; diagnostika parcely je dostane stejnou cestou, takže
+rozpis pořád sedí s tím, podle čeho se hraje.
+
+Rozsah vah ceny půdy jsem povolil na ±100: váhy pokrytí násobí vstup 0–255,
+kdežto váhy terénu podíl 0–1, takže musí být řádově větší.
+
+- [x] T23 — dialog nové hry (fáze 3a)
+
+Hra začíná dialogem: jméno města, seed (náhodný, ručně přepsatelný), **náhled
+mapy** a tlačítko „jiná mapa". Teprve po potvrzení vzniká svět — a tím padá
+i dluh z fáze 1, že se město dá pojmenovat jen v kódu.
+
+- náhled je prostý bitmapový render vrstvy terénu, ne izometrický: jde o tvar
+  pevniny, ne o obrázek města
+- `Math.random` v dialogu neporušuje P2 — ta zakazuje náhodu **v simulaci**,
+  ne ve výběru seedu, se kterým se hra teprve rozjede
+- pod náhledem je podíl souše a čas generování; při ~12–37 ms je přegenerování
+  okamžité, takže načítací proužek nemá co dělat
+
+Ověřeno v běžící hře skutečnými kliky: „jiná mapa" změní seed i náhled, ručně
+zapsaný seed 12345 se projeví a po „Založit město" má svět `seed === 12345`
+a 28 % vody.
+
+**Otevřené:** načíst uložené město jde až zevnitř hry, takže hráč musí nejdřív
+projít dialogem. Patří to k němu, ale zadání to nezmiňuje — doplním, až bude
+jasné, jestli má vzniknout i seznam uložených her.
+
 ## Rozpracované
-_(T22 hotové, dál T23: dialog nové hry — jméno, seed, náhled, přegenerování)_
+_(T23 hotové, dál T24: typy silnic — ulice, třída, dálnice)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

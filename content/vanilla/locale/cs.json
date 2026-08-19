@@ -68,6 +68,14 @@
   "ui.tool.group.utility": "Infrastruktura",
   "ui.tool.group.service": "Služby",
 
+  "ui.newGame.title": "Nové město",
+  "ui.newGame.cityName": "Jméno města",
+  "ui.newGame.defaultCityName": "Nový Brod",
+  "ui.newGame.seed": "Seed mapy",
+  "ui.newGame.reroll": "Jiná mapa",
+  "ui.newGame.start": "Založit město",
+  "ui.newGame.stats": "Souše {land} %, vygenerováno za {ms} ms.",
+
   "ui.hud.funds": "Kasa",
   "ui.hud.population": "Obyvatel",
   "ui.hud.jobs": "Práce",
