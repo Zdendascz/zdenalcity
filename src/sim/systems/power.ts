@@ -72,7 +72,7 @@ function floodFill(world: WorldState, reached: Uint8Array, queue: number[]): voi
     const tile = index(x, y);
     if (reached[tile] !== 0) return;
     // Vodičem je silnice nebo budova. Prázdná dlaždice proud nevede.
-    if (road[tile] !== 1 && buildingId[tile] === 0) return;
+    if (road[tile] === 0 && buildingId[tile] === 0) return;
     reached[tile] = 1;
     queue.push(tile);
   };

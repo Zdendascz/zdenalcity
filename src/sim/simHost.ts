@@ -87,7 +87,7 @@ class MainThreadSimHost implements SimHost {
         return OK;
       }
       case 'build_road':
-        return buildRoad(this.world, cmd.x, cmd.y);
+        return buildRoad(this.world, cmd.x, cmd.y, cmd.roadType, this.balance);
       case 'bulldoze':
         return bulldoze(this.world, cmd.x, cmd.y, this.balance);
       case 'zone':

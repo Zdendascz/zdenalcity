@@ -1,10 +1,11 @@
 import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from './buildings';
 import type { BuildingCatalogue } from './catalogue';
-import { inBounds, index, TERRAIN, ZONE } from './layers';
+import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
 import { checkRequirements, presentDefinitions } from './requirements';
+import { needsClearing } from './terrain';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
@@ -24,7 +25,7 @@ import type { WorldState } from './world';
  * Každá funkce vrací `CommandResult` — když příkaz neprojde, řekne proč.
  */
 export type Command =
-  | { type: 'build_road'; x: number; y: number }
+  | { type: 'build_road'; x: number; y: number; roadType?: number }
   | { type: 'bulldoze'; x: number; y: number }
   | { type: 'zone'; x: number; y: number; w: number; h: number; zone: ZoneType }
   | { type: 'place_building'; definitionId: string; x: number; y: number }
@@ -48,15 +49,35 @@ function markRoadNeighbourhoodDirty(world: WorldState, x: number, y: number): vo
  * Validace patří sem, ne do UI (architektura §5) — jinak by ji obcházel každý
  * další vstup, který kdy vznikne.
  */
-export function buildRoad(world: WorldState, x: number, y: number): CommandResult {
+export function buildRoad(
+  world: WorldState,
+  x: number,
+  y: number,
+  type: number = ROAD.street,
+  balance?: Balance,
+): CommandResult {
   if (!inBounds(x, y)) return reject('error.outOfBounds');
 
   const tile = index(x, y);
   if (world.layers.terrain[tile] === TERRAIN.water) return reject('error.water');
   if (world.layers.buildingId[tile] !== 0) return reject('error.occupied');
-  if (world.layers.road[tile] === 1) return reject('error.roadExists');
+  if (needsClearing(world.layers.terrain[tile] ?? TERRAIN.grass)) {
+    return reject('error.terrainNotAllowed');
+  }
 
-  world.layers.road[tile] = 1;
+  const current = world.layers.road[tile] ?? ROAD.none;
+  if (current === type) return reject('error.roadExists');
+  // Vylepšení na místě ano, snížení ne (§4). Kdo chce ulici zpátky, zbourá
+  // a postaví — jinak by se dala třída „prodat" za rozdíl cen.
+  if (current > type) return reject('error.roadDowngrade');
+
+  const cost = balance?.traffic.roadTypes[type - 1]?.cost ?? 0;
+  if (world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  }
+  world.economy.funds -= cost;
+
+  world.layers.road[tile] = type;
   markRoadNeighbourhoodDirty(world, x, y);
   markPowerNetworkDirty(world); // silnice je vodič
   return OK;
@@ -129,7 +150,7 @@ export function zoneArea(
         lastReason = 'error.water';
         continue;
       }
-      if (world.layers.road[tile] === 1) {
+      if ((world.layers.road[tile] ?? ROAD.none) !== ROAD.none) {
         lastReason = 'error.roadInTheWay';
         continue;
       }
@@ -170,8 +191,8 @@ export function bulldoze(
     return OK;
   }
 
-  if (world.layers.road[tile] === 1) {
-    world.layers.road[tile] = 0;
+  if ((world.layers.road[tile] ?? ROAD.none) !== ROAD.none) {
+    world.layers.road[tile] = ROAD.none;
     markRoadNeighbourhoodDirty(world, x, y);
     markPowerNetworkDirty(world);
     return OK;

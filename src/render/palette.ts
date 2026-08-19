@@ -57,7 +57,13 @@ export const WALL_LEFT_SHADE = 0.7;
 export const WALL_RIGHT_SHADE = 0.5;
 
 /** Vozovka. */
-export const ROAD_COLOR = 0x44454d;
+export const ROAD_COLORS = [0x000000, 0x44454d, 0x53555f, 0x646773] as const;
+
+/** Šířka vozovky podle typu; podíl dlaždice, index = hodnota vrstvy `road`. */
+export const ROAD_WIDTHS = [0, 0.5, 0.68, 0.86] as const;
+
+/** Barva ulice. Starší kód a testy se odkazují na ni. */
+export const ROAD_COLOR = ROAD_COLORS[1];
 
 /** Pozadí mimo mapu. */
 export const BACKGROUND_COLOR = 0x14161a;

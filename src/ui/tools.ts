@@ -8,7 +8,7 @@ import type { ZoneType } from '@/sim/layers';
  * v kódu není jméno ani jedné budovy (P5).
  */
 export type ToolAction =
-  | { kind: 'road' }
+  | { kind: 'road'; roadType: number }
   | { kind: 'bulldoze' }
   | { kind: 'zone'; zone: ZoneType }
   | { kind: 'place'; definitionId: string };

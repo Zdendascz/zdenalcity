@@ -80,13 +80,15 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
 /** Nástroje: pevné plus infrastruktura z obsahu. Žádné jméno budovy v kódu (P5). */
 function createTools(content: ContentRegistry): ToolOption[] {
   const tools: ToolOption[] = [
-    {
-      id: 'road',
-      labelKey: 'ui.tool.road',
-      hotkey: 'q',
+    // Typy silnic jdou z balancu, ne z kódu: přidat čtvrtý je změna JSONu
+    // a jednoho lokalizačního klíče (§4 fáze 3).
+    ...content.getBalance().traffic.roadTypes.map((road, order) => ({
+      id: `road:${road.id}`,
+      labelKey: `ui.tool.road.${road.id}`,
+      ...(order === 0 ? { hotkey: 'q' } : {}),
       groupKey: 'ui.tool.group.build',
-      action: { kind: 'road' },
-    },
+      action: { kind: 'road' as const, roadType: order + 1 },
+    })),
     {
       id: 'bulldoze',
       labelKey: 'ui.tool.bulldoze',
@@ -438,7 +440,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     switch (action.kind) {
       case 'road':
-        dispatch({ type: 'build_road', x: tile.x, y: tile.y });
+        dispatch({ type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType });
         break;
       case 'bulldoze':
         dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });

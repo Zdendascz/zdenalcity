@@ -25,6 +25,14 @@
     "minLandShare": 0.97
   },
 
+  "traffic": {
+    "roadTypes": [
+      { "id": "street", "capacity": 60, "cost": 10, "upkeep": 1 },
+      { "id": "avenue", "capacity": 180, "cost": 40, "upkeep": 3 },
+      { "id": "highway", "capacity": 480, "cost": 120, "upkeep": 8 }
+    ]
+  },
+
   "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },
 
   "landValue": {

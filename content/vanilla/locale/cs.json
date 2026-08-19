@@ -59,6 +59,9 @@
   "building.incinerator.desc": "Drahá, ale zpracuje třikrát víc odpadu a znečišťuje méně.",
 
   "ui.tool.road": "Silnice",
+  "ui.tool.road.street": "Ulice",
+  "ui.tool.road.avenue": "Třída",
+  "ui.tool.road.highway": "Dálnice",
   "ui.tool.bulldoze": "Bourání",
   "ui.tool.zone.residential": "Obytná zóna",
   "ui.tool.zone.commercial": "Komerční zóna",
@@ -126,6 +129,7 @@
   "ui.budget.income": "Příjem",
   "ui.budget.upkeep": "Údržba",
   "ui.budget.net": "Čistě",
+  "ui.budget.roads": "Silnice",
   "ui.budget.total": "Celkem za měsíc",
   "ui.budget.funds": "Stav kasy: {funds}. Temná budova nevydělává ani nestojí údržbu.",
   "ui.budget.unit.population": "obyvatel",
@@ -155,6 +159,7 @@
 
   "error.outOfBounds": "Mimo mapu.",
   "error.water": "Na vodu se stavět nedá.",
+  "error.roadDowngrade": "Silnici nejde snížit. Zbourej ji a postav znovu.",
   "error.roadExists": "Silnice už tady je.",
   "error.roadInTheWay": "Překáží silnice.",
   "error.occupied": "Dlaždice je obsazená.",

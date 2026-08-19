@@ -59,6 +59,9 @@
   "building.incinerator.desc": "Expensive, but handles three times the waste and pollutes less.",
 
   "ui.tool.road": "Road",
+  "ui.tool.road.street": "Street",
+  "ui.tool.road.avenue": "Avenue",
+  "ui.tool.road.highway": "Highway",
   "ui.tool.bulldoze": "Bulldoze",
   "ui.tool.zone.residential": "Residential zone",
   "ui.tool.zone.commercial": "Commercial zone",
@@ -126,6 +129,7 @@
   "ui.budget.income": "Income",
   "ui.budget.upkeep": "Upkeep",
   "ui.budget.net": "Net",
+  "ui.budget.roads": "Roads",
   "ui.budget.total": "Monthly total",
   "ui.budget.funds": "Funds: {funds}. An unpowered building earns nothing and costs nothing.",
   "ui.budget.unit.population": "residents",
@@ -155,6 +159,7 @@
 
   "error.outOfBounds": "Outside the map.",
   "error.water": "You cannot build on water.",
+  "error.roadDowngrade": "A road cannot be downgraded. Bulldoze it and build again.",
   "error.roadExists": "There is already a road here.",
   "error.roadInTheWay": "A road is in the way.",
   "error.occupied": "The tile is occupied.",

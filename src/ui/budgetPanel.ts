@@ -96,6 +96,19 @@ export class BudgetPanel {
       }
     }
 
+    // Silnice nejsou budova, ale platí se každý měsíc — vlastní řádek.
+    if (budget.roads.count > 0) {
+      const row = el('tr');
+      row.appendChild(el('td', 'sheet__name', t('ui.budget.roads')));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, formatNumber(budget.roads.count)));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, '-'));
+      row.appendChild(el('td', undefined, `−${formatNumber(budget.roads.upkeep)}`));
+      row.appendChild(el('td', 'is-negative', formatNumber(-budget.roads.upkeep)));
+      table.appendChild(row);
+    }
+
     const total = el('tr', 'sheet__total');
     total.appendChild(el('td', 'sheet__name', t('ui.budget.total')));
     total.appendChild(el('td'));

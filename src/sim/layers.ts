@@ -22,6 +22,15 @@ export const TERRAIN = {
 } as const;
 export type TerrainType = (typeof TERRAIN)[keyof typeof TERRAIN];
 
+/**
+ * Hodnoty vrstvy `road` (R11 zadání fáze 3).
+ *
+ * Do fáze 2 nesla vrstva jen 0/1. Typ silnice určuje kapacitu, cenu i údržbu —
+ * konkrétní čísla jsou v `balance.traffic.roadTypes`, kód zná jen pořadí.
+ */
+export const ROAD = { none: 0, street: 1, avenue: 2, highway: 3 } as const;
+export type RoadType = (typeof ROAD)[keyof typeof ROAD];
+
 /** Hodnoty vrstvy `zone`. */
 export const ZONE = { none: 0, residential: 1, commercial: 2, industrial: 3 } as const;
 export type ZoneType = (typeof ZONE)[keyof typeof ZONE];

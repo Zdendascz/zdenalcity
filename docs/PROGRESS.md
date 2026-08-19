@@ -855,8 +855,35 @@ v nejhorším případě 12 %. Souvislost souše drží dál na 200 seedech a p�
 test, že snižování hladiny nesmí moře vysušit — jinak by bonus ceny půdy u vody
 neměl kde platit.
 
+- [x] T24 — typy silnic (fáze 3a)
+
+Vrstva `road` přestala být 0/1 a nese typ (R11): ulice, třída, dálnice. Čísla
+jsou v `balance.traffic.roadTypes`, kód zná jen pořadí — přidat čtvrtý typ je
+změna JSONu a jednoho lokalizačního klíče, včetně tlačítka v liště.
+
+| typ | kapacita | cena | údržba |
+|---|---|---|---|
+| ulice | 60 | 10 | 1 |
+| třída | 180 | 40 | 3 |
+| dálnice | 480 | 120 | 8 |
+
+- **silnice nově stojí peníze** a mají údržbu; v ekonomické tabulce mají vlastní
+  řádek, protože to nejsou budovy a hráč jich má tisíce
+- **vylepšení na místě** ano, snížení ne (§4) — jinak by šlo třídu „prodat"
+  za rozdíl cen. Kdo chce zpátky ulici, zbourá a postaví
+- **auto-tiling napříč typy**: bitmask se počítá z „je tam jakákoli silnice",
+  šířku a barvu určuje typ vlastní dlaždice. Vyšší typ je širší a světlejší
+- kapacita se zatím nikde nepoužívá — čeká na dopravní model v T25
+
+Ověřeno v běžící hře: ceny 10 / 40 / 120 sedí, vylepšení ulice na dálnici
+projde, snížení skončí hláškou `error.roadDowngrade`, v liště jsou tři
+tlačítka z balancu a renderer kreslí všechny tři barvy vozovek.
+
+Testy: 13 v `tests/roadTypes.test.ts`. Že koušou, ověřeno rozbitím: povolené
+snížení shodí jeden test, silnice zdarma tři, nezapočtená údržba jeden.
+
 ## Rozpracované
-_(T23 hotové, dál T24: typy silnic — ulice, třída, dálnice)_
+_(T24 hotové, dál T25: dopravní model — trafficLoad, jobAccess, overlay)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

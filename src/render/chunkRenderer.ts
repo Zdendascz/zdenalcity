@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
-import { index } from '@/sim/layers';
+import { index, ROAD } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import {
@@ -7,6 +7,8 @@ import {
   POWER_ON_COLOR,
   POWER_OVERLAY_ALPHA,
   ROAD_COLOR,
+  ROAD_COLORS,
+  ROAD_WIDTHS,
   shade,
   TERRAIN_COLORS,
   TILE_EDGE_SHADE,
@@ -145,10 +147,13 @@ export class ChunkRenderer {
       graphics.poly(points).fill({ color: zoneColor, alpha: ZONE_OVERLAY_ALPHA });
     }
 
-    if (this.world.layers.road[tileIndex] === 1) {
+    const roadType = this.world.layers.road[tileIndex] ?? ROAD.none;
+    if (roadType !== ROAD.none) {
+      // Bitmask se počítá z „je tam jakákoli silnice" — všechny typy se
+      // navzájem napojují (§4). Šířku a barvu určuje typ vlastní dlaždice.
       const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
-      for (const polygon of roadPolygons(origin.x, origin.y, mask)) {
-        graphics.poly(polygon).fill({ color: ROAD_COLOR });
+      for (const polygon of roadPolygons(origin.x, origin.y, mask, ROAD_WIDTHS[roadType])) {
+        graphics.poly(polygon).fill({ color: ROAD_COLORS[roadType] ?? ROAD_COLOR });
       }
     }
 
@@ -165,7 +170,8 @@ export class ChunkRenderer {
    */
   private drawPowerOverlay(graphics: Graphics, points: number[], tileIndex: number): void {
     const isConductor =
-      this.world.layers.road[tileIndex] === 1 || this.world.layers.buildingId[tileIndex] !== 0;
+      (this.world.layers.road[tileIndex] ?? ROAD.none) !== ROAD.none ||
+      this.world.layers.buildingId[tileIndex] !== 0;
     if (!isConductor) return;
 
     const color = this.world.layers.power[tileIndex] === 1 ? POWER_ON_COLOR : POWER_OFF_COLOR;
@@ -175,7 +181,7 @@ export class ChunkRenderer {
   /** Mimo mapu silnice nikdy není — okraj mapy se tak chová jako slepý konec. */
   private isRoad(x: number, y: number): boolean {
     if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return false;
-    return this.world.layers.road[index(x, y)] === 1;
+    return (this.world.layers.road[index(x, y)] ?? ROAD.none) !== ROAD.none;
   }
 
   destroy(): void {

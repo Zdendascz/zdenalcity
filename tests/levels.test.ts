@@ -578,7 +578,8 @@ describe('důsledky opuštění', () => {
     const after = computeBudget(world, catalogue, balance);
 
     expect(after.income).toBe(0);
-    expect(after.expenses).toBe(0);
+    // Ve výdajích zbydou jen silnice — ruina sama nestojí nic.
+    expect(after.expenses).toBe(after.roads.upkeep);
     expect(after.lines[0]?.upkeepCount).toBe(0);
   });
 

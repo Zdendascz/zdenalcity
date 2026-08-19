@@ -2,7 +2,7 @@ import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from '../buildings';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
-import { index, MAP_SIZE, ZONE } from '../layers';
+import { index, MAP_SIZE, ROAD, ZONE } from '../layers';
 import { seedDefinitions } from '../levels';
 import { categoryForZone, RCI_CATEGORIES } from '../rci';
 import { checkRequirements, presentDefinitions } from '../requirements';
@@ -160,7 +160,7 @@ export function roadReach(world: WorldState, maxDistance: number): Uint8Array {
   let frontier: number[] = [];
 
   for (let tile = 0; tile < road.length; tile++) {
-    if (road[tile] === 1) {
+    if ((road[tile] ?? ROAD.none) !== ROAD.none) {
       distance[tile] = 0;
       frontier.push(tile);
     }

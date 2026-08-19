@@ -7,6 +7,14 @@ import type { ValidationIssue } from './schema';
  * Chybějící sekce je chyba, ne tichý default: kdyby se dala vynechat, hráč by
  * z rozbitého modu dostal město, které se chová jinak, než balanc popisuje.
  */
+/** Jeden typ silnice. `id` slouží k lokalizačnímu klíči, ne k logice. */
+export interface RoadTypeBalance {
+  id: string;
+  capacity: number;
+  cost: number;
+  upkeep: number;
+}
+
 export interface Balance {
   /**
    * Ekonomika. Původně konstanty fáze 1 v kódu — přesunuty sem, aby šel balanc
@@ -47,6 +55,14 @@ export interface Balance {
      * nepovede, generator ubere vodu a zkusi to znovu (R7).
      */
     minLandShare: number;
+  };
+
+  /**
+   * Doprava (§4 a §5 zadání fáze 3). `roadTypes` je pořadí typů silnic;
+   * index + 1 je hodnota ve vrstvě `road`, takže přidat typ je změna JSONu.
+   */
+  traffic: {
+    roadTypes: RoadTypeBalance[];
   };
 
   diffusion: { spread: number; decay: number; passes: number };
@@ -166,6 +182,7 @@ export function validateBalance(raw: unknown): {
   const economy = section(issues, root, 'economy');
   const demand = section(issues, root, 'demand');
   const map = section(issues, root, 'map');
+  const traffic = section(issues, root, 'traffic');
   const diffusion = section(issues, root, 'diffusion');
   const landValue = section(issues, root, 'landValue');
   const crime = section(issues, root, 'crime');
@@ -222,6 +239,32 @@ export function validateBalance(raw: unknown): {
     });
   }
 
+  const roadTypes: RoadTypeBalance[] = [];
+  const rawRoadTypes = traffic?.['roadTypes'];
+  if (!Array.isArray(rawRoadTypes) || rawRoadTypes.length === 0) {
+    issues.push({ field: 'traffic.roadTypes', message: 'musí být neprázdné pole typů silnic' });
+  } else {
+    rawRoadTypes.forEach((entry, i) => {
+      const where = `traffic.roadTypes[${i}]`;
+      const record = asRecord(entry);
+      if (!record) {
+        issues.push({ field: where, message: 'musí být objekt' });
+        return;
+      }
+      const id = record['id'];
+      if (typeof id !== 'string' || id.length === 0) {
+        issues.push({ field: `${where}.id`, message: 'musí být neprázdný řetězec' });
+        return;
+      }
+      roadTypes.push({
+        id,
+        capacity: num(issues, record, 'capacity', `${where}.capacity`, 1, 10000),
+        cost: num(issues, record, 'cost', `${where}.cost`, 0, 100000),
+        upkeep: num(issues, record, 'upkeep', `${where}.upkeep`, 0, 100000),
+      });
+    });
+  }
+
   const balance: Balance = {
     economy: {
       taxableValuePerUnit: num(
@@ -260,6 +303,7 @@ export function validateBalance(raw: unknown): {
       clearForestCost: num(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
       minLandShare: num(issues, map, 'minLandShare', 'map.minLandShare', 0, 1),
     },
+    traffic: { roadTypes },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),
       decay: num(issues, diffusion, 'decay', 'diffusion.decay', 0, 1),

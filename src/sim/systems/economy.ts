@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '../catalogue';
+import { ROAD } from '../layers';
 import { isRciCategory } from '../rci';
 import { serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
@@ -49,8 +50,16 @@ export interface BudgetLine {
   upkeepCount: number;
 }
 
+/** Silnice v rozpočtu: kolik jich stojí a co dohromady stojí za měsíc. */
+export interface RoadBudget {
+  count: number;
+  upkeep: number;
+}
+
 export interface Budget {
   lines: BudgetLine[];
+  /** Údržba silnic. Nejsou to budovy, takže mají vlastní řádek (§4 fáze 3). */
+  roads: RoadBudget;
   income: number;
   expenses: number;
   /** Kolik vynese jedna jednotka základu při 100 %. Do rozpisu v UI. */
@@ -168,6 +177,17 @@ export function computeBudget(
     expenses += upkeep;
   }
 
+  // Silnice se neúčtují po dlaždicích, ale jedním řádkem — hráč jich má tisíce
+  // a zajímá ho součet, ne kolik stojí každá zvlášť.
+  const roads: RoadBudget = { count: 0, upkeep: 0 };
+  for (const value of world.layers.road) {
+    if (value === ROAD.none) continue;
+    roads.count++;
+    roads.upkeep += balance.traffic.roadTypes[value - 1]?.upkeep ?? 0;
+  }
+  roads.upkeep = Math.round(roads.upkeep);
+  expenses += roads.upkeep;
+
   // Daň se zaokrouhluje **jednou za řádek**, ne u každé budovy. Jinak by rozpis
   // v UI tvrdil něco jiného, než kolik ve sloupci opravdu stojí.
   for (const line of byDefinition.values()) {
@@ -179,6 +199,7 @@ export function computeBudget(
   return {
     // Stabilní pořadí, ať tabulka neposkakuje.
     lines: [...byDefinition.values()].sort((a, b) => a.definitionId.localeCompare(b.definitionId)),
+    roads,
     income,
     expenses,
     valuePerUnit: balance.economy.taxableValuePerUnit,
