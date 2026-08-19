@@ -154,7 +154,7 @@ function pick(candidates: readonly Candidate[], roll: number): Candidate | undef
  * Průchod do šířky ze všech silnic naráz: jeden průchod mapou místo prohledávání
  * okolí u každé z tisíců parcel.
  */
-function roadReach(world: WorldState, maxDistance: number): Uint8Array {
+export function roadReach(world: WorldState, maxDistance: number): Uint8Array {
   const { road } = world.layers;
   const distance = new Uint8Array(road.length).fill(255);
   let frontier: number[] = [];

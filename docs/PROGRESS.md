@@ -724,9 +724,51 @@ zahazovala. Pokrytí se po loadu dopočítalo (parky 36).
 Že testy koušou, ověřeno rozbitím: bez ukládání hrubých vrstev padne round-trip,
 bez nulování v migraci tři testy fixtury v1, bez financování jeden.
 
+- [x] T21 — UI: overlaye, financování, diagnostika parcely (fáze 2)
+
+Přepínač overlayů a panel financování stály z T14; T21 je doplnil a přidal to
+podstatné — **rozbor parcely**. Podle §12 je to jediná věc, která z fáze 2 dělá
+hru místo tabulky: pět neviditelných veličin hráč jinak nemá jak přečíst.
+
+Pravé tlačítko teď otevře detail **jakékoli** dlaždice, s budovou i bez ní:
+
+```
+Rozbor parcely
+Pozice                24, 33
+Cena půdy             60
+Silnice               3 dlaždice, skóre × 30 %
+Poptávka              2
+Potřeba na vyšší úroveň  90
+Základ                +40
+Parky                 +36
+Znečištění             −1
+Kriminalita           −15
+Cena půdy směřuje k   60
+```
+
+- `src/sim/diagnostics.ts` vrací **čísla, ne texty** — `sim/` nesmí znát řetězce
+- **vzorec ceny půdy je jeden**: `explainLandValue` používá diagnostika i
+  `landValueSystem`. Kdyby si každý počítal svůj, ukazoval by panel něco jiného,
+  než podle čeho se hraje. Hlídá to test přes všech 1024 buněk — součet sčítanců
+  musí sedět a vrstva k němu musí dojít
+- řádek „Silnice" odpovídá na nejčastější otázku hráče: parcela mimo dosah
+  hlásí **„mimo dosah — tady nic nevyroste"**
+- práh další úrovně už je snížený o úlevu za poptávku, takže je to číslo,
+  se kterým jde porovnat cena půdy vedle
+- overlay dostala každá třída služeb, ne jen policie; seznam jde z obsahu, takže
+  mod se svou třídou dostane přepínač zadarmo
+
+Ověřeno v běžící hře skutečným kliknutím: panel u parku ukazuje `Parky +36`,
+u skládky `Znečištění −8`, na parcele za dosahem silnice hlášku o dosahu.
+Přepínačů je devět, posuvníků financování pět.
+
+Testy: 6 v `tests/diagnostics.test.ts`. Že koušou, ověřeno rozbitím: bez
+znečištění v rozpisu padnou dva testy ceny půdy, bez ořezu dosahu jeden.
+
+**Tím je fáze 2 hotová** — T11 až T21 uzavřeny.
+
 ## Rozpracované
-_(nic — T20 uzavřeno, zbývá poslední úkol fáze 2: T21 — UI, přepínač overlayů,
-panel financování, diagnostika parcely)_
+_(nic — fáze 2 uzavřena)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

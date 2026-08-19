@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { COARSE_FACTOR, COARSE_SIZE, coarseInBounds } from '../coarse';
+import { explainLandValue } from '../diagnostics';
 import { index, TERRAIN } from '../layers';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -32,31 +33,13 @@ export function createLandValueSystem(balance: Balance): System {
     offset: 5,
     run(world: WorldState) {
       const water = waterProximity(world);
-      const { landValue, pollution, crime } = world.coarse;
-
-      const { base, smoothing, waterBonus, weights } = balance.landValue;
-
-      // Jen třídy, které ve městě opravdu jsou a mají v balancu váhu.
-      const services: [Uint8Array, number][] = [];
-      for (const [serviceClass, coverage] of world.coverage) {
-        const weight = weights[serviceClass];
-        if (weight !== undefined) services.push([coverage, weight]);
-      }
+      const { landValue } = world.coarse;
+      const { smoothing } = balance.landValue;
 
       for (let cell = 0; cell < landValue.length; cell++) {
-        let services_ = 0;
-        for (const [coverage, weight] of services) {
-          services_ += (coverage[cell] ?? 0) * weight;
-        }
-
-        const raw =
-          base +
-          services_ +
-          (water[cell] === 1 ? waterBonus : 0) -
-          (pollution[cell] ?? 0) * (weights['pollution'] ?? 0) -
-          (crime[cell] ?? 0) * (weights['crime'] ?? 0);
-
-        const current = landValue[cell] ?? 0;
+        // Vzorec je jeden a sdílí ho diagnostika parcely (§12) — jinak by hráči
+        // ukazovala rozpis, podle kterého se ve skutečnosti nehraje.
+        const { raw, current } = explainLandValue(world, balance, cell, water[cell] === 1);
         const delta = raw - current;
         const next = current + delta * smoothing;
 
@@ -81,7 +64,7 @@ export function createLandValueSystem(balance: Balance): System {
  * Je to jediný vstup ceny půdy, který nezávisí na hráči — mapa díky němu není
  * homogenní ještě než se cokoli postaví.
  */
-function waterProximity(world: WorldState): Uint8Array {
+export function waterProximity(world: WorldState): Uint8Array {
   const size = COARSE_SIZE;
   const hasWater = new Uint8Array(size * size);
 

@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
+import type { ParcelExplanation } from '@/sim/diagnostics';
 import { buildingMonthlyTax, buildingMonthlyUpkeep } from '@/sim/systems/economy';
 import type { Building, WorldState } from '@/sim/world';
 import { button, el } from './dom';
@@ -30,17 +31,35 @@ export class BuildingInfo {
     this.root.classList.add('is-hidden');
   }
 
-  show(world: WorldState, building: Building, definition: Definition | undefined): void {
+  show(
+    world: WorldState,
+    parcel: ParcelExplanation,
+    building: Building | undefined,
+    definition: Definition | undefined,
+  ): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
     this.root.classList.remove('is-hidden');
 
+    const title = building
+      ? definition
+        ? t(definition.name)
+        : building.definitionId
+      : t('ui.info.emptyParcel');
+
     const header = el('div', 'sheet__header');
-    header.appendChild(el('h2', 'sheet__title', definition ? t(definition.name) : building.definitionId));
+    header.appendChild(el('h2', 'sheet__title', title));
     const close = button('chip chip--tight', () => this.hide());
     close.textContent = '×';
     header.appendChild(close);
     this.root.append(header);
+
+    // Diagnostika parcely je pod každou budovou i pod prázdným polem — to je
+    // ta část, ze které se hráč dozví, **proč** se tu nic neděje (§12).
+    if (!building) {
+      this.appendParcel(parcel);
+      return;
+    }
 
     if (!definition) {
       // Budova z chybějícího modu — save ji drží, ale nevíme o ní nic (§8).
@@ -105,5 +124,75 @@ export class BuildingInfo {
     } else if (!building.powered && consumption > 0) {
       this.root.appendChild(el('p', 'sheet__warning', t('ui.info.noPowerWarning')));
     }
+
+    this.appendParcel(parcel);
+  }
+
+  /**
+   * Rozpis parcely: cena půdy po sčítancích, dosah silnice a poptávka.
+   *
+   * Tohle je podle §12 jediná věc, která z fáze 2 dělá hru místo tabulky —
+   * pět neviditelných veličin jinak hráč nemá jak přečíst.
+   */
+  private appendParcel(parcel: ParcelExplanation): void {
+    const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
+
+    this.root.appendChild(el('h3', 'sheet__subtitle', t('ui.parcel.title')));
+
+    const rows: [string, string][] = [
+      ['ui.info.position', `${parcel.x}, ${parcel.y}`],
+      ['ui.overlay.landValue', `${parcel.landValue.current}`],
+    ];
+
+    // Dosah silnice — nejčastější důvod, proč zóna zůstane prázdná.
+    rows.push([
+      'ui.parcel.road',
+      parcel.roadDistance === null
+        ? t('ui.parcel.roadTooFar')
+        : t('ui.parcel.roadDistance', {
+            distance: parcel.roadDistance,
+            factor: Math.round(parcel.roadFactor * 100),
+          }),
+    ]);
+
+    if (parcel.demand !== null) rows.push(['ui.hud.demand', formatNumber(parcel.demand)]);
+    if (parcel.levels.nextThreshold !== null) {
+      rows.push([
+        'ui.parcel.nextLevel',
+        formatNumber(Math.round(Math.max(0, parcel.levels.nextThreshold - parcel.levels.demandRelief))),
+      ]);
+    }
+
+    const list = el('dl', 'sheet__list');
+    for (const [labelKey, value] of rows) {
+      list.appendChild(el('dt', undefined, t(labelKey)));
+      list.appendChild(el('dd', undefined, value));
+    }
+    this.root.appendChild(list);
+
+    // Rozpis ceny půdy: z čeho se to číslo skládá.
+    const breakdown = el('dl', 'sheet__list sheet__list--breakdown');
+    for (const term of parcel.landValue.terms) {
+      const label =
+        term.source === 'base' || term.source === 'water'
+          ? t(`ui.parcel.term.${term.source}`)
+          : this.i18n.has(`ui.service.${term.source}`)
+            ? t(`ui.service.${term.source}`)
+            : t(`ui.overlay.${term.source}`);
+
+      breakdown.appendChild(el('dt', undefined, label));
+      const amount = Math.round(term.amount);
+      // Typografické znaménko, ať se rozpis nerozchází se zbytkem UI.
+      breakdown.appendChild(
+        el(
+          'dd',
+          amount < 0 ? 'is-negative' : undefined,
+          `${amount < 0 ? '−' : '+'}${formatNumber(Math.abs(amount))}`,
+        ),
+      );
+    }
+    breakdown.appendChild(el('dt', 'sheet__total', t('ui.parcel.target')));
+    breakdown.appendChild(el('dd', 'sheet__total', formatNumber(Math.round(parcel.landValue.raw))));
+    this.root.appendChild(breakdown);
   }
 }

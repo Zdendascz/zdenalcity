@@ -3,6 +3,7 @@ import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { applySaveToWorld, collectLoadWarnings, unpackSave } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
+import { explainParcel } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
@@ -171,6 +172,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const worldContainer = new Container();
   app.stage.addChild(worldContainer);
 
+  // Třídy služeb, které v načteném obsahu opravdu existují, v pevném pořadí.
+  const serviceClasses = [
+    ...new Set(
+      content
+        .getAll('building')
+        .map((definition) => definition.service?.class)
+        .filter((serviceClass): serviceClass is string => serviceClass !== undefined),
+    ),
+  ].sort();
+
   const chunkRenderer = new ChunkRenderer(world, worldContainer);
   const buildingRenderer = new BuildingRenderer(
     world,
@@ -192,16 +203,19 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       values: () => world.coarse.landValue,
     },
     { id: 'crime', color: CRIME_COLOR, maxAlpha: CRIME_MAX_ALPHA, values: () => world.coarse.crime },
-    {
-      id: 'coverage:police',
+    // Dosah každé třídy, která ve hře existuje. Seznam jde z obsahu, ne z kódu —
+    // mod se svou třídou dostane přepínač zadarmo (P5).
+    ...serviceClasses.map((serviceClass) => ({
+      id: `coverage:${serviceClass}`,
       color: COVERAGE_COLOR,
       maxAlpha: COVERAGE_MAX_ALPHA,
-      values: () => simWorld.coverage.get('police'),
-    },
+      values: () => simWorld.coverage.get(serviceClass),
+    })),
   ]);
 
   const hover = new Graphics();
   worldContainer.addChild(hover);
+
 
   const debug = new DebugOverlay(mount);
   debug.setVisible(false);
@@ -329,24 +343,33 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     return definition ? checkFootprint(simWorld, definition, tile.x, tile.y).ok : true;
   }
 
-  /** Pravé tlačítko ukazuje detail budovy — bourání zůstává na nástroji. */
+  /**
+   * Pravé tlačítko ukazuje detail parcely — s budovou i bez ní. Bourání
+   * zůstává na nástroji.
+   */
   function showBuildingAt(tile: { x: number; y: number }): void {
     const buildingId = simWorld.layers.buildingId[index(tile.x, tile.y)] ?? 0;
     const building = buildingId === 0 ? undefined : simWorld.buildings.get(buildingId);
-    if (!building) {
-      buildingInfo.hide();
-      return;
-    }
-    buildingInfo.show(simWorld, building, content.get(building.definitionId));
+    const parcel = explainParcel(simWorld, content.getBalance(), tile.x, tile.y);
+
+    buildingInfo.show(
+      simWorld,
+      parcel,
+      building,
+      building ? content.get(building.definitionId) : undefined,
+    );
   }
 
-  /** Diagnostické pohledy. Skutečný přepínač s ikonami je T21. */
+  /** Diagnostické pohledy: čtyři veličiny plus dosah každé třídy služeb. */
   const overlays = [
     { id: 'power', labelKey: 'ui.overlay.power' },
     { id: 'pollution', labelKey: 'ui.overlay.pollution' },
     { id: 'landValue', labelKey: 'ui.overlay.landValue' },
     { id: 'crime', labelKey: 'ui.overlay.crime' },
-    { id: 'coverage:police', labelKey: 'ui.overlay.coverage.police' },
+    ...serviceClasses.map((serviceClass) => ({
+      id: `coverage:${serviceClass}`,
+      labelKey: `ui.overlay.coverage.${serviceClass}`,
+    })),
   ];
 
   let overlayMode = 'none';
@@ -357,16 +380,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     chunkRenderer.setOverlay(overlayMode === 'power' ? 'power' : ('none' as OverlayMode));
     coarseOverlay.setActive(overlayMode === 'power' ? 'none' : overlayMode);
   }
-
-  /** Třídy služeb, které vůbec existují v obsahu. Pořadí je stabilní. */
-  const serviceClasses = [
-    ...new Set(
-      content
-        .getAll('building')
-        .map((definition) => definition.service?.class)
-        .filter((serviceClass): serviceClass is string => serviceClass !== undefined),
-    ),
-  ].sort();
 
   const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, serviceClasses, {
     onSpeed: setSpeed,
