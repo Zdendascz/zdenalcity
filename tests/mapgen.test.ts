@@ -97,6 +97,24 @@ describe('generátor mapy', () => {
     }
   });
 
+  it('moře nezmizí, ani když generátor kvůli ostrovům ubírá vodu', { timeout: 30000 }, () => {
+    // Souvislost souše se řeší zaplavením ostrovů a v krajním případě snížením
+    // hladiny. Kdyby to sahalo moc hluboko, vznikla by mapa bez vody — a bonus
+    // ceny půdy u vody by neměl kde platit.
+    for (let seed = 1; seed <= 200; seed++) {
+      const { terrain } = generateTerrain(seed * 7919, VANILLA_BALANCE);
+      const water = share(terrain, TERRAIN.water);
+
+      // Nahoře je strop nastavená hladina plus utopené ostrovy, dole pojistka,
+      // že snižování hladiny nesmí moře vysušit úplně.
+      const drowned = 1 - VANILLA_BALANCE.map.minLandShare;
+      expect(water, `seed ${seed}: voda`).toBeGreaterThan(0.05);
+      expect(water, `seed ${seed}: voda`).toBeLessThanOrEqual(
+        VANILLA_BALANCE.map.seaLevel + drowned,
+      );
+    }
+  });
+
   it('vygeneruje všech šest terénů aspoň někde', { timeout: 20000 }, () => {
     const seen = new Set<number>();
     for (let seed = 1; seed <= 40; seed++) {

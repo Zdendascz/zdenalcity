@@ -36,8 +36,7 @@ export interface GeneratedMap {
 
 export function generateTerrain(seed: number, balance: Balance): GeneratedMap {
   const rng = new Rng(seed);
-  const { seaLevel, rockLevel, beachWidth, forestDensity, marshThreshold, octaves, roughness } =
-    balance.map;
+  const { rockLevel, beachWidth, forestDensity, marshThreshold, octaves, roughness } = balance.map;
 
   const heightField = createNoiseField(rng, FIELD_SIZE);
   const forestField = createNoiseField(rng, FIELD_SIZE);
@@ -56,16 +55,9 @@ export function generateTerrain(seed: number, balance: Balance): GeneratedMap {
   // fBm má u každého seedu jiné rozpětí, takže pevná hladina dá jednou pevninu
   // bez moře a podruhé mapu z 87 % pod vodou — obojí se stalo při ladění.
   // Takhle `seaLevel = 0,3` vždycky znamená „třetina mapy je voda".
-  const levels = quantiles(height, [seaLevel, rockLevel]);
-  const seaHeight = levels[0] ?? 0;
-  const rockHeight = levels[1] ?? 1;
-
-  for (let tile = 0; tile < cells; tile++) {
-    terrain[tile] = (height[tile] ?? 0) < seaHeight ? TERRAIN.water : TERRAIN.grass;
-  }
-
-  // Souš musí být souvislá, jinak by byla půlka mapy nedostupná (R7).
-  connectLand(terrain, height, seaHeight);
+  const sorted = Float32Array.from(height).sort();
+  const seaHeight = shapeCoastline(terrain, height, sorted, balance);
+  const rockHeight = quantileOf(sorted, rockLevel);
 
   paintBeaches(terrain, beachWidth);
 
@@ -116,30 +108,74 @@ function isLand(terrain: Uint8Array, tile: number): boolean {
   return terrain[tile] !== TERRAIN.water;
 }
 
-/** Zvedne dlaždici těsně nad hladinu. Písek na ni doplní pozdější krok. */
-function raiseTile(
-  terrain: Uint8Array,
-  height: Float32Array,
-  tile: number,
-  seaHeight: number,
-): void {
-  terrain[tile] = TERRAIN.grass;
-  height[tile] = seaHeight + 0.001;
+/** Hodnota, pod kterou leží `share` podíl už setříděného pole. */
+function quantileOf(sorted: Float32Array, share: number): number {
+  const at = Math.min(sorted.length - 1, Math.max(0, Math.round(share * (sorted.length - 1))));
+  return sorted[at] ?? 0;
+}
+
+function quantiles(values: Float32Array, shares: readonly number[]): number[] {
+  const sorted = Float32Array.from(values).sort();
+  return shares.map((share) => quantileOf(sorted, share));
 }
 
 /**
- * Hodnoty, pod kterými leží zadané podíly pole. Kvantily, ne pevné prahy.
+ * Rozhodne, kudy vede pobřeží, a zaručí souvislou souš (R7).
  *
- * Všechny naráz z jednoho setřídění — generátor běží při každém přegenerování
- * náhledu v dialogu nové hry, takže tam nemá co dělat druhý sort přes 16 384
- * čísel.
+ * Ostrovy se **zaplaví**, ne spojí. Původní verze k nim stavěla šíje a na
+ * členitých mapách z toho byly hřebeny přes celé moře — nahlásil autor. Ztráta
+ * je malá: medián mapy má 99 % souše v jednom kuse, takže se topí pár ostrůvků,
+ * které stejně nebylo jak zastavět.
+ *
+ * Když by tím ale souš přišla o víc než `minLandShare`, hladina se o kus sníží
+ * a zkusí se to znovu — méně vody znamená míň ostrovů. Takhle vzniká souvislá
+ * mapa bez jediného umělého pásu.
+ *
+ * Vrací výšku hladiny, kterou nakonec zvolil.
  */
-function quantiles(values: Float32Array, shares: readonly number[]): number[] {
-  const sorted = Float32Array.from(values).sort();
-  return shares.map((share) => {
-    const at = Math.min(sorted.length - 1, Math.max(0, Math.round(share * (sorted.length - 1))));
-    return sorted[at] ?? 0;
-  });
+function shapeCoastline(
+  terrain: Uint8Array,
+  height: Float32Array,
+  sorted: Float32Array,
+  balance: Balance,
+): number {
+  const { seaLevel, minLandShare } = balance.map;
+  let waterShare = seaLevel;
+  let seaHeight = quantileOf(sorted, waterShare);
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    seaHeight = quantileOf(sorted, waterShare);
+    for (let tile = 0; tile < terrain.length; tile++) {
+      terrain[tile] = (height[tile] ?? 0) < seaHeight ? TERRAIN.water : TERRAIN.grass;
+    }
+
+    const { componentOf, sizes } = landComponents(terrain);
+    if (sizes.length === 0) {
+      terrain.fill(TERRAIN.grass); // celá mapa pod vodou, radši bez moře
+      return seaHeight;
+    }
+
+    let largest = 0;
+    let land = 0;
+    for (let id = 0; id < sizes.length; id++) {
+      land += sizes[id] ?? 0;
+      if ((sizes[id] ?? 0) > (sizes[largest] ?? 0)) largest = id;
+    }
+
+    const keeps = (sizes[largest] ?? 0) / land;
+    if (keeps >= minLandShare || attempt === 4) {
+      for (let tile = 0; tile < terrain.length; tile++) {
+        if (isLand(terrain, tile) && componentOf[tile] !== largest) terrain[tile] = TERRAIN.water;
+      }
+      return seaHeight;
+    }
+
+    // Míň vody = míň ostrovů. Pětina dolů je dost hrubý krok na to, aby se
+    // pár pokusy dostal i ze zálivů plných ostrůvků.
+    waterShare *= 0.8;
+  }
+
+  return seaHeight;
 }
 
 /** Očísluje souvislé plochy souše. Vrací pole indexů komponent a jejich velikosti. */
@@ -177,111 +213,6 @@ function landComponents(terrain: Uint8Array): { componentOf: Int32Array; sizes: 
   }
 
   return { componentOf, sizes };
-}
-
-/**
- * Spojí všechnu souš do jedné plochy (R7).
- *
- * Ostrovy se **nezaplavují** — to by hráče připravilo o plochu a u členitých
- * seedů zbylo z mapy pár procent souše. Místo toho se zvedne nad hladinu
- * nejkratší pás vody mezi ostrovem a pevninou, tedy vznikne šíje.
- *
- * Jeden průchod do šířky vodou od hlavní pevniny obslouží **všechny** ostrovy
- * naráz: jakmile narazí na cizí souš, zvedne cestu, kterou se tam dostal.
- * Opakované značkování komponent pro každý ostroj zvlášť dělalo z generování
- * desítky milisekund navíc.
- */
-function connectLand(terrain: Uint8Array, height: Float32Array, seaHeight: number): void {
-  // Rozšiřování šíjí umí samo odříznout pár dlaždic do nového ostrůvku, takže
-  // se průchod opakuje, dokud nezbude jediná souš. Druhé kolo obvykle stačí;
-  // strop je pojistka, ne očekávaný počet.
-  for (let pass = 0; pass < 8; pass++) {
-    if (connectPass(terrain, height, seaHeight)) return;
-  }
-}
-
-/** Vrací `true`, když je souš už souvislá a není co spojovat. */
-function connectPass(terrain: Uint8Array, height: Float32Array, seaHeight: number): boolean {
-  const { componentOf, sizes } = landComponents(terrain);
-
-  if (sizes.length === 0) {
-    // Celá mapa pod vodou — zvedneme ji, prázdná mapa je horší než bez moře.
-    terrain.fill(TERRAIN.grass);
-    return true;
-  }
-  if (sizes.length === 1) return true;
-
-  let largest = 0;
-  for (let id = 1; id < sizes.length; id++) {
-    if ((sizes[id] ?? 0) > (sizes[largest] ?? 0)) largest = id;
-  }
-
-  const cameFrom = new Int32Array(terrain.length).fill(-1);
-  const seen = new Uint8Array(terrain.length);
-  const bridged = new Uint8Array(sizes.length);
-  bridged[largest] = 1;
-
-  let frontier: number[] = [];
-  for (let tile = 0; tile < terrain.length; tile++) {
-    if (componentOf[tile] === largest) {
-      seen[tile] = 1;
-      frontier.push(tile);
-    }
-  }
-
-  while (frontier.length > 0) {
-    const next: number[] = [];
-    for (const tile of frontier) {
-      const x = tile % MAP_SIZE;
-      const y = (tile - x) / MAP_SIZE;
-
-      for (const [dx, dy] of NEIGHBOURS) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (!inBounds(nx, ny)) continue;
-        const at = index(nx, ny);
-        if (seen[at] === 1) continue;
-
-        seen[at] = 1;
-        cameFrom[at] = tile;
-
-        const component = componentOf[at] ?? -1;
-        if (component >= 0) {
-          // Cizí souš: zvedneme vodu, kterou jsme se sem dostali. Ostrovy,
-          // které už spojené jsou, jen procházíme dál.
-          if (bridged[component] === 0) {
-            bridged[component] = 1;
-            // Cesta se sleduje **až na hlavní pevninu**, ne k první souši.
-            // Zastavit se na dlaždici, kterou zvedlo předchozí rozšíření,
-            // znamenalo nedokončený most a ostrůvek navíc.
-            let step = cameFrom[at] ?? -1;
-            while (step >= 0 && componentOf[step] !== largest) {
-              if (isLand(terrain, step)) {
-                step = cameFrom[step] ?? -1;
-                continue;
-              }
-              raiseTile(terrain, height, step, seaHeight);
-              // Šíje široká jednu dlaždici vypadá jako čára narýsovaná
-              // pravítkem. Rozšířením o sousedy z ní je kosa.
-              const sx = step % MAP_SIZE;
-              const sy = (step - sx) / MAP_SIZE;
-              for (const [ox, oy] of NEIGHBOURS) {
-                if (!inBounds(sx + ox, sy + oy)) continue;
-                const side = index(sx + ox, sy + oy);
-                if (!isLand(terrain, side)) raiseTile(terrain, height, side, seaHeight);
-              }
-              step = cameFrom[step] ?? -1;
-            }
-          }
-        }
-
-        next.push(at);
-      }
-    }
-    frontier = next;
-  }
-
-  return false;
 }
 
 function paintBeaches(terrain: Uint8Array, beachWidth: number): void {

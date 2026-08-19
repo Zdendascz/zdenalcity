@@ -1,3 +1,3 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`generátor mapy > hash mapy se nemění bez zásahu do generátoru 1`] = `"0a951591"`;
+exports[`generátor mapy > hash mapy se nemění bez zásahu do generátoru 1`] = `"94ed0b69"`;

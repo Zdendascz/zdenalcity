@@ -838,6 +838,23 @@ a 28 % vody.
 projít dialogem. Patří to k němu, ale zadání to nezmiňuje — doplním, až bude
 jasné, jestli má vzniknout i seznam uložených her.
 
+- [x] Oprava: hřebeny přes moře (nahlásil autor)
+
+Spojování ostrovů šíjemi bylo špatně. Na členitých mapách jich vznikly desítky
+a vypadaly jako hřebeny narýsované přes celé moře — autor to poznal na první
+pohled a měl pravdu.
+
+Šíje jsem zrušil úplně. Ostrovy se **zaplaví**, protože měření ukázalo, že
+medián mapy má stejně **99 % souše v jednom kuse**; topí se tedy pár ostrůvků,
+které se nedaly zastavět. Kdyby to znamenalo ztrátu větší než `minLandShare`
+(3 %), generátor **ubere vodu a zkusí to znovu** — méně vody znamená míň
+ostrovů. Až pět pokusů.
+
+Výsledek na 80 seedech: voda medián 28 % (přesně nastavená hodnota), p25 23 %,
+v nejhorším případě 12 %. Souvislost souše drží dál na 200 seedech a přibyl
+test, že snižování hladiny nesmí moře vysušit — jinak by bonus ceny půdy u vody
+neměl kde platit.
+
 ## Rozpracované
 _(T23 hotové, dál T24: typy silnic — ulice, třída, dálnice)_
 

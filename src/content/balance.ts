@@ -42,6 +42,11 @@ export interface Balance {
     forestAbsorption: number;
     /** Cena za vykaceni jedne dlazdice lesa. */
     clearForestCost: number;
+    /**
+     * Nejmensi podil souse, ktery musi zustat v jednom kuse. Kdyz se to
+     * nepovede, generator ubere vodu a zkusi to znovu (R7).
+     */
+    minLandShare: number;
   };
 
   diffusion: { spread: number; decay: number; passes: number };
@@ -253,6 +258,7 @@ export function validateBalance(raw: unknown): {
       roughness: num(issues, map, 'roughness', 'map.roughness', 0, 1),
       forestAbsorption: num(issues, map, 'forestAbsorption', 'map.forestAbsorption', 0, 1),
       clearForestCost: num(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
+      minLandShare: num(issues, map, 'minLandShare', 'map.minLandShare', 0, 1),
     },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),

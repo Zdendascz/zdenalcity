@@ -21,7 +21,8 @@
     "octaves": 5,
     "roughness": 0.5,
     "forestAbsorption": 0.5,
-    "clearForestCost": 12
+    "clearForestCost": 12,
+    "minLandShare": 0.97
   },
 
   "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },
