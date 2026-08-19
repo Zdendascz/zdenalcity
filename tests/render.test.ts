@@ -20,7 +20,7 @@ import {
 } from '@/render/projection';
 import { shade, TERRAIN_COLORS } from '@/render/palette';
 import { roadMask, roadPolygons, ROAD_E, ROAD_N, ROAD_S, ROAD_W } from '@/render/roads';
-import { MAP_SIZE } from '@/sim/layers';
+import { MAP_SIZE, TERRAIN } from '@/sim/layers';
 
 const VIEW_W = 1280;
 const VIEW_H = 720;
@@ -69,7 +69,11 @@ describe('palette', () => {
   });
 
   it('má barvu pro každou hodnotu vrstvy terrain', () => {
-    expect(TERRAIN_COLORS).toHaveLength(4);
+    // Kdyby přibyl terén bez barvy, renderer by ho kreslil jako `undefined`.
+    expect(TERRAIN_COLORS).toHaveLength(Object.keys(TERRAIN).length);
+    for (const value of Object.values(TERRAIN)) {
+      expect(TERRAIN_COLORS[value], `terén ${value}`).toBeTypeOf('number');
+    }
   });
 });
 

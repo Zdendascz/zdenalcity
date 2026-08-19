@@ -5,8 +5,21 @@
 
 export const MAP_SIZE = 128;
 
-/** Hodnoty vrstvy `terrain`. */
-export const TERRAIN = { grass: 0, water: 1, sand: 2, rock: 3 } as const;
+/**
+ * Hodnoty vrstvy `terrain`.
+ *
+ * Terén je **hratelný údaj, ne dekorace** (§2 zadání fáze 3): les se dá vykácet
+ * a do té doby zvedá cenu půdy a pohlcuje znečištění, mokřad se dá zavézt až
+ * s terraformingem, na skálu se bez srovnání nestaví.
+ */
+export const TERRAIN = {
+  grass: 0,
+  water: 1,
+  sand: 2,
+  rock: 3,
+  forest: 4,
+  marsh: 5,
+} as const;
 export type TerrainType = (typeof TERRAIN)[keyof typeof TERRAIN];
 
 /** Hodnoty vrstvy `zone`. */

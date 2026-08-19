@@ -21,6 +21,25 @@ export interface Balance {
     limit: number;
   };
 
+  /**
+   * Generátor mapy (§2 zadání fáze 3). Prahy jsou na normalizovaném výškovém
+   * poli 0–1, takže znamenají totéž bez ohledu na počet oktáv.
+   */
+  map: {
+    /** Podíl mapy pod vodou, 0-1. Bere se jako kvantil vysky, ne pevna hladina. */
+    seaLevel: number;
+    /** Kvantil vysky, nad kterym je skala. */
+    rockLevel: number;
+    /** Šířka pískového pásu v dlaždicích. */
+    beachWidth: number;
+    /** Podíl trávy, který zaroste lesem, 0–1. */
+    forestDensity: number;
+    /** O kolik nad hladinou ještě vzniká mokřad. */
+    marshThreshold: number;
+    octaves: number;
+    roughness: number;
+  };
+
   diffusion: { spread: number; decay: number; passes: number };
 
   landValue: {
@@ -137,6 +156,7 @@ export function validateBalance(raw: unknown): {
 
   const economy = section(issues, root, 'economy');
   const demand = section(issues, root, 'demand');
+  const map = section(issues, root, 'map');
   const diffusion = section(issues, root, 'diffusion');
   const landValue = section(issues, root, 'landValue');
   const crime = section(issues, root, 'crime');
@@ -216,6 +236,15 @@ export function validateBalance(raw: unknown): {
         100,
       ),
       limit: num(issues, demand, 'limit', 'demand.limit', 1, 1000),
+    },
+    map: {
+      seaLevel: num(issues, map, 'seaLevel', 'map.seaLevel', 0, 1),
+      rockLevel: num(issues, map, 'rockLevel', 'map.rockLevel', 0, 1),
+      beachWidth: num(issues, map, 'beachWidth', 'map.beachWidth', 0, 32),
+      forestDensity: num(issues, map, 'forestDensity', 'map.forestDensity', 0, 1),
+      marshThreshold: num(issues, map, 'marshThreshold', 'map.marshThreshold', 0, 1),
+      octaves: num(issues, map, 'octaves', 'map.octaves', 1, 8),
+      roughness: num(issues, map, 'roughness', 'map.roughness', 0, 1),
     },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),

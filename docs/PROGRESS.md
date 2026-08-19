@@ -767,8 +767,39 @@ znečištění v rozpisu padnou dva testy ceny půdy, bez ořezu dosahu jeden.
 
 **Tím je fáze 2 hotová** — T11 až T21 uzavřeny.
 
+- [x] T22 — generátor mapy, šest typů terénu (fáze 3a)
+
+Zadání fáze 3 leží v `docs/04-FAZE-3.md`. Rozhodnutí R6–R12 beru jako
+odsouhlasená tím, že autor předal zadání se slovy „pusť se do práce".
+
+Vzniklo:
+- `src/sim/mapgen/` pod P1 — žádný renderer, veškerá náhoda z `Rng` (P2)
+- hodnotový šum a fBm vlastní, ne z knihovny: je to třicet řádků a determinismus
+  musí být náš
+- terén rozšířen ze čtyř hodnot na šest (les, mokřad) i s barvami v paletě
+- sekce `map` v `balance.json`, mapa se generuje ze seedu při startu hry
+
+**Prahy jsou kvantily, ne pevné hodnoty.** Normalizovaný fBm má u každého seedu
+jiné rozpětí, takže pevná hladina dala jednou pevninu bez moře a podruhé mapu
+z 87 % pod vodou — obojí se stalo při ladění. Teď `seaLevel = 0,28` vždycky
+znamená „28 % mapy je voda" a `forestDensity = 0,35` „třetina trávy zaroste"
+(předtím z toho vycházelo šest procent).
+
+**Souvislá souš (R7)** se nedělá zaplavením ostrovů, ale zvednutím nejkratšího
+pásu vody mezi ostrovem a pevninou — hráč tak nepřijde o plochu. Dvě věci, které
+to stály:
+- šíje široká jednu dlaždici vypadala jako čára narýsovaná pravítkem, takže se
+  rozšiřuje o sousedy
+- cesta se musí sledovat **až na hlavní pevninu**, ne k první souši. Zastavit se
+  na dlaždici zvednuté předchozím rozšířením znamenalo nedokončený most a nový
+  ostrůvek — invariant padal na pětině seedů
+
+Testy: 7 v `tests/mapgen.test.ts`, mimo jiné souvislost souše na 200 seedech
+a golden hash mapy. Generování jedné mapy trvá ~25 ms, takže přegenerování
+náhledu v dialogu nové hry (T23) bude okamžité.
+
 ## Rozpracované
-_(nic — fáze 2 uzavřena)_
+_(T22 hotové, dál T23: dialog nové hry — jméno, seed, náhled, přegenerování)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

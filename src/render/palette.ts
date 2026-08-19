@@ -3,8 +3,14 @@
  * jinak nepůjde měnit vzhled bez lovení konstant po celém rendereru.
  */
 
-/** Index = hodnota vrstvy `terrain` (0 tráva, 1 voda, 2 písek, 3 skála). */
-export const TERRAIN_COLORS = [0x6b9b4a, 0x3a6ea5, 0xd6c48a, 0x8a8a8a] as const;
+/**
+ * Index = hodnota vrstvy `terrain`: tráva, voda, písek, skála, les, mokřad.
+ * Les je tmavší a sytější než tráva, mokřad kalný — musí být na první pohled
+ * poznat, kde se dá stavět a kde ne.
+ */
+export const TERRAIN_COLORS = [
+  0x6b9b4a, 0x3a6ea5, 0xd6c48a, 0x8a8a8a, 0x3f6b34, 0x6d7a55,
+] as const;
 
 export const ZONE_COLORS = {
   residential: 0x4a90d9,

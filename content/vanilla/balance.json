@@ -12,6 +12,16 @@
     "limit": 100
   },
 
+  "map": {
+    "seaLevel": 0.28,
+    "rockLevel": 0.9,
+    "beachWidth": 2,
+    "forestDensity": 0.35,
+    "marshThreshold": 0.03,
+    "octaves": 5,
+    "roughness": 0.5
+  },
+
   "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },
 
   "landValue": {

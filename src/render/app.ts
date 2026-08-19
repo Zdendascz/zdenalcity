@@ -8,6 +8,7 @@ import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
 import { index, MAP_SIZE, ZONE } from '@/sim/layers';
+import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
@@ -50,7 +51,7 @@ import {
 import { pickTile } from './picking';
 import { footprintQuad, gridToScreen } from './projection';
 
-/** Mapa je zatím všude tráva, takže na seedu vizuálně nezáleží. Generátor přijde později. */
+/** Seed mapy i simulace. Dialog nové hry ho zpřístupní hráči v T23. */
 const SEED = 483928492;
 
 /** Jeden krok kolečka = násobitel zoomu. */
@@ -158,6 +159,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
   const simWorld = createWorld(SEED, content.getBalance().economy);
+  // Mapa se generuje ze seedu (§2 fáze 3). Dialog nové hry, ve kterém si hráč
+  // seed vybere a uvidí náhled, přijde v T23 — do té doby je pevný.
+  applyGeneratedMap(simWorld.layers, generateTerrain(SEED, content.getBalance()));
   const host = createSimHost(
     simWorld,
     createDefaultSystems(content, content.getBalance()),
