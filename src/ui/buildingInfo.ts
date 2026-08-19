@@ -4,7 +4,7 @@ import type { ParcelExplanation } from '@/sim/diagnostics';
 import { buildingMonthlyTax, buildingMonthlyUpkeep } from '@/sim/systems/economy';
 import type { Building, WorldState } from '@/sim/world';
 import { button, el } from './dom';
-import { formatNumber } from './format';
+import { formatNumber, landValueTermKeys } from './format';
 import { dateParts } from './hud';
 import type { I18n } from './i18n';
 
@@ -155,6 +155,17 @@ export class BuildingInfo {
           }),
     ]);
 
+    // Dostupnost práce: druhý nejčastější důvod, proč se čtvrť zadrhne. Čísla
+    // ukazujeme vždycky, i když jsou to jedničky — jinak by hráč nevěděl, že
+    // tahle brzda vůbec existuje.
+    rows.push([
+      'ui.parcel.jobAccess',
+      t('ui.parcel.jobAccessFactors', {
+        cell: Math.round(parcel.jobAccessFactor * 100),
+        city: Math.round(parcel.cityJobAccessFactor * 100),
+      }),
+    ]);
+
     if (parcel.demand !== null) rows.push(['ui.hud.demand', formatNumber(parcel.demand)]);
     if (parcel.levels.nextThreshold !== null) {
       rows.push([
@@ -173,12 +184,8 @@ export class BuildingInfo {
     // Rozpis ceny půdy: z čeho se to číslo skládá.
     const breakdown = el('dl', 'sheet__list sheet__list--breakdown');
     for (const term of parcel.landValue.terms) {
-      const label =
-        term.source === 'base' || term.source === 'water'
-          ? t(`ui.parcel.term.${term.source}`)
-          : this.i18n.has(`ui.service.${term.source}`)
-            ? t(`ui.service.${term.source}`)
-            : t(`ui.overlay.${term.source}`);
+      const keys = landValueTermKeys(term.source);
+      const label = t(keys.find((key) => this.i18n.has(key)) ?? (keys.at(-1) as string));
 
       breakdown.appendChild(el('dt', undefined, label));
       const amount = Math.round(term.amount);

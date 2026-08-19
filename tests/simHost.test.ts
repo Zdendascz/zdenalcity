@@ -62,6 +62,20 @@ describe('akumulátor', () => {
     expect(host.getSnapshot().tick).toBe(MAX_TICKS_PER_FRAME + 1);
   });
 
+  it('nečíselná delta spadne hned, ne až tichým zamrznutím', () => {
+    // Bez téhle pojistky zůstane akumulátor NaN, žádné porovnání s TICK_MS už
+    // neprojde a hra se navždy zastaví, aniž by cokoli zahlásilo chybu.
+    const host = createSimHost(createWorld(1), [], NO_CONTENT);
+    host.step(1000);
+
+    expect(() => host.step(Number.NaN)).toThrow();
+    expect(() => host.step(undefined as unknown as number)).toThrow();
+
+    // A po pokusu je hra pořád živá.
+    host.step(1000);
+    expect(host.getSnapshot().tick).toBe(8);
+  });
+
   it('ignoruje nesmyslný index rychlosti', () => {
     const host = createSimHost(createWorld(1), [], NO_CONTENT);
     host.dispatch({ type: 'set_speed', speed: SPEEDS.length }); // mimo rozsah

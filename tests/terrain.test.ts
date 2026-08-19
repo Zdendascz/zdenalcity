@@ -54,7 +54,7 @@ describe('les v ceně půdy', () => {
     fillCell(world, 20, 20, TERRAIN.forest);
     const cell = coarseIndex(20, 20);
 
-    const withForest = explainLandValue(world, VANILLA_BALANCE, cell, landValueContext(world));
+    const withForest = explainLandValue(world, VANILLA_BALANCE, cell, landValueContext(world, VANILLA_BALANCE));
     const forestTerm = withForest.terms.find((term) => term.source === 'forest');
     expect(forestTerm?.amount).toBeCloseTo(VANILLA_BALANCE.landValue.weights['forest'] ?? 0);
 
@@ -63,7 +63,7 @@ describe('les v ceně půdy', () => {
       for (let dx = 0; dx < 4; dx++) bulldoze(world, 20 + dx, 20 + dy, VANILLA_BALANCE);
     }
 
-    const cleared = explainLandValue(world, VANILLA_BALANCE, cell, landValueContext(world));
+    const cleared = explainLandValue(world, VANILLA_BALANCE, cell, landValueContext(world, VANILLA_BALANCE));
     expect(cleared.terms.some((term) => term.source === 'forest')).toBe(false);
     expect(cleared.raw).toBeLessThan(withForest.raw);
   });
@@ -72,7 +72,7 @@ describe('les v ceně půdy', () => {
     const world = createWorld(1);
     fillCell(world, 20, 20, TERRAIN.sand);
 
-    const explained = explainLandValue(world, VANILLA_BALANCE, coarseIndex(20, 20), landValueContext(world));
+    const explained = explainLandValue(world, VANILLA_BALANCE, coarseIndex(20, 20), landValueContext(world, VANILLA_BALANCE));
     const sand = explained.terms.find((term) => term.source === 'sand');
 
     expect(sand?.amount).toBeLessThan(0);

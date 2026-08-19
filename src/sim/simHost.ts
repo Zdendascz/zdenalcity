@@ -106,6 +106,13 @@ class MainThreadSimHost implements SimHost {
   }
 
   step(deltaMs: number): void {
+    // Nečíselná delta je jed: `accumulator` z ní zůstane NaN, porovnání s
+    // TICK_MS je pak navždy false a hra se tiše zastaví, aniž by cokoli
+    // spadlo. Radši spadneme hned a hlasitě u viníka.
+    if (!Number.isFinite(deltaMs)) {
+      throw new Error(`SimHost.step dostal nečíselnou deltu: ${String(deltaMs)}`);
+    }
+
     // Záporná delta by akumulátor vracela zpět; rAF ji dodat nemá, ale kdyby ano,
     // je to chyba volajícího, ne důvod rozhodit časování.
     if (deltaMs <= 0) return;

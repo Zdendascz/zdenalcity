@@ -912,8 +912,56 @@ Testy: 14 v `tests/traffic.test.ts` včetně determinismu a kurzoru vzorkování
 Že koušou, ověřeno rozbitím: bez pravidla o vracení jeden, bez posunu kurzoru
 jeden, bez nulování zátěže jeden.
 
+- [x] T26 — kolony do ceny půdy, dostupnost práce do růstu (fáze 3a)
+
+Doprava se konečně vrací do smyčky: ucpané ulice srážejí cenu půdy a špatná
+dostupnost práce brzdí růst.
+
+- **kolony**: `coarseCongestion` zprůměruje `zátěž / kapacita` přes silniční
+  dlaždice buňky, stropem 2 (víc než dvojnásobek kapacity už je prostě „stojí
+  to"). Do ceny půdy vstupuje záporně s vahou 22. Vzniká záporná zpětná vazba:
+  dražší půda → vyšší úrovně → hustší zástavba → víc dopravy → kolony →
+  levnější půda. Zahušťování se samo zastaví, dokud hráč nezlepší dopravu
+- **dostupnost práce vstupuje dvakrát, a je to úmysl:**
+  - **po čtvrtích** do skóre parcely — dobře obsloužená čtvrť se zaplní dřív
+  - **celoměstsky** do počtu pokusů o stavbu — protože rovnoměrný násobitel by
+    se ve váženém losu vykrátil a město bez spojení by rostlo stejně rychle
+    jako město s metrem. Přesně ta past, do které spadl faktor daně v T18;
+    tady ji odhalilo až mutační testování, kdy dvě rozbití kódu prošla testy
+- **`minAccessFactor` 0,15 moduluje, nevetuje** — nejnižší hodnota není nula,
+  takže se čtvrť zpomalí, ale nezasekne. K tomu pojistka z R6: dokud město nemá
+  ani jedno pracovní místo, je faktor 1 pro všechny, jinak by se hra zamkla
+  hned na začátku, kdy dosažitelnost nutně nula je
+
+**Panel parcely ukazuje obě čísla vždycky**, i když jsou to jedničky — jinak
+by hráč ani netušil, že tahle brzda existuje. Zobrazuje přesně ta čísla, se
+kterými růst opravdu počítal (`world.jobAccessCells`, `world.cityJobAccess`;
+odvozené, do savu nepatří).
+
+Při ověřování ve hře vypadly dvě věci mimo zadání, obojí opraveno:
+
+1. **Simulace se dala natrvalo zabít jedním `NaN`.** Stačilo, aby `step()`
+   dostal nečíselnou deltu, akumulátor zůstal `NaN`, žádné porovnání s `TICK_MS`
+   už neprošlo a hra se tiše zastavila — bez chyby, bez varování, jen zamrzlé
+   hodiny. Teď to spadne hned a nahlas u viníka.
+2. **V rozpisu ceny půdy svítily holé klíče.** Popisek se skládá za běhu ze
+   jména váhy, takže test na literální klíče `t('…')` ho neviděl — chyběly
+   kolony, les i písek (les od T24). Nový test projde všechny váhy z balancu
+   proti oběma jazykům, takže další přidaná veličina se neprozradí až v UI.
+
+Ověřeno v běžící hře: nacpané ulice srazily cenu půdy z 40 na −4 (člen kolon
+−44 při dvojnásobku kapacity), panel ukazuje „Kolony −8" a řádek dostupnosti
+práce. Město s nedosažitelnou prací spadlo na obě podlahy 0,15 a rostlo dál —
+zastavila ho až záporná poptávka po bydlení, tedy RCI, ne dostupnost.
+
+Testy: 7 v `tests/congestion.test.ts`, 1 v `tests/simHost.test.ts`, 1
+v `tests/i18n.test.ts`. Že koušou, ověřeno rozbitím: vynechaný člen kolon
+shodí jeden, zrušená pojistka proti uzamčení jeden, nulová podlaha jeden,
+dostupnost mimo počet pokusů dva, chybějící pojistka proti `NaN` jeden,
+smazaný překlad jeden.
+
 ## Rozpracované
-_(T25 hotové, dál T26: kolony do ceny půdy a dostupnost práce do skóre parcely)_
+_(T26 hotové, dál T27: MHD — třída služby `transit`, zastávky, depo jako prerekvizita)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

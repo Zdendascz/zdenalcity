@@ -141,6 +141,12 @@ export interface Balance {
      * za posledním prvkem parcela z losu vypadne úplně (§9).
      */
     roadFactors: number[];
+    /**
+     * Nejnižší násobitel skóre při nulové dosažitelnosti práce (R6). **Není to
+     * nula schválně**: tvrdá brána by hru zamkla, protože na začátku nejsou
+     * žádná pracovní místa, takže by nic nevyrostlo a místa by nikdy nevznikla.
+     */
+    minAccessFactor: number;
   };
 }
 
@@ -377,6 +383,7 @@ export function validateBalance(raw: unknown): {
       neutralTaxRate: num(issues, growth, 'neutralTaxRate', 'growth.neutralTaxRate', 0, 100),
       taxRange: num(issues, growth, 'taxRange', 'growth.taxRange', 1, 100),
       roadFactors,
+      minAccessFactor: num(issues, growth, 'minAccessFactor', 'growth.minAccessFactor', 0, 1),
     },
   };
 

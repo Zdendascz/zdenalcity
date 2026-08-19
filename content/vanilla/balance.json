@@ -46,6 +46,7 @@
     "weights": {
       "pollution": 0.8,
       "crime": 0.7,
+      "congestion": 22,
       "forest": 18,
       "sand": -8,
       "police": 0.2,
@@ -90,6 +91,7 @@
     "maxAttempts": 12,
     "neutralTaxRate": 7,
     "taxRange": 20,
-    "roadFactors": [1, 1, 0.6, 0.3]
+    "roadFactors": [1, 1, 0.6, 0.3],
+    "minAccessFactor": 0.15
   }
 }

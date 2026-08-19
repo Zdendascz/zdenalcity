@@ -33,7 +33,7 @@ export function createLandValueSystem(balance: Balance): System {
     offset: 5,
     run(world: WorldState) {
       // Vodu i podíly terénu spočítáme jednou za běh, ne pro každou buňku.
-      const context = landValueContext(world);
+      const context = landValueContext(world, balance);
       const { landValue } = world.coarse;
       const { smoothing } = balance.landValue;
 

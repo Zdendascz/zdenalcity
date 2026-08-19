@@ -1,7 +1,7 @@
 import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from '../buildings';
 import type { BuildingCatalogue } from '../catalogue';
-import { coarseIndex } from '../coarse';
+import { COARSE_CELLS, coarseIndex } from '../coarse';
 import { index, MAP_SIZE, ROAD, ZONE } from '../layers';
 import { seedDefinitions } from '../levels';
 import { categoryForZone, RCI_CATEGORIES } from '../rci';
@@ -14,7 +14,7 @@ import type { System } from './index';
  * Růst zástavby (§9 zadání fáze 2).
  *
  * ```
- * skóre  = (cenaPůdy + 1) ^ EXPONENT × faktorSilnice
+ * skóre  = (cenaPůdy + 1) ^ EXPONENT × faktorSilnice × faktorDostupnostiPráce
  * pokusů = clamp(round(poptávka / POPTÁVKA_NA_POKUS × faktorDaně), 0, MAX_POKUSŮ)
  * ```
  *
@@ -52,6 +52,17 @@ function grow(world: WorldState, catalogue: BuildingCatalogue, balance: Balance)
 
   // Kam až od silnice se staví, říká balanc — délka tabulky je dosah.
   const reach = roadReach(world, balance.growth.roadFactors.length - 1);
+  // Dostupnost práce vstupuje dvakrát a záměrně:
+  // - **po čtvrtích** do skóre parcely, takže dobře obsloužená čtvrť se
+  //   zastaví dřív než ta na konci světa (§5),
+  // - **celoměstsky** do počtu pokusů, protože rovnoměrný násobitel by se ve
+  //   váženém losu vykrátil a město bez spojení by rostlo stejně rychle jako
+  //   město s metrem. Stejný důvod jako u faktoru daně v T18.
+  const access = jobAccessByCell(world, catalogue, balance.growth.minAccessFactor);
+  const cityAccess = cityAccessFactor(world, catalogue, balance.growth.minAccessFactor);
+  // Ať panel parcely ukazuje čísla, se kterými růst opravdu počítal.
+  world.jobAccessCells = access;
+  world.cityJobAccess = cityAccess;
   // Jednou za běh, ne u každého pokusu — seznam se během něj nemění tak, aby
   // to hráč poznal, a procházet všechny budovy dvanáctkrát je zbytečné.
   const present = presentDefinitions(world);
@@ -59,10 +70,10 @@ function grow(world: WorldState, catalogue: BuildingCatalogue, balance: Balance)
   // Pevné pořadí kategorií, ne pořadí nějaké mapy — jinak by determinismus
   // závisel na historii vkládání (P2).
   for (const category of RCI_CATEGORIES) {
-    const attempts = attemptsFor(world, balance, category);
+    const attempts = attemptsFor(world, balance, category, cityAccess);
     if (attempts === 0) continue;
 
-    const candidates = collectCandidates(world, balance, category, reach);
+    const candidates = collectCandidates(world, balance, category, reach, access);
     let total = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
 
     for (let attempt = 0; attempt < attempts && total > 0; attempt++) {
@@ -87,7 +98,12 @@ function grow(world: WorldState, catalogue: BuildingCatalogue, balance: Balance)
  * vliv. Zadání §9 přitom chce pravý opak — je to první skutečná vazba daní na
  * růst. **Doplněk zadání**, které vzorec dělí mezi skóre a počet pokusů.
  */
-function attemptsFor(world: WorldState, balance: Balance, category: RciCategory): number {
+function attemptsFor(
+  world: WorldState,
+  balance: Balance,
+  category: RciCategory,
+  cityAccess: number,
+): number {
   const demand = world.demand[category];
   if (demand <= 0) return 0;
 
@@ -95,7 +111,7 @@ function attemptsFor(world: WorldState, balance: Balance, category: RciCategory)
   const rate = world.economy.taxRates[category];
   const taxFactor = Math.max(0.2, Math.min(1.5, 1 - (rate - neutralTaxRate) / taxRange));
 
-  const attempts = Math.round((demand / demandPerAttempt) * taxFactor);
+  const attempts = Math.round((demand / demandPerAttempt) * taxFactor * cityAccess);
   return Math.max(0, Math.min(maxAttempts, attempts));
 }
 
@@ -111,6 +127,7 @@ function collectCandidates(
   balance: Balance,
   category: RciCategory,
   reach: Uint8Array,
+  access: Float32Array,
 ): Candidate[] {
   const { zone, buildingId, road } = world.layers;
   const candidates: Candidate[] = [];
@@ -124,8 +141,10 @@ function collectCandidates(
     if (roadFactor === 0) continue; // mimo dosah silnice se nestaví vůbec
 
     const x = tile % MAP_SIZE;
-    const landValue = world.coarse.landValue[coarseIndex(x, (tile - x) / MAP_SIZE)] ?? 0;
-    const weight = Math.pow(landValue + 1, balance.growth.exponent) * roadFactor;
+    const cell = coarseIndex(x, (tile - x) / MAP_SIZE);
+    const landValue = world.coarse.landValue[cell] ?? 0;
+    const weight =
+      Math.pow(landValue + 1, balance.growth.exponent) * roadFactor * (access[cell] ?? 1);
     if (weight > 0) candidates.push({ tile, weight });
   }
 
@@ -225,4 +244,84 @@ function tryBuild(
   if (!checkRequirements(world, catalogue, definition, x, y, present).ok) return;
 
   placeBuilding(world, definition, x, y);
+}
+
+/**
+ * Násobitel skóre podle dosažitelnosti práce, po buňkách hrubé mřížky (R6).
+ *
+ * **Moduluje, nevetuje.** Tvrdá brána by hru zamkla: na začátku nejsou žádná
+ * pracovní místa, takže by dosažitelnost byla všude nulová, nic by nevyrostlo
+ * a místa by nikdy nevznikla. Špatně obsloužená čtvrť proto roste pomalu, ne
+ * vůbec.
+ *
+ * Prázdná čtvrť dostane jedničku — nová zástavba se netrestá za to, že v ní
+ * zatím nikdo nebydlí. A dokud ve městě není ani jedno pracovní místo, platí
+ * jednička všude; jinak by první dům neměl kam chodit a hra by se nerozjela.
+ */
+function jobAccessByCell(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  minFactor: number,
+): Float32Array {
+  const factors = new Float32Array(COARSE_CELLS).fill(1);
+
+  let totalJobs = 0;
+  for (const building of world.buildings.values()) {
+    if (!building.abandoned) totalJobs += building.jobs;
+  }
+  if (totalJobs === 0) return factors;
+
+  const sums = new Float32Array(COARSE_CELLS);
+  const counts = new Float32Array(COARSE_CELLS);
+
+  for (const building of world.buildings.values()) {
+    if (building.abandoned || building.population === 0) continue;
+    if (catalogue.get(building.definitionId)?.category !== 'residential') continue;
+
+    const cell = coarseIndex(building.x, building.y);
+    sums[cell] = (sums[cell] ?? 0) + (world.jobAccess.get(building.id) ?? 0);
+    counts[cell] = (counts[cell] ?? 0) + 1;
+  }
+
+  const min = minFactor;
+  for (let cell = 0; cell < factors.length; cell++) {
+    const count = counts[cell] ?? 0;
+    if (count === 0) continue; // prázdná čtvrť zůstává na jedničce
+    const average = (sums[cell] ?? 0) / count;
+    factors[cell] = min + (1 - min) * Math.max(0, Math.min(1, average));
+  }
+
+  return factors;
+}
+
+/**
+ * Jak dobře se ve městě jako celku dostane do práce, převedené na násobitel
+ * rychlosti růstu (R6).
+ *
+ * **Moduluje, nevetuje** — nejnižší hodnota je `minAccessFactor`, ne nula.
+ * A dokud ve městě není ani jedno pracovní místo, je to jednička: jinak by se
+ * hra zamkla hned na začátku, kdy dosažitelnost nutně nula je.
+ */
+function cityAccessFactor(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  minFactor: number,
+): number {
+  let jobs = 0;
+  let sum = 0;
+  let homes = 0;
+
+  for (const building of world.buildings.values()) {
+    if (building.abandoned) continue;
+    jobs += building.jobs;
+    if (building.population === 0) continue;
+    if (catalogue.get(building.definitionId)?.category !== 'residential') continue;
+    sum += world.jobAccess.get(building.id) ?? 0;
+    homes++;
+  }
+
+  if (jobs === 0 || homes === 0) return 1;
+
+  const average = Math.max(0, Math.min(1, sum / homes));
+  return minFactor + (1 - minFactor) * average;
 }

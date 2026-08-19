@@ -1,4 +1,4 @@
-import { createCoarseLayers } from './coarse';
+import { COARSE_CELLS, createCoarseLayers } from './coarse';
 import type { CoarseLayers } from './coarse';
 import { createLayers, inBounds, index, MAP_SIZE } from './layers';
 import type { Layers } from './layers';
@@ -130,6 +130,18 @@ export interface WorldState {
   jobAccess: Map<number, number>;
 
   /**
+   * Poslední násobitele skóre za dostupnost práce po buňkách hrubé mřížky a
+   * jeden celoměstský, kterým se škrtí rychlost růstu (R6).
+   *
+   * **Neukládá se** — je to výstup růstu, ne stav světa. Drží se tu jen proto,
+   * aby panel parcely ukazoval přesně to číslo, se kterým růst opravdu počítal,
+   * a hráč viděl, proč se čtvrť zadrhla. Než růst poprvé proběhne, jsou to
+   * jedničky, tedy „nic to nebrzdí“.
+   */
+  jobAccessCells: Float32Array;
+  cityJobAccess: number;
+
+  /**
    * Kde skončilo vzorkování dopravy minule. **Do savu patří**: bez něj by se
    * po načtení vzorkovalo od začátku a determinismus by padl (§5 fáze 3).
    */
@@ -187,6 +199,8 @@ export function createWorld(
     coverageDirty: false,
     trafficLoad: new Float32Array(MAP_SIZE * MAP_SIZE),
     jobAccess: new Map(),
+    jobAccessCells: new Float32Array(COARSE_CELLS).fill(1),
+    cityJobAccess: 1,
     trafficCursor: 0,
     downgradeStreak: new Map(),
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat

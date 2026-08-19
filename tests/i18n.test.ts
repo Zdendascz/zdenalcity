@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
+import { landValueTermKeys } from '@/ui/format';
 import { dateParts } from '@/ui/hud';
 import { FALLBACK_LANGUAGE, I18n, pickLanguage } from '@/ui/i18n';
 
@@ -183,6 +184,27 @@ describe('žádná hláška nesmí skončit jako syrový klíč', () => {
     for (const key of used) {
       expect(cs[key], `chybí česky: ${key}`).toBeDefined();
       expect(en[key], `chybí anglicky: ${key}`).toBeDefined();
+    }
+  });
+});
+
+describe('popisky v rozpisu ceny půdy', () => {
+  it('každý možný člen má popisek v obou jazycích', async () => {
+    // Zdroje členů se skládají za běhu z názvů vah, takže je test na literální
+    // klíče nevidí. Bez tohohle testu svítí v panelu holé „ui.overlay.xyz“ —
+    // což se u kolon i u lesa opravdu stalo.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    const tables = { cs: content.getLocaleTable('cs'), en: content.getLocaleTable('en') };
+
+    const sources = ['base', 'water', ...Object.keys(content.getBalance().landValue.weights)];
+    expect(sources).toContain('congestion');
+
+    for (const [language, table] of Object.entries(tables)) {
+      for (const source of sources) {
+        const found = landValueTermKeys(source).some((key) => table[key] !== undefined);
+        expect(found, `${language}: žádný popisek pro člen „${source}“`).toBe(true);
+      }
     }
   });
 });

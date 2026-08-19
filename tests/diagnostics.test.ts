@@ -46,8 +46,11 @@ describe('rozpis ceny půdy', () => {
 
     const before = new Uint8Array(world.coarse.landValue);
     const targets = new Map<number, number>();
+    // Kontext se počítá jednou za běh, ne pro každou buňku — stejně jako
+    // v systému. Uvnitř smyčky by z toho byly čtyři průchody mapou krát 1024.
+    const context = landValueContext(world, balance);
     for (let cell = 0; cell < COARSE_CELLS; cell++) {
-      const explained = explainLandValue(world, balance, cell, landValueContext(world));
+      const explained = explainLandValue(world, balance, cell, context);
       expect(explained.terms.reduce((sum, term) => sum + term.amount, 0)).toBeCloseTo(explained.raw);
       expect(explained.current).toBe(before[cell]);
       targets.set(cell, explained.raw);
@@ -76,7 +79,8 @@ describe('rozpis ceny půdy', () => {
   it('pojmenuje, co cenu půdy sráží a co ji zvedá', async () => {
     const { world, content } = await city();
     const cell = coarseIndex(22, 31); // u parku
-    const explained = explainLandValue(world, content.getBalance(), cell, landValueContext(world));
+    const balance = content.getBalance();
+    const explained = explainLandValue(world, balance, cell, landValueContext(world, balance));
     const by = new Map(explained.terms.map((term) => [term.source, term]));
 
     expect(by.get('base')?.amount).toBe(content.getBalance().landValue.base);

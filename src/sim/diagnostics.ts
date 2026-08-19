@@ -1,6 +1,6 @@
 import type { Balance } from '@/content/balance';
-import { coarseIndex } from './coarse';
-import { index, TERRAIN, ZONE } from './layers';
+import { COARSE_CELLS, coarseIndex } from './coarse';
+import { index, MAP_SIZE, ROAD, TERRAIN, ZONE } from './layers';
 import { coarseTerrainShare } from './terrain';
 import { categoryForZone } from './rci';
 import type { RciCategory } from './rci';
@@ -30,14 +30,51 @@ export interface LandValueContext {
   /** Podíl buňky pokrytý lesem, 0–1. */
   forest: Float32Array;
   sand: Float32Array;
+  /** Průměrné vytížení silnic v buňce, 0 = volno, 1 = na kapacitě (§5 fáze 3). */
+  congestion: Float32Array;
 }
 
-export function landValueContext(world: WorldState): LandValueContext {
+export function landValueContext(world: WorldState, balance: Balance): LandValueContext {
   return {
     water: waterProximity(world),
     forest: coarseTerrainShare(world, TERRAIN.forest),
     sand: coarseTerrainShare(world, TERRAIN.sand),
+    congestion: coarseCongestion(world, balance),
   };
+}
+
+/**
+ * Vytížení silnic přenesené na hrubou mřížku.
+ *
+ * Průměruje se **přes silniční dlaždice v buňce**, ne přes všech šestnáct:
+ * jedna ucpaná ulice uprostřed pole není „šestnáctina problému", ale problém.
+ * Buňka bez silnice má nulu.
+ */
+export function coarseCongestion(world: WorldState, balance: Balance): Float32Array {
+  const total = new Float32Array(COARSE_CELLS);
+  const counts = new Float32Array(COARSE_CELLS);
+
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      const tile = index(x, y);
+      const roadType = world.layers.road[tile] ?? ROAD.none;
+      if (roadType === ROAD.none) continue;
+
+      const capacity = balance.traffic.roadTypes[roadType - 1]?.capacity ?? 0;
+      if (capacity <= 0) continue;
+
+      const cell = coarseIndex(x, y);
+      total[cell] = (total[cell] ?? 0) + Math.min(2, (world.trafficLoad[tile] ?? 0) / capacity);
+      counts[cell] = (counts[cell] ?? 0) + 1;
+    }
+  }
+
+  for (let cell = 0; cell < total.length; cell++) {
+    const count = counts[cell] ?? 0;
+    total[cell] = count === 0 ? 0 : (total[cell] ?? 0) / count;
+  }
+
+  return total;
 }
 
 /** Jeden sčítanec ceny půdy. `amount` už je se znaménkem. */
@@ -76,6 +113,22 @@ export function explainLandValue(
 
   if (context.water[cell] === 1) {
     terms.push({ source: 'water', input: 1, weight: waterBonus, amount: waterBonus });
+  }
+
+  // Kolony cenu půdy srážejí (§5 fáze 3). Vzniká tím záporná zpětná vazba:
+  // dražší půda → vyšší úrovně → hustší zástavba → víc dopravy → kolony →
+  // levnější půda. Město se přestane zahušťovat, dokud hráč nezlepší dopravu.
+  const congestion = context.congestion[cell] ?? 0;
+  if (congestion > 0) {
+    const weight = weights['congestion'] ?? 0;
+    if (weight !== 0) {
+      terms.push({
+        source: 'congestion',
+        input: congestion,
+        weight,
+        amount: -congestion * weight,
+      });
+    }
   }
 
   // Terén se do ceny půdy počítá podílem buňky, kterou zabírá. Les ji zvedá,
@@ -127,6 +180,12 @@ export interface ParcelExplanation {
   roadDistance: number | null;
   /** Násobitel skóre podle té vzdálenosti. Nula = parcela z losu vypadne. */
   roadFactor: number;
+  /**
+   * Násobitel skóre za dostupnost práce v této čtvrti a celoměstský násobitel
+   * rychlosti růstu (R6). Jedničky znamenají „nebrzdí to“.
+   */
+  jobAccessFactor: number;
+  cityJobAccessFactor: number;
   pollution: number;
   crime: number;
   landValue: LandValueExplanation;
@@ -172,9 +231,11 @@ export function explainParcel(
     category,
     roadDistance: roadFactor > 0 ? distance : null,
     roadFactor,
+    jobAccessFactor: world.jobAccessCells[cell] ?? 1,
+    cityJobAccessFactor: world.cityJobAccess,
     pollution: world.coarse.pollution[cell] ?? 0,
     crime: world.coarse.crime[cell] ?? 0,
-    landValue: explainLandValue(world, balance, cell, landValueContext(world)),
+    landValue: explainLandValue(world, balance, cell, landValueContext(world, balance)),
     coverage: [...world.coverage.keys()]
       .sort()
       .map((serviceClass) => ({
