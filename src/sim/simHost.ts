@@ -39,6 +39,8 @@ export interface ReadonlyWorldView {
   readonly buildings: ReadonlyMap<number, Readonly<Building>>;
   readonly economy: Readonly<EconomyState>;
   readonly demand: Readonly<DemandState>;
+  /** Zátěž silnic pro overlay dopravy. Odvozená, do savu nepatří (R10). */
+  readonly trafficLoad: Readonly<Float32Array>;
 }
 
 /**

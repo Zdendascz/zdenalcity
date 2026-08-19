@@ -33,6 +33,7 @@ import { createCamera, pan, zoomAt } from './camera';
 import { ChunkRenderer } from './chunkRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
+import { TrafficOverlay } from './trafficOverlay';
 import { DebugOverlay } from './debugOverlay';
 import {
   BACKGROUND_COLOR,
@@ -220,6 +221,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     })),
   ]);
 
+  // Doprava má vlastní overlay: plné rozlišení, jen silnice.
+  const trafficOverlay = new TrafficOverlay(
+    worldContainer,
+    world,
+    (roadType) => content.getBalance().traffic.roadTypes[roadType - 1]?.capacity ?? 0,
+  );
+
   const hover = new Graphics();
   worldContainer.addChild(hover);
 
@@ -373,6 +381,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     { id: 'pollution', labelKey: 'ui.overlay.pollution' },
     { id: 'landValue', labelKey: 'ui.overlay.landValue' },
     { id: 'crime', labelKey: 'ui.overlay.crime' },
+    { id: 'traffic', labelKey: 'ui.overlay.traffic' },
     ...serviceClasses.map((serviceClass) => ({
       id: `coverage:${serviceClass}`,
       labelKey: `ui.overlay.coverage.${serviceClass}`,
@@ -383,9 +392,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   function toggleOverlay(id: string): void {
     overlayMode = overlayMode === id ? 'none' : id;
-    // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu.
+    // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu
+    // a doprava svou vlastní v plném rozlišení.
     chunkRenderer.setOverlay(overlayMode === 'power' ? 'power' : ('none' as OverlayMode));
-    coarseOverlay.setActive(overlayMode === 'power' ? 'none' : overlayMode);
+    const coarseId = overlayMode === 'power' || overlayMode === 'traffic' ? 'none' : overlayMode;
+    coarseOverlay.setActive(coarseId);
+    trafficOverlay.setVisible(overlayMode === 'traffic');
   }
 
   const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, serviceClasses, {
@@ -627,6 +639,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     chunkRenderer.update(dirty);
     buildingRenderer.update(dirty);
     coarseOverlay.update(dirty.coarseChanged);
+    trafficOverlay.update();
 
     worldContainer.scale.set(camera.zoom);
     worldContainer.position.set(

@@ -98,6 +98,7 @@ describe('fázování systémů', () => {
       ['growth', 12, 2],
       ['levels', 20, 9],
       ['economy', 30, 0],
+      ['traffic', 8, 4],
       ['pollution', 8, 3],
       ['crime', 16, 11],
       ['health', 16, 13],

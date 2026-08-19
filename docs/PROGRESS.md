@@ -882,8 +882,38 @@ tlačítka z balancu a renderer kreslí všechny tři barvy vozovek.
 Testy: 13 v `tests/roadTypes.test.ts`. Že koušou, ověřeno rozbitím: povolené
 snížení shodí jeden test, silnice zdarma tři, nezapočtená údržba jeden.
 
+- [x] T25 — dopravní model (fáze 3a)
+
+Vzorkování náhodných cest po vzoru Micropolisu: z domu vyrazí pár chodců, ti se
+toulají po silnicích a počítá se, kolik jich narazí na práci. Vzniká z toho
+`trafficLoad` (kudy se chodilo) a `jobAccess` (podíl úspěšných cest, vyhlazený).
+
+- systém 8/4, vzorkuje `maxBuildingsPerRun` budov za běh a kruh drží
+  `world.trafficCursor` — **ten jediný z dopravy patří do savu** (R10), jinak
+  by se po načtení začalo od začátku a determinismus by padl
+- chodec se **nevrací, odkud přišel**; bez toho se procházka zacyklí na místě
+- overlay dopravy je v plném rozlišení, ne na hrubé mřížce: smysl je ukázat
+  konkrétní ucpaný úsek. Barva jde po stupních od zelené po červenou
+
+**Dvě věci vyplavaly až při zkoušce ve hře**, ne z testů:
+
+1. **Polovina domů měla dosažitelnost práce nula napořád** (17 z 32). Doprava
+   chtěla silnici hned vedle domu, ale růst je staví až tři dlaždice od vozovky
+   (§9 fáze 2). Chodec teď vyráží z nejbližší silnice **v dosahu růstu**, takže
+   si obě pravidla neodporují. Po opravě 32 z 32.
+2. **Overlay svítil celý červeně.** Zátěž nesla jednotku „populace × počet
+   vzorkovacích cest", takže neodpovídala kapacitám. Váha se teď dělí počtem
+   pokusů a kapacita silnice znamená „kolika obyvatelům odsud stačí".
+
+Ověřeno ve hře i akceptační kritérium 3a č. 5, které patří až k T26: povýšení
+páteřní ulice na třídu srazilo vytížení z **1,18 na 0,36** a overlay zezelenal.
+
+Testy: 14 v `tests/traffic.test.ts` včetně determinismu a kurzoru vzorkování.
+Že koušou, ověřeno rozbitím: bez pravidla o vracení jeden, bez posunu kurzoru
+jeden, bez nulování zátěže jeden.
+
 ## Rozpracované
-_(T24 hotové, dál T25: dopravní model — trafficLoad, jobAccess, overlay)_
+_(T25 hotové, dál T26: kolony do ceny půdy a dostupnost práce do skóre parcely)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

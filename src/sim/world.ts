@@ -121,6 +121,21 @@ export interface WorldState {
   coverageDirty: boolean;
 
   /**
+   * Zátěž na silnicích, plné rozlišení. **Neukládá se** (R10) — je odvozená
+   * a po načtení savu se do pár tiků spočítá znovu.
+   */
+  trafficLoad: Float32Array;
+
+  /** Jak dobře se z budovy dostane do práce, 0–1. Klíč je id budovy. */
+  jobAccess: Map<number, number>;
+
+  /**
+   * Kde skončilo vzorkování dopravy minule. **Do savu patří**: bez něj by se
+   * po načtení vzorkovalo od začátku a determinismus by padl (§5 fáze 3).
+   */
+  trafficCursor: number;
+
+  /**
    * Kolikrát po sobě vyšla budově cena půdy pod prahem její úrovně.
    *
    * **Neukládá se.** Je to jen hystereze proti kmitání na hranici prahu; po
@@ -170,6 +185,9 @@ export function createWorld(
     coverage: new Map(),
     serviceFunding: new Map(),
     coverageDirty: false,
+    trafficLoad: new Float32Array(MAP_SIZE * MAP_SIZE),
+    jobAccess: new Map(),
+    trafficCursor: 0,
     downgradeStreak: new Map(),
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
   };
@@ -214,6 +232,7 @@ export function markBuildingDirty(world: WorldState, buildingId: number): void {
 export function removeBuilding(world: WorldState, buildingId: number): boolean {
   if (!world.buildings.delete(buildingId)) return false;
   world.downgradeStreak.delete(buildingId);
+  world.jobAccess.delete(buildingId);
 
   const layer = world.layers.buildingId;
   for (let tile = 0; tile < layer.length; tile++) {

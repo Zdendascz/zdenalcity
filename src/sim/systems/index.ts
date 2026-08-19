@@ -10,6 +10,7 @@ import { createLandValueSystem } from './landValue';
 import { createServiceSystem } from './services';
 import { createCrimeSystem } from './crime';
 import { createHealthSystem } from './health';
+import { createTrafficSystem } from './traffic';
 import { createLevelSystem } from './levels';
 
 export interface System {
@@ -46,6 +47,8 @@ export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Bala
     // cooldown, ne ho dostat ve stejném tiku.
     createLevelSystem(catalogue, balance),
     createEconomySystem(catalogue, balance),
+    // Doprava před cenou půdy: kolony do ní vstupují od T26.
+    createTrafficSystem(catalogue, balance),
     createPollutionSystem(catalogue, balance),
     createCrimeSystem(balance),
     createHealthSystem(catalogue, balance),
@@ -64,5 +67,6 @@ export {
   createCrimeSystem,
   createHealthSystem,
   createLevelSystem,
+  createTrafficSystem,
 };
 export type { BuildingCatalogue };

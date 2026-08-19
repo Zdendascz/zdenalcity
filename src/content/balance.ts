@@ -63,6 +63,14 @@ export interface Balance {
    */
   traffic: {
     roadTypes: RoadTypeBalance[];
+    /** Kolik náhodných cest se z budovy zkusí za jeden běh. */
+    attempts: number;
+    /** Nejvíc kroků jedné cesty, než to chodec vzdá. */
+    maxSteps: number;
+    /** Kolik budov se za běh zpracuje; zbytek přijde na řadu příště. */
+    maxBuildingsPerRun: number;
+    /** Vyhlazení dosažitelnosti práce, 0–1. */
+    smoothing: number;
   };
 
   diffusion: { spread: number; decay: number; passes: number };
@@ -303,7 +311,20 @@ export function validateBalance(raw: unknown): {
       clearForestCost: num(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
       minLandShare: num(issues, map, 'minLandShare', 'map.minLandShare', 0, 1),
     },
-    traffic: { roadTypes },
+    traffic: {
+      roadTypes,
+      attempts: num(issues, traffic, 'attempts', 'traffic.attempts', 1, 100),
+      maxSteps: num(issues, traffic, 'maxSteps', 'traffic.maxSteps', 1, 1000),
+      maxBuildingsPerRun: num(
+        issues,
+        traffic,
+        'maxBuildingsPerRun',
+        'traffic.maxBuildingsPerRun',
+        1,
+        100000,
+      ),
+      smoothing: num(issues, traffic, 'smoothing', 'traffic.smoothing', 0, 1),
+    },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),
       decay: num(issues, diffusion, 'decay', 'diffusion.decay', 0, 1),

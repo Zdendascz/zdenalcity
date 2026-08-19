@@ -195,6 +195,7 @@
   "ui.overlay.power": "Power",
   "ui.overlay.pollution": "Pollution",
   "ui.overlay.landValue": "Land value",
+  "ui.overlay.traffic": "Traffic",
   "ui.overlay.crime": "Crime",
   "ui.overlay.coverage.police": "Police reach",
   "ui.language.label": "Language"

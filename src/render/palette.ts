@@ -43,6 +43,13 @@ export const LAND_VALUE_MAX_ALPHA = 0.75;
 export const CRIME_COLOR = 0xd94f4f;
 export const CRIME_MAX_ALPHA = 0.8;
 
+/**
+ * Overlay dopravy: od volné zelené po ucpanou červenou. Škála má stupně, ne
+ * plynulý přechod — hráč potřebuje poznat „tady už je zle", ne odhadovat odstín.
+ */
+export const TRAFFIC_COLORS = [0x4caf50, 0xa8c93a, 0xe0c33a, 0xe08b3a, 0xd9483a] as const;
+export const TRAFFIC_MAX_ALPHA = 0.85;
+
 /** Overlay pokrytí službami. */
 export const COVERAGE_COLOR = 0x5fb6d9;
 export const COVERAGE_MAX_ALPHA = 0.7;

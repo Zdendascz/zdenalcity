@@ -195,6 +195,7 @@
   "ui.overlay.power": "Elektřina",
   "ui.overlay.pollution": "Znečištění",
   "ui.overlay.landValue": "Cena půdy",
+  "ui.overlay.traffic": "Doprava",
   "ui.overlay.crime": "Kriminalita",
   "ui.overlay.coverage.police": "Dosah policie",
   "ui.language.label": "Jazyk"
