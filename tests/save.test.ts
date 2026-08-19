@@ -22,6 +22,7 @@ import { migrate } from '@/save/migrations';
 import type { Migration } from '@/save/migrations';
 import { packLayers, serializeSave, toSaveData } from '@/save/serialize';
 import type { SaveOptions } from '@/save/serialize';
+import { COARSE_CELLS } from '@/sim/coarse';
 import { buildRoad, placeDefinition, setTaxRate, zoneArea } from '@/sim/commands';
 import { hashLayers, index, LAYER_ORDER, MAP_SIZE, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
@@ -161,6 +162,59 @@ describe('round-trip', () => {
     }
     expect(hashLayers(restored.layers)).toBe(hashLayers(world.layers));
     expect(restored.rng.getState()).toBe(world.rng.getState());
+  });
+
+  it('po loadu znovu spočítá pokrytí službami', async () => {
+    // Regrese: load nastavoval jen `powerNetworkDirty`, ne `coverageDirty`.
+    // Načtené město tím přišlo o všechny služby — žádný bonus k ceně půdy,
+    // žádné srážení kriminality, žádné zdravotnictví — a nikdo si toho nevšiml,
+    // dokud hráč nepostavil další stanici. V uloženém městě to dělalo rozdíl
+    // mezi cenou půdy 0 a 27.
+    const content = await loadedContent();
+    const world = createWorld(1);
+    for (let x = 20; x <= 30; x++) buildRoad(world, x, 40);
+    placeDefinition(world, content, 'vanilla:police_small', 22, 41);
+
+    const systems = createDefaultSystems(content, content.getBalance());
+    for (let tick = 0; tick < 40; tick++) tickWorld(world, systems);
+    const expected = world.coverage.get('police');
+    expect(expected?.some((value) => value > 0)).toBe(true);
+
+    const bytes = serializeSave(world, OPTIONS);
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(unpackSave(bytes)));
+
+    // Hned po loadu ještě pokrytí není, ale svět ví, že ho má spočítat.
+    expect(restored.coverageDirty).toBe(true);
+    for (let tick = 0; tick < 40; tick++) tickWorld(restored, systems);
+    expect([...(restored.coverage.get('police') ?? [])]).toEqual([...(expected ?? [])]);
+  });
+
+  it('nenechá do načteného města protéct stav toho předchozího', async () => {
+    const content = await loadedContent();
+    const { world } = await builtCity();
+    const bytes = serializeSave(world, OPTIONS);
+
+    // Svět, ve kterém se už hrálo něco jiného.
+    const restored = createWorld(1);
+    restored.coverage.set('police', new Uint8Array(COARSE_CELLS).fill(200));
+    restored.serviceFunding.set('police', 0.3);
+    restored.coarse.landValue.fill(200);
+    restored.coarse.crime.fill(200);
+    restored.downgradeStreak.set(1, 2);
+
+    applySaveToWorld(restored, migrate(unpackSave(bytes)));
+
+    expect(restored.coverage.size).toBe(0);
+    expect(restored.serviceFunding.size).toBe(0);
+    expect(restored.downgradeStreak.size).toBe(0);
+    expect([...restored.coarse.landValue].every((value) => value === 0)).toBe(true);
+    expect([...restored.coarse.crime].every((value) => value === 0)).toBe(true);
+
+    // A po pár ticích si to město spočítá po svém.
+    const systems = createDefaultSystems(content, content.getBalance());
+    for (let tick = 0; tick < 40; tick++) tickWorld(restored, systems);
+    expect([...restored.coarse.landValue].some((value) => value > 0)).toBe(true);
   });
 
   it('přežije hodnotu buildingId nad 255 (endianita)', () => {

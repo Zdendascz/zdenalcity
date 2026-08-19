@@ -566,6 +566,24 @@ Testy: 25 v `tests/growth.test.ts`, včetně §13 kroku 9 (18 % daň měřiteln�
 zpomalí růst). Že koušou, ověřeno rozbitím: bez faktoru daně padnou dva testy,
 bez omezení dosahu dva, bez vah v losu jeden.
 
+- [x] Oprava: load savu zabíjel všechny služby (nahlásil autor)
+
+Autor hlásil, že mu při plné poptávce nerostou domy, a poslal uložené město.
+Diagnostika nad jeho savem odhalila chybu v `applySaveToWorld`: nastavovala
+`powerNetworkDirty`, ale **ne `coverageDirty`**. `serviceSystem` počítá jen při
+tom příznaku, takže načtené město zůstalo bez pokrytí — dokud hráč nepostavil
+další stanici, neplatil žádný bonus k ceně půdy, nesrážela se kriminalita a
+nefungovalo zdravotnictví.
+
+Ve městě autora to dělalo rozdíl mezi cenou půdy 0 a mediánem 27, kriminalitou
+106 a 0, příjmem 2017 a 3486 za měsíc.
+
+Do načteného světa navíc přetékal stav toho předchozího: pokrytí, financování
+tříd, hrubé vrstvy ceny půdy a kriminality (nulovalo se jen znečištění) a
+počítadlo snížení úrovně. Load je teď čistí všechny.
+
+Kryjí to dva testy v `tests/save.test.ts`; ověřeno rozbitím, že koušou.
+
 ## Rozpracované
 _(nic — T18 uzavřeno, dál T19: prerekvizity v růstu i ruční stavbě)_
 

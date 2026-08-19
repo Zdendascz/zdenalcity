@@ -271,6 +271,19 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   // Difuzní vrstvy save verze 1 nenese. Vynulují se a systémy si je dopočítají —
   // ukládat je začne až formát verze 2 (T20).
   world.coarse.pollution.fill(0);
+  world.coarse.landValue.fill(0);
+  world.coarse.crime.fill(0);
+
+  // Odvozený a runtime stav předchozího města nesmí přetéct do načteného.
+  // Pokrytí se **musí** označit za špinavé: bez toho by ho `serviceSystem`
+  // nikdy nepřepočítal a všechny služby by po loadu přestaly fungovat —
+  // žádný bonus k ceně půdy, žádné srážení kriminality, žádné zdravotnictví.
+  world.coverage.clear();
+  world.coverageDirty = true;
+  // Financování tříd save verze 1 nenese; podle §11 zadání fáze 2 se všem
+  // třídám nastavuje 100 %, což je prázdná mapa.
+  world.serviceFunding.clear();
+  world.downgradeStreak.clear();
 
   // Po loadu se kreslí všechno a síť se přepočítá znovu.
   world.dirty = { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true };
