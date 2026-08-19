@@ -1,0 +1,25 @@
+{
+  "id": "vanilla:transit_depot",
+  "type": "building",
+  "category": "service",
+  "name": "building.transit_depot.name",
+  "description": "building.transit_depot.desc",
+  "footprint": [3, 3],
+  "construction": {
+    "cost": 900,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 150
+  },
+  "jobs": {
+    "capacity": 20
+  },
+  "graphics": {
+    "color": "#c7a45a",
+    "heightLevels": 2,
+    "icon": "bus"
+  }
+}

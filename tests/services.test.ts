@@ -250,7 +250,7 @@ describe('vanilla policejní stanice', () => {
     expect(content.byCategory('service').map((d) => d.id)).toContain('vanilla:police_small');
   });
 
-  it('vanilla nabízí všech pět tříd služeb plus odpady', async () => {
+  it('vanilla nabízí šest tříd služeb plus odpady', async () => {
     const content = new ContentRegistry();
     await content.load(createVanillaSource());
 
@@ -263,7 +263,7 @@ describe('vanilla policejní stanice', () => {
       ),
     ].sort();
 
-    expect(classes).toEqual(['education', 'fire', 'health', 'parks', 'police']);
+    expect(classes).toEqual(['education', 'fire', 'health', 'parks', 'police', 'transit']);
 
     const waste = content.getAll('building').filter((d) => d.waste !== undefined);
     expect(waste.map((d) => d.id).sort()).toEqual(['vanilla:incinerator', 'vanilla:landfill']);

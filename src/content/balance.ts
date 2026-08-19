@@ -71,6 +71,12 @@ export interface Balance {
     maxBuildingsPerRun: number;
     /** Vyhlazení dosažitelnosti práce, 0–1. */
     smoothing: number;
+    /**
+     * Jakou část dopravy sebere plné pokrytí MHD (§6 fáze 3). Jednička by
+     * znamenala „obsloužená čtvrť po silnicích nejezdí vůbec", což nechceme —
+     * MHD zátěž snižuje, neruší.
+     */
+    transitReduction: number;
   };
 
   diffusion: { spread: number; decay: number; passes: number };
@@ -330,6 +336,7 @@ export function validateBalance(raw: unknown): {
         100000,
       ),
       smoothing: num(issues, traffic, 'smoothing', 'traffic.smoothing', 0, 1),
+      transitReduction: num(issues, traffic, 'transitReduction', 'traffic.transitReduction', 0, 1),
     },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),

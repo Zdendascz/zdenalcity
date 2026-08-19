@@ -960,8 +960,44 @@ shodí jeden, zrušená pojistka proti uzamčení jeden, nulová podlaha jeden,
 dostupnost mimo počet pokusů dva, chybějící pojistka proti `NaN` jeden,
 smazaný překlad jeden.
 
+- [x] T27 — MHD: třída `transit`, zastávky, vozovna jako prerekvizita (fáze 3a)
+
+MHD je ve 3a **obyčejná třída služby** nad mechanismem z T13 (rozhodnutí autora
+— linky s vozidly jsou pozdější fáze). Nový kód je jedna funkce v dopravním
+modelu, zbytek je obsah.
+
+- **zastávka** (`vanilla:transit_stop`, 150 / 30 za měsíc) — třída `transit`,
+  poloměr 3 buňky, síla 110. Váha budovy v dopravním modelu se násobí
+  `1 − pokrytí × transitReduction`, kde `transitReduction` je 0,6
+- **vozovna** (`vanilla:transit_depot`, 3×3, 900 / 150) — **nepokrývá nic**,
+  je to čistá prerekvizita zastávky. První ostré použití mechanismu z T19,
+  který byl doteď implementovaný, ale nevyužitý
+- **ubírá se zátěž, ne dosažitelnost práce.** Kdyby zastávka zvedala i
+  `jobAccess`, byla by to zkratka, jak rozjet růst úplně bez silnic — a takový
+  model tahle hra nemá. MHD přesouvá lidi z aut, nic nezkracuje
+- **plné pokrytí sebere 60 %, ne všechno**; i s dokonalou MHD něco po silnicích
+  jezdí dál
+
+Lišta, overlay „Dosah MHD" i posuvník financování vznikly samy z obsahu (P5) —
+kód se kvůli nové třídě služby nezměnil ani řádkem.
+
+Ověřeno v běžící hře na městě se 49 budovami: zastávka bez vozovny skončí
+hláškou „Nejdřív musí ve městě stát Vozovna MHD.", po postavení vozovny a tří
+zastávek klesla zátěž na páteřní ulici z **1994 na 1312 (0,66×)**. Tím jsou
+splněná akceptační kritéria 3a č. 8 a 9.
+
+Mimochodem se ukázalo, že **neznámý `graphics.icon` se tiše ignoroval** —
+budova prostě vyjela bez symbolu a nic nikde nezahlásilo. Přibyl tvar `bus`
+a test, který projde všechny ikony z obsahu proti sadě tvarů v rendereru.
+
+Testy: 6 v `tests/transit.test.ts`, 1 v `tests/render.test.ts`; tři starší
+testy, které vyjmenovávaly vanilla obsah, se rozšířily — mezi nimi ten, který
+tvrdil, že nic nic nepodmiňuje. Že koušou, ověřeno rozbitím: vypnutý násobitel
+shodí dva, MHD bez stropu jeden, MHD do dosažitelnosti práce jeden, zastávka
+bez prerekvizity tři, chybějící tvar autobusu jeden.
+
 ## Rozpracované
-_(T26 hotové, dál T27: MHD — třída služby `transit`, zastávky, depo jako prerekvizita)_
+_(T27 hotové, dál T28: save v3, migrace, fixtura — poslední úkol 3a)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

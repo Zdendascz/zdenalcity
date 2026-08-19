@@ -34,7 +34,8 @@
     "attempts": 4,
     "maxSteps": 24,
     "maxBuildingsPerRun": 96,
-    "smoothing": 0.3
+    "smoothing": 0.3,
+    "transitReduction": 0.6
   },
 
   "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },

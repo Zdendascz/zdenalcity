@@ -9,6 +9,9 @@ import {
   worldToViewport,
   zoomAt,
 } from '@/render/camera';
+import { createVanillaSource } from '@/content/loader';
+import { ContentRegistry } from '@/content/registry';
+import { iconShape } from '@/render/icons';
 import { pickTile } from '@/render/picking';
 import {
   cuboidFaces,
@@ -224,5 +227,24 @@ describe('picking', () => {
     const beyond = tileCenter(MAP_SIZE + 2, MAP_SIZE + 2);
     const far = createCamera(beyond.x, beyond.y, 1);
     expect(pickTile(far, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toBeNull();
+  });
+});
+
+describe('symboly na střechách', () => {
+  it('každý icon z obsahu má tvar, který renderer umí nakreslit', async () => {
+    // Neznámý název se dnes jen tiše ignoruje: budova vyjde bez symbolu a nic
+    // nikde nezahlásí. Tenhle test je jediné místo, kde se překlep pozná.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const icons = content
+      .getAll('building')
+      .map((definition) => definition.graphics.icon)
+      .filter((icon): icon is string => icon !== undefined);
+
+    expect(icons.length).toBeGreaterThan(0);
+    for (const icon of new Set(icons)) {
+      expect(iconShape(icon), `chybí tvar pro icon: ${icon}`).toBeDefined();
+    }
   });
 });

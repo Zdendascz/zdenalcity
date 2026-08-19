@@ -206,15 +206,27 @@ describe('podmínky platí pro růst, povýšení i ruční stavbu', () => {
 });
 
 describe('vanilla obsah', () => {
-  it('žádná budova zatím nic nepodmiňuje (rozhodnutí autora, §7)', async () => {
+  it('jediná podmíněná budova je zastávka MHD, a čeká na vozovnu (§6 fáze 3)', async () => {
+    // Mechanismus vznikl v T19 a rok ležel ladem; MHD je jeho první ostré
+    // použití. Kdyby podmínku dostalo něco dalšího, ať je to vidět tady.
     const content = new ContentRegistry();
     await content.load(createVanillaSource());
 
-    for (const building of content.getAll('building')) {
-      const requirements = building.requirements;
-      const gates =
-        (requirements?.buildings.length ?? 0) + Object.keys(requirements?.services ?? {}).length;
-      expect(gates, building.id).toBe(0);
-    }
+    const gated = content
+      .getAll('building')
+      .filter((building) => {
+        const requirements = building.requirements;
+        return (
+          (requirements?.buildings.length ?? 0) +
+            Object.keys(requirements?.services ?? {}).length >
+          0
+        );
+      })
+      .map((building) => building.id);
+
+    expect(gated).toEqual(['vanilla:transit_stop']);
+    expect(content.get('vanilla:transit_stop')?.requirements?.buildings).toEqual([
+      'vanilla:transit_depot',
+    ]);
   });
 });

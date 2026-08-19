@@ -53,6 +53,10 @@
   "building.school.desc": "Zvedá cenu půdy a otevírá cestu k vyšším úrovním obchodu a průmyslu.",
   "building.park_small.name": "Park",
   "building.park_small.desc": "Levné a jediné, co dělá, je že zvedá cenu půdy v okolí.",
+  "building.transit_depot.name": "Vozovna MHD",
+  "building.transit_depot.desc": "Sama nic neobsluhuje, ale bez ní se nedá postavit zastávka.",
+  "building.transit_stop.name": "Zastávka MHD",
+  "building.transit_stop.desc": "Lidé v okolí přesednou z aut, takže na silnicích ubude dopravy.",
   "building.landfill.name": "Skládka",
   "building.landfill.desc": "Levné zpracování odpadu za cenu silného znečištění okolí.",
   "building.incinerator.name": "Spalovna",
@@ -102,6 +106,7 @@
   "ui.service.health": "Zdravotnictví",
   "ui.service.education": "Vzdělání",
   "ui.service.parks": "Parky",
+  "ui.service.transit": "MHD",
 
   "ui.tax.title": "Daňové sazby",
   "ui.tax.decrease": "Snížit sazbu",
@@ -203,5 +208,6 @@
   "ui.overlay.traffic": "Doprava",
   "ui.overlay.crime": "Kriminalita",
   "ui.overlay.coverage.police": "Dosah policie",
+  "ui.overlay.coverage.transit": "Dosah MHD",
   "ui.language.label": "Jazyk"
 }

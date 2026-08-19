@@ -53,6 +53,10 @@
   "building.school.desc": "Lifts land value and unlocks higher commercial and industrial levels.",
   "building.park_small.name": "Park",
   "building.park_small.desc": "Cheap, and all it does is lift land value nearby.",
+  "building.transit_depot.name": "Transit Depot",
+  "building.transit_depot.desc": "Serves nobody on its own, but no stop can be built without it.",
+  "building.transit_stop.name": "Transit Stop",
+  "building.transit_stop.desc": "People nearby leave the car at home, so the roads carry less traffic.",
   "building.landfill.name": "Landfill",
   "building.landfill.desc": "Cheap waste disposal at the cost of heavy local pollution.",
   "building.incinerator.name": "Incinerator",
@@ -102,6 +106,7 @@
   "ui.service.health": "Health",
   "ui.service.education": "Education",
   "ui.service.parks": "Parks",
+  "ui.service.transit": "Transit",
 
   "ui.tax.title": "Tax rates",
   "ui.tax.decrease": "Lower the tax rate",
@@ -203,5 +208,6 @@
   "ui.overlay.traffic": "Traffic",
   "ui.overlay.crime": "Crime",
   "ui.overlay.coverage.police": "Police reach",
+  "ui.overlay.coverage.transit": "Transit reach",
   "ui.language.label": "Language"
 }

@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
+import { coarseIndex } from '../coarse';
 import { index, MAP_SIZE, ROAD } from '../layers';
 import type { WorldState } from '../world';
 import type { Building } from '../world';
@@ -164,7 +165,7 @@ function walkFrom(
   // Váha se dělí počtem pokusů: budova pošle do ulic svou populaci, ne
   // populaci krát počet vzorkovacích cest. Kapacita silnice tak znamená
   // „kolika obyvatelům odsud stačí" a jde nastavit podle rozumu.
-  const weight = building.population / attempts;
+  const weight = (building.population / attempts) * transitFactor(world, balance, building);
   let hits = 0;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -189,6 +190,29 @@ function walkFrom(
 
   const measured = hits / attempts;
   return previous + (measured - previous) * smoothing;
+}
+
+/**
+ * O kolik MHD ubere téhle budově dopravy (§6 fáze 3).
+ *
+ * MHD je ve 3a **obyčejná třída služby** nad mechanismem z T13 (rozhodnutí
+ * autora — linky s vozidly jsou pozdější fáze), takže zastávka nedělá nic než
+ * pokrytí a tenhle násobitel z něj čte.
+ *
+ * Ubírá se **zátěž na silnicích, ne dosažitelnost práce**: obsloužená čtvrť
+ * jezdí míň autem, ale do práce se z ní dostane pořád stejně dobře. Kdyby
+ * zastávka zvedala i `jobAccess`, byla by to zkratka, jak růst rozjet úplně bez
+ * silnic — a to je model, který tahle hra nemá.
+ *
+ * Plné pokrytí sebere `transitReduction`, ne všechno; i s dokonalou MHD něco
+ * po silnicích jezdí dál.
+ */
+function transitFactor(world: WorldState, balance: Balance, building: Building): number {
+  const reduction = balance.traffic.transitReduction;
+  if (reduction <= 0) return 1;
+
+  const coverage = (world.coverage.get('transit')?.[coarseIndex(building.x, building.y)] ?? 0) / 255;
+  return 1 - Math.max(0, Math.min(1, coverage)) * reduction;
 }
 
 /**

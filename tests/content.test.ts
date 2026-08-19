@@ -85,6 +85,8 @@ describe('vanilla obsah', () => {
       'vanilla:residential_terrace',
       'vanilla:residential_tower',
       'vanilla:school',
+      'vanilla:transit_depot',
+      'vanilla:transit_stop',
     ]);
   });
 

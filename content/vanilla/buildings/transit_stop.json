@@ -1,0 +1,31 @@
+{
+  "id": "vanilla:transit_stop",
+  "type": "building",
+  "category": "service",
+  "name": "building.transit_stop.name",
+  "description": "building.transit_stop.desc",
+  "footprint": [1, 1],
+  "construction": {
+    "cost": 150,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 30
+  },
+  "requirements": {
+    "services": {},
+    "buildings": ["vanilla:transit_depot"]
+  },
+  "service": {
+    "class": "transit",
+    "radius": 3,
+    "strength": 110
+  },
+  "graphics": {
+    "color": "#5aa9c7",
+    "heightLevels": 1,
+    "icon": "bus"
+  }
+}

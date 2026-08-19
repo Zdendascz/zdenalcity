@@ -114,6 +114,18 @@ const BOLT: IconShape = [
   ],
 ];
 
+/** Autobus zepředu — MHD. */
+const BUS: IconShape = [
+  [
+    [0.16, 0.14],
+    [0.84, 0.14],
+    [0.84, 0.74],
+    [0.16, 0.74],
+  ],
+  circle(0.3, 0.86, 0.1),
+  circle(0.7, 0.86, 0.1),
+];
+
 export const ICON_SHAPES: Readonly<Record<string, IconShape>> = {
   cross: CROSS,
   shield: SHIELD,
@@ -122,6 +134,7 @@ export const ICON_SHAPES: Readonly<Record<string, IconShape>> = {
   tree: TREE,
   bin: BIN,
   bolt: BOLT,
+  bus: BUS,
 };
 
 export function iconShape(name: string | undefined): IconShape | undefined {
