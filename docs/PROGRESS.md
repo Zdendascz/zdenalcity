@@ -693,8 +693,40 @@ vzdělání bude bránou k vyšším úrovním obchodu a průmyslu — je to zm�
 Testy: 11 v `tests/requirements.test.ts`. Že koušou, ověřeno rozbitím: bez
 kontroly podmínek padne sedm, bez kontroly při povyšování jeden.
 
+- [x] T20 — save verze 2, migrace, fixtury (fáze 2)
+
+Formát verze 2 doplnil to, co fáze 2 přinesla a save dosud zahazoval:
+
+- **`coarse.bin`** — hrubé vrstvy (znečištění, cena půdy, kriminalita) v pořadí
+  `SAVE_COARSE_LAYER_ORDER`. Vlastní soubor, ne přílepek k `layers.bin`: jsou
+  na jiné mřížce a míchat je do jednoho bufferu by znamenalo číst bajty podle
+  toho, co je zrovna v kódu
+- **`meta.grid`** — `{ size, coarseSize }`. Do verze 1 byla velikost `layers.bin`
+  implicitní; s druhou mřížkou to přestalo platit
+- `abandoned` a `levelChangedAtTick` na entitě
+- `state.serviceFunding` — nastavení posuvníků financování
+
+**Migrace v1 → v2** podle §11: hrubé vrstvy se vynulují, `abandoned = false`,
+`levelChangedAtTick = 0`, financování všech tříd 100 % (prázdná mapa), `grid`
+se doplní podle rozměrů, se kterými verze 1 mlčky počítala. Pokrytí se po
+načtení přepočítá vždycky — je odvozené a do savu nepatří.
+
+Fixtura `v2.city.base64` vznikla vedle `v1.city.base64`. Testy nad nimi teď
+kromě načtení ověřují i to, že se ve hře dá pokračovat (populace nespadne na
+nulu a cena půdy se dopočítá), a hlídá se, že **ke každé vydané verzi formátu
+fixtura existuje** — příště na ni nepůjde zapomenout.
+
+Round-trip ověřen v běžící hře: quicksave a quickload vrátily město na tik 411
+se stejnou populací, stejným stavem RNG a hlavně se **znečištěním 24, cenou
+půdy 43 a financováním parků 0,4** — přesně ty tři věci, které verze 1
+zahazovala. Pokrytí se po loadu dopočítalo (parky 36).
+
+Že testy koušou, ověřeno rozbitím: bez ukládání hrubých vrstev padne round-trip,
+bez nulování v migraci tři testy fixtury v1, bez financování jeden.
+
 ## Rozpracované
-_(nic — T19 uzavřeno, dál T20: save v2, migrace, fixtury)_
+_(nic — T20 uzavřeno, zbývá poslední úkol fáze 2: T21 — UI, přepínač overlayů,
+panel financování, diagnostika parcely)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

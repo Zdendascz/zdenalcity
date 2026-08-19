@@ -23,11 +23,11 @@ import type { Migration } from '@/save/migrations';
 import { packLayers, serializeSave, toSaveData } from '@/save/serialize';
 import type { SaveOptions } from '@/save/serialize';
 import { COARSE_CELLS } from '@/sim/coarse';
-import { buildRoad, placeDefinition, setTaxRate, zoneArea } from '@/sim/commands';
+import { buildRoad, placeDefinition, setServiceFunding, setTaxRate, zoneArea } from '@/sim/commands';
 import { hashLayers, index, LAYER_ORDER, MAP_SIZE, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
-import type { Building, WorldState } from '@/sim/world';
+import type { WorldState } from '@/sim/world';
 
 const OPTIONS: SaveOptions = {
   cityName: 'Nový Brod',
@@ -94,7 +94,7 @@ describe('formát savu', () => {
   it('meta.json je v ZIPu nekomprimovaná, aby se dala číst samostatně', async () => {
     const { world } = await builtCity();
     const bytes = serializeSave(world, OPTIONS);
-    expect(containsBytes(bytes, '"formatVersion": 1')).toBe(true);
+    expect(containsBytes(bytes, '"formatVersion": 2')).toBe(true);
     expect(containsBytes(bytes, '"Nový Brod"')).toBe(true);
   });
 
@@ -136,19 +136,9 @@ describe('round-trip', () => {
     expect(hashLayers(restored.layers)).toBe(before.hash);
     expect(restored.rng.getState()).toBe(before.rng);
     expect(restored.tick).toBe(before.tick);
-    // `levelChangedAtTick` save verze 1 nenese — podle §11 zadání fáze 2 se při
-    // migraci nuluje a ukládat ho začne až formát v2 v T20. Jediné pole, které
-    // round-trip nepřežije; kdyby jich přibylo víc, tenhle test to řekne.
-    const withoutLevelClock = (buildings: readonly Building[]): Partial<Building>[] =>
-      buildings.map((building) => {
-        const copy: Partial<Building> = { ...building };
-        delete copy.levelChangedAtTick;
-        return copy;
-      });
-    expect(withoutLevelClock([...restored.buildings.values()])).toEqual(
-      withoutLevelClock(before.buildings),
-    );
-    expect([...restored.buildings.values()].every((b) => b.levelChangedAtTick === 0)).toBe(true);
+    // Od verze 2 přežije entita round-trip celá, včetně `levelChangedAtTick`
+    // a `abandoned`.
+    expect([...restored.buildings.values()]).toEqual(before.buildings);
     expect(restored.nextBuildingId).toBe(before.nextBuildingId);
     expect(restored.economy).toEqual(before.economy);
     expect(restored.demand).toEqual(before.demand);
@@ -197,24 +187,43 @@ describe('round-trip', () => {
 
     // Svět, ve kterém se už hrálo něco jiného.
     const restored = createWorld(1);
-    restored.coverage.set('police', new Uint8Array(COARSE_CELLS).fill(200));
-    restored.serviceFunding.set('police', 0.3);
+    restored.coverage.set('parks', new Uint8Array(COARSE_CELLS).fill(200));
+    restored.serviceFunding.set('parks', 0.3);
     restored.coarse.landValue.fill(200);
     restored.coarse.crime.fill(200);
     restored.downgradeStreak.set(1, 2);
 
     applySaveToWorld(restored, migrate(unpackSave(bytes)));
 
+    // Pokrytí je odvozené, do savu nepatří a po loadu se počítá znovu.
     expect(restored.coverage.size).toBe(0);
-    expect(restored.serviceFunding.size).toBe(0);
+    expect(restored.coverageDirty).toBe(true);
     expect(restored.downgradeStreak.size).toBe(0);
-    expect([...restored.coarse.landValue].every((value) => value === 0)).toBe(true);
-    expect([...restored.coarse.crime].every((value) => value === 0)).toBe(true);
+    // Financování i hrubé vrstvy přepsal save, ne zbytek po minulém městě.
+    expect(restored.serviceFunding.has('parks')).toBe(false);
+    expect([...restored.coarse.landValue]).toEqual([...world.coarse.landValue]);
+    expect([...restored.coarse.crime]).toEqual([...world.coarse.crime]);
+    expect([...restored.coarse.pollution]).toEqual([...world.coarse.pollution]);
 
-    // A po pár ticích si to město spočítá po svém.
+    // A pokračování hry se nesmí rozejít.
     const systems = createDefaultSystems(content, content.getBalance());
-    for (let tick = 0; tick < 40; tick++) tickWorld(restored, systems);
-    expect([...restored.coarse.landValue].some((value) => value > 0)).toBe(true);
+    for (let tick = 0; tick < 60; tick++) {
+      tickWorld(world, systems);
+      tickWorld(restored, systems);
+    }
+    expect([...restored.coarse.landValue]).toEqual([...world.coarse.landValue]);
+  });
+
+  it('financování tříd přežije round-trip', async () => {
+    const { world } = await builtCity();
+    setServiceFunding(world, 'police', 0.3);
+    setServiceFunding(world, 'parks', 1);
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(unpackSave(serializeSave(world, OPTIONS))));
+
+    expect(restored.serviceFunding.get('police')).toBe(0.3);
+    expect(restored.serviceFunding.get('parks')).toBe(1);
   });
 
   it('přežije hodnotu buildingId nad 255 (endianita)', () => {
@@ -402,11 +411,11 @@ describe('chybějící obsah při načtení', () => {
 });
 
 describe('ZIP kontejner', () => {
-  it('obsahuje právě čtyři očekávané soubory', async () => {
+  it('obsahuje právě pět očekávaných souborů', async () => {
     const { world } = await builtCity();
     const files = unzipSync(serializeSave(world, OPTIONS));
     expect(Object.keys(files).sort()).toEqual(
-      ['entities.json', 'layers.bin', 'meta.json', 'state.json'].sort(),
+      ['coarse.bin', 'entities.json', 'layers.bin', 'meta.json', 'state.json'].sort(),
     );
   });
 });

@@ -1,4 +1,6 @@
 import { strToU8, zipSync } from 'fflate';
+import { COARSE_CELLS, COARSE_SIZE } from '@/sim/coarse';
+import type { CoarseLayers } from '@/sim/coarse';
 import { MAP_SIZE } from '@/sim/layers';
 import type { Layers } from '@/sim/layers';
 import { totalPopulation } from '@/sim/world';
@@ -6,6 +8,7 @@ import type { WorldState } from '@/sim/world';
 import {
   CURRENT_FORMAT_VERSION,
   GAME_VERSION,
+  SAVE_COARSE_LAYER_ORDER,
   SAVE_FILES,
   SAVE_LAYER_ORDER,
 } from './format';
@@ -56,6 +59,20 @@ export function packLayers(layers: Layers): Uint8Array {
   return new Uint8Array(buffer);
 }
 
+/**
+ * Hrubé vrstvy do jednoho bufferu. Všechny jsou jednobajtové, takže endianita
+ * nehraje roli — kdyby některá přestala být, je to nová verze formátu.
+ */
+export function packCoarseLayers(coarse: CoarseLayers): Uint8Array {
+  const buffer = new Uint8Array(COARSE_CELLS * SAVE_COARSE_LAYER_ORDER.length);
+  let offset = 0;
+  for (const name of SAVE_COARSE_LAYER_ORDER) {
+    buffer.set(coarse[name], offset);
+    offset += COARSE_CELLS;
+  }
+  return buffer;
+}
+
 export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
   return {
     meta: {
@@ -70,6 +87,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
       content: {
         sources: options.sources.map(({ id, version }) => ({ id, version })),
       },
+      grid: { size: MAP_SIZE, coarseSize: COARSE_SIZE },
       preview: {
         population: totalPopulation(world.buildings),
         funds: world.economy.funds,
@@ -77,6 +95,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
       },
     },
     layers: packLayers(world.layers),
+    coarse: packCoarseLayers(world.coarse),
     entities: {
       nextBuildingId: world.nextBuildingId,
       // Pořadí podle id, ať je save bajtově stabilní.
@@ -89,6 +108,10 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
       rngState: world.rng.getState(),
       economy: { ...world.economy, taxRates: { ...world.economy.taxRates } },
       demand: { ...world.demand },
+      // Setříděné klíče, ať je save bajtově stabilní.
+      serviceFunding: Object.fromEntries(
+        [...world.serviceFunding.entries()].sort(([a], [b]) => a.localeCompare(b)),
+      ),
     },
   };
 }
@@ -103,6 +126,7 @@ export function packSave(save: SaveData): Uint8Array {
   return zipSync({
     [SAVE_FILES.meta]: [strToU8(JSON.stringify(save.meta, null, 2)), { level: 0 }],
     [SAVE_FILES.layers]: [save.layers, { level: 9 }],
+    [SAVE_FILES.coarse]: [save.coarse, { level: 9 }],
     [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level: 9 }],
     [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level: 9 }],
   });

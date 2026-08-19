@@ -1,11 +1,18 @@
 import { strFromU8, unzipSync } from 'fflate';
 import type { BuildingCatalogue } from '@/sim/catalogue';
+import { COARSE_CELLS } from '@/sim/coarse';
+import type { CoarseLayers } from '@/sim/coarse';
 import { MAP_SIZE } from '@/sim/layers';
 import type { Layers } from '@/sim/layers';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
 import type { Building, DemandState, EconomyState, WorldState } from '@/sim/world';
-import { SAVE_FILES, SAVE_LAYER_ORDER, SaveFormatError } from './format';
+import {
+  SAVE_COARSE_LAYER_ORDER,
+  SAVE_FILES,
+  SAVE_LAYER_ORDER,
+  SaveFormatError,
+} from './format';
 import type { SaveData, SaveEntities, SaveMeta, SaveSourceInfo, SaveState } from './format';
 
 function fail(message: string): never {
@@ -71,8 +78,19 @@ export function parseMeta(raw: Record<string, unknown>): SaveMeta {
     };
   });
 
+  // Rozměry mřížek nese až verze 2; ve verzi 1 je doplní migrace.
+  let grid: SaveMeta['grid'];
+  if (raw['grid'] !== undefined) {
+    const rawGrid = asRecord(raw['grid'], 'meta.grid');
+    grid = {
+      size: int(rawGrid, 'size', 'meta.grid'),
+      coarseSize: int(rawGrid, 'coarseSize', 'meta.grid'),
+    };
+  }
+
   return {
     formatVersion: int(raw, 'formatVersion', 'meta'),
+    ...(grid ? { grid } : {}),
     gameVersion: str(raw, 'gameVersion', 'meta'),
     city: { name: str(city, 'name', 'meta.city'), seed: int(city, 'seed', 'meta.city') },
     createdAt: str(raw, 'createdAt', 'meta'),
@@ -105,10 +123,13 @@ function parseEntities(raw: Record<string, unknown>): SaveEntities {
       jobs: int(building, 'jobs', where),
       powered: bool(building, 'powered', where),
       builtAtTick: int(building, 'builtAtTick', where),
-      // Save v1 tahle pole nenese; podle §11 zadání fáze 2 se při migraci
-      // nulují. Ukládat je začne formát verze 2 v T20.
-      levelChangedAtTick: 0,
-      abandoned: false,
+      // Verze 1 tahle pole nenese. Hodnoty pro starý save nastavuje **migrace**
+      // (§11), tady je jen zástupná výplň, aby šel formát parsovat do jednoho
+      // tvaru v paměti.
+      levelChangedAtTick: building['levelChangedAtTick'] === undefined
+        ? 0
+        : int(building, 'levelChangedAtTick', where),
+      abandoned: building['abandoned'] === undefined ? false : bool(building, 'abandoned', where),
     };
   });
 
@@ -130,7 +151,19 @@ function parseState(raw: Record<string, unknown>): SaveState {
   const rngState = int(raw, 'rngState', 'state');
   if (rngState < 0 || rngState > 0xffffffff) fail('state.rngState musí být uint32');
 
+  // Financování tříd nese až verze 2; prázdná mapa znamená všem 100 %.
+  const serviceFunding: Record<string, number> = {};
+  if (raw['serviceFunding'] !== undefined) {
+    const rawFunding = asRecord(raw['serviceFunding'], 'state.serviceFunding');
+    for (const key of Object.keys(rawFunding).sort()) {
+      const value = num(rawFunding, key, 'state.serviceFunding');
+      if (value < 0 || value > 1) fail(`state.serviceFunding.${key} musí být v rozsahu 0–1`);
+      serviceFunding[key] = value;
+    }
+  }
+
   return {
+    serviceFunding,
     tick: int(raw, 'tick', 'state'),
     rngState,
     economy: {
@@ -141,6 +174,25 @@ function parseState(raw: Record<string, unknown>): SaveState {
     },
     demand,
   };
+}
+
+/** Očekávaná délka `coarse.bin`: tři jednobajtové vrstvy na hrubé mřížce. */
+export function expectedCoarseByteLength(): number {
+  return COARSE_CELLS * SAVE_COARSE_LAYER_ORDER.length;
+}
+
+export function unpackCoarseInto(bytes: Uint8Array, coarse: CoarseLayers): void {
+  if (bytes.byteLength !== expectedCoarseByteLength()) {
+    fail(
+      `coarse.bin má ${bytes.byteLength} B, čekalo se ${expectedCoarseByteLength()} B — jiná velikost hrubé mřížky nebo jiná sada vrstev`,
+    );
+  }
+
+  let offset = 0;
+  for (const name of SAVE_COARSE_LAYER_ORDER) {
+    coarse[name].set(bytes.subarray(offset, offset + COARSE_CELLS));
+    offset += COARSE_CELLS;
+  }
 }
 
 /** Očekávaná délka `layers.bin` pro aktuální formát. */
@@ -189,9 +241,13 @@ export function unpackSave(bytes: Uint8Array): SaveData {
   const layers = files[SAVE_FILES.layers];
   if (!layers) fail(`v savu chybí ${SAVE_FILES.layers}`);
 
+  // `coarse.bin` má až verze 2. U starší je prázdný a naplní ho migrace.
+  const coarse = files[SAVE_FILES.coarse] ?? new Uint8Array(0);
+
   return {
     meta: parseMeta(parseJson(files[SAVE_FILES.meta], SAVE_FILES.meta)),
     layers,
+    coarse,
     entities: parseEntities(parseJson(files[SAVE_FILES.entities], SAVE_FILES.entities)),
     state: parseState(parseJson(files[SAVE_FILES.state], SAVE_FILES.state)),
   };
@@ -268,11 +324,9 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   }
   world.nextBuildingId = save.entities.nextBuildingId;
 
-  // Difuzní vrstvy save verze 1 nenese. Vynulují se a systémy si je dopočítají —
-  // ukládat je začne až formát verze 2 (T20).
-  world.coarse.pollution.fill(0);
-  world.coarse.landValue.fill(0);
-  world.coarse.crime.fill(0);
+  // Hrubé vrstvy nese formát verze 2. Starší save jimi projde s vynulovaným
+  // `coarse.bin`, který mu doplnila migrace.
+  unpackCoarseInto(save.coarse, world.coarse);
 
   // Odvozený a runtime stav předchozího města nesmí přetéct do načteného.
   // Pokrytí se **musí** označit za špinavé: bez toho by ho `serviceSystem`
@@ -280,9 +334,10 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   // žádný bonus k ceně půdy, žádné srážení kriminality, žádné zdravotnictví.
   world.coverage.clear();
   world.coverageDirty = true;
-  // Financování tříd save verze 1 nenese; podle §11 zadání fáze 2 se všem
-  // třídám nastavuje 100 %, což je prázdná mapa.
   world.serviceFunding.clear();
+  for (const [serviceClass, funding] of Object.entries(save.state.serviceFunding)) {
+    world.serviceFunding.set(serviceClass, funding);
+  }
   world.downgradeStreak.clear();
 
   // Po loadu se kreslí všechno a síť se přepočítá znovu.

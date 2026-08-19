@@ -1,3 +1,4 @@
+import type { CoarseLayers } from '@/sim/coarse';
 import type { Layers } from '@/sim/layers';
 import type { Building, DemandState, EconomyState } from '@/sim/world';
 
@@ -9,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 1;
+export const CURRENT_FORMAT_VERSION = 2;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -30,9 +31,22 @@ export const SAVE_LAYER_ORDER = [
   'power',
 ] as const satisfies readonly (keyof Layers)[];
 
+/**
+ * Pořadí hrubých vrstev v `coarse.bin` (verze 2). Vlastní seznam ze stejného
+ * důvodu jako `SAVE_LAYER_ORDER` — kdyby se vzalo pořadí z `sim/coarse.ts`,
+ * jeho změna by savy rozbila potichu.
+ */
+export const SAVE_COARSE_LAYER_ORDER = [
+  'pollution',
+  'landValue',
+  'crime',
+] as const satisfies readonly (keyof CoarseLayers)[];
+
 export const SAVE_FILES = {
   meta: 'meta.json',
   layers: 'layers.bin',
+  /** Hrubé vrstvy, od verze 2. */
+  coarse: 'coarse.bin',
   entities: 'entities.json',
   state: 'state.json',
 } as const;
@@ -50,6 +64,12 @@ export interface SaveMeta {
   modifiedAt: string;
   playtimeSeconds: number;
   content: { sources: SaveSourceInfo[] };
+  /**
+   * Rozměry mřížek. Do verze 1 byla velikost `layers.bin` implicitní; s hrubou
+   * mřížkou to přestalo platit, takže si save nese, na co se ty bajty čtou.
+   * Save verze 1 ji nemá — doplní ji migrace.
+   */
+  grid?: { size: number; coarseSize: number };
   /** Aby šel seznam uložených her vykreslit bez načtení zbytku savu. */
   preview: { population: number; funds: number; tick: number };
 }
@@ -65,12 +85,16 @@ export interface SaveState {
   rngState: number;
   economy: EconomyState;
   demand: DemandState;
+  /** Financování tříd služeb, 0–1. Chybějící klíč znamená plné (verze 2). */
+  serviceFunding: Readonly<Record<string, number>>;
 }
 
 export interface SaveData {
   meta: SaveMeta;
   /** Obsah `layers.bin` — konkatenace vrstev v `SAVE_LAYER_ORDER`. */
   layers: Uint8Array;
+  /** Obsah `coarse.bin` — konkatenace vrstev v `SAVE_COARSE_LAYER_ORDER`. */
+  coarse: Uint8Array;
   entities: SaveEntities;
   state: SaveState;
 }

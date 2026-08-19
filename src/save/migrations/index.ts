@@ -1,4 +1,6 @@
-import { CURRENT_FORMAT_VERSION, SaveMigrationError } from '../format';
+import { COARSE_CELLS, COARSE_SIZE } from '@/sim/coarse';
+import { MAP_SIZE } from '@/sim/layers';
+import { CURRENT_FORMAT_VERSION, SAVE_COARSE_LAYER_ORDER, SaveMigrationError } from '../format';
 import type { SaveData } from '../format';
 
 /**
@@ -11,10 +13,43 @@ import type { SaveData } from '../format';
 export type Migration = (save: SaveData) => SaveData;
 
 /**
- * Klíč = verze, ze které se migruje. Zatím prázdné: `formatVersion` je 1 a nic
- * staršího neexistuje. První skutečná migrace přijde s první změnou formátu.
+ * Verze 1 → 2 (§11 zadání fáze 2).
+ *
+ * Verze 2 přidala hrubé vrstvy, dvě pole entity a financování tříd. Starý save
+ * o nich neví, takže:
+ * - hrubé vrstvy se **vynulují** a systémy si je do pár tiků dopočítají,
+ * - `abandoned = false` a `levelChangedAtTick = 0` — ve verzi 1 žádné ruiny
+ *   nebyly a cooldown úrovní začne běžet od načtení,
+ * - financování všech tříd 100 %, což je prázdná mapa (rozhodnutí autora —
+ *   žádné ostré savy verze 1 neexistují),
+ * - `meta.grid` se doplní podle rozměrů, se kterými verze 1 mlčky počítala.
+ *
+ * Po načtení se ještě jednou vynutí přepočet pokrytí, aby město nezačínalo
+ * s nulovou cenou půdy; dělá to `applySaveToWorld` pro každý save.
  */
-export const MIGRATIONS: Readonly<Record<number, Migration>> = {};
+const migrateV1ToV2: Migration = (save) => ({
+  ...save,
+  meta: {
+    ...save.meta,
+    formatVersion: 2,
+    grid: { size: MAP_SIZE, coarseSize: COARSE_SIZE },
+  },
+  coarse: new Uint8Array(COARSE_CELLS * SAVE_COARSE_LAYER_ORDER.length),
+  entities: {
+    ...save.entities,
+    buildings: save.entities.buildings.map((building) => ({
+      ...building,
+      abandoned: false,
+      levelChangedAtTick: 0,
+    })),
+  },
+  state: { ...save.state, serviceFunding: {} },
+});
+
+/** Klíč = verze, ze které se migruje. */
+export const MIGRATIONS: Readonly<Record<number, Migration>> = {
+  1: migrateV1ToV2,
+};
 
 /**
  * Postupně přežene save na aktuální verzi.
