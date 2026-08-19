@@ -22,7 +22,7 @@
     "consumption": 520
   },
   "environment": {
-    "pollution": 30
+    "pollution": 10
   },
   "graphics": {
     "color": "#cfb471",

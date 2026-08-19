@@ -219,12 +219,62 @@ describe('znečištění ve světě', () => {
 });
 
 describe('vanilla obsah', () => {
-  it('dílna znečišťuje, dům ne', async () => {
+  it('dílna a elektrárna znečišťují, dům sám o sobě ne', async () => {
     const content = new ContentRegistry();
     await content.load(createVanillaSource());
 
     expect(content.get('vanilla:industrial_small')?.environment?.pollution).toBeGreaterThan(0);
     expect(content.get('vanilla:coal_power_plant')?.environment?.pollution).toBeGreaterThan(0);
-    expect(content.get('vanilla:residential_small')?.environment?.pollution).toBeGreaterThan(0);
+    // Bydlení špiní přes odpad, který obyvatelé vyrobí, ne přímo. Jinak se
+    // hustá čtvrť otráví sama a zahušťování ztratí smysl.
+    expect(content.get('vanilla:residential_small')?.environment?.pollution ?? 0).toBe(0);
+  });
+
+  it('čtvrť bez průmyslu zůstane měřitelně čistší než ta s ním', async () => {
+    // Nahlásil autor: overlay znečištění byl celý stejně fialový, u elektrárny
+    // i v parku. Difuze se ustaluje zhruba na dvouapůlnásobku zdroje, takže
+    // hodnoty volené „jak špinavá ta budova je" se v husté čtvrti sečetly přes
+    // strop 255 a mapa přestala cokoli rozlišovat.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    const balance = content.getBalance();
+
+    const world = createWorld(1, balance.economy);
+    // Průmyslový areál v jednom rohu, obytná čtvrť daleko v druhém.
+    const factory = content.get('vanilla:industrial_small');
+    const house = content.get('vanilla:residential_small');
+    expect(factory && house).toBeTruthy();
+    if (!factory || !house) return;
+
+    for (let x = 8; x < 16; x++) {
+      for (let y = 8; y < 16; y++) placeBuilding(world, factory, x, y);
+    }
+    for (let x = 100; x < 108; x++) {
+      for (let y = 100; y < 108; y++) placeBuilding(world, house, x, y);
+    }
+
+    const system = createPollutionSystem(content, balance);
+    for (let tick = 0; tick < 2000; tick++) tickWorld(world, [system]);
+
+    const dirty = world.coarse.pollution[coarseIndex(12, 12)] ?? 0;
+    const clean = world.coarse.pollution[coarseIndex(104, 104)] ?? 0;
+
+    expect(dirty).toBeGreaterThan(50); // areál musí být vidět
+    expect(clean).toBeLessThan(dirty / 4); // a čtvrť daleko od něj musí být jinak
+  });
+
+  it('jedna skládka pobere odpad malého města', async () => {
+    // Původní kapacita 20 znamenala, že město o třech tisících lidech potřebuje
+    // patnáct skládek — a nepokrytý odpad zaplavil znečištěním celou mapu
+    // rovnoměrně, tedy i parky.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    const balance = content.getBalance();
+
+    const landfill = content.get('vanilla:landfill')?.waste?.capacity ?? 0;
+    const incinerator = content.get('vanilla:incinerator')?.waste?.capacity ?? 0;
+
+    expect(landfill).toBeGreaterThanOrEqual(1000 * balance.waste.perCitizen);
+    expect(incinerator).toBeGreaterThan(landfill * 2);
   });
 });

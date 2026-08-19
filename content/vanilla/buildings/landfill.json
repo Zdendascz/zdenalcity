@@ -18,10 +18,10 @@
     "capacity": 4
   },
   "waste": {
-    "capacity": 20
+    "capacity": 120
   },
   "environment": {
-    "pollution": 60
+    "pollution": 21
   },
   "graphics": {
     "color": "#7a6a4a",

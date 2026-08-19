@@ -21,7 +21,7 @@
     "consumption": 100
   },
   "environment": {
-    "pollution": 2
+    "pollution": 0
   },
   "graphics": {
     "color": "#8fb4dd",

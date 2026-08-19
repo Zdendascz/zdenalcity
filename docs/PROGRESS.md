@@ -613,6 +613,42 @@ Dvě věci se ukázaly až při simulaci uloženého města autora:
 Na městě autora (znečištění pod domy 242 z 255): 2498 → 2670 obyvatel, 25 domů
 na úrovni 2, a stav se drží — žádné kmitání.
 
+- [x] Oprava: overlay znečištění byl všude stejný (nahlásil autor)
+
+Autor hlásil, že znečištění je stejné u elektrárny i v parku. Bylo — celá
+zastavěná plocha seděla na stropě 255, takže overlay nerozlišoval nic.
+
+Dvě příčiny, obojí špatně zvolená čísla v obsahu, ne chyba mechaniky:
+
+1. **Kapacity odpadu byly směšně malé.** Skládka pobrala odpad za 200 lidí,
+   takže město o třech tisících jich potřebovalo patnáct. Nepokrytý odpad se
+   podle §6 rozpouští **celoměstsky do každé buňky**, takže vyrobil rovnou
+   podlahu ~100 znečištění přes celou mapu — i tam, kde nic nestojí. Přesně to
+   autor viděl. Skládka teď pobere 120 (1200 obyvatel), spalovna 400.
+2. **Hodnoty zdrojů nepočítaly s tím, že se difuze načítá.** Stálý zdroj se
+   ustálí zhruba na 2,5násobku své hodnoty, a v souvisle znečištěné čtvrti až
+   na patnáctinásobku. Čísla byla vybraná, jako by vrstva ukazovala přímo
+   hodnotu ze zdroje, takže každá hustší čtvrť usekla o strop. Všechny zdroje
+   jsou na 0,35násobku (elektrárna 30 → 10, dílna 20 → 7, skládka 60 → 21).
+3. Bydlení nespíní vůbec — jeho stopa jde přes odpad, který obyvatelé vyrobí.
+   Jinak se hustá čtvrť otrávila sama a zahušťování ztratilo smysl.
+
+Řez městem po opravě (bydlení s parky vlevo, průmysl a elektrárna vpravo):
+
+```
+x        22   26   30   34   38   42   46   50   54   58
+zneč.     0    0    0    4   14   49   41   39   37   31
+cena     70   70   72   61   44   40   23   20   26   28
+```
+
+Na uloženém městě autora: 2670 → 6526 obyvatel, cena půdy pod domy z mediánu
+22 na 103, znečištění u průmyslu 252 proti 85 u bydlení. 273 domů se dostalo na
+třetí úroveň.
+
+Hlídají to dva testy v `tests/pollution.test.ts`: čtvrť bez průmyslu musí
+zůstat pod čtvrtinou znečištění průmyslové, a jedna skládka musí pobrat odpad
+aspoň tisícovky lidí.
+
 ## Rozpracované
 _(nic — T18 uzavřeno, dál T19: prerekvizity v růstu i ruční stavbě)_
 
