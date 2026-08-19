@@ -505,6 +505,29 @@ describe('vanilla balanc', () => {
     expect(world.economy.taxRates.residential).toBe(VANILLA_BALANCE.economy.defaultTaxRate);
   });
 
+  it('sloučení dvou parcel se vyplatí — jinak je povýšení do šířky k ničemu', async () => {
+    // Řadovka dřív dala přesně tolik co dva domky, takže se budovy sloučily
+    // a městu to nepřineslo ani jednoho obyvatele. Hráč viděl změnu a žádný
+    // výsledek. Nahlásil autor.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    for (const category of ['residential', 'commercial', 'industrial']) {
+      const level1 = content.byCategory(category).filter((d) => d.level === 1);
+      const capacity = (d: Definition): number =>
+        (d.population?.capacity ?? 0) + (d.jobs?.capacity ?? 0);
+      const area = (d: Definition): number => d.footprint[0] * d.footprint[1];
+
+      const single = level1.find((d) => area(d) === 1);
+      const pair = level1.find((d) => area(d) === 2);
+      expect(single, category).toBeDefined();
+      expect(pair, category).toBeDefined();
+      if (!single || !pair) continue;
+
+      expect(capacity(pair), `${category}: ${pair.id}`).toBeGreaterThan(capacity(single) * 2);
+    }
+  });
+
   it('každá RCI budova při výchozí dani utáhne aspoň dvojnásobek své údržby', async () => {
     // Kdyby se dům sotva zaplatil, město by nikdy nevydělalo na policii ani
     // školu a hráč by při 7 % neufinancoval nic — přesně to se stalo před

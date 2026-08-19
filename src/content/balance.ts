@@ -64,6 +64,16 @@ export interface Balance {
      * buňce. Doplněk zadání — to chátrání věkem popisuje, ale výši neurčuje.
      */
     decayPenalty: number;
+    /**
+     * O kolik se sníží práh povýšení při **plné** poptávce; slabší poptávka
+     * sníží úměrně méně. Města se zahušťují, když se lidé nemají kam nastěhovat.
+     *
+     * Doplněk zadání (rozhodnutí autora): §8 poptávku bere jen jako vypínač,
+     * takže město s poptávkou 100 povyšovalo stejně jako město s poptávkou 1.
+     *
+     * Posouvá **oba** prahy, jinak by budovy v pásmu mezi nimi kmitaly.
+     */
+    demandRelief: number;
   };
 
   /** Čte se od T18 (přepis růstu). */
@@ -250,6 +260,7 @@ export function validateBalance(raw: unknown): {
         255,
       ),
       decayPenalty: num(issues, levels, 'decayPenalty', 'levels.decayPenalty', 0, 255),
+      demandRelief: num(issues, levels, 'demandRelief', 'levels.demandRelief', 0, 255),
     },
     growth: {
       exponent: num(issues, growth, 'exponent', 'growth.exponent', 0, 10),

@@ -48,12 +48,13 @@
 
   "levels": {
     "thresholds": [0, 0, 90, 130, 170, 210],
-    "hysteresis": 15,
+    "hysteresis": 35,
     "cooldown": 60,
     "downgradeConfirm": 3,
     "decayAge": 3600,
     "decayCoverageThreshold": 20,
-    "decayPenalty": 25
+    "decayPenalty": 25,
+    "demandRelief": 25
   },
 
   "growth": {

@@ -17,6 +17,11 @@ import type { System } from './index';
  * Chátrání okolím je v ceně půdy samo. Navíc chátrá **věkem, ale jen při
  * podfinancování**: stará budova v nedostatečně obsloužené buňce dostane
  * penalizaci k efektivní ceně půdy. Plně obsloužená budova nechátrá nikdy.
+ *
+ * Vysoká poptávka snižuje oba prahy (`levels.demandRelief`) — město, kam se
+ * lidé nemají kam nastěhovat, se zahustí ochotněji, a když poptávka opadne,
+ * zahuštění se zase rozpustí. Posunout jen horní práh nejde: pásmo mezi nimi
+ * by se převrátilo a budovy by kmitaly nahoru a dolů donekonečna.
  */
 const INTERVAL = 20;
 /** Offset mimo růst (12/2) i cenu půdy (16/5), ze které systém čte. */
@@ -44,9 +49,30 @@ export function createLevelSystem(catalogue: BuildingCatalogue, balance: Balance
         const cell = coarseIndex(building.x, building.y);
         const landValue = (world.coarse.landValue[cell] ?? 0) - neglect(building, cell);
 
+        // Čím větší tlak, tím ochotněji se čtvrť zahustí. Bez téhle úlevy
+        // povyšovalo město s poptávkou 100 stejně jako město s poptávkou 1.
+        const demand = world.demand[definition.category];
+        const relief =
+          (Math.max(0, Math.min(demand, balance.demand.limit)) / balance.demand.limit) *
+          balance.levels.demandRelief;
+
         // Snížení má přednost: chátrající čtvrť nemá růst, i kdyby na horní
         // práh náhodou dosáhla.
-        const floor = (balance.levels.thresholds[building.level] ?? 0) - balance.levels.hysteresis;
+        //
+        // Úleva se odečítá **i tady**, jinak by se pásmo mezi oběma prahy
+        // převrátilo: budova by povýšila při 65, spadla pod 75 a tak pořád
+        // dokola. Ukázalo se to při simulaci uloženého města autora, kde
+        // devět domů kmitalo mezi úrovní 1 a 2. Když poptávka opadne, práh
+        // se vrátí nahoru a zahuštění se rozpustí — to je záměr.
+        //
+        // Na první úrovni neplatí ani jedno: pod ní je opuštění a s ruinou
+        // není co kmitat, protože se sama nikdy nevrátí. Dům se vzdá teprve
+        // tehdy, když zanedbanost přebije všechnu hodnotu jeho pozemku —
+        // a to je nezávislé na tom, jak široká je zrovna hystereze.
+        const floor =
+          building.level <= 1
+            ? 0
+            : (balance.levels.thresholds[building.level] ?? 0) - balance.levels.hysteresis - relief;
         if (landValue < floor) {
           const streak = (world.downgradeStreak.get(id) ?? 0) + 1;
           if (streak < balance.levels.downgradeConfirm) {
@@ -61,11 +87,11 @@ export function createLevelSystem(catalogue: BuildingCatalogue, balance: Balance
 
         // Bez poptávky nikdo nerozšiřuje. Prázdná čtvrť má růst přestat,
         // i když je půda drahá.
-        if (world.demand[definition.category] <= 0) continue;
+        if (demand <= 0) continue;
 
         const threshold = balance.levels.thresholds[building.level + 1];
         if (threshold === undefined) continue; // nad poslední úrovní není kam růst
-        if (landValue < threshold) continue;
+        if (landValue < threshold - relief) continue;
 
         tryUpgrade(world, catalogue, building);
       }

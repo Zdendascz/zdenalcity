@@ -584,6 +584,35 @@ počítadlo snížení úrovně. Load je teď čistí všechny.
 
 Kryjí to dva testy v `tests/save.test.ts`; ověřeno rozbitím, že koušou.
 
+- [x] Poptávka snižuje práh povýšení + sloučení parcel se vyplatí (rozhodl autor)
+
+Dvě změny na žádost autora, obojí zapsané do balancu, ne do kódu:
+
+**Sloučení parcel.** Řadovka dávala přesně tolik, co dva domky — budovy se
+sloučily a městu to nepřineslo ani jednoho obyvatele. Kapacita 2×1 na první
+úrovni je teď o čtvrtinu vyšší než dvě samostatné parcely (bydlení 16 → 20,
+obchod 12 → 15, průmysl 24 → 30). Hlídá to test v `economy.test.ts`.
+
+**Úleva za poptávku** (`levels.demandRelief`, doplněk §8): při plné poptávce
+klesá práh povýšení o 25, při slabší úměrně méně. Zadání bere poptávku jen jako
+vypínač, takže město s poptávkou 100 povyšovalo stejně jako město s poptávkou 1.
+
+Dvě věci se ukázaly až při simulaci uloženého města autora:
+
+- úleva musí posunout **oba** prahy. Když se odečítala jen od horního, pásmo
+  mezi nimi se převrátilo: dům povýšil při 65, spadl pod 75 a tak pořád dokola.
+- ani to nestačilo. Povýšení přidá obyvatele, hustota zvedá kriminalitu a ta
+  sráží cenu půdy zpátky pod práh — smyčka širší než tehdejší hystereze 15.
+  **Hystereze je proto 35**, tedy širší než ten výkyv. Alternativa (zeslabit
+  váhu hustoty v kriminalitě z 0,6 na 0,3) kmitání zastaví taky, ale mění model
+  kriminality a oslabuje policii, tak jsem sáhl po hysterezi.
+- opuštění budov na tom viselo: spodní práh úrovně 1 byl `0 − hystereze`, takže
+  širší hystereze opuštění úplně vypnula. Pod první úrovní se hystereze ani
+  úleva neuplatňují — s ruinou není co kmitat. Kryje to test s hysterezí 200.
+
+Na městě autora (znečištění pod domy 242 z 255): 2498 → 2670 obyvatel, 25 domů
+na úrovni 2, a stav se drží — žádné kmitání.
+
 ## Rozpracované
 _(nic — T18 uzavřeno, dál T19: prerekvizity v růstu i ruční stavbě)_
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Balance } from '@/content/balance';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import type { Definition } from '@/content/schema';
@@ -263,7 +264,8 @@ describe('systém úrovní', () => {
   it('bez dost drahé půdy budova nepovýší', () => {
     const world = zonedWorld();
     const building = placeBuilding(world, HOUSE, 6, 6);
-    setLandValue(world, 6, 6, (balance.levels.thresholds[2] ?? 0) - 1);
+    // I s úlevou za poptávku, kterou `zonedWorld` nastavuje, je to málo.
+    setLandValue(world, 6, 6, (balance.levels.thresholds[2] ?? 0) - balance.levels.demandRelief - 1);
 
     run(world);
 
@@ -278,6 +280,92 @@ describe('systém úrovní', () => {
     run(world);
 
     expect(building.definitionId).toBe(ROW.id);
+  });
+
+  it('vysoká poptávka sníží práh povýšení', () => {
+    const { thresholds, demandRelief } = balance.levels;
+    // Pod prahem, ale v dosahu úlevy při plné poptávce.
+    const landValue = (thresholds[2] ?? 0) - Math.round(demandRelief / 2);
+
+    const pressed = zonedWorld();
+    pressed.demand.residential = balance.demand.limit;
+    const pressedBuilding = placeBuilding(pressed, HOUSE, 6, 6);
+    setLandValue(pressed, 6, 6, landValue);
+    run(pressed);
+    expect(pressedBuilding.definitionId).toBe(ROW.id);
+
+    const calm = zonedWorld();
+    calm.demand.residential = 1; // poptávka je, ale žádný tlak
+    const calmBuilding = placeBuilding(calm, HOUSE, 6, 6);
+    setLandValue(calm, 6, 6, landValue);
+    run(calm);
+    expect(calmBuilding.definitionId).toBe(HOUSE.id);
+  });
+
+  it('budova povýšená díky poptávce hned zase nespadne', () => {
+    // Regrese: úleva se odečítala jen od horního prahu, takže se pásmo mezi
+    // prahy převrátilo — dům povýšil při 65 a hned spadl pod 75. Na uloženém
+    // městě autora takhle kmitalo devět domů donekonečna.
+    const world = zonedWorld();
+    world.demand.residential = balance.demand.limit;
+    const building = placeBuilding(world, HOUSE, 6, 6);
+    setLandValue(world, 6, 6, (balance.levels.thresholds[2] ?? 0) - balance.levels.demandRelief);
+
+    run(world);
+    expect(building.definitionId).toBe(ROW.id);
+    const level = building.level;
+
+    // A dál už se nic měnit nemá, ani po několika dalších vyhodnoceních.
+    for (let i = 0; i < balance.levels.cooldown * 4; i++) tickWorld(world, [levels]);
+    expect(building.level).toBe(level);
+    expect(building.definitionId).not.toBe(HOUSE.id);
+  });
+
+  it('opuštění nezávisí na šířce hystereze', () => {
+    // Regrese: opuštění vycházelo ze spodního prahu úrovně 1, který je nula
+    // mínus hystereze. Rozšíření hystereze na 35 tím zrušilo opuštění úplně,
+    // protože penalizace za zanedbanost je 25. Pod první úrovní se hystereze
+    // ani úleva neuplatňují — s ruinou není co kmitat.
+    const wide: Balance = {
+      ...balance,
+      levels: { ...balance.levels, hysteresis: 200, demandRelief: 200 },
+    };
+    const world = zonedWorld();
+    world.tick = balance.levels.decayAge + 1;
+    const building = placeBuilding(world, HOUSE, 6, 6);
+    building.builtAtTick = 0;
+
+    const system = createLevelSystem(catalogue, wide);
+    for (let i = 0; i < wide.levels.cooldown + system.interval * 5; i++) {
+      tickWorld(world, [system]);
+    }
+
+    expect(building.abandoned).toBe(true);
+  });
+
+  it('propadlá čtvrť klesne i při plné poptávce', () => {
+    const world = zonedWorld();
+    world.demand.residential = balance.demand.limit;
+    const building = placeBuilding(world, HOUSE_L2, 6, 6);
+    // Pod spodním prahem i s celou úlevou — takovou čtvrť poptávka nezachrání.
+    setLandValue(
+      world,
+      6,
+      6,
+      Math.max(
+        0,
+        (balance.levels.thresholds[2] ?? 0) -
+          balance.levels.hysteresis -
+          balance.levels.demandRelief -
+          1,
+      ),
+    );
+
+    for (let i = 0; i < balance.levels.cooldown + levels.interval * 5; i++) {
+      tickWorld(world, [levels]);
+    }
+
+    expect(building.definitionId).toBe(HOUSE.id);
   });
 
   it('bez poptávky se nerozšiřuje ani na drahé půdě', () => {
@@ -328,9 +416,14 @@ describe('snížení a opuštění', () => {
   const balance = VANILLA_BALANCE;
   const levels = createLevelSystem(catalogue, balance);
 
-  /** Cena půdy, při které budova dané úrovně padá pod práh i s hysterezí. */
+  /**
+   * Cena půdy, při které budova dané úrovně padá pod práh i s hysterezí
+   * a celou úlevou za poptávku — tedy bez ohledu na to, jak moc se zrovna
+   * chce stavět.
+   */
   function belowFloor(level: number): number {
-    return Math.max(0, (balance.levels.thresholds[level] ?? 0) - balance.levels.hysteresis - 1);
+    const { thresholds, hysteresis, demandRelief } = balance.levels;
+    return Math.max(0, (thresholds[level] ?? 0) - hysteresis - demandRelief - 1);
   }
 
   /** Odtiká cooldown a k tomu tolik vyhodnocení, kolik snížení potřebuje. */
