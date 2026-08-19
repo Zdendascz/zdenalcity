@@ -1,6 +1,7 @@
 import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from './catalogue';
 import { inBounds, index } from './layers';
+import { checkRequirements, presentDefinitions } from './requirements';
 import {
   markBuildingDirty,
   markCoverageDirty,
@@ -107,12 +108,13 @@ export function tryUpgrade(
   world: WorldState,
   catalogue: BuildingCatalogue,
   building: Building,
+  present: ReadonlySet<string> = presentDefinitions(world),
 ): boolean {
   const definition = catalogue.get(building.definitionId);
   if (!definition || building.abandoned) return false;
 
-  const widen = planWiden(world, catalogue, definition, building);
-  const upgrade = widen ?? planTaller(world, catalogue, definition, building);
+  const widen = planWiden(world, catalogue, definition, building, present);
+  const upgrade = widen ?? planTaller(world, catalogue, definition, building, present);
   if (!upgrade) return false;
 
   apply(world, definition, building, upgrade);
@@ -125,6 +127,7 @@ function planWiden(
   catalogue: BuildingCatalogue,
   definition: Definition,
   building: Building,
+  present: ReadonlySet<string>,
 ): Upgrade | null {
   const [width, depth] = definition.footprint;
   const zone = world.layers.zone[index(building.x, building.y)] ?? 0;
@@ -145,6 +148,8 @@ function planWiden(
       building.level, // rozšíření drží úroveň, mění se jen půdorys
     );
     if (!candidate) continue;
+    // Prerekvizity kandidátní definice, ne té současné (§8).
+    if (!checkRequirements(world, catalogue, candidate, x, y, present).ok) continue;
 
     const absorbed = claimable(world, catalogue, candidate, building, zone, x, y);
     if (absorbed) return { definition: candidate, x, y, absorbed };
@@ -208,6 +213,7 @@ function planTaller(
   catalogue: BuildingCatalogue,
   definition: Definition,
   building: Building,
+  present: ReadonlySet<string>,
 ): Upgrade | null {
   const [width, depth] = definition.footprint;
   const taller = pickDefinition(
@@ -218,7 +224,9 @@ function planTaller(
     depth,
     building.level + 1,
   );
-  return taller ? { definition: taller, x: building.x, y: building.y, absorbed: [] } : null;
+  if (!taller) return null;
+  if (!checkRequirements(world, catalogue, taller, building.x, building.y, present).ok) return null;
+  return { definition: taller, x: building.x, y: building.y, absorbed: [] };
 }
 
 /**

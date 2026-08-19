@@ -57,6 +57,17 @@ export interface BuildingDefinition {
    * celoměstsky (§6 zadání fáze 2).
    */
   waste?: { capacity: number };
+  /**
+   * Co musí platit, aby budova mohla vzniknout (§7 zadání fáze 2).
+   *
+   * `services` je minimální pokrytí dané třídy v buňce budovy, `buildings`
+   * seznam definic, které musí ve městě stát. Chybějící sekce znamená
+   * „bez podmínek" — přesně to je stav vanilla obsahu 2a.
+   */
+  requirements?: {
+    services: Readonly<Record<string, number>>;
+    buildings: readonly string[];
+  };
   power?: { production?: number; consumption?: number };
   environment?: { pollution?: number };
   graphics: {
@@ -96,6 +107,7 @@ const DEFINITION_SECTIONS = [
   'jobs',
   'service',
   'waste',
+  'requirements',
   'power',
   'environment',
   'graphics',
@@ -264,6 +276,7 @@ export function validateDefinition(
   const jobs = validateCapacity(issues, record, 'jobs');
   const service = validateService(issues, record);
   const waste = validateWaste(issues, record);
+  const requirements = validateRequirements(issues, record);
 
   if (
     issues.length > 0 ||
@@ -295,6 +308,7 @@ export function validateDefinition(
       ...(jobs ? { jobs } : {}),
       ...(service ? { service } : {}),
       ...(waste ? { waste } : {}),
+      ...(requirements ? { requirements } : {}),
       ...(power ? { power } : {}),
       ...(environment ? { environment } : {}),
       graphics,
@@ -429,6 +443,54 @@ function validateWaste(
 
   const capacity = requireInt(issues, section, 'capacity', 'waste.capacity', 1, 65535);
   return capacity === null ? undefined : { capacity };
+}
+
+/**
+ * Prerekvizity (§7). Obě části jsou volitelné, ale co je uvedené, musí mít
+ * správný tvar — jinak by se překlep ve třídě služby projevil jako budova,
+ * která nikdy nevyroste, a nikdo by nevěděl proč.
+ */
+function validateRequirements(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['requirements'] {
+  if (record['requirements'] === undefined) return undefined;
+  const section = requireRecord(issues, record, 'requirements', 'requirements');
+  if (!section) return undefined;
+
+  const services: Record<string, number> = {};
+  if (section['services'] !== undefined) {
+    const raw = requireRecord(issues, section, 'services', 'requirements.services');
+    for (const key of Object.keys(raw ?? {}).sort()) {
+      if (!NAMESPACE.test(key)) {
+        issues.push({ field: `requirements.services.${key}`, message: 'není platné jméno třídy' });
+        continue;
+      }
+      const value = requireInt(issues, raw ?? {}, key, `requirements.services.${key}`, 0, 255);
+      if (value !== null) services[key] = value;
+    }
+  }
+
+  const buildings: string[] = [];
+  if (section['buildings'] !== undefined) {
+    const raw = section['buildings'];
+    if (!Array.isArray(raw)) {
+      issues.push({ field: 'requirements.buildings', message: 'musí být pole id definic' });
+    } else {
+      raw.forEach((entry, i) => {
+        if (typeof entry !== 'string' || !DEFINITION_ID.test(entry)) {
+          issues.push({
+            field: `requirements.buildings[${i}]`,
+            message: 'musí být id definice s namespace',
+          });
+        } else {
+          buildings.push(entry);
+        }
+      });
+    }
+  }
+
+  return { services, buildings };
 }
 
 function validatePower(

@@ -52,9 +52,23 @@ export class I18n {
     this.listeners.add(listener);
   }
 
+  /**
+   * Parametr, který je sám lokalizačním klíčem, se přeloží.
+   *
+   * Simulace nesmí znát texty (§10), ale hlášku „potřebuje pokrytí policie"
+   * skládá právě ona — jméno třídy služby tak předá jako klíč `ui.service.police`
+   * a překlad se doplní tady. Kdo chce klíč vypsat doslova, ať ho nepojmenuje
+   * jako existující klíč.
+   */
   t(key: string, params?: TranslateParams): string {
     const text = this.tables[this.language]?.[key] ?? this.tables[FALLBACK_LANGUAGE]?.[key];
-    return interpolate(text ?? key, params);
+    if (!params) return interpolate(text ?? key);
+
+    const resolved: Record<string, string | number> = {};
+    for (const [name, value] of Object.entries(params)) {
+      resolved[name] = typeof value === 'string' && this.has(value) ? this.t(value) : value;
+    }
+    return interpolate(text ?? key, resolved);
   }
 
   /** Existuje pro klíč překlad, nebo by `t()` vrátilo jen klíč? */

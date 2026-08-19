@@ -665,8 +665,36 @@ Vyplavalo přitom najevo, co model elektřiny znamená v praxi: proud vede po
 silnicích **a po budovách**, takže dům uprostřed bloku bez souvislé řady sousedů
 zůstane temný, i když silnice vede o dvě dlaždice dál. Teď je to vidět.
 
+- [x] T19 — prerekvizity (fáze 2)
+
+Vzniklo:
+- sekce `requirements` ve schématu: `services` (minimální pokrytí třídy v buňce
+  budovy) a `buildings` (definice, která musí ve městě stát)
+- `src/sim/requirements.ts` — vyhodnocení, vrací `CommandResult`, ne `boolean`,
+  aby hráč věděl, **co** chybí
+
+Vyhodnocuje se na všech třech místech, kde budova vzniká:
+- **růst** — parcela se nezastaví, dokud podmínka neplatí
+- **povýšení** — kontroluje se definice **kandidáta**, ne té současné (§8)
+- **ruční stavba** — odmítnutí i s důvodem, a hlavně **před** stržením peněz
+
+Seznam postavených definic se počítá jednou za běh systému, ne u každého
+pokusu. Ruina se za postavenou budovu nepočítá — prázdná budova nic neposkytuje.
+
+`I18n.t` nově přeloží i **parametr, který je sám lokalizačním klíčem**. Bez
+toho by hláška o chybějící službě musela nést buď anglické id třídy, nebo by
+simulace musela znát texty. Hláška o chybějící budově díky tomu ukazuje její
+jméno, ne `vanilla:school`.
+
+Vanilla obsah 2a **žádnou podmínku nemá** (rozhodnutí autora v §7) a hlídá to
+test. Mechanismus je tedy hotový a čeká na hodnoty: §6 počítá s tím, že
+vzdělání bude bránou k vyšším úrovním obchodu a průmyslu — je to změna JSONu.
+
+Testy: 11 v `tests/requirements.test.ts`. Že koušou, ověřeno rozbitím: bez
+kontroly podmínek padne sedm, bez kontroly při povyšování jeden.
+
 ## Rozpracované
-_(nic — T18 uzavřeno, dál T19: prerekvizity v růstu i ruční stavbě)_
+_(nic — T19 uzavřeno, dál T20: save v2, migrace, fixtury)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

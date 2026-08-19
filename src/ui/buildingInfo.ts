@@ -80,6 +80,19 @@ export class BuildingInfo {
       rows.push(['ui.info.pollution', formatNumber(definition.environment.pollution)]);
     }
 
+    // Prerekvizity ukazujeme, jen když nějaké jsou — vanilla obsah 2a je nemá,
+    // ale mod ano a hráč musí vědět, na čem budova stojí (§7).
+    const requirements = definition.requirements;
+    if (requirements) {
+      const parts = [
+        ...Object.keys(requirements.services)
+          .sort()
+          .map((cls) => `${t(`ui.service.${cls}`)} ≥ ${requirements.services[cls] ?? 0}`),
+        ...requirements.buildings,
+      ];
+      if (parts.length > 0) rows.push(['ui.info.requirements', parts.join(', ')]);
+    }
+
     const list = el('dl', 'sheet__list');
     for (const [labelKey, value] of rows) {
       list.appendChild(el('dt', undefined, t(labelKey)));

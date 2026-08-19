@@ -5,6 +5,7 @@ import { coarseIndex } from '../coarse';
 import { index, MAP_SIZE, ZONE } from '../layers';
 import { seedDefinitions } from '../levels';
 import { categoryForZone, RCI_CATEGORIES } from '../rci';
+import { checkRequirements, presentDefinitions } from '../requirements';
 import type { RciCategory } from '../rci';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -51,6 +52,9 @@ function grow(world: WorldState, catalogue: BuildingCatalogue, balance: Balance)
 
   // Kam až od silnice se staví, říká balanc — délka tabulky je dosah.
   const reach = roadReach(world, balance.growth.roadFactors.length - 1);
+  // Jednou za běh, ne u každého pokusu — seznam se během něj nemění tak, aby
+  // to hráč poznal, a procházet všechny budovy dvanáctkrát je zbytečné.
+  const present = presentDefinitions(world);
 
   // Pevné pořadí kategorií, ne pořadí nějaké mapy — jinak by determinismus
   // závisel na historii vkládání (P2).
@@ -70,7 +74,7 @@ function grow(world: WorldState, catalogue: BuildingCatalogue, balance: Balance)
       total -= picked.weight;
       picked.weight = 0;
 
-      tryBuild(world, catalogue, category, picked.tile);
+      tryBuild(world, catalogue, category, picked.tile, present);
     }
   }
 }
@@ -195,6 +199,7 @@ function tryBuild(
   catalogue: BuildingCatalogue,
   category: RciCategory,
   tile: number,
+  present: ReadonlySet<string>,
 ): void {
   const x = tile % world.size;
   const y = (tile - x) / world.size;
@@ -216,6 +221,8 @@ function tryBuild(
   if (!checkFootprint(world, definition, x, y, { requireZone: zone, skipRoadCheck: true }).ok) {
     return;
   }
+  // Prerekvizity definice (§7). Vanilla je nemá, ale mod je mít může.
+  if (!checkRequirements(world, catalogue, definition, x, y, present).ok) return;
 
   placeBuilding(world, definition, x, y);
 }

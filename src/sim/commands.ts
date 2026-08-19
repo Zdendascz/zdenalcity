@@ -3,6 +3,7 @@ import type { BuildingCatalogue } from './catalogue';
 import { inBounds, index, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
+import { checkRequirements, presentDefinitions } from './requirements';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
@@ -78,6 +79,10 @@ export function placeDefinition(
   // Zóna se nekontroluje: elektrárna smí stát i na nezónované půdě.
   const fits = checkFootprint(world, definition, x, y);
   if (!fits.ok) return fits;
+
+  // Prerekvizity platí i pro ruční stavbu, ne jen pro růst (§7).
+  const met = checkRequirements(world, catalogue, definition, x, y, presentDefinitions(world));
+  if (!met.ok) return met;
 
   // Na co nejsou peníze, to se nepostaví. Na rozdíl od budov, které vyrostou
   // ze zóny samy, tuhle platí hráč.

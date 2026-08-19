@@ -3,6 +3,7 @@ import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
 import { tryDowngrade, tryUpgrade } from '../levels';
 import { isRciCategory } from '../rci';
+import { presentDefinitions } from '../requirements';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
@@ -37,6 +38,8 @@ export function createLevelSystem(catalogue: BuildingCatalogue, balance: Balance
       // podle `id` drží výsledek nezávislý na tom, jak se do mapy vkládalo.
       const ids = [...world.buildings.keys()].sort((a, b) => a - b);
       const neglect = neglectPenalty(world, balance);
+      // Prerekvizity se ptají, co ve městě stojí; stačí to zjistit jednou.
+      const present = presentDefinitions(world);
 
       for (const id of ids) {
         const building = world.buildings.get(id);
@@ -93,7 +96,7 @@ export function createLevelSystem(catalogue: BuildingCatalogue, balance: Balance
         if (threshold === undefined) continue; // nad poslední úrovní není kam růst
         if (landValue < threshold - relief) continue;
 
-        tryUpgrade(world, catalogue, building);
+        tryUpgrade(world, catalogue, building, present);
       }
     },
   };
