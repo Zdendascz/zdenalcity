@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from './catalogue';
 import type { ReadonlyCoarseLayers } from './coarse';
 import {
@@ -59,10 +60,19 @@ class MainThreadSimHost implements SimHost {
   private accumulator = 0;
   private speedIndex = 1; // 1×
 
-  constructor(world: WorldState, systems: readonly System[], catalogue: BuildingCatalogue) {
+  /** Balanc drží ceny akcí, které nejsou stavbou budovy — třeba kácení lesa. */
+  private readonly balance: Balance | undefined;
+
+  constructor(
+    world: WorldState,
+    systems: readonly System[],
+    catalogue: BuildingCatalogue,
+    balance?: Balance,
+  ) {
     this.world = world;
     this.systems = systems;
     this.catalogue = catalogue;
+    this.balance = balance;
   }
 
   dispatch(cmd: Command): CommandResult {
@@ -79,7 +89,7 @@ class MainThreadSimHost implements SimHost {
       case 'build_road':
         return buildRoad(this.world, cmd.x, cmd.y);
       case 'bulldoze':
-        return bulldoze(this.world, cmd.x, cmd.y);
+        return bulldoze(this.world, cmd.x, cmd.y, this.balance);
       case 'zone':
         return zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone);
       case 'place_building':
@@ -133,6 +143,7 @@ export function createSimHost(
   world: WorldState,
   systems: readonly System[],
   catalogue: BuildingCatalogue,
+  balance?: Balance,
 ): SimHost {
-  return new MainThreadSimHost(world, systems, catalogue);
+  return new MainThreadSimHost(world, systems, catalogue, balance);
 }

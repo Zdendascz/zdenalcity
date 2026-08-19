@@ -19,7 +19,9 @@
     "forestDensity": 0.35,
     "marshThreshold": 0.03,
     "octaves": 5,
-    "roughness": 0.5
+    "roughness": 0.5,
+    "forestAbsorption": 0.5,
+    "clearForestCost": 12
   },
 
   "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },
@@ -31,6 +33,8 @@
     "weights": {
       "pollution": 0.8,
       "crime": 0.7,
+      "forest": 18,
+      "sand": -8,
       "police": 0.2,
       "fire": 0.2,
       "health": 0.3,

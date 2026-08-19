@@ -166,6 +166,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     simWorld,
     createDefaultSystems(content, content.getBalance()),
     content,
+    content.getBalance(),
   );
   const world = host.getSnapshot();
 

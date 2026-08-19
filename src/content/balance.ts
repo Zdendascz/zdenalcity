@@ -38,6 +38,10 @@ export interface Balance {
     marshThreshold: number;
     octaves: number;
     roughness: number;
+    /** Jaky podil znecisteni pohlti buňka plna lesa, 0-1. */
+    forestAbsorption: number;
+    /** Cena za vykaceni jedne dlazdice lesa. */
+    clearForestCost: number;
   };
 
   diffusion: { spread: number; decay: number; passes: number };
@@ -171,7 +175,9 @@ export function validateBalance(raw: unknown): {
     issues.push({ field: 'landValue.weights', message: 'chybí, nebo není objekt' });
   } else {
     for (const key of Object.keys(rawWeights).sort()) {
-      weights[key] = num(issues, rawWeights, key, `landValue.weights.${key}`, -10, 10);
+      // Rozsah je široký schválně: váhy pokrytí násobí vstup 0–255, kdežto
+      // váhy terénu podíl 0–1, takže musí být řádově větší.
+      weights[key] = num(issues, rawWeights, key, `landValue.weights.${key}`, -100, 100);
     }
     for (const required of ['pollution', 'crime']) {
       if (weights[required] === undefined) {
@@ -245,6 +251,8 @@ export function validateBalance(raw: unknown): {
       marshThreshold: num(issues, map, 'marshThreshold', 'map.marshThreshold', 0, 1),
       octaves: num(issues, map, 'octaves', 'map.octaves', 1, 8),
       roughness: num(issues, map, 'roughness', 'map.roughness', 0, 1),
+      forestAbsorption: num(issues, map, 'forestAbsorption', 'map.forestAbsorption', 0, 1),
+      clearForestCost: num(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
     },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),

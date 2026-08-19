@@ -2,7 +2,8 @@ import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { COARSE_CELLS, coarseIndex } from '../coarse';
 import { diffuse } from '../diffusion';
-import { MAP_SIZE } from '../layers';
+import { MAP_SIZE, TERRAIN } from '../layers';
+import { coarseTerrainShare } from '../terrain';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
@@ -63,6 +64,21 @@ export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Bal
 
       const { spread, decay, passes } = balance.diffusion;
       diffuse(world.coarse.pollution, sources, spread, decay, passes);
+
+      // Les pohlcuje znečištění, dokud stojí (§2 fáze 3). Až za difuzí, aby
+      // filtroval i to, co do buňky přiteče od sousedů — jinak by les chránil
+      // jen před vlastní továrnou.
+      const forest = coarseTerrainShare(world, TERRAIN.forest);
+      const { forestAbsorption } = balance.map;
+      if (forestAbsorption > 0) {
+        for (let cell = 0; cell < world.coarse.pollution.length; cell++) {
+          const share = forest[cell] ?? 0;
+          if (share === 0) continue;
+          const kept = 1 - share * forestAbsorption;
+          world.coarse.pollution[cell] = Math.floor((world.coarse.pollution[cell] ?? 0) * kept);
+        }
+      }
+
       world.dirty.coarseChanged = true;
     },
   };

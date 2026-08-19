@@ -1,6 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { COARSE_FACTOR, COARSE_SIZE, coarseInBounds } from '../coarse';
-import { explainLandValue } from '../diagnostics';
+import { explainLandValue, landValueContext } from '../diagnostics';
 import { index, TERRAIN } from '../layers';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -32,14 +32,15 @@ export function createLandValueSystem(balance: Balance): System {
     interval: 16,
     offset: 5,
     run(world: WorldState) {
-      const water = waterProximity(world);
+      // Vodu i podíly terénu spočítáme jednou za běh, ne pro každou buňku.
+      const context = landValueContext(world);
       const { landValue } = world.coarse;
       const { smoothing } = balance.landValue;
 
       for (let cell = 0; cell < landValue.length; cell++) {
         // Vzorec je jeden a sdílí ho diagnostika parcely (§12) — jinak by hráči
         // ukazovala rozpis, podle kterého se ve skutečnosti nehraje.
-        const { raw, current } = explainLandValue(world, balance, cell, water[cell] === 1);
+        const { raw, current } = explainLandValue(world, balance, cell, context);
         const delta = raw - current;
         const next = current + delta * smoothing;
 

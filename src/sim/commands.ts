@@ -1,3 +1,4 @@
+import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from './buildings';
 import type { BuildingCatalogue } from './catalogue';
 import { inBounds, index, TERRAIN, ZONE } from './layers';
@@ -153,7 +154,12 @@ export function zoneArea(
  * Zóna po zbourání budovy **zůstává**, aby na ní mohlo vyrůst něco nového —
  * hráč, který chce zónu zrušit, klikne podruhé.
  */
-export function bulldoze(world: WorldState, x: number, y: number): CommandResult {
+export function bulldoze(
+  world: WorldState,
+  x: number,
+  y: number,
+  balance?: Balance,
+): CommandResult {
   if (!inBounds(x, y)) return reject('error.outOfBounds');
 
   const tile = index(x, y);
@@ -173,6 +179,19 @@ export function bulldoze(world: WorldState, x: number, y: number): CommandResult
 
   if (world.layers.zone[tile] !== ZONE.none) {
     world.layers.zone[tile] = ZONE.none;
+    markTileDirty(world, x, y);
+    return OK;
+  }
+
+  // Vykácení lesa. Stojí peníze a je to **volba**: les do té doby zvedá cenu
+  // půdy a pohlcuje znečištění, po vykácení zbude místo na stavbu (§2 fáze 3).
+  if (world.layers.terrain[tile] === TERRAIN.forest) {
+    const cost = balance?.map.clearForestCost ?? 0;
+    if (world.economy.funds < cost) {
+      return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+    }
+    world.economy.funds -= cost;
+    world.layers.terrain[tile] = TERRAIN.grass;
     markTileDirty(world, x, y);
     return OK;
   }

@@ -4,7 +4,7 @@ import { ContentRegistry } from '@/content/registry';
 import { placeBuilding } from '@/sim/buildings';
 import { buildRoad, zoneArea } from '@/sim/commands';
 import { COARSE_CELLS, coarseIndex } from '@/sim/coarse';
-import { explainLandValue, explainParcel } from '@/sim/diagnostics';
+import { explainLandValue, explainParcel, landValueContext } from '@/sim/diagnostics';
 import { ZONE } from '@/sim/layers';
 import { createDefaultSystems, createLandValueSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
@@ -47,7 +47,7 @@ describe('rozpis ceny půdy', () => {
     const before = new Uint8Array(world.coarse.landValue);
     const targets = new Map<number, number>();
     for (let cell = 0; cell < COARSE_CELLS; cell++) {
-      const explained = explainLandValue(world, balance, cell, false);
+      const explained = explainLandValue(world, balance, cell, landValueContext(world));
       expect(explained.terms.reduce((sum, term) => sum + term.amount, 0)).toBeCloseTo(explained.raw);
       expect(explained.current).toBe(before[cell]);
       targets.set(cell, explained.raw);
@@ -76,7 +76,7 @@ describe('rozpis ceny půdy', () => {
   it('pojmenuje, co cenu půdy sráží a co ji zvedá', async () => {
     const { world, content } = await city();
     const cell = coarseIndex(22, 31); // u parku
-    const explained = explainLandValue(world, content.getBalance(), cell, false);
+    const explained = explainLandValue(world, content.getBalance(), cell, landValueContext(world));
     const by = new Map(explained.terms.map((term) => [term.source, term]));
 
     expect(by.get('base')?.amount).toBe(content.getBalance().landValue.base);

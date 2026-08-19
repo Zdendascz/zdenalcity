@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import { coarseIndex } from './coarse';
 import { index, TERRAIN, ZONE } from './layers';
+import { coarseTerrainShare } from './terrain';
 import { categoryForZone } from './rci';
 import type { RciCategory } from './rci';
 import { roadReach } from './systems/growth';
@@ -16,6 +17,28 @@ import type { WorldState } from './world';
  *
  * Vrací **čísla, ne texty**: `sim/` nesmí znát řetězce (§10), překlad si udělá UI.
  */
+
+/**
+ * Vstupy ceny půdy, které se počítají pro celou mapu naráz.
+ *
+ * Systém i diagnostika si ho spočítají jednou a předají do každé buňky —
+ * jinak by průchod terénem probíhal tisíckrát za běh.
+ */
+export interface LandValueContext {
+  /** 1 = buňka sousedí s vodou. */
+  water: Uint8Array;
+  /** Podíl buňky pokrytý lesem, 0–1. */
+  forest: Float32Array;
+  sand: Float32Array;
+}
+
+export function landValueContext(world: WorldState): LandValueContext {
+  return {
+    water: waterProximity(world),
+    forest: coarseTerrainShare(world, TERRAIN.forest),
+    sand: coarseTerrainShare(world, TERRAIN.sand),
+  };
+}
 
 /** Jeden sčítanec ceny půdy. `amount` už je se znaménkem. */
 export interface LandValueTerm {
@@ -46,13 +69,25 @@ export function explainLandValue(
   world: WorldState,
   balance: Balance,
   cell: number,
-  nearWater: boolean,
+  context: LandValueContext,
 ): LandValueExplanation {
   const { base, waterBonus, weights } = balance.landValue;
   const terms: LandValueTerm[] = [{ source: 'base', input: 1, weight: base, amount: base }];
 
-  if (nearWater) {
+  if (context.water[cell] === 1) {
     terms.push({ source: 'water', input: 1, weight: waterBonus, amount: waterBonus });
+  }
+
+  // Terén se do ceny půdy počítá podílem buňky, kterou zabírá. Les ji zvedá,
+  // dokud stojí — vykácení je tím pádem volba, ne samozřejmost (§2).
+  for (const [source, shares] of [
+    ['forest', context.forest],
+    ['sand', context.sand],
+  ] as const) {
+    const input = shares[cell] ?? 0;
+    const weight = weights[source] ?? 0;
+    if (input === 0 || weight === 0) continue;
+    terms.push({ source, input, weight, amount: input * weight });
   }
 
   // Pevné pořadí tříd, ať rozpis neposkakuje podle historie vkládání do mapy.
@@ -114,8 +149,7 @@ export function explainParcel(
   const zone = world.layers.zone[tile] ?? ZONE.none;
   const category = categoryForZone(zone);
 
-  // Obojí je průchod mapou, ale děje se to na kliknutí hráče, ne v tiku.
-  const nearWater = waterProximity(world)[cell] === 1;
+  // Průchod mapou, ale děje se to na kliknutí hráče, ne v tiku.
   const building = world.buildings.get(world.layers.buildingId[tile] ?? 0);
   const level = building?.level ?? 0;
 
@@ -140,7 +174,7 @@ export function explainParcel(
     roadFactor,
     pollution: world.coarse.pollution[cell] ?? 0,
     crime: world.coarse.crime[cell] ?? 0,
-    landValue: explainLandValue(world, balance, cell, nearWater),
+    landValue: explainLandValue(world, balance, cell, landValueContext(world)),
     coverage: [...world.coverage.keys()]
       .sort()
       .map((serviceClass) => ({
