@@ -7,6 +7,7 @@ import { explainParcel } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
+import { tileBaseHeight } from '@/sim/heights';
 import { index, MAP_SIZE, ZONE } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
@@ -444,6 +445,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       app.screen.width,
       app.screen.height,
       MAP_SIZE,
+      world.cornerHeight,
     );
   }
 
@@ -659,7 +661,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const color = blocked ? HOVER_BLOCKED_COLOR : HOVER_COLOR;
 
       hover
-        .poly(footprintQuad(hoveredTile.x, hoveredTile.y, width, depth))
+        .poly(
+          footprintQuad(
+            hoveredTile.x,
+            hoveredTile.y,
+            width,
+            depth,
+            tileBaseHeight(world.cornerHeight, hoveredTile.x, hoveredTile.y),
+          ),
+        )
         .fill({ color, alpha: HOVER_FILL_ALPHA })
         .stroke({ color, alpha: HOVER_LINE_ALPHA, width: 2 / camera.zoom });
     }

@@ -1123,8 +1123,45 @@ jeden, budova bez základny jeden, označení jediné dlaždice jeden, nehláše
 budovy jeden. **Pořadí chunků test nemá** — je to jedna vlastnost objektu Pixi
 a testy Pixi nespouští; ověřeno jen ve hře.
 
+- [x] T31 — picking od předu dozadu, konec `screenToGrid` (fáze 3b)
+
+Klikání na terén se přepsalo od základu. `screenToGrid` byla inverze projekce,
+jenže ta je jednoznačná jen na placce: jakmile má každý roh vlastní výšku, jeden
+bod na obrazovce může patřit několika dlaždicím nad sebou a inverze nemá co
+vracet. Zadání proto předepisuje **nahrazení, ne opravu**.
+
+Nový postup jde po dlaždicích **od nejbližší dozadu** a ptá se, jestli kurzor
+leží uvnitř promítnutého čtyřúhelníku. První zásah vyhrává, takže výsledek je
+z definice ta dlaždice, kterou hráč vidí.
+
+- **netestuje se celá mapa.** Zvednutá dlaždice se posune nahoru o patro na
+  výškovou úroveň, a protože `LEVEL_H` je půlka `TILE_H`, je to zároveň posun
+  o jedna v součtu `x + y`. Kandidáti tak leží v úzkém pásu; rozdíl `x − y`
+  výška nemění vůbec. Vyjde z toho ~40 testů na klik místo 16 384
+- **ray casting, ne test na konvexní tvar.** Zkroucená dlaždice se promítne
+  jako nekonvexní čtyřúhelník a hráč na ni musí umět kliknout jako na každou
+  jinou
+- **`screenToGrid` je pryč ze `src/`.** Nechat ji tam by byla past — na svahu
+  vrací špatnou dlaždici a nic by na to neupozornilo. Vzorec zůstal jen
+  v testu, jako doklad, že nová cesta řeší něco, co ta stará neuměla
+- rámeček pod kurzorem se taky posadil na výšku terénu
+
+Ověřeno na skutečné vygenerované mapě: **625 vzorků po celé mapě, 621 trefilo
+přesně tu dlaždici, ze které vzorek pocházel.** Stará inverze by na těch samých
+bodech minula ve 267 případech ze 625, tedy ve 43 %.
+
+Zbylé čtyři případy stály za rozbor a **nejsou to chyby**: bod uprostřed zadní
+dlaždice v nich vůbec neleží uvnitř jejího čtyřúhelníku, zato leží v tom
+předním. Terén tam stoupá k pozorovateli, takže přední dlaždice tu zadní
+opravdu zakrývá — picking vrátil to, co je vidět. Chybný byl předpoklad mé
+sondy, ne kód. Na ten případ je teď vlastní test.
+
+Testy: 6 nových v `tests/render.test.ts`. Že koušou, ověřeno rozbitím: hledání
+odzadu dopředu shodí jeden, výška vynechaná z pásu kandidátů dva, test na
+obálku místo ray castingu pět, chybějící kontrola hranic mapy jeden.
+
 ## Rozpracované
-_(T30 hotové, dál T31: picking od předu dozadu, náhrada `screenToGrid`.)_
+_(T31 hotové, dál T32: terraforming — nástroje, kaskáda, ceny.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

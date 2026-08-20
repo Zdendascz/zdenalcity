@@ -12,13 +12,13 @@ import {
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { iconShape } from '@/render/icons';
-import { pickTile } from '@/render/picking';
+import { containsPoint, pickTile } from '@/render/picking';
+import { createCornerHeights, cornerIndex, MAX_HEIGHT } from '@/sim/heights';
 import {
   cuboidFaces,
   diamondPoints,
   gridToScreen,
   LEVEL_H,
-  screenToGrid,
   slopeLight,
   tileQuad,
   TILE_H,
@@ -30,6 +30,22 @@ import { MAP_SIZE, TERRAIN } from '@/sim/layers';
 
 /** Rovná dlaždice v počátku — nejčastější vstup do testů vozovky. */
 const FLAT_TILE = tileQuad(0, 0, [0, 0, 0, 0]);
+
+/**
+ * Inverze projekce z fáze 1 — vzorec, který T31 nahradil.
+ *
+ * Ve `src/` už neexistuje schválně: na svahu vrací špatnou dlaždici a nechat ji
+ * tam by byla past. Tady zůstává jako doklad, že nová cesta řeší něco, co ta
+ * stará neuměla.
+ */
+function flatInverse(screenX: number, screenY: number): { x: number; y: number } {
+  const a = screenX / (TILE_W / 2);
+  const b = screenY / (TILE_H / 2);
+  return { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) };
+}
+
+/** Placka: mřížka rohů samých nul, tedy terén fáze 1. */
+const FLAT_HEIGHTS = createCornerHeights();
 
 const VIEW_W = 1280;
 const VIEW_H = 720;
@@ -54,15 +70,6 @@ describe('projection', () => {
 
   it('elevation posouvá dlaždici nahoru o LEVEL_H', () => {
     expect(gridToScreen(0, 0, 2).y).toBe(-32);
-  });
-
-  it('screenToGrid je inverzní ke gridToScreen na ploché mapě', () => {
-    for (let y = 0; y < MAP_SIZE; y += 7) {
-      for (let x = 0; x < MAP_SIZE; x += 7) {
-        const center = tileCenter(x, y);
-        expect(screenToGrid(center.x, center.y), `${x},${y}`).toEqual({ x, y });
-      }
-    }
   });
 
   it('diamondPoints vrací čtyři vrcholy kolem horního rohu', () => {
@@ -284,7 +291,7 @@ describe('picking', () => {
     const center = tileCenter(target.x, target.y);
     const camera = createCamera(center.x, center.y, 1);
 
-    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toEqual(target);
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, FLAT_HEIGHTS)).toEqual(target);
   });
 
   it('funguje i mimo jednotkový zoom', () => {
@@ -292,17 +299,157 @@ describe('picking', () => {
     const center = tileCenter(target.x, target.y);
     const camera = createCamera(center.x, center.y, 3.5);
 
-    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toEqual(target);
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, FLAT_HEIGHTS)).toEqual(target);
   });
 
   it('vrací null mimo mapu', () => {
     const outside = tileCenter(-3, -3);
     const camera = createCamera(outside.x, outside.y, 1);
-    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toBeNull();
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, FLAT_HEIGHTS)).toBeNull();
 
     const beyond = tileCenter(MAP_SIZE + 2, MAP_SIZE + 2);
     const far = createCamera(beyond.x, beyond.y, 1);
-    expect(pickTile(far, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE)).toBeNull();
+    expect(pickTile(far, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, FLAT_HEIGHTS)).toBeNull();
+  });
+});
+
+describe('picking s převýšením (§7 fáze 3)', () => {
+  /** Mřížka rohů, kde celá plocha od `x0,y0` do konce mapy stojí ve výšce `h`. */
+  function plateau(x0: number, y0: number, h: number): Uint8Array {
+    const heights = createCornerHeights();
+    for (let y = y0; y < MAP_SIZE + 1; y++) {
+      for (let x = x0; x < MAP_SIZE + 1; x++) heights[cornerIndex(x, y)] = h;
+    }
+    return heights;
+  }
+
+  /** Kam se na obrazovce promítne střed dlaždice, když je ve výšce `h`. */
+  function centerOf(x: number, y: number, h: number): { x: number; y: number } {
+    const origin = gridToScreen(x, y, h);
+    return { x: origin.x, y: origin.y + TILE_H / 2 };
+  }
+
+  it('zvednutá dlaždice se trefí tam, kde se opravdu kreslí', () => {
+    // Tohle je přesně ten případ, na kterém `screenToGrid` selhalo: inverze
+    // projekce o výšce neví, takže by vrátila dlaždici o pět polí vedle.
+    const target = { x: 60, y: 60 };
+    const heights = plateau(50, 50, 5);
+    const center = centerOf(target.x, target.y, 5);
+    const camera = createCamera(center.x, center.y, 1);
+
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, heights)).toEqual(
+      target,
+    );
+    // Kontrola, že to není náhoda: vzorec z fáze 1 na témž bodě mine.
+    expect(flatInverse(center.x, center.y)).not.toEqual(target);
+  });
+
+  it('vyhrává dlaždice blíž k pozorovateli, ne ta za ní', () => {
+    // Vysoká dlaždice vpředu zakrývá kus té za sebou. Klik do překryvu patří
+    // té přední — to je smysl průchodu od předu dozadu.
+    const heights = createCornerHeights();
+    for (const [x, y] of [
+      [40, 40],
+      [41, 40],
+      [40, 41],
+      [41, 41],
+    ] as const) {
+      heights[cornerIndex(x, y)] = MAX_HEIGHT;
+    }
+
+    // Střed vysoké dlaždice (40,40) leží nad dlaždicemi, které jsou dál.
+    const center = centerOf(40, 40, MAX_HEIGHT);
+    const camera = createCamera(center.x, center.y, 1);
+
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, heights)).toEqual({
+      x: 40,
+      y: 40,
+    });
+  });
+
+  it('trefí i zkroucenou dlaždici (sedlo)', () => {
+    // Sedlo se promítne jako nekonvexní čtyřúhelník. Test na konvexní tvar by
+    // ho odmítl, ray casting ne.
+    const heights = createCornerHeights();
+    heights[cornerIndex(30, 30)] = 1;
+    heights[cornerIndex(31, 31)] = 1;
+
+    const center = { x: gridToScreen(30, 30).x, y: gridToScreen(30, 30).y + TILE_H / 2 - LEVEL_H / 2 };
+    const camera = createCamera(center.x, center.y, 1);
+
+    expect(pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, heights)).toEqual({
+      x: 30,
+      y: 30,
+    });
+  });
+
+  it('na stoupajícím svahu vrátí přední dlaždici, i když míříš na střed zadní', () => {
+    // Vypadá to jako chyba, ale je to správně: terén stoupající k pozorovateli
+    // znamená, že přední dlaždice je nakreslená výš a zadní zakryje. Přesně
+    // tenhle případ vyplaval při zkoušce na vygenerované mapě (4 z 625 vzorků).
+    const heights = createCornerHeights();
+    for (let y = 0; y < MAP_SIZE + 1; y++) {
+      for (let x = 0; x < MAP_SIZE + 1; x++) {
+        // Terén stoupá na jihovýchod o patro na dlaždici.
+        heights[cornerIndex(x, y)] = Math.min(MAX_HEIGHT, Math.max(0, x + y - 100));
+      }
+    }
+
+    const back = { x: 52, y: 52 };
+    const corners = [
+      heights[cornerIndex(back.x, back.y)] ?? 0,
+      heights[cornerIndex(back.x + 1, back.y)] ?? 0,
+      heights[cornerIndex(back.x, back.y + 1)] ?? 0,
+      heights[cornerIndex(back.x + 1, back.y + 1)] ?? 0,
+    ];
+    const quad = tileQuad(back.x, back.y, corners as [number, number, number, number]);
+    const center = {
+      x: (quad[0]! + quad[2]! + quad[4]! + quad[6]!) / 4,
+      y: (quad[1]! + quad[3]! + quad[5]! + quad[7]!) / 4,
+    };
+
+    const camera = createCamera(center.x, center.y, 1);
+    const hit = pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, heights);
+
+    expect(hit).not.toBeNull();
+    // Ať už vyjde kterákoli, musí to být dlaždice, která ten bod opravdu kryje.
+    const hitCorners = [
+      heights[cornerIndex(hit!.x, hit!.y)] ?? 0,
+      heights[cornerIndex(hit!.x + 1, hit!.y)] ?? 0,
+      heights[cornerIndex(hit!.x, hit!.y + 1)] ?? 0,
+      heights[cornerIndex(hit!.x + 1, hit!.y + 1)] ?? 0,
+    ] as [number, number, number, number];
+    expect(containsPoint(tileQuad(hit!.x, hit!.y, hitCorners), center.x, center.y)).toBe(true);
+    // A nesmí být dál než ta, na kterou se mířilo.
+    expect(hit!.x + hit!.y).toBeGreaterThanOrEqual(back.x + back.y);
+  });
+
+  it('na ploché mapě se shoduje se starou inverzí', () => {
+    // Regrese: nová cesta nesmí nic pokazit tam, kde ta stará fungovala.
+    for (let y = 3; y < MAP_SIZE - 3; y += 11) {
+      for (let x = 3; x < MAP_SIZE - 3; x += 11) {
+        const center = tileCenter(x, y);
+        const camera = createCamera(center.x, center.y, 1);
+        expect(
+          pickTile(camera, VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, MAP_SIZE, FLAT_HEIGHTS),
+          `${x},${y}`,
+        ).toEqual({ x, y });
+      }
+    }
+  });
+});
+
+describe('bod ve čtyřúhelníku', () => {
+  it('pozná vnitřek, vnějšek i nekonvexní tvar', () => {
+    const square = [0, 0, 10, 0, 10, 10, 0, 10];
+    expect(containsPoint(square, 5, 5)).toBe(true);
+    expect(containsPoint(square, 15, 5)).toBe(false);
+    expect(containsPoint(square, -1, -1)).toBe(false);
+
+    // Šipka dovnitř: bod ve výřezu leží venku, i když je uvnitř obalu.
+    const arrow = [0, 0, 10, 0, 5, 5, 10, 10, 0, 10];
+    expect(containsPoint(arrow, 2, 5)).toBe(true);
+    expect(containsPoint(arrow, 8, 5)).toBe(false);
   });
 });
 

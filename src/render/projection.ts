@@ -82,23 +82,6 @@ export function slopeLight(corners: readonly [number, number, number, number], s
 }
 
 /**
- * Inverze `gridToScreen`.
- *
- * **Platí jen pro plochý terén.** Fáze 1 má `elevation` všude 0, takže inverze
- * sedí přesně. Jakmile přibude převýšení, tahle funkce přestane stačit a picking
- * se bude muset dělat testováním dlaždic od předu dozadu (architektura §3).
- * Proto je izolovaná sem a nikdo si ji nepočítá inline.
- */
-export function screenToGrid(screenX: number, screenY: number): Point {
-  const a = screenX / (TILE_W / 2); // = x - y
-  const b = screenY / (TILE_H / 2); // = x + y
-  return {
-    x: Math.floor((a + b) / 2),
-    y: Math.floor((b - a) / 2),
-  };
-}
-
-/**
  * Obdélníková oblast mřížky `w × h` od `(x, y)` jako čtyřúhelník na zemi.
  * Pro 1×1 vyjde přesně diamant dlaždice.
  */
