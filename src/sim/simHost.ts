@@ -7,6 +7,7 @@ import {
   bulldoze,
   levelArea,
   placeDefinition,
+  removePipe,
   setServiceFunding,
   setTaxRate,
   terraformCorner,
@@ -46,6 +47,8 @@ export interface ReadonlyWorldView {
   readonly trafficLoad: Readonly<Float32Array>;
   /** Patra v rozích — bez nich by renderer neuměl naklonit dlaždici (§7 fáze 3). */
   readonly cornerHeight: Readonly<Uint8Array>;
+  /** Kam došla voda. Podzemní pohled ji kreslí, jinak se nikde nezobrazuje (§8). */
+  readonly waterSupply: Readonly<Uint8Array>;
 }
 
 /**
@@ -112,6 +115,8 @@ class MainThreadSimHost implements SimHost {
         return setTaxRate(this.world, cmd.zone, cmd.rate);
       case 'build_pipe':
         return buildPipe(this.world, cmd.x, cmd.y, this.balance);
+      case 'remove_pipe':
+        return removePipe(this.world, cmd.x, cmd.y);
       case 'terraform_corner':
         return terraformCorner(this.world, cmd.x, cmd.y, cmd.delta, this.balance);
       case 'level_area':

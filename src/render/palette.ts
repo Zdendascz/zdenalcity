@@ -77,6 +77,19 @@ export const ROAD_COLOR = ROAD_COLORS[1];
  * musí poznat, kde silnice opouští břeh (§7 fáze 3).
  */
 export const BRIDGE_COLOR = 0x8d8f99;
+
+/**
+ * Podzemní pohled (§8 fáze 3). Terén se ztlumí na desetinu jasu, aby se
+ * potrubí nemuselo prát s barvami trávy a vody — pod zemí je stejně tma.
+ */
+export const UNDERGROUND_TERRAIN_SHADE = 0.35;
+/** Potrubí. Modrá jako voda, ale světlejší, ať je vidět na tmavém terénu. */
+export const PIPE_COLOR = 0x67b6e8;
+/** Šířka trubky jako podíl dlaždice. Užší než vozovka — je to trubka. */
+export const PIPE_WIDTH = 0.24;
+/** Nádech na dlaždicích, kam voda opravdu dotekla. */
+export const WATER_SUPPLY_COLOR = 0x2f7fb8;
+export const WATER_SUPPLY_ALPHA = 0.4;
 /** Mantinel mostu. Kreslí se přes celou dlaždici, ať je konstrukce vidět. */
 export const BRIDGE_RAIL_COLOR = 0xb4b7c2;
 

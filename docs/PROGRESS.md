@@ -1334,8 +1334,37 @@ Testy: 15 v `tests/water.test.ts`. Že koušou, ověřeno rozbitím: voda mimo
 potrubí shodí tři, zrušený dosah dva, stanice jako samostatný zdroj jeden,
 stanice bez prodloužení jeden, stavba bez vody jeden, vodárna bez břehu jeden.
 
+- [x] T36 — podzemní pohled, kladení potrubí (fáze 3c)
+
+Vodovod z T35 přestal být neviditelný a hráč se k němu konečně dostane.
+
+- **podzemní pohled** je přepínač vedle overlayů, protože se tak i chová:
+  vždycky nejvýš jeden. Terén ztmavne na 35 %, budovy zmizí úplně (hráč se
+  dívá **pod** ně) a místo nich se kreslí potrubí a pokrytí vodou
+- **trubky používají geometrii vozovky, jen užší.** Auto-tiling tím vyjde
+  zadarmo a napojení vypadá jako napojení, ne jako řada čtverečků
+- **stavební nástroj v tomhle režimu klade potrubí** místo silnice a **buldozer
+  bourá trubky** místo toho, co stojí nad nimi. To druhé je vlastní příkaz
+  `remove_pipe`: obyčejný buldozer bourá to nejvrchnější, takže by hráči
+  mířícímu na trubku sundal dům
+- **změna pokrytí vodou označí dotčené dlaždice** k překreslení. Bez toho by
+  v podzemním pohledu zůstala na obrazovce stará voda, dokud by hráč nesáhl na
+  dlaždici jinak. Označuje se **jen to, co se změnilo** — mutační test ukázal,
+  že to původní znění netestovalo, protože se přepočet vůbec nespustil
+
+Ověřeno v běžící hře po pixelech: nad zemí jsou obě dlaždice stejná tráva
+RGB(107, 155, 74), pod zemí je trubka **(103, 182, 232)** a sousední dlaždice
+bez ní ztlumená tráva **(37, 54, 26)** — přesně 35 % původního jasu. Klik
+stavebním nástrojem v podzemním pohledu položil trubku a **silnici nechal**,
+buldozer trubku sundal a **silnici nad ní nechal stát**. Tím je splněné
+akceptační kritérium 3c č. 18.
+
+Testy: 4 v `tests/water.test.ts`. Že koušou, ověřeno rozbitím: neoznačené
+změny pokrytí shodí jeden, označování všeho jeden, buldozer sahající i na
+silnici jeden.
+
 ## Rozpracované
-_(T35 hotové, dál T36: podzemní pohled a nástroj na kladení potrubí.)_
+_(T36 hotové, dál T37: kanalizace jako kapacita a čistírna.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -1451,9 +1480,6 @@ _(T35 hotové, dál T36: podzemní pohled a nástroj na kladení potrubí.)_
 - **Potrubí se zatím neukládá do savu** (přijde ve verzi 5, T40). Načtené město
   do té doby přijde o vodovod a začne chátrat — což je mimochodem přesně to
   chování, které §10 pro migraci na v5 předepisuje, jen zatím bez hlášky.
-- **Nástroj na kladení potrubí ještě není v liště** (T36). Do té doby jde
-  potrubí položit jen příkazem `build_pipe`, takže ve hře je vodovod
-  nedosažitelný pro hráče, i když v simulaci funguje.
 
 - **Kopec před budovou ji nezakryje.** Renderer kreslí nejdřív celý terén a pak
   všechny budovy, takže budova je vždycky nad terénem. Správně by se muselo

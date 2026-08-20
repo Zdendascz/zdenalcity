@@ -6,6 +6,8 @@ import type { DirtySet } from '@/sim/world';
 import {
   BRIDGE_COLOR,
   BRIDGE_RAIL_COLOR,
+  PIPE_COLOR,
+  PIPE_WIDTH,
   POWER_OFF_COLOR,
   POWER_ON_COLOR,
   POWER_OVERLAY_ALPHA,
@@ -15,6 +17,9 @@ import {
   shade,
   TERRAIN_COLORS,
   TILE_EDGE_SHADE,
+  UNDERGROUND_TERRAIN_SHADE,
+  WATER_SUPPLY_ALPHA,
+  WATER_SUPPLY_COLOR,
   ZONE_COLOR_BY_VALUE,
   ZONE_OVERLAY_ALPHA,
 } from './palette';
@@ -28,7 +33,7 @@ export const CHUNK_SIZE = 16;
  * Který diagnostický pohled je zapnutý. Vždycky nejvýš jeden — dva překryvy
  * přes sebe by se nedaly přečíst. Skutečný přepínač s ikonami je T21.
  */
-export type OverlayMode = 'none' | 'power';
+export type OverlayMode = 'none' | 'power' | 'underground';
 
 interface Chunk {
   readonly x0: number;
@@ -141,9 +146,12 @@ export class ChunkRenderer {
     const tileIndex = index(x, y);
     const terrain = this.world.layers.terrain[tileIndex] ?? 0;
     const corners = tileCorners(this.world.cornerHeight, x, y);
+    const underground = this.overlay === 'underground';
     const flat = TERRAIN_COLORS[terrain] ?? TERRAIN_COLORS[0];
     // Sklon se promítne do jasu, jinak by svah vypadal jako rovina (§7).
-    const color = shade(flat, slopeLight(corners));
+    // V podzemním pohledu se terén ztlumí, ať nepřekřičí potrubí (§8).
+    const lit = shade(flat, slopeLight(corners));
+    const color = underground ? shade(lit, UNDERGROUND_TERRAIN_SHADE) : lit;
 
     // Vše ostatní na dlaždici — vozovka i překryvy — se kreslí do téhle plochy,
     // ne do pravidelného diamantu. Na svahu by se od terénu odlepilo.
@@ -153,6 +161,12 @@ export class ChunkRenderer {
       .poly(points)
       .fill({ color })
       .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
+
+    if (underground) {
+      // Pod zemí zóny ani vozovka nezajímají — jen kudy vede voda a kam došla.
+      this.drawUnderground(graphics, points, tileIndex, x, y);
+      return;
+    }
 
     const zone = this.world.layers.zone[tileIndex] ?? 0;
     const zoneColor = ZONE_COLOR_BY_VALUE[zone];
@@ -183,6 +197,37 @@ export class ChunkRenderer {
     if (this.overlay === 'power') {
       this.drawPowerOverlay(graphics, points, tileIndex);
     }
+  }
+
+  /**
+   * Podzemní pohled: potrubí a pokrytí vodou (§8 fáze 3).
+   *
+   * Trubky se skládají ze stejné geometrie jako vozovka, jen užší — auto-tiling
+   * tak vyjde zadarmo a napojení vypadá jako napojení, ne jako řada čtverečků.
+   */
+  private drawUnderground(
+    graphics: Graphics,
+    points: number[],
+    tileIndex: number,
+    x: number,
+    y: number,
+  ): void {
+    if (this.world.waterSupply[tileIndex] === 1) {
+      graphics.poly(points).fill({ color: WATER_SUPPLY_COLOR, alpha: WATER_SUPPLY_ALPHA });
+    }
+
+    if (this.world.layers.pipe[tileIndex] !== 1) return;
+
+    const mask = roadMask((nx, ny) => this.isPipe(nx, ny), x, y);
+    for (const polygon of roadPolygons(points, mask, PIPE_WIDTH)) {
+      graphics.poly(polygon).fill({ color: PIPE_COLOR });
+    }
+  }
+
+  /** Mimo mapu potrubí není — okraj se chová jako slepý konec, stejně jako u silnic. */
+  private isPipe(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return false;
+    return this.world.layers.pipe[index(x, y)] === 1;
   }
 
   /**

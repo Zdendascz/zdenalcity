@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { checkFootprint, placeBuilding } from '@/sim/buildings';
-import { buildPipe, buildRoad, bulldoze, placeDefinition } from '@/sim/commands';
+import { buildPipe, buildRoad, bulldoze, placeDefinition, removePipe } from '@/sim/commands';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { createWaterDecaySystem, createWaterSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
@@ -209,6 +209,63 @@ describe('vodovod (§8 fáze 3)', () => {
     placeBuilding(w, house, 30, 30);
     expect(buildPipe(w, 30, 30, VANILLA_BALANCE).ok).toBe(true);
     expect(w.layers.pipe[index(30, 30)]).toBe(1);
+  });
+});
+
+describe('podzemní pohled a kladení potrubí (T36)', () => {
+  it('buldozer pod zemí sundá trubku, ne to, co stojí nad ní', () => {
+    // Obyčejný `bulldoze` bourá to nejvrchnější, takže by v podzemním pohledu
+    // sundal budovu nad potrubím. Hráč, který kouká pod zem, míří na trubku.
+    const w = world();
+    w.layers.road[index(20, 20)] = ROAD.street;
+    buildPipe(w, 20, 20, VANILLA_BALANCE);
+
+    expect(removePipe(w, 20, 20).ok).toBe(true);
+
+    expect(w.layers.pipe[index(20, 20)]).toBe(0);
+    expect(w.layers.road[index(20, 20)]).toBe(ROAD.street); // silnice zůstala
+  });
+
+  it('kde trubka není, nemá buldozer co sundat', () => {
+    const w = world();
+    const result = removePipe(w, 30, 30);
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toBe('error.noPipe');
+  });
+
+  it('změna pokrytí vodou označí dlaždice k překreslení', async () => {
+    // Bez toho by v podzemním pohledu zůstala na obrazovce stará voda.
+    const content = await vanilla();
+    const w = world();
+    lake(w);
+    waterworks(w, content, 4, 20);
+    pipes(w, 7, 20, 20);
+
+    w.dirty.tiles.clear();
+    run(w, content, 4);
+
+    expect(w.dirty.tiles.size).toBeGreaterThan(10);
+    expect(w.dirty.tiles.has(index(20, 20))).toBe(true);
+  });
+
+  it('označí se jen to, co se opravdu změnilo', async () => {
+    // Přepočet nad **stejnou** sítí nesmí označit nic. Kdyby označoval všechno,
+    // překresloval by se každou změnou potrubí celý svět.
+    const content = await vanilla();
+    const w = world();
+    lake(w);
+    waterworks(w, content, 4, 20);
+    pipes(w, 7, 20, 20);
+    run(w, content, 4);
+
+    w.dirty.tiles.clear();
+    // Vynucený přepočet beze změny sítě — přesně ten případ, na kterém se pozná
+    // rozdíl mezi „označ změněné" a „označ všechno".
+    w.waterNetworkDirty = true;
+    run(w, content, 4);
+
+    expect(w.dirty.tiles.size).toBe(0);
   });
 });
 

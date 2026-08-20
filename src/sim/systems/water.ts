@@ -1,7 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { index, MAP_SIZE } from '../layers';
-import { markBuildingDirty } from '../world';
+import { markBuildingDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
@@ -51,6 +51,10 @@ interface Source {
 
 function recompute(world: WorldState, catalogue: BuildingCatalogue, balance: Balance): void {
   const supply = world.waterSupply;
+  // Předchozí stav si necháme, aby šlo označit **jen to, co se změnilo**.
+  // Podzemní pohled pokrytí kreslí, takže bez toho by na obrazovce zůstala
+  // stará voda, dokud hráč nesáhne na dlaždici jinak.
+  const before = Uint8Array.from(supply);
   supply.fill(0);
 
   // Pořadí podle id, ať je průchod deterministický bez ohledu na to, jak mapa
@@ -82,7 +86,17 @@ function recompute(world: WorldState, catalogue: BuildingCatalogue, balance: Bal
   // Bez jediné vodárny nemá co téct ani nejdelší potrubí.
   if (production > 0) floodFill(world, sources, supply);
 
+  markChangedTiles(world, before, supply);
   markWateredBuildings(world, catalogue, ids);
+}
+
+/** Označí dlaždice, kterým voda přibyla nebo zmizela. */
+function markChangedTiles(world: WorldState, before: Uint8Array, after: Uint8Array): void {
+  for (let tile = 0; tile < after.length; tile++) {
+    if (before[tile] === after[tile]) continue;
+    const x = tile % world.size;
+    markTileDirty(world, x, (tile - x) / world.size);
+  }
 }
 
 function footprintTiles(x: number, y: number, footprint: readonly [number, number]): number[] {

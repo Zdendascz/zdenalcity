@@ -61,6 +61,17 @@ export class BuildingRenderer {
     parent.addChild(this.container);
   }
 
+  /**
+   * Schová nebo ukáže všechny budovy naráz.
+   *
+   * Podzemní pohled se dívá **pod** ně, takže by v cestě jen překážely (§8).
+   * Je to jeden příznak na kontejneru, ne překreslení — přepnutí pohledu se
+   * nesmí projevit prodlevou.
+   */
+  setVisible(visible: boolean): void {
+    this.container.visible = visible;
+  }
+
   update(dirty: DirtySet): void {
     if (dirty.fullRedraw) {
       for (const id of [...this.views.keys()]) {

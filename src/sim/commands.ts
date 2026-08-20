@@ -42,6 +42,7 @@ export type Command =
   | { type: 'set_tax_rate'; zone: ZoneType; rate: number }
   | { type: 'set_service_funding'; serviceClass: string; funding: number }
   | { type: 'build_pipe'; x: number; y: number }
+  | { type: 'remove_pipe'; x: number; y: number }
   | { type: 'terraform_corner'; x: number; y: number; delta: number }
   | { type: 'level_area'; x: number; y: number; w: number; h: number }
   | { type: 'set_speed'; speed: number };
@@ -417,6 +418,24 @@ export function buildPipe(
 
   world.economy.funds -= cost;
   world.layers.pipe[tile] = 1;
+  markTileDirty(world, x, y);
+  markWaterNetworkDirty(world);
+  return OK;
+}
+
+/**
+ * Odstraní potrubí, a **jen potrubí**.
+ *
+ * Buldozer bourá to nejvrchnější, takže by v podzemním pohledu sundal budovu
+ * nebo silnici nad trubkou. Hráč, který kouká pod zem, ale míří na trubku.
+ */
+export function removePipe(world: WorldState, x: number, y: number): CommandResult {
+  if (!inBounds(x, y)) return reject('error.outOfBounds');
+
+  const tile = index(x, y);
+  if (world.layers.pipe[tile] !== 1) return reject('error.noPipe');
+
+  world.layers.pipe[tile] = 0;
   markTileDirty(world, x, y);
   markWaterNetworkDirty(world);
   return OK;

@@ -412,6 +412,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     { id: 'landValue', labelKey: 'ui.overlay.landValue' },
     { id: 'crime', labelKey: 'ui.overlay.crime' },
     { id: 'traffic', labelKey: 'ui.overlay.traffic' },
+    // Podzemí není překryv, ale jiný pohled na svět. Přepínač je vedle nich,
+    // protože se tak chová: vždycky nejvýš jeden (§8 fáze 3).
+    { id: 'underground', labelKey: 'ui.overlay.underground' },
     ...serviceClasses.map((serviceClass) => ({
       id: `coverage:${serviceClass}`,
       labelKey: `ui.overlay.coverage.${serviceClass}`,
@@ -424,10 +427,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     overlayMode = overlayMode === id ? 'none' : id;
     // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu
     // a doprava svou vlastní v plném rozlišení.
-    chunkRenderer.setOverlay(overlayMode === 'power' ? 'power' : ('none' as OverlayMode));
-    const coarseId = overlayMode === 'power' || overlayMode === 'traffic' ? 'none' : overlayMode;
+    const chunkMode: OverlayMode =
+      overlayMode === 'power' ? 'power' : overlayMode === 'underground' ? 'underground' : 'none';
+    chunkRenderer.setOverlay(chunkMode);
+    const coarseId =
+      overlayMode === 'power' || overlayMode === 'traffic' || overlayMode === 'underground'
+        ? 'none'
+        : overlayMode;
     coarseOverlay.setActive(coarseId);
     trafficOverlay.setVisible(overlayMode === 'traffic');
+    // Budovy v podzemním pohledu překáží — hráč se dívá pod ně.
+    buildingRenderer.setVisible(overlayMode !== 'underground');
   }
 
   const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, serviceClasses, {
@@ -554,10 +564,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     switch (action.kind) {
       case 'road':
-        dispatch({ type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType });
+        // V podzemním pohledu klade stavební nástroj potrubí, ne silnici (§8).
+        if (overlayMode === 'underground') {
+          dispatch({ type: 'build_pipe', x: tile.x, y: tile.y });
+        } else {
+          dispatch({ type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType });
+        }
         break;
       case 'bulldoze':
-        dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
+        // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.
+        if (overlayMode === 'underground') {
+          dispatch({ type: 'remove_pipe', x: tile.x, y: tile.y });
+        } else {
+          dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
+        }
         break;
       case 'zone':
         dispatch({ type: 'zone', x: tile.x, y: tile.y, w: 1, h: 1, zone: action.zone });
