@@ -443,6 +443,20 @@ body {
 
 /* --- bublina s cenou ---------------------------------------------------- */
 
+.price-tag {
+  position: absolute;
+  z-index: 20;
+  transform: translate(14px, 14px);
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 72%);
+  color: #e6e9ef;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .cost-popup {
   position: absolute;
   z-index: 20;

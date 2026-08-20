@@ -99,7 +99,14 @@ class MainThreadSimHost implements SimHost {
       case 'zone':
         return zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone);
       case 'place_building':
-        return placeDefinition(this.world, this.catalogue, cmd.definitionId, cmd.x, cmd.y);
+        return placeDefinition(
+          this.world,
+          this.catalogue,
+          cmd.definitionId,
+          cmd.x,
+          cmd.y,
+          this.balance,
+        );
       case 'set_tax_rate':
         return setTaxRate(this.world, cmd.zone, cmd.rate);
       case 'terraform_corner':

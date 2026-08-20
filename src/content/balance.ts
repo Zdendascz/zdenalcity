@@ -76,6 +76,9 @@ export interface Balance {
      * u strmého svahu rozhýbe desítky rohů a hráč to má vidět na účtu (§7).
      */
     terraformCost: number;
+    /** Odtěžení skály a zavezení mokřadu — od 3b jsou obojí řešitelné (§7). */
+    clearRockCost: number;
+    fillMarshCost: number;
   };
 
   /**
@@ -98,6 +101,8 @@ export interface Balance {
      * MHD zátěž snižuje, neruší.
      */
     transitReduction: number;
+    /** Cena jedné dlaždice mostu. Most je dražší než vozovka na souši (§7). */
+    bridgeCost: number;
   };
 
   diffusion: { spread: number; decay: number; passes: number };
@@ -348,6 +353,8 @@ export function validateBalance(raw: unknown): {
       rivers: num(issues, map, 'rivers', 'map.rivers', 0, 16),
       riverSourceHeight: num(issues, map, 'riverSourceHeight', 'map.riverSourceHeight', 0, MAX_HEIGHT),
       terraformCost: num(issues, map, 'terraformCost', 'map.terraformCost', 0, 100000),
+      clearRockCost: num(issues, map, 'clearRockCost', 'map.clearRockCost', 0, 100000),
+      fillMarshCost: num(issues, map, 'fillMarshCost', 'map.fillMarshCost', 0, 100000),
     },
     traffic: {
       roadTypes,
@@ -363,6 +370,7 @@ export function validateBalance(raw: unknown): {
       ),
       smoothing: num(issues, traffic, 'smoothing', 'traffic.smoothing', 0, 1),
       transitReduction: num(issues, traffic, 'transitReduction', 'traffic.transitReduction', 0, 1),
+      bridgeCost: num(issues, traffic, 'bridgeCost', 'traffic.bridgeCost', 0, 100000),
     },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),

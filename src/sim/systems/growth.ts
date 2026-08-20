@@ -111,7 +111,17 @@ function attemptsFor(
   const rate = world.economy.taxRates[category];
   const taxFactor = Math.max(0.2, Math.min(1.5, 1 - (rate - neutralTaxRate) / taxRange));
 
-  const attempts = Math.round((demand / demandPerAttempt) * taxFactor * cityAccess);
+  const raw = (demand / demandPerAttempt) * taxFactor * cityAccess;
+
+  // **Zlomek pokusu se nezaokrouhluje, ale losuje.** Původní `Math.round` dělal
+  // z každé hodnoty pod 0,5 tvrdou nulu, takže město s poptávkou 26 a špatnou
+  // dostupností práce (0,487 pokusu) stálo úplně — přesně to, co R6 zakazuje:
+  // „roste pomalu, ne vůbec". Vyplavalo to při hraní ve fázi 3b, ne z testů.
+  //
+  // Takhle zůstane střední hodnota přesně `raw` a pomalý růst je opravdu
+  // pomalý, ne žádný. Náhoda jde z `world.rng`, takže determinismus platí (P2).
+  const whole = Math.floor(raw);
+  const attempts = whole + (world.rng.next() < raw - whole ? 1 : 0);
   return Math.max(0, Math.min(maxAttempts, attempts));
 }
 

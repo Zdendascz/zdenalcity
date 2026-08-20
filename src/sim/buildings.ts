@@ -1,4 +1,5 @@
 import type { Definition } from '@/content/schema';
+import { isFlatTile } from './heights';
 import { inBounds, index } from './layers';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
@@ -22,6 +23,13 @@ export interface FitOptions {
    * stavba hráče pravidlo z definice dodržuje dál.
    */
   skipRoadCheck?: boolean;
+  /**
+   * Vynechá kontrolu rovného půdorysu.
+   *
+   * Používá ji stavba, která si parcelu **předtím srovná** a nechce se ptát
+   * dvakrát na totéž. Nikdo jiný ji nastavovat nemá.
+   */
+  skipFlatCheck?: boolean;
 }
 
 /**
@@ -62,6 +70,13 @@ export function checkFootprint(
       const terrain = world.layers.terrain[tile] ?? 0;
       if (!definition.construction.allowedTerrain.includes(terrain)) {
         return reject('error.terrainNotAllowed');
+      }
+
+      // Budova stojí na rovině (§7 fáze 3). Na svahu by visela jedním rohem ve
+      // vzduchu — a srovnat parcelu je nabídka, ne automatika, protože stojí
+      // peníze a hráč to má vidět předem (§12 kritérium 14).
+      if (!options.skipFlatCheck && !isFlatTile(world.cornerHeight, tileX, tileY)) {
+        return reject('error.notFlat');
       }
     }
   }

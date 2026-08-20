@@ -1,9 +1,11 @@
 import { Container, Graphics } from 'pixi.js';
 import { tileCorners } from '@/sim/heights';
-import { index, ROAD } from '@/sim/layers';
+import { index, ROAD, TERRAIN } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import {
+  BRIDGE_COLOR,
+  BRIDGE_RAIL_COLOR,
   POWER_OFF_COLOR,
   POWER_ON_COLOR,
   POWER_OVERLAY_ALPHA,
@@ -159,12 +161,20 @@ export class ChunkRenderer {
     }
 
     const roadType = this.world.layers.road[tileIndex] ?? ROAD.none;
+    // Vozovka na vodě je most. Kreslí se přes celou dlaždici a světleji, aby
+    // šlo poznat, kde silnice opouští břeh (§7 fáze 3).
+    const bridge = roadType !== ROAD.none && terrain === TERRAIN.water;
+    if (bridge) {
+      graphics.poly(points).fill({ color: BRIDGE_RAIL_COLOR });
+    }
     if (roadType !== ROAD.none) {
       // Bitmask se počítá z „je tam jakákoli silnice" — všechny typy se
       // navzájem napojují (§4). Šířku a barvu určuje typ vlastní dlaždice.
       const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
       for (const polygon of roadPolygons(points, mask, ROAD_WIDTHS[roadType])) {
-        graphics.poly(polygon).fill({ color: ROAD_COLORS[roadType] ?? ROAD_COLOR });
+        graphics
+          .poly(polygon)
+          .fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[roadType] ?? ROAD_COLOR) });
       }
     }
 

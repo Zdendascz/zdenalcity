@@ -136,6 +136,22 @@ describe('dostupnost práce v růstu (R6)', () => {
     expect(near).toBeGreaterThan(far);
   });
 
+  it('zlomek pokusu se losuje, ne zaokrouhluje — jinak město zamrzne', () => {
+    // Ostrá chyba z hraní fáze 3b: poptávka 26, dostupnost práce na podlaze,
+    // z toho 0,487 pokusu za běh. `Math.round` z toho udělal nulu a město
+    // stálo napořád, i když mělo desítky volných parcel. R6 přitom říká
+    // „roste pomalu, ne vůbec".
+    const w = zoned(11);
+    w.demand.residential = 3; // málo poptávky = zlomek pokusu na běh
+    placeBuilding(w, SHOP, 12, 9);
+    for (let tick = 0; tick < 600; tick++) {
+      for (const building of w.buildings.values()) w.jobAccess.set(building.id, 0);
+      tickWorld(w, [growth]);
+    }
+
+    expect(w.buildings.size).toBeGreaterThan(1);
+  });
+
   it('při nulové dostupnosti se staví pomalu, ale staví', () => {
     // Tvrdá nula by z dostupnosti udělala bránu, ze které není cesta ven:
     // nikdo by se nepřistěhoval, takže by nikdo nepostavil silnici k práci.

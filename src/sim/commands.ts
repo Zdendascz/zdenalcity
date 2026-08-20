@@ -4,6 +4,8 @@ import type { BuildingCatalogue } from './catalogue';
 import {
   cornerInBounds,
   cornerIndex,
+  isTwistedTile,
+  MAX_HEIGHT,
   planCornerHeight,
   planLevelArea,
 } from './heights';
@@ -42,6 +44,20 @@ export type Command =
   | { type: 'level_area'; x: number; y: number; w: number; h: number }
   | { type: 'set_speed'; speed: number };
 
+/** Má dlaždice aspoň jednoho silničního souseda? Odsud se staví mosty dál. */
+function touchesRoad(world: WorldState, x: number, y: number): boolean {
+  for (const [dx, dy] of [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+  ] as const) {
+    if (!inBounds(x + dx, y + dy)) continue;
+    if ((world.layers.road[index(x + dx, y + dy)] ?? ROAD.none) !== ROAD.none) return true;
+  }
+  return false;
+}
+
 /**
  * Změna silnice mění auto-tiling i u čtyř sousedů, takže do `DirtySet` musí
  * i oni — jinak by zůstali vykreslení se starým napojením.
@@ -68,10 +84,21 @@ export function buildRoad(
   if (!inBounds(x, y)) return reject('error.outOfBounds');
 
   const tile = index(x, y);
-  if (world.layers.terrain[tile] === TERRAIN.water) return reject('error.water');
   if (world.layers.buildingId[tile] !== 0) return reject('error.occupied');
-  if (needsClearing(world.layers.terrain[tile] ?? TERRAIN.grass)) {
+
+  // Vozovka na vodě je **most** (§7 fáze 3). Staví se jen z břehu dál, aby
+  // hráč nemohl položit kus vozovky doprostřed moře.
+  const overWater = world.layers.terrain[tile] === TERRAIN.water;
+  if (overWater && !touchesRoad(world, x, y)) return reject('error.bridgeNeedsBank');
+
+  if (!overWater && needsClearing(world.layers.terrain[tile] ?? TERRAIN.grass)) {
     return reject('error.terrainNotAllowed');
+  }
+
+  // Rovnoměrný svah vozovka snese, sedlo ne: zkroucenou dlaždici nejde
+  // přejet po rovině a ani nakreslit jako vozovku (§7).
+  if (!overWater && isTwistedTile(world.cornerHeight, x, y)) {
+    return reject('error.roadTwisted');
   }
 
   const current = world.layers.road[tile] ?? ROAD.none;
@@ -80,7 +107,9 @@ export function buildRoad(
   // a postaví — jinak by se dala třída „prodat" za rozdíl cen.
   if (current > type) return reject('error.roadDowngrade');
 
-  const cost = balance?.traffic.roadTypes[type - 1]?.cost ?? 0;
+  const cost = overWater
+    ? (balance?.traffic.bridgeCost ?? 0)
+    : (balance?.traffic.roadTypes[type - 1]?.cost ?? 0);
   if (world.economy.funds < cost) {
     return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
   }
@@ -97,32 +126,111 @@ export function buildRoad(
  * typicky infrastruktura. Definici hledá v katalogu, takže v kódu není ani
  * jedna budova (P5).
  */
+export interface PlacementEstimate {
+  /** Cena samotné budovy. */
+  building: number;
+  /** Kolik navíc stojí srovnání parcely. Nula, když je rovná. */
+  levelling: number;
+  total: number;
+  /** Rohy, které srovnání pohne. Prázdné, když se nic srovnávat nemusí. */
+  changes: Map<number, number>;
+}
+
+/**
+ * Co bude stát postavení téhle budovy sem, **včetně srovnání parcely**.
+ *
+ * Nic nemění. Existuje kvůli §12 kritériu 14: srovnání pod budovou se má
+ * nabídnout **s cenou předem**, ne až po zaplacení. UI si tohle zavolá při
+ * najetí myší a hráč vidí, do čeho jde.
+ */
+export function estimatePlacement(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  definitionId: string,
+  x: number,
+  y: number,
+  balance?: Balance,
+): PlacementEstimate {
+  const definition = catalogue.get(definitionId);
+  if (!definition) return { building: 0, levelling: 0, total: 0, changes: new Map() };
+
+  const [width, depth] = definition.footprint;
+  const changes = planLevelling(world, x, y, width, depth);
+  const levelling = changes.size * (balance?.map.terraformCost ?? 0);
+  const building = definition.construction.cost;
+
+  return { building, levelling, total: building + levelling, changes };
+}
+
+/**
+ * Srovnání, které projde i na břehu.
+ *
+ * Standardně se rovná na **průměr** rohů, protože to je nejlevnější. U vody to
+ * ale nejde: průměr může zvednout roh sdílený s vodní dlaždicí a moře by se
+ * naklonilo. V tom případě se rovná na **nejnižší roh** — pobřežní svah se
+ * odkope, hladina zůstane, kde byla.
+ *
+ * Vyplavalo to při hraní: elektrárna u pobřeží se odmítala postavit s hláškou
+ * „zvedat dno moře neumíme", i když stála celá na souši.
+ */
+function planLevelling(
+  world: WorldState,
+  x: number,
+  y: number,
+  width: number,
+  depth: number,
+): Map<number, number> {
+  const averaged = planLevelArea(world.cornerHeight, x, y, width, depth);
+  if (checkTerraform(world, averaged).ok) return averaged;
+
+  let lowest = MAX_HEIGHT;
+  for (let cy = y; cy <= y + depth; cy++) {
+    for (let cx = x; cx <= x + width; cx++) {
+      if (!cornerInBounds(cx, cy)) continue;
+      lowest = Math.min(lowest, world.cornerHeight[cornerIndex(cx, cy)] ?? 0);
+    }
+  }
+
+  return planLevelArea(world.cornerHeight, x, y, width, depth, lowest);
+}
+
 export function placeDefinition(
   world: WorldState,
   catalogue: BuildingCatalogue,
   definitionId: string,
   x: number,
   y: number,
+  balance?: Balance,
 ): CommandResult {
   const definition = catalogue.get(definitionId);
   if (!definition) return reject('error.unknownDefinition', { id: definitionId });
 
-  // Zóna se nekontroluje: elektrárna smí stát i na nezónované půdě.
-  const fits = checkFootprint(world, definition, x, y);
+  // Nerovná parcela se **srovná**, ne odmítne (§7 fáze 3). Cena srovnání se
+  // připočte a UI ji přes `estimatePlacement` umí ukázat dřív, než hráč klikne.
+  const plan = estimatePlacement(world, catalogue, definitionId, x, y, balance);
+
+  // Zóna se nekontroluje: elektrárna smí stát i na nezónované půdě. Rovina se
+  // nekontroluje taky — od toho je to srovnání o řádek níž.
+  const fits = checkFootprint(world, definition, x, y, { skipFlatCheck: true });
   if (!fits.ok) return fits;
 
   // Prerekvizity platí i pro ruční stavbu, ne jen pro růst (§7).
   const met = checkRequirements(world, catalogue, definition, x, y, presentDefinitions(world));
   if (!met.ok) return met;
 
-  // Na co nejsou peníze, to se nepostaví. Na rozdíl od budov, které vyrostou
-  // ze zóny samy, tuhle platí hráč.
-  const cost = definition.construction.cost;
-  if (world.economy.funds < cost) {
-    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  if (plan.changes.size > 0) {
+    const allowed = checkTerraform(world, plan.changes);
+    if (!allowed.ok) return allowed;
   }
 
-  world.economy.funds -= cost;
+  // Na co nejsou peníze, to se nepostaví. Na rozdíl od budov, které vyrostou
+  // ze zóny samy, tuhle platí hráč.
+  if (world.economy.funds < plan.total) {
+    return reject('error.notEnoughFunds', { cost: plan.total, funds: world.economy.funds });
+  }
+
+  world.economy.funds -= plan.total;
+  if (plan.changes.size > 0) applyHeightChanges(world, plan.changes);
   placeBuilding(world, definition, x, y);
   return OK;
 }
@@ -217,6 +325,23 @@ export function bulldoze(
   // půdy a pohlcuje znečištění, po vykácení zbude místo na stavbu (§2 fáze 3).
   if (world.layers.terrain[tile] === TERRAIN.forest) {
     const cost = balance?.map.clearForestCost ?? 0;
+    if (world.economy.funds < cost) {
+      return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+    }
+    world.economy.funds -= cost;
+    world.layers.terrain[tile] = TERRAIN.grass;
+    markTileDirty(world, x, y);
+    return OK;
+  }
+
+  // Skálu jde odtěžit a mokřad zavézt — obojí za cenu terraformingu (§7 fáze 3).
+  // Do fáze 3a to byly terény, se kterými hráč nemohl dělat vůbec nic.
+  const terrain = world.layers.terrain[tile] ?? TERRAIN.grass;
+  if (terrain === TERRAIN.rock || terrain === TERRAIN.marsh) {
+    const cost =
+      terrain === TERRAIN.rock
+        ? (balance?.map.clearRockCost ?? 0)
+        : (balance?.map.fillMarshCost ?? 0);
     if (world.economy.funds < cost) {
       return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
     }
@@ -345,7 +470,7 @@ export function estimateLevelArea(
   h: number,
   balance?: Balance,
 ): TerraformEstimate {
-  return estimate(planLevelArea(world.cornerHeight, x, y, w, h), balance);
+  return estimate(planLevelling(world, x, y, w, h), balance);
 }
 
 function commit(world: WorldState, plan: TerraformEstimate): CommandResult {

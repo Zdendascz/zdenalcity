@@ -72,6 +72,14 @@ export const ROAD_WIDTHS = [0, 0.5, 0.68, 0.86] as const;
 /** Barva ulice. Starší kód a testy se odkazují na ni. */
 export const ROAD_COLOR = ROAD_COLORS[1];
 
+/**
+ * Most je světlejší než vozovka na souši — na tmavé vodě by splynul, a hráč
+ * musí poznat, kde silnice opouští břeh (§7 fáze 3).
+ */
+export const BRIDGE_COLOR = 0x8d8f99;
+/** Mantinel mostu. Kreslí se přes celou dlaždici, ať je konstrukce vidět. */
+export const BRIDGE_RAIL_COLOR = 0xb4b7c2;
+
 /** Pozadí mimo mapu. */
 export const BACKGROUND_COLOR = 0x14161a;
 

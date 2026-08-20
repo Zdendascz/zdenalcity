@@ -27,7 +27,9 @@
     "heightCurve": 1.6,
     "rivers": 0,
     "riverSourceHeight": 5,
-    "terraformCost": 8
+    "terraformCost": 8,
+    "clearRockCost": 60,
+    "fillMarshCost": 40
   },
 
   "traffic": {
@@ -40,7 +42,8 @@
     "maxSteps": 24,
     "maxBuildingsPerRun": 96,
     "smoothing": 0.3,
-    "transitReduction": 0.6
+    "transitReduction": 0.6,
+    "bridgeCost": 150
   },
 
   "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },

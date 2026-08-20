@@ -3,6 +3,7 @@ import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { applySaveToWorld, collectLoadWarnings, unpackSave } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
+import { estimatePlacement } from '@/sim/commands';
 import { explainParcel } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
@@ -19,6 +20,7 @@ import { createWorld } from '@/sim/world';
 import { BudgetPanel } from '@/ui/budgetPanel';
 import { BuildingInfo } from '@/ui/buildingInfo';
 import { CostPopup } from '@/ui/costPopup';
+import { PriceTag } from '@/ui/priceTag';
 import { Notifications } from '@/ui/notifications';
 import { formatNumber } from '@/ui/format';
 import { Hud } from '@/ui/hud';
@@ -259,6 +261,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const debug = new DebugOverlay(mount);
   debug.setVisible(false);
   const costPopup = new CostPopup(mount);
+  const priceTag = new PriceTag(mount);
   const notifications = new Notifications(mount);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
   const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance());
@@ -379,7 +382,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (tile.x + width > MAP_SIZE || tile.y + depth > MAP_SIZE) return false;
 
     const definition = content.get(activeTool.action.definitionId);
-    return definition ? checkFootprint(simWorld, definition, tile.x, tile.y).ok : true;
+    // Svah **není** překážka: parcela se srovná při stavbě, jen to něco stojí.
+    return definition
+      ? checkFootprint(simWorld, definition, tile.x, tile.y, { skipFlatCheck: true }).ok
+      : true;
   }
 
   /**
@@ -507,6 +513,40 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     return best;
   }
 
+  /** Poslední pozice kurzoru — cenovka se překresluje každý snímek. */
+  let pointerX = 0;
+  let pointerY = 0;
+
+  /**
+   * Cenovka u kurzoru: co bude stát postavit tohle sem, **včetně srovnání
+   * parcely** (§12 kritérium 14). U ostatních nástrojů se schová — cena
+   * silnice je pevná a v liště.
+   */
+  function showPlacementPrice(tile: { x: number; y: number }): void {
+    if (activeTool.action.kind !== 'place') {
+      priceTag.hide();
+      return;
+    }
+
+    const plan = estimatePlacement(
+      simWorld,
+      content,
+      activeTool.action.definitionId,
+      tile.x,
+      tile.y,
+      content.getBalance(),
+    );
+
+    const text =
+      plan.levelling > 0
+        ? i18n.t('ui.price.withLevelling', {
+            total: formatNumber(plan.total),
+            levelling: formatNumber(plan.levelling),
+          })
+        : formatNumber(plan.total);
+    priceTag.show(pointerX, pointerY, text);
+  }
+
   /** Veškeré hráčské akce jdou přes dispatch — renderer na WorldState nesahá. */
   function applyTool(tile: { x: number; y: number }, viewX: number, viewY: number): void {
     const action = activeTool.action;
@@ -583,6 +623,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
 
     hoveredTile = tileAt(event);
+    pointerX = event.offsetX;
+    pointerY = event.offsetY;
 
     // Malování tažením: dokud je tlačítko dole, každá nová dlaždice dostane
     // stejný nástroj. Bez toho by se zóna vyznačovala klikáním po jedné.
@@ -741,6 +783,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         )
         .fill({ color, alpha: HOVER_FILL_ALPHA })
         .stroke({ color, alpha: HOVER_LINE_ALPHA, width: 2 / camera.zoom });
+
+      // Cena **předem** (§12 kritérium 14). Srovnání parcely se nemá objevit
+      // až na účtu — hráč musí vidět, kolik ho svah bude stát, dřív než klikne.
+      showPlacementPrice(hoveredTile);
+    } else {
+      priceTag.hide();
     }
 
     let poweredBuildings = 0;

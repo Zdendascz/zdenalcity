@@ -128,6 +128,7 @@
   "ui.save.missingContent": "Missing content: {list}",
 
   "ui.cost.spent": "−{amount}",
+  "ui.price.withLevelling": "{total} ({levelling} of it for levelling)",
 
   "ui.budget.toggle": "Economy",
   "ui.budget.title": "Economy overview",
@@ -177,6 +178,9 @@
   "error.terraformBuilding": "The ground under a building cannot move. Demolish it first.",
   "error.terraformWater": "Raising the sea floor is beyond us.",
   "error.terraformNoChange": "The ground is already exactly like this.",
+  "error.notFlat": "Nothing builds on a slope. Level the plot first.",
+  "error.roadTwisted": "Twisted ground will not take a road. Level it.",
+  "error.bridgeNeedsBank": "A bridge has to start on a bank, not mid-water.",
   "error.needsRoad": "It must touch a road.",
   "error.needsPower": "It needs a power connection.",
   "error.requiresService": "{service} does not reach here — needs coverage of at least {needed}.",

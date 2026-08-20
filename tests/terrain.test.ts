@@ -129,13 +129,23 @@ describe('kácení lesa', () => {
     expect(world.layers.terrain[index(30, 30)]).toBe(TERRAIN.forest);
   });
 
-  it('mokřad ani skálu buldozer nespraví — to je až terraforming (3b)', () => {
+  it('mokřad se zaveze a skála odtěží — od 3b už to jde (§7)', () => {
+    // Do fáze 3a to byly terény, se kterými hráč nemohl dělat vůbec nic.
     const world = createWorld(1, VANILLA_BALANCE.economy);
     world.layers.terrain[index(30, 30)] = TERRAIN.marsh;
     world.layers.terrain[index(31, 30)] = TERRAIN.rock;
+    const funds = world.economy.funds;
 
-    expect(bulldoze(world, 30, 30, VANILLA_BALANCE).ok).toBe(false);
-    expect(bulldoze(world, 31, 30, VANILLA_BALANCE).ok).toBe(false);
+    expect(bulldoze(world, 30, 30, VANILLA_BALANCE).ok).toBe(true);
+    expect(bulldoze(world, 31, 30, VANILLA_BALANCE).ok).toBe(true);
+
+    expect(world.layers.terrain[index(30, 30)]).toBe(TERRAIN.grass);
+    expect(world.layers.terrain[index(31, 30)]).toBe(TERRAIN.grass);
+    // Skála stojí víc než mokřad — je to těžba, ne navážka.
+    expect(funds - world.economy.funds).toBe(
+      VANILLA_BALANCE.map.fillMarshCost + VANILLA_BALANCE.map.clearRockCost,
+    );
+    expect(VANILLA_BALANCE.map.clearRockCost).toBeGreaterThan(VANILLA_BALANCE.map.fillMarshCost);
   });
 
   it('na lese nic nevyroste, dokud se nevykácí', async () => {

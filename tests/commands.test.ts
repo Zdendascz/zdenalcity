@@ -125,7 +125,9 @@ describe('odmítnutí říká proč', () => {
     world.layers.terrain[index(5, 5)] = TERRAIN.water;
     world.layers.buildingId[index(6, 5)] = 7;
 
-    expect(buildRoad(world, 5, 5)).toEqual({ ok: false, reason: 'error.water' });
+    // Od T33 je vozovka na vodě most, ale musí začínat na břehu — uprostřed
+    // moře se stavět nedá.
+    expect(buildRoad(world, 5, 5)).toEqual({ ok: false, reason: 'error.bridgeNeedsBank' });
     expect(buildRoad(world, -1, 0)).toEqual({ ok: false, reason: 'error.outOfBounds' });
     expect(buildRoad(world, 6, 5)).toEqual({ ok: false, reason: 'error.occupied' });
 

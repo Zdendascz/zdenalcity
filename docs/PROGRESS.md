@@ -1202,9 +1202,53 @@ placení za nulovou práci dva, srovnání ignorující předchozí kaskády jed
 **Náhled ceny na hover zatím není** — funkce na to jsou hotové a otestované,
 ale do UI je zapojí až T33, kde na tom stojí akceptační kritérium 14.
 
+- [x] T33 — pravidla na svazích, srovnání pod budovou, mosty, skála a mokřad (3b)
+
+Nejširší úkol 3b. Terén přestal být kulisa a začal být překážka, se kterou se
+dá něco dělat.
+
+- **budovy chtějí rovinu.** `checkFootprint` svah odmítne, ale ruční stavba ho
+  **srovná a postaví** — o to hráči jde. Odmítnutí je pro růst, nabídka pro
+  hráče
+- **cena předem** (§12 kritérium 14): `estimatePlacement` vrátí cenu budovy
+  i srovnání zvlášť a nic nemění. Nová cenovka u kurzoru ukazuje třeba
+  „4 128 (z toho 128 za srovnání)", takže se hráč nedozví o svahu až z účtu
+- **silnice snese rovnoměrný svah, sedlo ne.** Zkroucenou dlaždici nejde
+  přejet po rovině ani nakreslit jako vozovku
+- **most** je vozovka na vodě s vlastní cenou (150 proti 10 za ulici). Staví se
+  **jen z břehu dál**, aby nešlo položit kus vozovky doprostřed moře. Zbourání
+  nechá vodu vodou
+- **skálu jde odtěžit (60) a mokřad zavézt (40)** obyčejným buldozerem. Do 3a
+  to byly terény, se kterými hráč nemohl dělat vůbec nic
+
+**Dvě chyby, které vyplavaly až hraním, ne z testů:**
+
+1. **Elektrárna celá na souši se odmítala postavit u pobřeží** s hláškou
+   „zvedat dno moře neumíme". Srovnání totiž míří na průměr rohů a ten u břehu
+   zvedne roh sdílený s vodou — moře by se naklonilo. Teď se u vody rovná na
+   **nejnižší roh**: pobřežní svah se odkope, hladina zůstane.
+2. **Město s poptávkou 26 stálo úplně a měsíce se nehnulo.** Ukázalo se, že to
+   není T33, ale díra z T26: počet pokusů o stavbu vyšel na `0,487` a
+   `Math.round` z toho udělal **nulu**. To přímo popírá R6 („roste pomalu, ne
+   vůbec"). Zlomek pokusu se teď **losuje** z `world.rng` místo zaokrouhlování,
+   takže střední hodnota sedí a pomalý růst je pomalý, ne žádný.
+
+Ověřeno v běžící hře: elektrárna na nerovné parcele u pobřeží — odhad 4 000 +
+120 za srovnání, strženo přesně 4 120. Most přes úžinu stál 150 podle balancu,
+pod ním zůstala voda a silnice na něm drží. Po opravě zamrznutí město ožilo
+(8 → 17 budov). A když růst zase zastavil, mělo to důvod, ne chybu: z 60
+obytných parcel bylo 11 zastavěných, **28 les a 21 svah** — volná použitelná
+ani jedna. Přesně tak to má vypadat, hráč musí kácet a srovnávat.
+
+Testy: 12 v `tests/slopeRules.test.ts`, 1 v `tests/congestion.test.ts`, dva
+starší testy se přepsaly, protože T33 vědomě mění jejich pravidla (silnice na
+vodě, skála a mokřad). Že koušou, ověřeno rozbitím: budova na svahu shodí
+jeden, neúčtované srovnání jeden, povolené sedlo pod silnicí jeden, most
+uprostřed moře tři, most za cenu ulice jeden, skála zdarma jeden, návrat
+`Math.round` u pokusů jeden.
+
 ## Rozpracované
-_(T32 hotové, dál T33: stavební pravidla na svazích, srovnání pod budovou,
-mosty, těžba skály a zavážení mokřadu.)_
+_(T33 hotové, zbývá T34: save v4, migrace, fixtura — poslední úkol 3b.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
