@@ -148,6 +148,18 @@ export interface WorldState {
   trafficCursor: number;
 
   /**
+   * Odkud se vzala mapa. **Do savu patří** (§10 fáze 3): ze seedu jde terén
+   * kdykoli vygenerovat znovu, takže město zůstává reprodukovatelné i pro
+   * nástroje mimo hru.
+   *
+   * `generated: false` znamená „mapa nevznikla generátorem" — ruční mapa,
+   * testovací svět, nebo město ze savu, který generátor ještě nezažil.
+   * Parametry generátoru se sem nepíšou: sedí v balancu, a ten je obsah, takže
+   * ho save eviduje přes `meta.content.sources`.
+   */
+  map: { seed: number; generated: boolean };
+
+  /**
    * Kolikrát po sobě vyšla budově cena půdy pod prahem její úrovně.
    *
    * **Neukládá se.** Je to jen hystereze proti kmitání na hranici prahu; po
@@ -202,6 +214,7 @@ export function createWorld(
     jobAccessCells: new Float32Array(COARSE_CELLS).fill(1),
     cityJobAccess: 1,
     trafficCursor: 0,
+    map: { seed: seed >>> 0, generated: false },
     downgradeStreak: new Map(),
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
   };

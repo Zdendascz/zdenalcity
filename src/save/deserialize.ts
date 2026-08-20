@@ -88,9 +88,20 @@ export function parseMeta(raw: Record<string, unknown>): SaveMeta {
     };
   }
 
+  // Původ mapy nese až verze 3; ve starším savu ho doplní migrace.
+  let map: SaveMeta['map'];
+  if (raw['map'] !== undefined) {
+    const rawMap = asRecord(raw['map'], 'meta.map');
+    map = {
+      seed: int(rawMap, 'seed', 'meta.map'),
+      generated: bool(rawMap, 'generated', 'meta.map'),
+    };
+  }
+
   return {
     formatVersion: int(raw, 'formatVersion', 'meta'),
     ...(grid ? { grid } : {}),
+    ...(map ? { map } : {}),
     gameVersion: str(raw, 'gameVersion', 'meta'),
     city: { name: str(city, 'name', 'meta.city'), seed: int(city, 'seed', 'meta.city') },
     createdAt: str(raw, 'createdAt', 'meta'),
@@ -162,8 +173,13 @@ function parseState(raw: Record<string, unknown>): SaveState {
     }
   }
 
+  // Kurzor vzorkování dopravy nese až verze 3; staršímu savu ho doplní migrace.
+  const trafficCursor = raw['trafficCursor'] === undefined ? 0 : int(raw, 'trafficCursor', 'state');
+  if (trafficCursor < 0) fail('state.trafficCursor nesmí být záporný');
+
   return {
     serviceFunding,
+    trafficCursor,
     tick: int(raw, 'tick', 'state'),
     rngState,
     economy: {
@@ -339,6 +355,21 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
     world.serviceFunding.set(serviceClass, funding);
   }
   world.downgradeStreak.clear();
+
+  // Doprava se neukládá (R10) — a právě proto se musí **vynulovat**. Zátěž ani
+  // dosažitelnost práce z předchozího města nesmí přetéct do načteného: silnice
+  // jsou jinde, budovy mají jiná id a chvíli by hra počítala s dopravou, která
+  // v tomhle městě nikdy nebyla. Kurzor je jediné, co se přenáší ze savu.
+  world.trafficLoad.fill(0);
+  world.jobAccess.clear();
+  world.jobAccessCells = new Float32Array(COARSE_CELLS).fill(1);
+  world.cityJobAccess = 1;
+  world.trafficCursor = save.state.trafficCursor;
+
+  // Původ mapy: co save neví, bereme jako ruční mapu (migrace to doplňuje stejně).
+  world.map = save.meta.map
+    ? { ...save.meta.map }
+    : { seed: save.meta.city.seed, generated: false };
 
   // Po loadu se kreslí všechno a síť se přepočítá znovu.
   world.dirty = { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true };

@@ -9,9 +9,9 @@ import {
   unpackSave,
 } from '@/save/deserialize';
 import { CURRENT_FORMAT_VERSION } from '@/save/format';
-import { migrate } from '@/save/migrations';
+import { migrate, MIGRATIONS } from '@/save/migrations';
 import { COARSE_SIZE } from '@/sim/coarse';
-import { hashLayers, MAP_SIZE } from '@/sim/layers';
+import { hashLayers, MAP_SIZE, ROAD, TERRAIN } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld, totalPopulation } from '@/sim/world';
 
@@ -60,7 +60,7 @@ describe('fixtury savů', () => {
     expect(before.meta.formatVersion).toBe(1);
     expect(before.coarse.byteLength).toBe(0); // v1 hrubé vrstvy nenese
 
-    const after = migrate(before);
+    const after = migrate(before, MIGRATIONS, 2);
 
     expect(after.meta.formatVersion).toBe(2);
     expect([...after.coarse].every((value) => value === 0)).toBe(true);
@@ -69,6 +69,58 @@ describe('fixtury savů', () => {
       expect(building.abandoned).toBe(false);
       expect(building.levelChangedAtTick).toBe(0);
     }
+  });
+
+  it('migrace v2 → v3 doplní přesně to, co §10 předepisuje', () => {
+    const v2 = Object.entries(fixtures).find(([path]) => path.includes('v2.city'));
+    expect(v2).toBeDefined();
+    if (!v2) return;
+
+    const before = migrate(unpackSave(decode(v2[1] as string)), MIGRATIONS, 2);
+    const after = migrate(before, MIGRATIONS, 3);
+
+    expect(after.meta.formatVersion).toBe(3);
+    // Mapa verze 2 byla holá tráva, žádný generátor tehdy nebyl. Tvářit se, že
+    // vznikla ze seedu, by byla lež — podle toho seedu by vyšel jiný terén.
+    expect(after.meta.map).toEqual({ seed: 0, generated: false });
+    expect(after.state.trafficCursor).toBe(0);
+
+    // Bajty vrstev se nepřepisují: `ROAD.street` je 1 stejně jako ve verzi 2 a
+    // nové terény se přidaly až za stávající hodnoty.
+    expect(after.layers).toBe(before.layers);
+    expect(after.coarse).toBe(before.coarse);
+  });
+
+  it('typy silnic a nové terény ze staré mapy znamenají pořád totéž', () => {
+    // Kdyby někdo přečísloval ROAD nebo TERRAIN, tenhle test spadne dřív, než
+    // se hráči rozsypou uložená města.
+    expect(ROAD.none).toBe(0);
+    expect(ROAD.street).toBe(1);
+    expect(TERRAIN.grass).toBe(0);
+    expect(TERRAIN.water).toBe(1);
+    expect(TERRAIN.sand).toBe(2);
+    expect(TERRAIN.rock).toBe(3);
+  });
+
+  it('fixtura v3 si původ mapy i kurzor dopravy nese sama', () => {
+    const v3 = Object.entries(fixtures).find(([path]) => path.includes('v3.city'));
+    expect(v3).toBeDefined();
+    if (!v3) return;
+
+    const save = unpackSave(decode(v3[1] as string));
+
+    expect(save.meta.formatVersion).toBe(3);
+    expect(save.meta.map?.generated).toBe(true);
+    expect(save.meta.map?.seed).toBeGreaterThan(0);
+    expect(Number.isInteger(save.state.trafficCursor)).toBe(true);
+
+    // Mapa z generátoru: víc terénů než jen tráva, a všechny tři typy vozovky.
+    const world = createWorld(1);
+    applySaveToWorld(world, migrate(save));
+    const terrains = new Set(world.layers.terrain);
+    const roads = new Set(world.layers.road);
+    expect(terrains.size).toBeGreaterThan(2);
+    expect([...roads].sort()).toEqual([ROAD.none, ROAD.street, ROAD.avenue, ROAD.highway]);
   });
 
   it('save verze 2 si hrubé vrstvy i financování nese sám', () => {

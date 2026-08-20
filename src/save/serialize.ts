@@ -88,6 +88,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
         sources: options.sources.map(({ id, version }) => ({ id, version })),
       },
       grid: { size: MAP_SIZE, coarseSize: COARSE_SIZE },
+      map: { ...world.map },
       preview: {
         population: totalPopulation(world.buildings),
         funds: world.economy.funds,
@@ -108,6 +109,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
       rngState: world.rng.getState(),
       economy: { ...world.economy, taxRates: { ...world.economy.taxRates } },
       demand: { ...world.demand },
+      trafficCursor: world.trafficCursor,
       // Setříděné klíče, ať je save bajtově stabilní.
       serviceFunding: Object.fromEntries(
         [...world.serviceFunding.entries()].sort(([a], [b]) => a.localeCompare(b)),

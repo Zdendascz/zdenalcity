@@ -94,7 +94,7 @@ describe('formát savu', () => {
   it('meta.json je v ZIPu nekomprimovaná, aby se dala číst samostatně', async () => {
     const { world } = await builtCity();
     const bytes = serializeSave(world, OPTIONS);
-    expect(containsBytes(bytes, '"formatVersion": 2')).toBe(true);
+    expect(containsBytes(bytes, `"formatVersion": ${CURRENT_FORMAT_VERSION}`)).toBe(true);
     expect(containsBytes(bytes, '"Nový Brod"')).toBe(true);
   });
 
@@ -224,6 +224,48 @@ describe('round-trip', () => {
 
     expect(restored.serviceFunding.get('police')).toBe(0.3);
     expect(restored.serviceFunding.get('parks')).toBe(1);
+  });
+
+  it('kurzor vzorkování dopravy přežije round-trip (verze 3)', async () => {
+    // Jediné, co z celé dopravy do savu patří. Bez něj by se po načtení
+    // vzorkovalo od začátku a determinismus by padl.
+    const { world } = await builtCity();
+    world.trafficCursor = 37;
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(unpackSave(serializeSave(world, OPTIONS))));
+
+    expect(restored.trafficCursor).toBe(37);
+  });
+
+  it('odvozená doprava se neukládá a po loadu je čistá (R10)', async () => {
+    // Zátěž a dosažitelnost předchozího města nesmí přetéct do načteného:
+    // silnice jsou jinde a budovy mají jiná id.
+    const { world } = await builtCity();
+    const bytes = serializeSave(world, OPTIONS);
+
+    const restored = createWorld(1);
+    restored.trafficLoad[index(5, 5)] = 999;
+    restored.jobAccess.set(1234, 0.9);
+    restored.jobAccessCells.fill(0.15);
+    restored.cityJobAccess = 0.15;
+
+    applySaveToWorld(restored, migrate(unpackSave(bytes)));
+
+    expect([...restored.trafficLoad].every((value) => value === 0)).toBe(true);
+    expect(restored.jobAccess.size).toBe(0);
+    expect([...restored.jobAccessCells].every((value) => value === 1)).toBe(true);
+    expect(restored.cityJobAccess).toBe(1);
+  });
+
+  it('původ mapy přežije round-trip (verze 3)', async () => {
+    const { world } = await builtCity();
+    world.map = { seed: 123456, generated: true };
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(unpackSave(serializeSave(world, OPTIONS))));
+
+    expect(restored.map).toEqual({ seed: 123456, generated: true });
   });
 
   it('přežije hodnotu buildingId nad 255 (endianita)', () => {

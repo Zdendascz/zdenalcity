@@ -996,8 +996,50 @@ tvrdil, že nic nic nepodmiňuje. Že koušou, ověřeno rozbitím: vypnutý ná
 shodí dva, MHD bez stropu jeden, MHD do dosažitelnosti práce jeden, zastávka
 bez prerekvizity tři, chybějící tvar autobusu jeden.
 
+- [x] T28 — save verze 3, migrace, fixtura (fáze 3a hotová)
+
+Formát savu povýšil na 3. Přibylo jen to, co fáze 3a opravdu přinesla:
+
+- **`meta.map`** — `{ seed, generated }`. Ze seedu jde terén kdykoli
+  vygenerovat znovu; parametry generátoru se sem nepíšou, protože sedí
+  v balancu, a ten save eviduje přes `content.sources`
+- **`state.trafficCursor`** — jediná věc z celé dopravy, která do savu patří
+  (R10). Bez něj by se po načtení vzorkovalo od začátku a determinismus by padl
+
+**Vrstvy se nepřepisují ani jednou, a je to schválně.** Zadání předepisuje
+mapování „road 1 → ulice", jenže `ROAD.street` **je** 1, takže je to identita;
+přepisovat bajty by byla jen příležitost udělat chybu. Nové terény (les,
+mokřad) se přidaly za stávající hodnoty, takže 0–3 znamenají pořád totéž. Aby
+to tak zůstalo, hlídá čísla obou výčtů vlastní test.
+
+**Migrace v2 → v3** doplní `map: { seed: 0, generated: false }` a nulový kurzor.
+Seed schválně nula, ne `city.seed`: v době verze 2 generátor neexistoval a každá
+mapa byla holá tráva — tvrdit, že vznikla z toho seedu, by byla lež, protože
+podle něj by dnes vyšel úplně jiný terén.
+
+Při psaní se našla **stará díra ze stejné rodiny jako pokrytí v T20**:
+`applySaveToWorld` nemazal zátěž silnic ani dosažitelnost práce, takže se
+odvozená doprava předchozího města přelila do načteného — jiné silnice, jiná
+id budov. Teď se obojí nuluje, kurzor se bere ze savu.
+
+Fixtura `v3.city.base64` je skutečný save z běžící hry: mapa z generátoru,
+všechny tři typy vozovky, elektrárna, park, vozovna i zastávka MHD, financování
+parků 0,75.
+
+Ověřeno v běžící hře: s pauzou vyšly tik, stav RNG i kasa po quickloadu na
+bit stejně, kurzor se vrátil na uloženou sedmičku a zátěž s dosažitelností byly
+vyčištěné. A hlavně — **skutečný save hráče z Downloads** (`mesto (8).city`,
+verze 1, 638 budov, 6666 obyvatel) prošel migrací v1 → v2 → v3 a hraje se dál:
+populace beze změny, žádné ruiny, cena půdy 219. Tím je splněné akceptační
+kritérium 3a č. 10 a **fáze 3a je hotová**.
+
+Testy: 3 v `tests/save.test.ts`, 3 v `tests/migrations.test.ts` plus fixtura
+v3, kterou automaticky prochází všech pět testů nad fixturami. Že koušou,
+ověřeno rozbitím: chybějící migrace shodí pět, lživý původ mapy jeden,
+neuložený kurzor jeden, neuložený původ mapy jeden, nevyčištěná doprava jeden.
+
 ## Rozpracované
-_(T27 hotové, dál T28: save v3, migrace, fixtura — poslední úkol 3a)_
+_(3a hotová. Dál fáze 3b: T29 a výš — převýšení terénu.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

@@ -46,9 +46,38 @@ const migrateV1ToV2: Migration = (save) => ({
   state: { ...save.state, serviceFunding: {} },
 });
 
+/**
+ * Verze 2 → 3 (§10 zadání fáze 3).
+ *
+ * Verze 3 přinesla typované silnice, nové terény, původ mapy a kurzor
+ * vzorkování dopravy. Bajty vrstev se **nepřepisují ani jednou**, a je to tak
+ * schválně:
+ * - **silnice**: `ROAD.street` je 1, tedy přesně to, co v savu verze 2 znamenala
+ *   jednička. Mapování „1 → ulice" ze zadání je tím pádem identita a jakékoli
+ *   přepisování by bylo jen příležitost udělat chybu,
+ * - **terén**: nové hodnoty (les, mokřad) se přidaly **za** stávající, takže
+ *   0–3 znamenají pořád totéž.
+ *
+ * Doplňuje se jen to, co verze 2 neměla kde vzít:
+ * - `meta.map` — seed nula a `generated: false`. V době verze 2 generátor
+ *   neexistoval, každá mapa byla holá tráva. Tvářit se, že město vzniklo ze
+ *   seedu, by byla lež: podle toho seedu by vyšel úplně jiný terén,
+ * - `state.trafficCursor` — nula, tedy „vzorkuj od začátku".
+ */
+const migrateV2ToV3: Migration = (save) => ({
+  ...save,
+  meta: {
+    ...save.meta,
+    formatVersion: 3,
+    map: { seed: 0, generated: false },
+  },
+  state: { ...save.state, trafficCursor: 0 },
+});
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
+  2: migrateV2ToV3,
 };
 
 /**

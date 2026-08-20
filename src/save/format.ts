@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 2;
+export const CURRENT_FORMAT_VERSION = 3;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -70,6 +70,15 @@ export interface SaveMeta {
    * Save verze 1 ji nemá — doplní ji migrace.
    */
   grid?: { size: number; coarseSize: number };
+  /**
+   * Odkud se vzala mapa (verze 3). Seed stačí k tomu, aby šel terén
+   * vygenerovat znovu; parametry generátoru jsou v balancu, a ten je obsah —
+   * eviduje ho `content.sources`.
+   *
+   * Starší save ji nemá: migrace ji doplní nulou a mapu prohlásí za ruční,
+   * protože v době verze 2 žádný generátor neexistoval.
+   */
+  map?: { seed: number; generated: boolean };
   /** Aby šel seznam uložených her vykreslit bez načtení zbytku savu. */
   preview: { population: number; funds: number; tick: number };
 }
@@ -87,6 +96,12 @@ export interface SaveState {
   demand: DemandState;
   /** Financování tříd služeb, 0–1. Chybějící klíč znamená plné (verze 2). */
   serviceFunding: Readonly<Record<string, number>>;
+  /**
+   * Kde skončilo vzorkování dopravy (verze 3). Jediná věc z celé dopravy, která
+   * do savu patří — zbytek je odvozený a po načtení se přepočítá (R10). Bez
+   * kurzoru by se po loadu začalo vzorkovat od začátku a determinismus by padl.
+   */
+  trafficCursor: number;
 }
 
 export interface SaveData {
