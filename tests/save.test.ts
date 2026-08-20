@@ -23,6 +23,7 @@ import type { Migration } from '@/save/migrations';
 import { packLayers, serializeSave, toSaveData } from '@/save/serialize';
 import type { SaveOptions } from '@/save/serialize';
 import { COARSE_CELLS } from '@/sim/coarse';
+import { applyCornerChanges, countViolations, planCornerHeight } from '@/sim/heights';
 import { buildRoad, placeDefinition, setServiceFunding, setTaxRate, zoneArea } from '@/sim/commands';
 import { hashLayers, index, LAYER_ORDER, MAP_SIZE, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
@@ -87,8 +88,9 @@ describe('formát savu', () => {
   it('layers.bin má očekávanou délku', async () => {
     const { world } = await builtCity();
     expect(packLayers(world.layers).byteLength).toBe(expectedLayersByteLength());
-    // 6 vrstev, z toho jedna dvoubajtová.
-    expect(expectedLayersByteLength()).toBe(MAP_SIZE * MAP_SIZE * 7);
+    // 5 vrstev, z toho jedna dvoubajtová. Šestá (`elevation`) zmizela ve
+    // verzi 4 — výšku od T29 nese `heights.bin`.
+    expect(expectedLayersByteLength()).toBe(MAP_SIZE * MAP_SIZE * 6);
   });
 
   it('meta.json je v ZIPu nekomprimovaná, aby se dala číst samostatně', async () => {
@@ -256,6 +258,28 @@ describe('round-trip', () => {
     expect(restored.jobAccess.size).toBe(0);
     expect([...restored.jobAccessCells].every((value) => value === 1)).toBe(true);
     expect(restored.cityJobAccess).toBe(1);
+  });
+
+  it('patra terénu přežijí round-trip (verze 4)', async () => {
+    // Do verze 3 se `cornerHeight` neukládalo vůbec a načtené město dostalo
+    // placku. Tohle je ten dluh, který T34 splácí.
+    const { world } = await builtCity();
+    applyCornerChanges(world.cornerHeight, planCornerHeight(world.cornerHeight, 60, 60, 5));
+    const before = Uint8Array.from(world.cornerHeight);
+    expect(new Set(before).size).toBeGreaterThan(1);
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(unpackSave(serializeSave(world, OPTIONS))));
+
+    expect(restored.cornerHeight).toEqual(before);
+    expect(countViolations(restored.cornerHeight)).toBe(0);
+  });
+
+  it('vrstva elevation je pryč a nikdo ji nehledá (verze 4)', () => {
+    // Od T29 byla mrtvá — výšku nese `cornerHeight`. Kdyby se někdy vrátila,
+    // musí to být vědomé rozhodnutí, ne omyl.
+    expect([...SAVE_LAYER_ORDER]).not.toContain('elevation');
+    expect([...LAYER_ORDER]).not.toContain('elevation');
   });
 
   it('původ mapy přežije round-trip (verze 3)', async () => {
@@ -453,11 +477,18 @@ describe('chybějící obsah při načtení', () => {
 });
 
 describe('ZIP kontejner', () => {
-  it('obsahuje právě pět očekávaných souborů', async () => {
+  it('obsahuje právě šest očekávaných souborů', async () => {
     const { world } = await builtCity();
     const files = unzipSync(serializeSave(world, OPTIONS));
     expect(Object.keys(files).sort()).toEqual(
-      ['coarse.bin', 'entities.json', 'layers.bin', 'meta.json', 'state.json'].sort(),
+      [
+        'coarse.bin',
+        'entities.json',
+        'heights.bin',
+        'layers.bin',
+        'meta.json',
+        'state.json',
+      ].sort(),
     );
   });
 });

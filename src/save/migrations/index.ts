@@ -1,4 +1,5 @@
 import { COARSE_CELLS, COARSE_SIZE } from '@/sim/coarse';
+import { CORNER_CELLS } from '@/sim/heights';
 import { MAP_SIZE } from '@/sim/layers';
 import { CURRENT_FORMAT_VERSION, SAVE_COARSE_LAYER_ORDER, SaveMigrationError } from '../format';
 import type { SaveData } from '../format';
@@ -74,10 +75,51 @@ const migrateV2ToV3: Migration = (save) => ({
   state: { ...save.state, trafficCursor: 0 },
 });
 
+/**
+ * Verze 3 → 4 (§10 zadání fáze 3).
+ *
+ * Dvě změny naráz, obě z převýšení terénu:
+ * - **přibyl `heights.bin`** — patra v rozích. Starý save je nemá odkud vzít,
+ *   takže dostane **rovnou mapu**, všechny rohy na nule. Je to jediná poctivá
+ *   volba: dopočítat patra ze seedu by šlo jen u map z generátoru a i tam by
+ *   se rozešla s tím, co hráč mezitím postavil,
+ * - **zmizela vrstva `elevation`.** Od T29 byla mrtvá — výšku nese
+ *   `cornerHeight` — a tady se vystřihne i z bajtů. To je ta nepříjemná část:
+ *   `layers.bin` se musí přeskládat, protože vrstvy jsou v něm za sebou a
+ *   `elevation` byla druhá v pořadí.
+ */
+const migrateV3ToV4: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 4 },
+  layers: dropElevationLayer(save.layers),
+  heights: new Uint8Array(CORNER_CELLS),
+});
+
+/**
+ * Vystřihne z `layers.bin` verze 3 druhou vrstvu v pořadí.
+ *
+ * Pořadí verze 3 bylo `terrain, elevation, zone, road, buildingId, power`,
+ * kde všechny jsou jednobajtové kromě dvoubajtového `buildingId`. Číslo se
+ * nedá odvodit z aktuálního `SAVE_LAYER_ORDER` — ten už `elevation` nezná —
+ * takže je tu natvrdo, stejně jako v každé migraci: **popisuje minulost, ne
+ * současnost.**
+ */
+function dropElevationLayer(layers: Uint8Array): Uint8Array {
+  const cells = MAP_SIZE * MAP_SIZE;
+  const expected = cells * 7; // 6 vrstev, z toho jedna dvoubajtová
+  if (layers.byteLength !== expected) return layers; // cizí velikost mapy neřešíme
+
+  const out = new Uint8Array(cells * 6);
+  out.set(layers.subarray(0, cells), 0); // terrain
+  out.set(layers.subarray(cells * 2), cells); // zone a všechno za ní
+  return out;
+}
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
   2: migrateV2ToV3,
+  3: migrateV3ToV4,
 };
 
 /**

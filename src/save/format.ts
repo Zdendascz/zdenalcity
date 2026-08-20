@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 3;
+export const CURRENT_FORMAT_VERSION = 4;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -24,7 +24,6 @@ export const GAME_VERSION = '0.1.0';
  */
 export const SAVE_LAYER_ORDER = [
   'terrain',
-  'elevation',
   'zone',
   'road',
   'buildingId',
@@ -47,6 +46,12 @@ export const SAVE_FILES = {
   layers: 'layers.bin',
   /** Hrubé vrstvy, od verze 2. */
   coarse: 'coarse.bin',
+  /**
+   * Patra v rozích, od verze 4. Vlastní soubor, ne přílepek k `layers.bin`:
+   * mřížka rohů je o jedna větší než mřížka dlaždic, takže míchat je do
+   * jednoho bufferu by znamenalo číst bajty podle toho, co je zrovna v kódu.
+   */
+  heights: 'heights.bin',
   entities: 'entities.json',
   state: 'state.json',
 } as const;
@@ -110,6 +115,8 @@ export interface SaveData {
   layers: Uint8Array;
   /** Obsah `coarse.bin` — konkatenace vrstev v `SAVE_COARSE_LAYER_ORDER`. */
   coarse: Uint8Array;
+  /** Obsah `heights.bin` — patra v rozích, po jednom bajtu (verze 4). */
+  heights: Uint8Array;
   entities: SaveEntities;
   state: SaveState;
 }

@@ -45,7 +45,6 @@ export function inBounds(x: number, y: number): boolean {
 
 export interface Layers {
   terrain: Uint8Array;
-  elevation: Uint8Array;
   zone: Uint8Array;
   road: Uint8Array;
   buildingId: Uint16Array;
@@ -61,7 +60,6 @@ export type ReadonlyLayers = { readonly [K in keyof Layers]: Readonly<Layers[K]>
  */
 export const LAYER_ORDER = [
   'terrain',
-  'elevation',
   'zone',
   'road',
   'buildingId',
@@ -74,7 +72,6 @@ export function createLayers(size: number): Layers {
   const cells = size * size;
   return {
     terrain: new Uint8Array(cells), // 0 = tráva
-    elevation: new Uint8Array(cells), // fáze 1: všude 0
     zone: new Uint8Array(cells), // 0 = bez zóny
     road: new Uint8Array(cells), // 0/1
     buildingId: new Uint16Array(cells), // 0 = prázdná dlaždice

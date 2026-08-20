@@ -1,6 +1,7 @@
 import { strFromU8, unzipSync } from 'fflate';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { COARSE_CELLS } from '@/sim/coarse';
+import { CORNER_CELLS } from '@/sim/heights';
 import type { CoarseLayers } from '@/sim/coarse';
 import { MAP_SIZE } from '@/sim/layers';
 import type { Layers } from '@/sim/layers';
@@ -211,6 +212,20 @@ export function unpackCoarseInto(bytes: Uint8Array, coarse: CoarseLayers): void 
   }
 }
 
+/** Očekávaná délka `heights.bin`: jeden bajt na roh mřížky. */
+export function expectedHeightsByteLength(): number {
+  return CORNER_CELLS;
+}
+
+export function unpackHeightsInto(bytes: Uint8Array, heights: Uint8Array): void {
+  if (bytes.byteLength !== expectedHeightsByteLength()) {
+    fail(
+      `heights.bin má ${bytes.byteLength} B, čekalo se ${expectedHeightsByteLength()} B — jiná velikost mapy`,
+    );
+  }
+  heights.set(bytes);
+}
+
 /** Očekávaná délka `layers.bin` pro aktuální formát. */
 export function expectedLayersByteLength(): number {
   const cells = MAP_SIZE * MAP_SIZE;
@@ -257,13 +272,16 @@ export function unpackSave(bytes: Uint8Array): SaveData {
   const layers = files[SAVE_FILES.layers];
   if (!layers) fail(`v savu chybí ${SAVE_FILES.layers}`);
 
-  // `coarse.bin` má až verze 2. U starší je prázdný a naplní ho migrace.
+  // `coarse.bin` má až verze 2, `heights.bin` až verze 4. U starších jsou
+  // prázdné a naplní je migrace.
   const coarse = files[SAVE_FILES.coarse] ?? new Uint8Array(0);
+  const heights = files[SAVE_FILES.heights] ?? new Uint8Array(0);
 
   return {
     meta: parseMeta(parseJson(files[SAVE_FILES.meta], SAVE_FILES.meta)),
     layers,
     coarse,
+    heights,
     entities: parseEntities(parseJson(files[SAVE_FILES.entities], SAVE_FILES.entities)),
     state: parseState(parseJson(files[SAVE_FILES.state], SAVE_FILES.state)),
   };
@@ -343,6 +361,8 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   // Hrubé vrstvy nese formát verze 2. Starší save jimi projde s vynulovaným
   // `coarse.bin`, který mu doplnila migrace.
   unpackCoarseInto(save.coarse, world.coarse);
+  // Patra nese verze 4; starším je migrace doplnila jako rovinu.
+  unpackHeightsInto(save.heights, world.cornerHeight);
 
   // Odvozený a runtime stav předchozího města nesmí přetéct do načteného.
   // Pokrytí se **musí** označit za špinavé: bez toho by ho `serviceSystem`

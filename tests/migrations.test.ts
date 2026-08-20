@@ -5,12 +5,15 @@ import {
   applySaveToWorld,
   collectLoadWarnings,
   expectedCoarseByteLength,
+  expectedHeightsByteLength,
+  expectedLayersByteLength,
   readSaveMeta,
   unpackSave,
 } from '@/save/deserialize';
 import { CURRENT_FORMAT_VERSION } from '@/save/format';
 import { migrate, MIGRATIONS } from '@/save/migrations';
 import { COARSE_SIZE } from '@/sim/coarse';
+import { countViolations } from '@/sim/heights';
 import { hashLayers, MAP_SIZE, ROAD, TERRAIN } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld, totalPopulation } from '@/sim/world';
@@ -121,6 +124,61 @@ describe('fixtury savů', () => {
     const roads = new Set(world.layers.road);
     expect(terrains.size).toBeGreaterThan(2);
     expect([...roads].sort()).toEqual([ROAD.none, ROAD.street, ROAD.avenue, ROAD.highway]);
+  });
+
+  it('migrace v3 → v4 udělá z mapy rovinu a vystřihne mrtvou vrstvu', () => {
+    const v3 = Object.entries(fixtures).find(([path]) => path.includes('v3.city'));
+    expect(v3).toBeDefined();
+    if (!v3) return;
+
+    const before = migrate(unpackSave(decode(v3[1] as string)), MIGRATIONS, 3);
+    expect(before.heights.byteLength).toBe(0); // verze 3 patra nenese
+
+    const after = migrate(before, MIGRATIONS, 4);
+
+    expect(after.meta.formatVersion).toBe(4);
+    // Rovná mapa: dopočítat patra ze seedu by šlo jen u map z generátoru a
+    // i tam by se rozešla s tím, co hráč mezitím postavil.
+    expect(after.heights.byteLength).toBe(expectedHeightsByteLength());
+    expect([...after.heights].every((value) => value === 0)).toBe(true);
+
+    // `layers.bin` se zkrátil přesně o jednu jednobajtovou vrstvu.
+    expect(before.layers.byteLength - after.layers.byteLength).toBe(MAP_SIZE * MAP_SIZE);
+    expect(after.layers.byteLength).toBe(expectedLayersByteLength());
+  });
+
+  it('vystřižení vrstvy nepřeházelo ty ostatní', () => {
+    // Nejnebezpečnější místo celé migrace: vrstvy leží v jednom bufferu za
+    // sebou, takže špatný posun by z terénu udělal zóny a nikdo by si toho
+    // nemusel všimnout, dokud se mapa nevykreslí.
+    const v3 = Object.entries(fixtures).find(([path]) => path.includes('v3.city'));
+    if (!v3) return;
+
+    const cells = MAP_SIZE * MAP_SIZE;
+    const before = migrate(unpackSave(decode(v3[1] as string)), MIGRATIONS, 3);
+    const after = migrate(before, MIGRATIONS, 4);
+
+    // Terén zůstal na začátku beze změny…
+    expect([...after.layers.subarray(0, cells)]).toEqual([...before.layers.subarray(0, cells)]);
+    // …a zbytek se posunul o přesně jednu vrstvu doleva.
+    expect([...after.layers.subarray(cells)]).toEqual([...before.layers.subarray(cells * 2)]);
+  });
+
+  it('fixtura v4 nese skutečná patra, ne rovinu', () => {
+    const v4 = Object.entries(fixtures).find(([path]) => path.includes('v4.city'));
+    expect(v4).toBeDefined();
+    if (!v4) return;
+
+    const save = unpackSave(decode(v4[1] as string));
+    expect(save.meta.formatVersion).toBe(4);
+
+    const world = createWorld(1);
+    applySaveToWorld(world, migrate(save));
+
+    // Kdyby fixtura byla z placky, neověřila by na patrech vůbec nic.
+    expect(new Set(world.cornerHeight).size).toBeGreaterThan(3);
+    expect(Math.max(...world.cornerHeight)).toBeGreaterThan(2);
+    expect(countViolations(world.cornerHeight)).toBe(0);
   });
 
   it('save verze 2 si hrubé vrstvy i financování nese sám', () => {

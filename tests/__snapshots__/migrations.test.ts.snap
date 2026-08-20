@@ -1,7 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`fixtury savů > v1.city.base64 se načte do aktuální verze formátu 1`] = `"e3f4fc0c"`;
+exports[`fixtury savů > v1.city.base64 se načte do aktuální verze formátu 1`] = `"d75ad3c5"`;
 
-exports[`fixtury savů > v2.city.base64 se načte do aktuální verze formátu 1`] = `"cffc07bf"`;
+exports[`fixtury savů > v2.city.base64 se načte do aktuální verze formátu 1`] = `"60d188fa"`;
 
-exports[`fixtury savů > v3.city.base64 se načte do aktuální verze formátu 1`] = `"0e3c9aec"`;
+exports[`fixtury savů > v3.city.base64 se načte do aktuální verze formátu 1`] = `"c9235d53"`;
+
+exports[`fixtury savů > v4.city.base64 se načte do aktuální verze formátu 1`] = `"6465f98e"`;

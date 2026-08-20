@@ -97,6 +97,8 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
     },
     layers: packLayers(world.layers),
     coarse: packCoarseLayers(world.coarse),
+    // Patra jdou do savu tak, jak jsou: jeden bajt na roh, žádné pořadí vrstev.
+    heights: Uint8Array.from(world.cornerHeight),
     entities: {
       nextBuildingId: world.nextBuildingId,
       // Pořadí podle id, ať je save bajtově stabilní.
@@ -129,6 +131,7 @@ export function packSave(save: SaveData): Uint8Array {
     [SAVE_FILES.meta]: [strToU8(JSON.stringify(save.meta, null, 2)), { level: 0 }],
     [SAVE_FILES.layers]: [save.layers, { level: 9 }],
     [SAVE_FILES.coarse]: [save.coarse, { level: 9 }],
+    [SAVE_FILES.heights]: [save.heights, { level: 9 }],
     [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level: 9 }],
     [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level: 9 }],
   });

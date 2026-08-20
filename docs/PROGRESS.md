@@ -1247,8 +1247,53 @@ jeden, neúčtované srovnání jeden, povolené sedlo pod silnicí jeden, most
 uprostřed moře tři, most za cenu ulice jeden, skála zdarma jeden, návrat
 `Math.round` u pokusů jeden.
 
+- [x] T34 — save verze 4, migrace, fixtura (fáze 3b hotová)
+
+Save se dorovnal s tím, co hra od T29 umí.
+
+- **přibyl `heights.bin`** — patra v rozích, jeden bajt na roh. Vlastní soubor
+  ze stejného důvodu jako `coarse.bin`: mřížka rohů je o jedna větší než mřížka
+  dlaždic, takže míchat je do jednoho bufferu by znamenalo číst bajty podle
+  toho, co je zrovna v kódu
+- **zmizela vrstva `elevation`.** Od T29 byla mrtvá a od téhle verze je pryč
+  i z bajtů. `layers.bin` se tím zkrátil z 114 688 na 98 304 B
+
+**Migrace v3 → v4** dá staré mapě **rovinu**, všechny rohy na nule. Dopočítat
+patra ze seedu by šlo jen u map z generátoru — a i tam by se rozešla s tím, co
+hráč mezitím postavil. A hlavně musí **vystřihnout `elevation` z bufferu**: to
+je nejnebezpečnější místo celé migrace, protože vrstvy leží za sebou a špatný
+posun by z terénu udělal zóny, aniž by cokoli spadlo. Vlastní test proto
+kontroluje, že terén zůstal na začátku beze změny a zbytek se posunul přesně
+o jednu vrstvu.
+
+Fixtura `v4.city.base64` je opět skutečný save: generovaná mapa s patry 0–10,
+všechny tři typy vozovky, elektrárna, park, financování parků 0,75.
+
+**Poznámka k tomu, jak vznikla.** Napoprvé jsem ji přenášel z prohlížeče ručně
+po dvou kusech base64 a **transkripce se poškodila** — ZIP šel otevřít, ale
+`entities.json` uvnitř byl rozbitý. Podruhé ji vyrobil kód: dočasný test ji
+postavil v Node stejnými funkcemi a zapsal přes snapshot, odkud se jen
+zkopírovala. Ručně přepisovat devět kilobajtů base64 je hloupost, kterou už
+neopakuju.
+
+Ověřeno v běžící hře: quicksave, vynulování všech pater, quickload — a patra
+se vrátila přesně (součet 25 890, jedenáct různých hodnot, nula porušení
+invariantu), stejně jako tik, stav RNG i kasa. A **skutečný save hráče**
+(`mesto (8).city`, verze 1, 638 budov, 6 666 obyvatel) prošel migrací
+v1 → v2 → v3 → v4 a hraje se dál: populace beze změny, žádné ruiny, cena půdy
+219, terén rovina bez porušení invariantu.
+
+Testy: 2 v `tests/save.test.ts`, 3 v `tests/migrations.test.ts` plus fixtura,
+kterou automaticky prochází všech pět testů nad fixturami. Snapshoty hashů
+vrstev se přepsaly — zrušená vrstva mění hash, což je vědomý důsledek, ne
+překvapení. Že testy koušou, ověřeno rozbitím: chybějící migrace shodí čtyři,
+nevystřižená vrstva čtyři, posun o špatný počet vrstev čtyři, neuložená patra
+jeden, nenačtená patra dva.
+
+**Fáze 3b je hotová** (T29–T34). Zbývá 3c: sítě a spokojenost.
+
 ## Rozpracované
-_(T33 hotové, zbývá T34: save v4, migrace, fixtura — poslední úkol 3b.)_
+_(3b hotová. Dál fáze 3c: T35 a výš — voda a kanalizace, spokojenost.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -1361,11 +1406,6 @@ _(T33 hotové, zbývá T34: save v4, migrace, fixtura — poslední úkol 3b.)_
 
 ## Známé problémy / technický dluh
 
-- **`cornerHeight` se zatím neukládá do savu** (přijde ve verzi 4, T34). Načtené
-  město do té doby dostane rovný terén. Vědomý dluh daný pořadím úkolů — než
-  bude co ukládat, musí terén umět renderer, picking i terraforming.
-- **Vrstva `elevation` je od T29 mrtvá.** Výšku nese `cornerHeight`; `elevation`
-  zůstává v `Layers` i v savu jen proto, že ji odstraní až save verze 4 (T34).
 - **Kopec před budovou ji nezakryje.** Renderer kreslí nejdřív celý terén a pak
   všechny budovy, takže budova je vždycky nad terénem. Správně by se muselo
   řadit po dlaždicích dohromady s budovami, což by zrušilo smysl chunkování.
