@@ -1038,8 +1038,53 @@ v3, kterou automaticky prochází všech pět testů nad fixturami. Že koušou,
 ověřeno rozbitím: chybějící migrace shodí pět, lživý původ mapy jeden,
 neuložený kurzor jeden, neuložený původ mapy jeden, nevyčištěná doprava jeden.
 
+- [x] T29 — `cornerHeight`, invariant rohů, patra z generátoru, řeky (fáze 3b)
+
+Terén dostal výšku. Zatím jen v simulaci — renderer ji začne kreslit v T30,
+takže mapa vypadá pořád placatě, ale data pod ní už členitá jsou.
+
+- **výška patří rohu, ne dlaždici.** Mřížka rohů je 129×129 proti 128×128
+  dlaždicím. Kdyby výška patřila dlaždici, každý svah by byl schod a sousední
+  dlaždice by se nikdy nedotýkaly
+- **invariant: sousední rohy se liší nejvýš o 1.** Vynucuje ho kaskáda —
+  zvednutí rohu si vytáhne sousedy s sebou. Bez toho by šlo postavit svislou
+  stěnu, kterou renderer neumí nakreslit a picking trefit
+- **jen kolmí sousedé, ne úhlopříční.** Rohy jedné dlaždice se tím pádem smí
+  lišit o dva a vzniká „zkroucená" dlaždice tvaru sedla. Zadání s ní počítá
+  (silnice ji nepobere), a bez té volnosti by terén ztuhl do samých teras
+- **plán a zápis jsou oddělené.** `planCornerHeight` vrátí mapu `roh → výška`
+  a **nic nemění**; teprve `applyCornerChanges` zapisuje. Terraforming z T32
+  z toho spočítá cenu **než** se hráče zeptá — akceptační kritérium 14 chce
+  cenu předem, a to by se zpětně dolepovalo špatně
+
+Generátor patra vzorkuje **přímo v rozích** (fBm umí libovolné souřadnice,
+takže se nic neprůměruje), rohy vody srazí na nulu a zbytek srovná
+`relaxHeights`. Škáluje se od hladiny, ne od nuly, takže „patro 0" znamená
+u moře bez ohledu na to, kde u daného seedu hladina vyšla. Vrchol se bere jako
+kvantil 0,995 — jediná špička šumu by jinak stlačila celou souš do prvního
+patra.
+
+**Řeky jsou hotové, ale ve vanille vypnuté** (`map.rivers: 0`). Je to vědomé:
+řeka rozdělí souš na dva břehy a most přijde až v T33, takže do té doby by z ní
+byla jen nepřístupná polovina mapy. Testy si je zapínají vlastním balancem, což
+je přesně to, k čemu je P5 dobré. Až budou mosty, je to změna jednoho čísla
+v JSONu.
+
+Ověřeno v běžící hře: mapa 129×129 rohů, **nula porušení invariantu**, patra
+0–10 s rozumným rozložením (42 % rohů u moře, deset pater nahoře), voda všude
+na nule a 43 % dlaždic je svah. Zvednutí rohu uprostřed mapy na patnáct
+rozhýbalo **320 rohů** a invariant zůstal celý.
+
+Testy: 12 v `tests/heights.test.ts`, 7 v `tests/mapgen.test.ts` včetně
+invariantu na 200 seedech. Že koušou, ověřeno rozbitím: kaskáda bez šíření
+shodí pět, `relaxHeights` bez práce tři, špatně poznané sedlo jeden,
+nenulované rohy vody jeden, ignorovaný `maxHeight` jeden, nekopané řeky dva.
+Ten test na vodu byl napoprvé slabý — ptal se na nejnižší roh, takže mu
+uniklo, že hladina může být nakloněná; teď kontroluje nejvyšší.
+
 ## Rozpracované
-_(3a hotová. Dál fáze 3b: T29 a výš — převýšení terénu.)_
+_(T29 hotové, dál T30: renderer svahů, re-bake chunků při změně výšky,
+řazení podle výšky základny.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -1152,6 +1197,11 @@ _(3a hotová. Dál fáze 3b: T29 a výš — převýšení terénu.)_
 
 ## Známé problémy / technický dluh
 
+- **`cornerHeight` se zatím neukládá do savu** (přijde ve verzi 4, T34). Načtené
+  město do té doby dostane rovný terén. Vědomý dluh daný pořadím úkolů — než
+  bude co ukládat, musí terén umět renderer, picking i terraforming.
+- **Vrstva `elevation` je od T29 mrtvá.** Výšku nese `cornerHeight`; `elevation`
+  zůstává v `Layers` i v savu jen proto, že ji odstraní až save verze 4 (T34).
 - `vite.config.ts` je mimo `tsc --noEmit` (viz tabulka rozhodnutí).
 - **Save není bajtově reprodukovatelný, jen obsahově.** fflate zapisuje do ZIPu
   čas modifikace, takže dva savy z téhož stavu se liší v několika bajtech

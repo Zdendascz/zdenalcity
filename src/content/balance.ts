@@ -1,3 +1,4 @@
+import { MAX_HEIGHT } from '@/sim/heights';
 import type { ValidationIssue } from './schema';
 
 /**
@@ -55,6 +56,21 @@ export interface Balance {
      * nepovede, generator ubere vodu a zkusi to znovu (R7).
      */
     minLandShare: number;
+    /** Nejvyšší patro, které generátor postaví. Strop modelu je 15 (R8). */
+    maxHeight: number;
+    /**
+     * Zakřivení převodu šumu na patra. Nad jedničkou zůstává většina souše
+     * nízko a kopce jsou vzácné; jednička dá rovnoměrné rozložení.
+     */
+    heightCurve: number;
+    /**
+     * Kolik řek generátor prokope. **Ve vanille zatím nula**: řeka rozdělí
+     * souš na dva břehy a most přijde až v T33, takže dokud tam není, byla by
+     * to jen nepřístupná polovina mapy.
+     */
+    rivers: number;
+    /** Odkud řeka vyráží — nejmenší patro pramene. */
+    riverSourceHeight: number;
   };
 
   /**
@@ -322,6 +338,10 @@ export function validateBalance(raw: unknown): {
       forestAbsorption: num(issues, map, 'forestAbsorption', 'map.forestAbsorption', 0, 1),
       clearForestCost: num(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
       minLandShare: num(issues, map, 'minLandShare', 'map.minLandShare', 0, 1),
+      maxHeight: num(issues, map, 'maxHeight', 'map.maxHeight', 0, MAX_HEIGHT),
+      heightCurve: num(issues, map, 'heightCurve', 'map.heightCurve', 0.1, 8),
+      rivers: num(issues, map, 'rivers', 'map.rivers', 0, 16),
+      riverSourceHeight: num(issues, map, 'riverSourceHeight', 'map.riverSourceHeight', 0, MAX_HEIGHT),
     },
     traffic: {
       roadTypes,

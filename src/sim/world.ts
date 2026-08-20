@@ -1,4 +1,5 @@
 import { COARSE_CELLS, createCoarseLayers } from './coarse';
+import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
 import { createLayers, inBounds, index, MAP_SIZE } from './layers';
 import type { Layers } from './layers';
@@ -126,6 +127,16 @@ export interface WorldState {
    */
   trafficLoad: Float32Array;
 
+  /**
+   * Patra v rozích mřížky, 0–15 (§7 fáze 3). Mřížka je o jedna větší než mřížka
+   * dlaždic — výška patří rohu, ne dlaždici, jinak by každý svah byl schod.
+   * Pravidla i kaskádu drží `sim/heights.ts`.
+   *
+   * **Do savu půjde až ve verzi 4 (T34).** Do té doby si načtené město odnese
+   * rovný terén; je to vědomý dluh, ne opomenutí.
+   */
+  cornerHeight: Uint8Array;
+
   /** Jak dobře se z budovy dostane do práce, 0–1. Klíč je id budovy. */
   jobAccess: Map<number, number>;
 
@@ -210,6 +221,7 @@ export function createWorld(
     serviceFunding: new Map(),
     coverageDirty: false,
     trafficLoad: new Float32Array(MAP_SIZE * MAP_SIZE),
+    cornerHeight: createCornerHeights(),
     jobAccess: new Map(),
     jobAccessCells: new Float32Array(COARSE_CELLS).fill(1),
     cityJobAccess: 1,

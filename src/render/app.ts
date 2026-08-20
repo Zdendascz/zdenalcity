@@ -164,7 +164,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
   const simWorld = createWorld(newGame.seed, content.getBalance().economy);
-  applyGeneratedMap(simWorld.layers, generateTerrain(newGame.seed, content.getBalance()));
+  applyGeneratedMap(simWorld, generateTerrain(newGame.seed, content.getBalance()));
   // Ze seedu jde tenhle terén kdykoli vygenerovat znovu, tak ať to save ví.
   simWorld.map = { seed: newGame.seed, generated: true };
   const host = createSimHost(

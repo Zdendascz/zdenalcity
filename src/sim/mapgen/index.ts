@@ -1,4 +1,12 @@
 import type { Balance } from '@/content/balance';
+import {
+  CORNER_SIZE,
+  cornerIndex,
+  createCornerHeights,
+  MAX_HEIGHT,
+  relaxHeights,
+  tileBaseHeight,
+} from '../heights';
 import { index, inBounds, MAP_SIZE, TERRAIN } from '../layers';
 import type { Layers } from '../layers';
 import { Rng } from '../rng';
@@ -17,9 +25,10 @@ import { createNoiseField, fbm } from './noise';
  * 4. skála nad prahem
  * 5. les z druhé šumové vrstvy, jen na trávě
  * 6. mokřad v nížinách u vody
+ * 7. patra v rozích a koryta řek (3b)
  *
- * Výškové pole se ve fázi 3a jen použije k rozmístění terénu a zahodí; ve 3b
- * se z něj stane `cornerHeight`.
+ * Výškové pole na dlaždicích slouží jen k rozmístění terénu. Patra, se kterými
+ * pak hra pracuje, se vzorkují zvlášť **v rozích** — viz `buildCornerHeights`.
  */
 
 /** Měřítko šumu v dlaždicích. Menší číslo = drobnější členitost. */
@@ -30,8 +39,10 @@ const FIELD_SIZE = 64;
 
 export interface GeneratedMap {
   terrain: Uint8Array;
-  /** Výškové pole 0–1. Ve 3a slouží jen ke generování, do světa se neukládá. */
+  /** Výškové pole 0–1 na dlaždicích. Slouží ke generování, do světa nejde. */
   height: Float32Array;
+  /** Patra v rozích, 0–`maxHeight`. Tohle je to, co si svět odnese (§7 fáze 3). */
+  cornerHeight: Uint8Array;
 }
 
 export function generateTerrain(seed: number, balance: Balance): GeneratedMap {
@@ -89,13 +100,196 @@ export function generateTerrain(seed: number, balance: Balance): GeneratedMap {
     if ((forestNoise[tile] ?? 0) >= forestHeight) terrain[tile] = TERRAIN.forest;
   }
 
-  return { terrain, height };
+  // Patra až nakonec: potřebují hotové pobřeží, aby voda ležela na nule.
+  const cornerHeight = buildCornerHeights(heightField, terrain, seaHeight, sorted, balance);
+  carveRivers(rng, terrain, cornerHeight, balance);
+
+  return { terrain, height, cornerHeight };
 }
 
-/** Zapíše vygenerovaný terén do vrstev světa. */
-export function applyGeneratedMap(layers: Layers, map: GeneratedMap): void {
-  layers.terrain.set(map.terrain);
+/** Zapíše vygenerovaný terén i patra do světa. */
+export function applyGeneratedMap(
+  world: { layers: Layers; cornerHeight: Uint8Array },
+  map: GeneratedMap,
+): void {
+  world.layers.terrain.set(map.terrain);
+  world.cornerHeight.set(map.cornerHeight);
 }
+
+/**
+ * Převede šum na patra v rozích (§7 fáze 3).
+ *
+ * Tři kroky, každý má důvod:
+ * 1. **vzorkuje se v rozích, ne v dlaždicích** — fBm umí libovolné souřadnice,
+ *    takže se nic neprůměruje a sousední dlaždice na sebe přesně navazují,
+ * 2. **rohy vody jdou na nulu** — jinak by moře leželo na kopci. Sráží se
+ *    i rohy sdílené se souší, takže z toho vznikne pobřežní svah zadarmo,
+ * 3. **`relaxHeights` srovná zbytek** — šum o invariantu nic neví.
+ *
+ * Škáluje se od hladiny, ne od nuly: výška 0 znamená „u moře" bez ohledu na to,
+ * kde zrovna u tohohle seedu hladina vyšla.
+ */
+function buildCornerHeights(
+  heightField: ReturnType<typeof createNoiseField>,
+  terrain: Uint8Array,
+  seaHeight: number,
+  sorted: Float32Array,
+  balance: Balance,
+): Uint8Array {
+  const { maxHeight, heightCurve, octaves, roughness } = balance.map;
+  const heights = createCornerHeights();
+  if (maxHeight <= 0) return heights;
+
+  // Vrchol bereme jako kvantil, ne maximum: jediná špička šumu by jinak
+  // stlačila celou zbylou souš do prvního patra.
+  const peak = quantileOf(sorted, 0.995);
+  const span = Math.max(1e-6, peak - seaHeight);
+
+  for (let y = 0; y < CORNER_SIZE; y++) {
+    for (let x = 0; x < CORNER_SIZE; x++) {
+      const value = fbm(heightField, x, y, octaves, roughness, HEIGHT_SCALE);
+      const above = Math.max(0, Math.min(1, (value - seaHeight) / span));
+      heights[cornerIndex(x, y)] = Math.round(Math.pow(above, heightCurve) * maxHeight);
+    }
+  }
+
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      if (terrain[index(x, y)] !== TERRAIN.water) continue;
+      for (const [dx, dy] of TILE_CORNERS) heights[cornerIndex(x + dx, y + dy)] = 0;
+    }
+  }
+
+  relaxHeights(heights);
+  return heights;
+}
+
+/**
+ * Prokope řeky od pramene k moři (R7).
+ *
+ * Řeka teče **po spádnici**: z pramene se pokaždé jde do nejnižšího souseda.
+ * Když se zasekne v proláklině, koryto se prokope dál k nejbližšímu nižšímu
+ * místu — jinak by na mapě zůstávaly slepé stružky končící uprostřed pole.
+ *
+ * Koryto klesá monotónně a rohy se srovnají, takže voda neteče do kopce.
+ *
+ * **Pozor**: řeka rozdělí souš na dva břehy a most je až v T33. Proto je
+ * `map.rivers` ve vanille zatím nula a tenhle kód čeká na mosty.
+ */
+function carveRivers(rng: Rng, terrain: Uint8Array, heights: Uint8Array, balance: Balance): void {
+  const { rivers, riverSourceHeight } = balance.map;
+  if (rivers <= 0) return;
+
+  const sources: number[] = [];
+  for (let y = 1; y < MAP_SIZE - 1; y++) {
+    for (let x = 1; x < MAP_SIZE - 1; x++) {
+      const tile = index(x, y);
+      if (terrain[tile] === TERRAIN.water) continue;
+      if (tileBaseHeight(heights, x, y) >= riverSourceHeight) sources.push(tile);
+    }
+  }
+  if (sources.length === 0) return;
+
+  for (let river = 0; river < rivers; river++) {
+    const start = sources[rng.int(sources.length)];
+    if (start === undefined) continue;
+    carveOne(rng, terrain, heights, start);
+  }
+
+  relaxHeights(heights);
+}
+
+/** Jedna řeka od pramene dolů. Vrací délku koryta v dlaždicích. */
+function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: number): number {
+  const path: number[] = [];
+  const visited = new Set<number>();
+  let tile = start;
+
+  // Strop kroků je obvod mapy: delší koryto než okolo dokola být nemůže.
+  for (let step = 0; step < MAP_SIZE * 4; step++) {
+    if (visited.has(tile)) break;
+    visited.add(tile);
+    path.push(tile);
+
+    if (terrain[tile] === TERRAIN.water) break; // dotekli jsme moře, hotovo
+
+    const x = tile % MAP_SIZE;
+    const y = (tile - x) / MAP_SIZE;
+    const here = tileBaseHeight(heights, x, y);
+
+    let next = -1;
+    let lowest = here;
+    for (const [dx, dy] of NEIGHBOURS) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!inBounds(nx, ny)) continue;
+      const at = index(nx, ny);
+      if (visited.has(at)) continue;
+
+      const level = terrain[at] === TERRAIN.water ? -1 : tileBaseHeight(heights, nx, ny);
+      // Shodnou výšku bere jen náhoda, jinak by koryto jelo pořád stejným směrem.
+      if (level < lowest || (level === lowest && next >= 0 && rng.int(2) === 0)) {
+        lowest = level;
+        next = at;
+      }
+    }
+
+    if (next < 0) {
+      // Prolákliny: pokračuj k nejbližšímu okraji mapy, ať řeka někde skončí.
+      next = stepTowardsEdge(x, y, visited);
+      if (next < 0) break;
+    }
+
+    tile = next;
+  }
+
+  // Koryto se zapíše až teď: cesta se mohla zaseknout a nedokončená řeka
+  // uprostřed pole vypadá jako chyba generátoru.
+  let level = MAX_HEIGHT;
+  for (const at of path) {
+    terrain[at] = TERRAIN.water;
+    const x = at % MAP_SIZE;
+    const y = (at - x) / MAP_SIZE;
+    level = Math.min(level, tileBaseHeight(heights, x, y));
+    for (const [dx, dy] of TILE_CORNERS) {
+      const corner = cornerIndex(x + dx, y + dy);
+      heights[corner] = Math.min(heights[corner] ?? 0, level);
+    }
+  }
+
+  return path.length;
+}
+
+/** Krok k nejbližšímu okraji mapy. Slouží jen k dokopání řeky z prolákliny. */
+function stepTowardsEdge(x: number, y: number, visited: ReadonlySet<number>): number {
+  const toEdge = [
+    [0, -1, y],
+    [1, 0, MAP_SIZE - 1 - x],
+    [0, 1, MAP_SIZE - 1 - y],
+    [-1, 0, x],
+  ] as const;
+
+  let best = -1;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const [dx, dy, distance] of toEdge) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (!inBounds(nx, ny)) continue;
+    const at = index(nx, ny);
+    if (visited.has(at) || distance >= bestDistance) continue;
+    best = at;
+    bestDistance = distance;
+  }
+  return best;
+}
+
+/** Posuny k rohům dlaždice. Pořadí nehraje roli, jde jen o úplnost. */
+const TILE_CORNERS = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1],
+] as const;
 
 const NEIGHBOURS = [
   [0, -1],
