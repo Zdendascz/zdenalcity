@@ -1363,8 +1363,38 @@ Testy: 4 v `tests/water.test.ts`. Že koušou, ověřeno rozbitím: neoznačené
 změny pokrytí shodí jeden, označování všeho jeden, buldozer sahající i na
 silnici jeden.
 
+- [x] Opravy po hlášení autora (mezi T36 a T37)
+
+Tři hlášené příznaky, dvě příčiny — a ani jednu z nich testy nechytily.
+
+**1. Rámeček pod kurzorem zmizel** (hlášeno jako „diamanty se nezobrazují, ani
+u zón, ani u infrastruktury" a „nezobrazuje se vyznačení polí, která stavba
+zabere" — je to jedna a tatáž grafika). **Regrese z T30**: kvůli řazení chunků
+podle `cx + cy` jsem zapnul `sortableChildren` na **světovém** kontejneru, čímž
+propadly pod terén všechny uzly, které zIndex nemají. Rámeček byl jedním z nich
+a kreslil se pod mapou.
+
+Oprava: chunky si řadí **vlastní kontejner**, světový zůstává v pořadí vkládání.
+Tím past mizí i pro cokoli, co se do světa přidá později.
+
+**2. U třídy a dálnice nešlo stavět.** `touchesRoad` porovnávala vrstvu
+s jedničkou, jenže od T24 je 1 ulice, 2 třída a 3 dálnice — takže všechno
+kromě ulice bylo pro budovy neviditelné. Sdílená pomocná funkce `isSet` teď
+znamená „nenulová", ne „jednička". Růst, doprava ani diagnostika tuhle chybu
+neměly, ptaly se správně; ostrá byla jen ruční stavba.
+
+**Poučení:** obě chyby prošly kolem 494 testů. U řazení proto, že Pixi se
+v testech nespouštělo vůbec — ukázalo se, že `Container` a `Graphics` jsou jen
+grafy uzlů a v Node běží bez plátna, takže `tests/renderLayers.test.ts` teď
+vrstvení hlídá. U silnic proto, že testy typů vozovky zkoumaly jen kreslení,
+ne to, jestli se u nich dá stavět.
+
+Testy: 2 v `tests/renderLayers.test.ts`, 1 v `tests/roadTypes.test.ts`. Že
+koušou, ověřeno rozbitím: řazení světového kontejneru shodí jeden, chunky
+přidané napřímo do rodiče jeden, návrat porovnání s jedničkou jeden.
+
 ## Rozpracované
-_(T36 hotové, dál T37: kanalizace jako kapacita a čistírna.)_
+_(Opravy hotové, dál T37: kanalizace jako kapacita a čistírna.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

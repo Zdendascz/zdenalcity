@@ -56,9 +56,10 @@ export class ChunkRenderer {
   private readonly world: ReadonlyWorldView;
   private readonly chunksPerAxis: number;
   private readonly chunks: Chunk[] = [];
+  private readonly container: Container;
   private overlay: OverlayMode = 'none';
 
-  constructor(world: ReadonlyWorldView, container: Container) {
+  constructor(world: ReadonlyWorldView, parent: Container) {
     this.world = world;
     this.chunksPerAxis = Math.ceil(world.size / CHUNK_SIZE);
 
@@ -66,13 +67,20 @@ export class ChunkRenderer {
     // mapě to bylo jedno — diamanty do sebe zapadají bez přesahu a pořadí
     // vzniku (po řádcích) nikoho netrápilo. S převýšením ale kopec přesahuje
     // do sousedního chunku, a ten se pak kreslí přes něj.
-    container.sortableChildren = true;
+    //
+    // Řadí se **vlastní kontejner terénu**, ne ten světový. Když se zapnulo
+    // `sortableChildren` na světovém, propadly pod terén všechny uzly, které
+    // zIndex nemají — rámeček pod kurzorem a s ním i obrys půdorysu. Hráč
+    // nahlásil, že „diamanty se nezobrazují"; tohle byla ta příčina.
+    this.container = new Container();
+    this.container.sortableChildren = true;
+    parent.addChild(this.container);
 
     for (let cy = 0; cy < this.chunksPerAxis; cy++) {
       for (let cx = 0; cx < this.chunksPerAxis; cx++) {
         const graphics = new Graphics();
         graphics.zIndex = cx + cy;
-        container.addChild(graphics);
+        this.container.addChild(graphics);
         this.chunks.push({ x0: cx * CHUNK_SIZE, y0: cy * CHUNK_SIZE, graphics });
       }
     }
@@ -255,5 +263,6 @@ export class ChunkRenderer {
       chunk.graphics.destroy();
     }
     this.chunks.length = 0;
+    this.container.destroy();
   }
 }

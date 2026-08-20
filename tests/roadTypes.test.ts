@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { createVanillaSource } from '@/content/loader';
+import { ContentRegistry } from '@/content/registry';
+import { checkFootprint } from '@/sim/buildings';
 import { buildRoad, bulldoze } from '@/sim/commands';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { tileQuad } from '@/render/projection';
@@ -146,6 +149,31 @@ describe('vykreslení', () => {
     expect(ROAD_WIDTHS[ROAD.avenue]).toBeGreaterThan(ROAD_WIDTHS[ROAD.street] ?? 0);
     expect(ROAD_WIDTHS[ROAD.highway]).toBeGreaterThan(ROAD_WIDTHS[ROAD.avenue] ?? 0);
     expect(new Set(ROAD_COLORS.slice(1)).size).toBe(3);
+  });
+
+  it('stavět jde u každého typu vozovky, ne jen u ulice', async () => {
+    // Nahlásil autor při hraní: u třídy ani dálnice nešlo postavit nic.
+    // `touchesRoad` porovnávala vrstvu s jedničkou, jenže od T24 je 1 ulice,
+    // 2 třída a 3 dálnice — takže všechno kromě ulice bylo pro budovy neviditelné.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    // Klinika je budova, která silnici podle definice **vyžaduje** — na parku
+    // by test neukázal nic, ten se obejde bez ní.
+    const clinic = content.get('vanilla:clinic');
+    expect(clinic?.construction.requiresRoad).toBe(true);
+    if (!clinic) return;
+
+    for (const [name, roadType] of [
+      ['ulice', ROAD.street],
+      ['třída', ROAD.avenue],
+      ['dálnice', ROAD.highway],
+    ] as const) {
+      const world = createWorld(1, VANILLA_BALANCE.economy);
+      world.economy.funds = 100000;
+      expect(buildRoad(world, 20, 20, roadType, VANILLA_BALANCE).ok, name).toBe(true);
+
+      expect(checkFootprint(world, clinic, 20, 21).ok, name).toBe(true);
+    }
   });
 
   it('šířka mění geometrii vozovky, ne počet dílů', () => {

@@ -192,8 +192,16 @@ function touchesLayerValue(
   return false;
 }
 
+/**
+ * Je na dlaždici hodnota, která znamená „ano"?
+ *
+ * **Nenulová, ne jednička.** Vrstva `power` je 0/1, ale `road` od T24 nese typ:
+ * 1 ulice, 2 třída, 3 dálnice. Porovnání s jedničkou znamenalo, že budovy
+ * uznávaly jen ulici a u třídy ani dálnice nešlo stavět — nahlásil autor při
+ * hraní.
+ */
 function isSet(layer: Uint8Array, x: number, y: number): boolean {
-  return inBounds(x, y) && layer[index(x, y)] === 1;
+  return inBounds(x, y) && (layer[index(x, y)] ?? 0) !== 0;
 }
 
 export function placeBuilding(
