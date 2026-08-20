@@ -162,6 +162,59 @@ export function planCornerHeight(
   return changes;
 }
 
+/**
+ * Plán srovnání obdélníku dlaždic do jedné výšky (§7 fáze 3).
+ *
+ * Skládá se z jednotlivých kaskád, protože ty se **navzájem ovlivňují**:
+ * srovnání druhého rohu už musí vidět, co udělal ten první. Proto se počítá nad
+ * pracovní kopií a vrací se sjednocení změn.
+ *
+ * Cílová výška je zaokrouhlený průměr rohů oblasti. Je to volba pro hráče
+ * nejlevnější: srovnání na nejvyšší nebo nejnižší roh by hýbalo víc terénem
+ * a stálo víc.
+ */
+export function planLevelArea(
+  heights: Readonly<Uint8Array>,
+  x: number,
+  y: number,
+  width: number,
+  depth: number,
+  target?: number,
+): Map<number, number> {
+  const corners: number[] = [];
+  for (let cy = y; cy <= y + depth; cy++) {
+    for (let cx = x; cx <= x + width; cx++) {
+      if (cornerInBounds(cx, cy)) corners.push(cornerIndex(cx, cy));
+    }
+  }
+
+  const changes = new Map<number, number>();
+  if (corners.length === 0) return changes;
+
+  let level = target;
+  if (level === undefined) {
+    let sum = 0;
+    for (const corner of corners) sum += heights[corner] ?? 0;
+    level = Math.round(sum / corners.length);
+  }
+
+  const working = Uint8Array.from(heights);
+  for (const corner of corners) {
+    const cx = corner % CORNER_SIZE;
+    const cy = (corner - cx) / CORNER_SIZE;
+    const step = planCornerHeight(working, cx, cy, level);
+    applyCornerChanges(working, step);
+    for (const [at, value] of step) changes.set(at, value);
+  }
+
+  // Roh, který se vrátil na původní hodnotu, se do účtu počítat nemá.
+  for (const [at, value] of [...changes]) {
+    if ((heights[at] ?? 0) === value) changes.delete(at);
+  }
+
+  return changes;
+}
+
 /** Zapíše plán z `planCornerHeight`. Oddělené schválně — viz komentář tamtéž. */
 export function applyCornerChanges(heights: Uint8Array, changes: ReadonlyMap<number, number>): void {
   for (const [corner, value] of changes) heights[corner] = value;

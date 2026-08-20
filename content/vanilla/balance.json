@@ -26,7 +26,8 @@
     "maxHeight": 10,
     "heightCurve": 1.6,
     "rivers": 0,
-    "riverSourceHeight": 5
+    "riverSourceHeight": 5,
+    "terraformCost": 8
   },
 
   "traffic": {

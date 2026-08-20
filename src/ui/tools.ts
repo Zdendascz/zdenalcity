@@ -11,7 +11,9 @@ export type ToolAction =
   | { kind: 'road'; roadType: number }
   | { kind: 'bulldoze' }
   | { kind: 'zone'; zone: ZoneType }
-  | { kind: 'place'; definitionId: string };
+  | { kind: 'place'; definitionId: string }
+  /** Terraforming: kladná delta zvedá, záporná sníží. Nula srovná oblast. */
+  | { kind: 'terraform'; delta: number };
 
 export interface ToolOption {
   id: string;

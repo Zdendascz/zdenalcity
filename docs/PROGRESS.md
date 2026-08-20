@@ -1160,8 +1160,51 @@ Testy: 6 nových v `tests/render.test.ts`. Že koušou, ověřeno rozbitím: hle
 odzadu dopředu shodí jeden, výška vynechaná z pásu kandidátů dva, test na
 obálku místo ray castingu pět, chybějící kontrola hranic mapy jeden.
 
+- [x] T32 — terraforming: nástroje, kaskáda, ceny (fáze 3b)
+
+Hráč konečně smí sáhnout na terén. Tři nástroje v liště — zvednout roh (E),
+snížit roh (D), srovnat dlaždici (F) — nad kaskádou z T29.
+
+- **odhad a provedení jsou oddělené.** `estimateCornerHeight` a
+  `estimateLevelArea` spočítají, kolik rohů se hne a co to stojí, a **nic
+  nemění**. Teprve pak se sahá na kasu. Kvůli tomu byl plán oddělený od zápisu
+  už v T29 — bez toho by nešlo ukázat cenu dřív, než hráč klikne
+- **účtuje se celá kaskáda** (§12 kritérium 13), ne roh, na který se kliklo.
+  Zvednutí u strmého svahu rozhýbe desítky rohů a hráč to má vidět na účtu
+- **cena počítá rohy, ne patra.** Vyšlo z toho pravidlo, které jsem nečekal a
+  které je vlastně dobré: **zvednout o čtyři patra naráz je levnější než
+  čtyřikrát o jedno**, protože kdo zvedá po jednom, platí každý prstenec
+  kaskády znovu. Původní test tvrdil něco jiného a byl špatně
+- **pod budovou se terén nehne ani nahoru, ani dolů.** Zadání zakazuje
+  snižování; zvedání zakazuju taky, protože budova stojí na rovině a nakloněný
+  terén pod ní by ji zavěsil do vzduchu. Srovnat parcelu jde **před** stavbou,
+  a to je T33
+- **budova zasažená až kaskádou zastaví celou operaci.** Provést půlku kaskády
+  by porušilo invariant
+- **dno moře se nezvedá**, ale u vody se smí snižovat — jinak by nešel srovnat
+  ani břeh. Silnice se hýbat smí, invariant drží svah v mezích sám
+- srovnání jde na **zaokrouhlený průměr** rohů oblasti. Je to pro hráče
+  nejlevnější varianta; srovnání na nejvyšší nebo nejnižší roh hýbe víc terénem
+- terraforming míří na **nejbližší roh ke kurzoru**, ne pevně na severozápadní.
+  Jinak by klik na pravou půlku dlaždice zvedl roh na opačné straně
+
+Ověřeno v běžící hře: odhad slíbil 14 rohů za 112, příkaz strhl přesně 112 a
+roh šel z prvního patra do čtvrtého bez jediného porušení invariantu. Srovnání
+oblasti 3×3 udělalo z devíti nakloněných dlaždic devět rovných za 96. Pokus
+zvednout terén pod budovou skončil hláškou, stejně jako pokus zvednout dno u
+pobřeží. A po pixelech: dlaždice šla z rovné (107, 155, 74) na svah
+(94, 137, 65) po překreslení 39 označených dlaždic.
+
+Testy: 15 v `tests/terraform.test.ts`. Že koušou, ověřeno rozbitím: cena za
+jediný roh shodí tři, budova bez zákazu dva, povolené zvedání dna jeden,
+placení za nulovou práci dva, srovnání ignorující předchozí kaskády jeden.
+
+**Náhled ceny na hover zatím není** — funkce na to jsou hotové a otestované,
+ale do UI je zapojí až T33, kde na tom stojí akceptační kritérium 14.
+
 ## Rozpracované
-_(T31 hotové, dál T32: terraforming — nástroje, kaskáda, ceny.)_
+_(T32 hotové, dál T33: stavební pravidla na svazích, srovnání pod budovou,
+mosty, těžba skály a zavážení mokřadu.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

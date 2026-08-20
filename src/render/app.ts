@@ -7,7 +7,7 @@ import { explainParcel } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
-import { tileBaseHeight } from '@/sim/heights';
+import { cornerIndex, tileBaseHeight } from '@/sim/heights';
 import { index, MAP_SIZE, ZONE } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
@@ -30,7 +30,7 @@ import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
 import { BuildingRenderer } from './buildingRenderer';
 import type { AppearanceLookup } from './buildingRenderer';
-import { createCamera, pan, zoomAt } from './camera';
+import { createCamera, pan, viewportToWorld, zoomAt } from './camera';
 import { ChunkRenderer } from './chunkRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
@@ -97,6 +97,27 @@ function createTools(content: ContentRegistry): ToolOption[] {
       hotkey: 'x',
       groupKey: 'ui.tool.group.build',
       action: { kind: 'bulldoze' },
+    },
+    {
+      id: 'terrain:raise',
+      labelKey: 'ui.tool.terrain.raise',
+      hotkey: 'e',
+      groupKey: 'ui.tool.group.terrain',
+      action: { kind: 'terraform', delta: 1 },
+    },
+    {
+      id: 'terrain:lower',
+      labelKey: 'ui.tool.terrain.lower',
+      hotkey: 'd',
+      groupKey: 'ui.tool.group.terrain',
+      action: { kind: 'terraform', delta: -1 },
+    },
+    {
+      id: 'terrain:level',
+      labelKey: 'ui.tool.terrain.level',
+      hotkey: 'f',
+      groupKey: 'ui.tool.group.terrain',
+      action: { kind: 'terraform', delta: 0 },
     },
     {
       id: 'zone:residential',
@@ -449,6 +470,43 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     );
   }
 
+  /**
+   * Roh dlaždice nejblíž kurzoru.
+   *
+   * Terraforming hýbe rohem, ne dlaždicí, takže se hráč musí trefit do rohu.
+   * Pevný severozápadní by znamenal, že kliknutí na pravou půlku dlaždice
+   * zvedne roh na opačné straně, než kam hráč mířil.
+   */
+  function nearestCorner(
+    tile: { x: number; y: number },
+    viewX: number,
+    viewY: number,
+  ): { x: number; y: number } {
+    const point = viewportToWorld(camera, viewX, viewY, app.screen.width, app.screen.height);
+    const heights = world.cornerHeight;
+
+    let best = { x: tile.x, y: tile.y };
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const [dx, dy] of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ] as const) {
+      const cx = tile.x + dx;
+      const cy = tile.y + dy;
+      const at = gridToScreen(cx, cy, heights[cornerIndex(cx, cy)] ?? 0);
+      const distance = (at.x - point.x) ** 2 + (at.y - point.y) ** 2;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = { x: cx, y: cy };
+      }
+    }
+
+    return best;
+  }
+
   /** Veškeré hráčské akce jdou přes dispatch — renderer na WorldState nesahá. */
   function applyTool(tile: { x: number; y: number }, viewX: number, viewY: number): void {
     const action = activeTool.action;
@@ -472,6 +530,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           y: tile.y,
         });
         break;
+      case 'terraform': {
+        if (action.delta === 0) {
+          dispatch({ type: 'level_area', x: tile.x, y: tile.y, w: 1, h: 1 });
+          break;
+        }
+        // Zvedá se **nejbližší roh**, ne pevně ten severozápadní: hráč míří
+        // kurzorem na konkrétní roh a čeká, že se zvedne ten.
+        const corner = nearestCorner(tile, viewX, viewY);
+        dispatch({ type: 'terraform_corner', x: corner.x, y: corner.y, delta: action.delta });
+        break;
+      }
     }
 
     // Cena se čte z rozdílu v kase, ne z definice — bublina tak vyskočí u čehokoli,

@@ -4,9 +4,11 @@ import type { ReadonlyCoarseLayers } from './coarse';
 import {
   buildRoad,
   bulldoze,
+  levelArea,
   placeDefinition,
   setServiceFunding,
   setTaxRate,
+  terraformCorner,
   zoneArea,
 } from './commands';
 import type { Command } from './commands';
@@ -100,6 +102,10 @@ class MainThreadSimHost implements SimHost {
         return placeDefinition(this.world, this.catalogue, cmd.definitionId, cmd.x, cmd.y);
       case 'set_tax_rate':
         return setTaxRate(this.world, cmd.zone, cmd.rate);
+      case 'terraform_corner':
+        return terraformCorner(this.world, cmd.x, cmd.y, cmd.delta, this.balance);
+      case 'level_area':
+        return levelArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, this.balance);
       case 'set_service_funding':
         return setServiceFunding(this.world, cmd.serviceClass, cmd.funding);
       default:

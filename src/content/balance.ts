@@ -71,6 +71,11 @@ export interface Balance {
     rivers: number;
     /** Odkud řeka vyráží — nejmenší patro pramene. */
     riverSourceHeight: number;
+    /**
+     * Cena terraformingu **za jeden dotčený roh**, včetně kaskády. Zvednutí
+     * u strmého svahu rozhýbe desítky rohů a hráč to má vidět na účtu (§7).
+     */
+    terraformCost: number;
   };
 
   /**
@@ -342,6 +347,7 @@ export function validateBalance(raw: unknown): {
       heightCurve: num(issues, map, 'heightCurve', 'map.heightCurve', 0.1, 8),
       rivers: num(issues, map, 'rivers', 'map.rivers', 0, 16),
       riverSourceHeight: num(issues, map, 'riverSourceHeight', 'map.riverSourceHeight', 0, MAX_HEIGHT),
+      terraformCost: num(issues, map, 'terraformCost', 'map.terraformCost', 0, 100000),
     },
     traffic: {
       roadTypes,

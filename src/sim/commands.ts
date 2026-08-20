@@ -1,6 +1,12 @@
 import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from './buildings';
 import type { BuildingCatalogue } from './catalogue';
+import {
+  cornerInBounds,
+  cornerIndex,
+  planCornerHeight,
+  planLevelArea,
+} from './heights';
 import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
@@ -9,6 +15,7 @@ import { needsClearing } from './terrain';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
+  applyHeightChanges,
   MAX_TAX_RATE,
   MIN_TAX_RATE,
   markCoverageDirty,
@@ -31,6 +38,8 @@ export type Command =
   | { type: 'place_building'; definitionId: string; x: number; y: number }
   | { type: 'set_tax_rate'; zone: ZoneType; rate: number }
   | { type: 'set_service_funding'; serviceClass: string; funding: number }
+  | { type: 'terraform_corner'; x: number; y: number; delta: number }
+  | { type: 'level_area'; x: number; y: number; w: number; h: number }
   | { type: 'set_speed'; speed: number };
 
 /**
@@ -246,4 +255,135 @@ export function setTaxRate(world: WorldState, zone: ZoneType, rate: number): Com
     Math.min(MAX_TAX_RATE, Math.round(rate)),
   );
   return OK;
+}
+
+/**
+ * Terraforming (§7 zadání fáze 3).
+ *
+ * Dvě věci, které dělá kaskáda z T29, se tady potkávají s ekonomikou: plán se
+ * spočítá **napřed** a teprve pak se ptá na peníze, takže cena jde ukázat dřív,
+ * než hráč klikne (§12 kritérium 14). A účtuje se **celá kaskáda**, ne jeden
+ * roh — zvednutí u strmého svahu rozhýbe desítky rohů a hráč to má vidět na
+ * účtu (kritérium 13).
+ */
+export interface TerraformEstimate {
+  /** Kolik rohů se změní včetně kaskády. */
+  corners: number;
+  cost: number;
+  changes: Map<number, number>;
+}
+
+/** Dlaždice, které se dotýkají rohu. Roh drží čtyři, u kraje mapy míň. */
+function tilesAroundCorner(world: WorldState, corner: number): number[] {
+  const cornerSize = world.size + 1;
+  const cx = corner % cornerSize;
+  const cy = (corner - cx) / cornerSize;
+
+  const tiles: number[] = [];
+  for (const [dx, dy] of [
+    [-1, -1],
+    [0, -1],
+    [-1, 0],
+    [0, 0],
+  ] as const) {
+    const x = cx + dx;
+    const y = cy + dy;
+    if (inBounds(x, y)) tiles.push(index(x, y));
+  }
+  return tiles;
+}
+
+/**
+ * Smí se terén na tomhle plánu vůbec hnout?
+ *
+ * - **pod vodou se nezvedá** — zavážení moře je jiná mechanika, ne terraforming,
+ * - **pod budovou se nehýbe vůbec.** Zadání zakazuje snižování; zvedání
+ *   zakazuju taky, protože budova stojí na rovině a nakloněný terén pod ní by
+ *   ji zavěsil do vzduchu. Srovnat parcelu jde **před** stavbou (to je T33).
+ *
+ * Silnice se hýbat smí — invariant drží svah v mezích sám.
+ */
+function checkTerraform(world: WorldState, changes: ReadonlyMap<number, number>): CommandResult {
+  for (const [corner, target] of changes) {
+    const current = world.cornerHeight[corner] ?? 0;
+
+    for (const tile of tilesAroundCorner(world, corner)) {
+      if (world.layers.buildingId[tile] !== 0) return reject('error.terraformBuilding');
+      if (target > current && world.layers.terrain[tile] === TERRAIN.water) {
+        return reject('error.terraformWater');
+      }
+    }
+  }
+
+  return OK;
+}
+
+function estimate(changes: Map<number, number>, balance?: Balance): TerraformEstimate {
+  const perCorner = balance?.map.terraformCost ?? 0;
+  return { corners: changes.size, cost: changes.size * perCorner, changes };
+}
+
+/** Kolik by stálo zvednutí nebo snížení rohu. Nic nemění — jen počítá. */
+export function estimateCornerHeight(
+  world: WorldState,
+  x: number,
+  y: number,
+  delta: number,
+  balance?: Balance,
+): TerraformEstimate {
+  const corner = cornerIndex(x, y);
+  const current = world.cornerHeight[corner] ?? 0;
+  return estimate(planCornerHeight(world.cornerHeight, x, y, current + delta), balance);
+}
+
+/** Kolik by stálo srovnání oblasti. Nic nemění — jen počítá. */
+export function estimateLevelArea(
+  world: WorldState,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  balance?: Balance,
+): TerraformEstimate {
+  return estimate(planLevelArea(world.cornerHeight, x, y, w, h), balance);
+}
+
+function commit(world: WorldState, plan: TerraformEstimate): CommandResult {
+  if (plan.corners === 0) return reject('error.terraformNoChange');
+
+  const allowed = checkTerraform(world, plan.changes);
+  if (!allowed.ok) return allowed;
+
+  if (world.economy.funds < plan.cost) {
+    return reject('error.notEnoughFunds', { cost: plan.cost, funds: world.economy.funds });
+  }
+  world.economy.funds -= plan.cost;
+
+  applyHeightChanges(world, plan.changes);
+  return OK;
+}
+
+/** Zvedne nebo sníží roh mřížky o `delta` pater, i s kaskádou a účtem. */
+export function terraformCorner(
+  world: WorldState,
+  x: number,
+  y: number,
+  delta: number,
+  balance?: Balance,
+): CommandResult {
+  if (!cornerInBounds(x, y)) return reject('error.outOfBounds');
+  return commit(world, estimateCornerHeight(world, x, y, delta, balance));
+}
+
+/** Srovná obdélník dlaždic do jedné výšky, i s kaskádou a účtem. */
+export function levelArea(
+  world: WorldState,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  balance?: Balance,
+): CommandResult {
+  if (!inBounds(x, y)) return reject('error.outOfBounds');
+  return commit(world, estimateLevelArea(world, x, y, w, h, balance));
 }
