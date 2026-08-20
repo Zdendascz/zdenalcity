@@ -2,7 +2,8 @@ import { Container, Graphics } from 'pixi.js';
 import { index, MAP_SIZE, ROAD } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { TRAFFIC_COLORS, TRAFFIC_MAX_ALPHA } from './palette';
-import { footprintQuad } from './projection';
+import { tileCorners } from '@/sim/heights';
+import { tileQuad } from './projection';
 
 /**
  * Overlay dopravy (§5 zadání fáze 3).
@@ -63,7 +64,7 @@ export class TrafficOverlay {
         if (ratio === 0) continue;
 
         const color = TRAFFIC_COLORS[Math.min(TRAFFIC_COLORS.length - 1, Math.floor(ratio * TRAFFIC_COLORS.length))];
-        this.graphics.poly(footprintQuad(x, y, 1, 1)).fill({
+        this.graphics.poly(tileQuad(x, y, tileCorners(this.world.cornerHeight, x, y))).fill({
           color: color ?? TRAFFIC_COLORS[0] ?? 0,
           alpha: TRAFFIC_MAX_ALPHA,
         });

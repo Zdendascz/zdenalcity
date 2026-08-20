@@ -242,6 +242,46 @@ export function markCoverageDirty(world: WorldState): void {
   world.coverageDirty = true;
 }
 
+/**
+ * Zapíše nové výšky rohů a označí, co se kvůli tomu musí překreslit (§7 fáze 3).
+ *
+ * Jeden roh drží **čtyři dlaždice** — ty kolem něj. Kdyby se označila jen jedna,
+ * zůstal by na mapě viset zlom: sousední chunk by si dál kreslil starý tvar.
+ *
+ * Budovy na dotčených dlaždicích se hlásí zvlášť. Stojí na výšce základny,
+ * takže se s terénem musí posunout, a `dirty.tiles` se jich netýká — kreslí je
+ * jiný renderer.
+ */
+export function applyHeightChanges(
+  world: WorldState,
+  changes: ReadonlyMap<number, number>,
+): void {
+  const cornerSize = world.size + 1;
+
+  for (const [corner, height] of changes) {
+    world.cornerHeight[corner] = height;
+
+    const cx = corner % cornerSize;
+    const cy = (corner - cx) / cornerSize;
+    for (const [dx, dy] of [
+      [-1, -1],
+      [0, -1],
+      [-1, 0],
+      [0, 0],
+    ] as const) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (!inBounds(x, y)) continue;
+
+      const tile = index(x, y);
+      world.dirty.tiles.add(tile);
+
+      const buildingId = world.layers.buildingId[tile] ?? 0;
+      if (buildingId !== 0) world.dirty.buildings.add(buildingId);
+    }
+  }
+}
+
 /** Financování třídy v rozsahu 0–1. Neznámá třída je plně financovaná. */
 export function serviceFunding(world: WorldState, serviceClass: string): number {
   return world.serviceFunding.get(serviceClass) ?? 1;

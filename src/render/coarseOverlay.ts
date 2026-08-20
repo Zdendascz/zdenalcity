@@ -1,6 +1,8 @@
 import { Container, Graphics } from 'pixi.js';
 import { COARSE_FACTOR, COARSE_SIZE } from '@/sim/coarse';
-import { footprintQuad } from './projection';
+import { cornerIndex } from '@/sim/heights';
+import type { ReadonlyWorldView } from '@/sim/simHost';
+import { areaQuad } from './projection';
 
 /**
  * Jeden diagnostický pohled na hrubou mřížku.
@@ -29,8 +31,14 @@ export class CoarseOverlay {
   private readonly graphics = new Graphics();
   private readonly layers = new Map<string, CoarseLayerView>();
   private active = 'none';
+  private readonly world: ReadonlyWorldView;
 
-  constructor(parent: Container, layers: readonly CoarseLayerView[]) {
+  constructor(
+    world: ReadonlyWorldView,
+    parent: Container,
+    layers: readonly CoarseLayerView[],
+  ) {
+    this.world = world;
     for (const layer of layers) this.layers.set(layer.id, layer);
     this.graphics.visible = false;
     parent.addChild(this.graphics);
@@ -64,17 +72,30 @@ export class CoarseOverlay {
         const value = values[cellY * COARSE_SIZE + cellX] ?? 0;
         if (value === 0) continue;
 
-        const quad = footprintQuad(
-          cellX * COARSE_FACTOR,
-          cellY * COARSE_FACTOR,
-          COARSE_FACTOR,
-          COARSE_FACTOR,
-        );
+        // Blok se naklopí podle **svých čtyř rohů**, ne podle každé dlaždice
+        // uvnitř. Je to aproximace: uvnitř bloku může terén stoupat jinak, než
+        // rovina mezi rohy. Šestnáctkrát víc polygonů za stejnou informaci ale
+        // nestojí za to — a přesně kvůli tomu tenhle overlay vznikl.
+        const x = cellX * COARSE_FACTOR;
+        const y = cellY * COARSE_FACTOR;
+        const quad = areaQuad(x, y, COARSE_FACTOR, COARSE_FACTOR, this.blockCorners(x, y));
         this.graphics
           .poly(quad)
           .fill({ color: layer.color, alpha: (value / 255) * layer.maxAlpha });
       }
     }
+  }
+
+  /** Výšky čtyř rohů bloku 4×4 v pořadí SZ, SV, JZ, JV. */
+  private blockCorners(x: number, y: number): [number, number, number, number] {
+    const heights = this.world.cornerHeight;
+    const far = COARSE_FACTOR;
+    return [
+      heights[cornerIndex(x, y)] ?? 0,
+      heights[cornerIndex(x + far, y)] ?? 0,
+      heights[cornerIndex(x, y + far)] ?? 0,
+      heights[cornerIndex(x + far, y + far)] ?? 0,
+    ];
   }
 
   destroy(): void {

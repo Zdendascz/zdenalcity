@@ -17,13 +17,19 @@ import {
   cuboidFaces,
   diamondPoints,
   gridToScreen,
+  LEVEL_H,
   screenToGrid,
+  slopeLight,
+  tileQuad,
   TILE_H,
   TILE_W,
 } from '@/render/projection';
 import { shade, TERRAIN_COLORS } from '@/render/palette';
 import { roadMask, roadPolygons, ROAD_E, ROAD_N, ROAD_S, ROAD_W } from '@/render/roads';
 import { MAP_SIZE, TERRAIN } from '@/sim/layers';
+
+/** Rovná dlaždice v počátku — nejčastější vstup do testů vozovky. */
+const FLAT_TILE = tileQuad(0, 0, [0, 0, 0, 0]);
 
 const VIEW_W = 1280;
 const VIEW_H = 720;
@@ -61,6 +67,60 @@ describe('projection', () => {
 
   it('diamondPoints vrací čtyři vrcholy kolem horního rohu', () => {
     expect(diamondPoints(0, 0)).toEqual([0, 0, 32, 16, 0, 32, -32, 16]);
+  });
+});
+
+describe('dlaždice s převýšením (§7 fáze 3)', () => {
+  it('rovná dlaždice vyjde jako pravidelný diamant', () => {
+    expect(tileQuad(0, 0, [0, 0, 0, 0])).toEqual(diamondPoints(0, 0));
+  });
+
+  it('každý roh se zvedne o svou vlastní výšku', () => {
+    // Východní roh o patro výš: v pořadí sever, východ, jih, západ je to
+    // druhá dvojice a posune se nahoru přesně o LEVEL_H.
+    const flat = tileQuad(0, 0, [0, 0, 0, 0]);
+    const slope = tileQuad(0, 0, [0, 1, 0, 0]);
+
+    expect(slope[2]).toBe(flat[2]); // x se nemění, zvedá se jen y
+    expect((slope[3] ?? 0) - (flat[3] ?? 0)).toBe(-LEVEL_H);
+    expect(slope.slice(4)).toEqual(flat.slice(4));
+  });
+
+  it('sousední dlaždice sdílí rohy, takže terén nepraskne', () => {
+    // Východní roh dlaždice (0,0) je západní roh dlaždice (1,0). Pokud se
+    // počítají ze stejné výšky, musí vyjít týž bod.
+    const left = tileQuad(0, 0, [0, 2, 0, 1]);
+    const right = tileQuad(1, 0, [2, 0, 1, 0]);
+
+    expect([left[2], left[3]]).toEqual([right[0], right[1]]);
+    expect([left[4], left[5]]).toEqual([right[6], right[7]]);
+  });
+
+  it('sklon mění jas: přivrácený svah je světlejší, odvrácený tmavší', () => {
+    // Bez toho by svah vypadal jako rovina — izometrie nemá perspektivu,
+    // která by tvar prozradila.
+    const flat = slopeLight([0, 0, 0, 0]);
+    const towardsViewer = slopeLight([2, 2, 0, 0]); // klesá na jih
+    const awayFromViewer = slopeLight([0, 0, 2, 2]); // stoupá na jih
+
+    expect(flat).toBe(1);
+    expect(towardsViewer).toBeLessThan(flat);
+    expect(awayFromViewer).toBeGreaterThan(flat);
+  });
+
+  it('stejně vysoká rovina má stejný jas bez ohledu na patro', () => {
+    // Plošina ve třetím patře není svah, takže se nesmí stínovat.
+    expect(slopeLight([3, 3, 3, 3])).toBe(slopeLight([0, 0, 0, 0]));
+  });
+
+  it('budova se posadí na výšku základny', () => {
+    const ground = cuboidFaces(0, 0, 1, 1, 16);
+    const hill = cuboidFaces(0, 0, 1, 1, 16, 3);
+
+    // Celý kvádr se zvedne o tři patra, tvar zůstane.
+    for (let i = 1; i < ground.top.length; i += 2) {
+      expect((hill.top[i] ?? 0) - (ground.top[i] ?? 0)).toBe(-3 * LEVEL_H);
+    }
   });
 });
 
@@ -183,22 +243,38 @@ describe('auto-tiling silnic', () => {
   it('všech 16 variant má středový kus a rameno na každý připojený směr', () => {
     for (let mask = 0; mask < 16; mask++) {
       const arms = [ROAD_N, ROAD_E, ROAD_S, ROAD_W].filter((bit) => mask & bit).length;
-      expect(roadPolygons(0, 0, mask), `mask ${mask}`).toHaveLength(1 + arms);
+      expect(roadPolygons(FLAT_TILE, mask), `mask ${mask}`).toHaveLength(1 + arms);
     }
   });
 
   it('středový kus je zmenšený diamant kolem středu dlaždice', () => {
-    expect(roadPolygons(0, 0, 0)[0]).toEqual([0, 8, 16, 16, 0, 24, -16, 16]);
+    expect(roadPolygons(FLAT_TILE, 0)[0]).toEqual([0, 8, 16, 16, 0, 24, -16, 16]);
   });
 
   it('rameno sahá až na hranu diamantu, aby sousedé navazovali bez mezery', () => {
     // Severní hrana dlaždice vede z horního vrcholu (0,0) do pravého (32,16).
-    expect(roadPolygons(0, 0, ROAD_N)[1]).toEqual([0, 8, 16, 16, 32, 16, 0, 0]);
+    expect(roadPolygons(FLAT_TILE, ROAD_N)[1]).toEqual([0, 8, 16, 16, 32, 16, 0, 0]);
   });
 
   it('respektuje posun počátku dlaždice', () => {
-    const shifted = roadPolygons(100, 200, 0)[0];
+    const shifted = roadPolygons(
+      FLAT_TILE.map((value, i) => value + (i % 2 === 0 ? 100 : 200)),
+      0,
+    )[0];
     expect(shifted).toEqual([100, 208, 116, 216, 100, 224, 84, 216]);
+  });
+
+  it('na svahu jde vozovka po ploše dlaždice, ne po pravidelném diamantu', () => {
+    // Dlaždice stoupající na východ: východní roh je o patro výš, takže se
+    // musí zvednout i střed vozovky. Kdyby se počítala z pravidelného diamantu,
+    // silnice by se od terénu odlepila.
+    const flat = roadPolygons(FLAT_TILE, 0)[0] ?? [];
+    const slope = roadPolygons(tileQuad(0, 0, [0, 1, 0, 1]), 0)[0] ?? [];
+    expect(slope).not.toEqual(flat);
+
+    // Plošina o patro výš: vozovka musí být přesně ta samá, jen zvednutá.
+    const lifted = roadPolygons(tileQuad(0, 0, [1, 1, 1, 1]), 0)[0] ?? [];
+    expect(lifted).toEqual(flat.map((value, i) => (i % 2 === 0 ? value : value - LEVEL_H)));
   });
 });
 

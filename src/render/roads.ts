@@ -1,5 +1,3 @@
-import { TILE_H, TILE_W } from './projection';
-
 /**
  * Auto-tiling silnic. Bitmask sousedů se počítá **v rendereru** — simulace zná
  * jen `road: 0|1` a o tvaru napojení nic neví (P3).
@@ -30,9 +28,6 @@ export function roadMask(isRoad: IsRoad, x: number, y: number): number {
  */
 const CORE_SCALE = 0.5;
 
-const HALF_W = TILE_W / 2;
-const HALF_H = TILE_H / 2;
-
 function towardCenter(
   px: number,
   py: number,
@@ -44,23 +39,32 @@ function towardCenter(
 }
 
 /**
+ * Diamant dlaždice jako čtyři vrcholy v pořadí sever, východ, jih, západ —
+ * přesně to, co vrací `tileQuad`.
+ */
+export type TileQuad = readonly number[];
+
+/**
  * Vozovka jedné dlaždice jako seznam polygonů: středový kus plus jedno rameno
  * na každou stranu, kam silnice pokračuje. Tím vznikne všech 16 variant
  * (slepý konec, rovinka, zatáčka, T, křižovatka) bez jediné hardcoded tabulky.
  *
- * `originX/Y` je horní vrchol diamantu, stejně jako u `gridToScreen`.
+ * Bere **skutečné vrcholy dlaždice**, ne počátek pravidelného diamantu. Na
+ * svahu se totiž každý roh zvedne jinak a silnice počítaná z pravidelného tvaru
+ * by se od terénu odlepila (§7 fáze 3). Střed se bere jako průměr rohů, takže
+ * geometrie sedí i na zkroucené dlaždici.
  */
 export function roadPolygons(
-  originX: number,
-  originY: number,
+  quad: TileQuad,
   mask: number,
   width: number = CORE_SCALE,
 ): number[][] {
-  const top: [number, number] = [originX, originY];
-  const right: [number, number] = [originX + HALF_W, originY + HALF_H];
-  const bottom: [number, number] = [originX, originY + TILE_H];
-  const left: [number, number] = [originX - HALF_W, originY + HALF_H];
-  const [cx, cy] = [originX, originY + HALF_H];
+  const top: [number, number] = [quad[0] ?? 0, quad[1] ?? 0];
+  const right: [number, number] = [quad[2] ?? 0, quad[3] ?? 0];
+  const bottom: [number, number] = [quad[4] ?? 0, quad[5] ?? 0];
+  const left: [number, number] = [quad[6] ?? 0, quad[7] ?? 0];
+  const cx = (top[0] + right[0] + bottom[0] + left[0]) / 4;
+  const cy = (top[1] + right[1] + bottom[1] + left[1]) / 4;
 
   const topCore = towardCenter(top[0], top[1], cx, cy, width);
   const rightCore = towardCenter(right[0], right[1], cx, cy, width);

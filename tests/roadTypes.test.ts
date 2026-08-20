@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildRoad, bulldoze } from '@/sim/commands';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
+import { tileQuad } from '@/render/projection';
 import { roadMask, roadPolygons } from '@/render/roads';
 import { ROAD_COLORS, ROAD_WIDTHS } from '@/render/palette';
 import { computeBudget } from '@/sim/systems/economy';
@@ -148,8 +149,8 @@ describe('vykreslení', () => {
   });
 
   it('šířka mění geometrii vozovky, ne počet dílů', () => {
-    const narrow = roadPolygons(0, 0, 0, 0.5);
-    const wide = roadPolygons(0, 0, 0, 0.86);
+    const narrow = roadPolygons(tileQuad(0, 0, [0, 0, 0, 0]), 0, 0.5);
+    const wide = roadPolygons(tileQuad(0, 0, [0, 0, 0, 0]), 0, 0.86);
 
     expect(narrow).toHaveLength(wide.length);
     expect(narrow[0]).not.toEqual(wide[0]);

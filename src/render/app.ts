@@ -199,7 +199,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     createAppearanceLookup(content),
   );
 
-  const coarseOverlay = new CoarseOverlay(worldContainer, [
+  const coarseOverlay = new CoarseOverlay(world, worldContainer, [
     {
       id: 'pollution',
       color: POLLUTION_COLOR,

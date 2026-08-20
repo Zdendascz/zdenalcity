@@ -14,7 +14,8 @@ import {
   tileBaseHeight,
   tileCorners,
 } from '@/sim/heights';
-import { MAP_SIZE } from '@/sim/layers';
+import { index, MAP_SIZE } from '@/sim/layers';
+import { applyHeightChanges, createWorld } from '@/sim/world';
 
 /** Zvedne roh a rovnou zapíše, což je to, co bude dělat terraforming z T32. */
 function raise(heights: Uint8Array, x: number, y: number, target: number): number {
@@ -152,5 +153,51 @@ describe('srovnání pole (relaxHeights)', () => {
 
     expect(relaxHeights(heights)).toBe(1); // jeden průchod, nic se nezměnilo
     expect(heights).toEqual(before);
+  });
+});
+
+describe('překreslení po změně výšky (T30)', () => {
+  it('jeden roh označí všechny čtyři dlaždice kolem sebe', () => {
+    // Kdyby se označila jen jedna, zůstal by na mapě viset zlom: sousední
+    // chunk by si dál kreslil starý tvar.
+    const world = createWorld(1);
+    world.dirty.tiles.clear();
+
+    applyHeightChanges(world, planCornerHeight(world.cornerHeight, 20, 20, 1));
+
+    for (const [x, y] of [
+      [19, 19],
+      [20, 19],
+      [19, 20],
+      [20, 20],
+    ] as const) {
+      expect(world.dirty.tiles.has(index(x, y)), `${x},${y}`).toBe(true);
+    }
+    expect(world.cornerHeight[cornerIndex(20, 20)]).toBe(1);
+  });
+
+  it('u kraje mapy neoznačí dlaždici mimo mřížku', () => {
+    const world = createWorld(1);
+    world.dirty.tiles.clear();
+
+    applyHeightChanges(world, planCornerHeight(world.cornerHeight, 0, 0, 1));
+
+    expect(world.dirty.tiles.has(index(0, 0))).toBe(true);
+    for (const tile of world.dirty.tiles) {
+      expect(tile).toBeGreaterThanOrEqual(0);
+      expect(tile).toBeLessThan(MAP_SIZE * MAP_SIZE);
+    }
+  });
+
+  it('budovu na dotčené dlaždici pošle překreslit taky', () => {
+    // Budova stojí na výšce základny, takže se s terénem musí posunout —
+    // a kreslí ji jiný renderer než dlaždice, který `dirty.tiles` nečte.
+    const world = createWorld(1);
+    world.layers.buildingId[index(50, 50)] = 7;
+    world.dirty.buildings.clear();
+
+    applyHeightChanges(world, planCornerHeight(world.cornerHeight, 50, 50, 2));
+
+    expect(world.dirty.buildings.has(7)).toBe(true);
   });
 });

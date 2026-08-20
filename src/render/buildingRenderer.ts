@@ -13,6 +13,7 @@ import {
   WALL_LEFT_SHADE,
   WALL_RIGHT_SHADE,
 } from './palette';
+import { MAX_HEIGHT, tileBaseHeight } from '@/sim/heights';
 import { cuboidFaces, gridToScreen, LEVEL_H } from './projection';
 
 /**
@@ -116,12 +117,15 @@ export class BuildingRenderer {
     // znamenalo patnáctipatrový věžák, protože vyšší úroveň už má vyšší
     // `heightLevels` sama.
     const height = appearance.heightLevels * LEVEL_H;
+    // Budova stojí na rovině (§7 fáze 3), takže jí stačí jedno patro základny.
+    const base = tileBaseHeight(this.world.cornerHeight, building.x, building.y);
     const faces = cuboidFaces(
       building.x + BUILDING_INSET,
       building.y + BUILDING_INSET,
       width - BUILDING_INSET * 2,
       depth - BUILDING_INSET * 2,
       height,
+      base,
     );
 
     view.clear();
@@ -137,12 +141,18 @@ export class BuildingRenderer {
       width: width - BUILDING_INSET * 2,
       depth: depth - BUILDING_INSET * 2,
       height,
+      base,
     });
 
     // Hloubka se řídí **předním rohem** půdorysu, ne počátkem. Kdyby se řadilo
     // podle `x + y`, dvoudlaždicová továrna by se schovala za jednodlaždicový
     // obchod, který stojí za ní — právě tak vypadala nahlášená chyba.
-    view.zIndex = building.x + width + (building.y + depth);
+    //
+    // Při shodě rozhoduje **výška základny sestupně** (§7 fáze 3): dvě budovy
+    // ve stejné hloubce, jedna na kopci a druhá pod ním, se v izometrii
+    // překrývají a ta výš stojící je dál od pozorovatele, takže patří dozadu.
+    view.zIndex =
+      (building.x + width + building.y + depth) * (MAX_HEIGHT + 1) + (MAX_HEIGHT - base);
   }
 
   /**
@@ -155,7 +165,7 @@ export class BuildingRenderer {
     appearance: BuildingAppearance,
     originX: number,
     originY: number,
-    size: { width: number; depth: number; height: number },
+    size: { width: number; depth: number; height: number; base: number },
   ): void {
     const shape = iconShape(appearance.icon);
     if (!shape) return;
@@ -172,6 +182,7 @@ export class BuildingRenderer {
         const point = gridToScreen(
           originX + (0.25 + u * 0.5) * size.width,
           originY + (0.25 + v * 0.5) * size.depth,
+          size.base,
         );
         points.push(point.x, point.y - size.height);
       }

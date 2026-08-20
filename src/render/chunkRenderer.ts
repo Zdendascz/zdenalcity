@@ -1,4 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
+import { tileCorners } from '@/sim/heights';
 import { index, ROAD } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
@@ -15,7 +16,7 @@ import {
   ZONE_COLOR_BY_VALUE,
   ZONE_OVERLAY_ALPHA,
 } from './palette';
-import { diamondPoints, gridToScreen } from './projection';
+import { slopeLight, tileQuad } from './projection';
 import { roadMask, roadPolygons } from './roads';
 
 /** Chunk = 16×16 dlaždic. Změna jedné dlaždice invaliduje jeden chunk, ne mapu. */
@@ -54,9 +55,16 @@ export class ChunkRenderer {
     this.world = world;
     this.chunksPerAxis = Math.ceil(world.size / CHUNK_SIZE);
 
+    // Chunky se musí kreslit zezadu dopředu, tedy podle `cx + cy`. Na ploché
+    // mapě to bylo jedno — diamanty do sebe zapadají bez přesahu a pořadí
+    // vzniku (po řádcích) nikoho netrápilo. S převýšením ale kopec přesahuje
+    // do sousedního chunku, a ten se pak kreslí přes něj.
+    container.sortableChildren = true;
+
     for (let cy = 0; cy < this.chunksPerAxis; cy++) {
       for (let cx = 0; cx < this.chunksPerAxis; cx++) {
         const graphics = new Graphics();
+        graphics.zIndex = cx + cy;
         container.addChild(graphics);
         this.chunks.push({ x0: cx * CHUNK_SIZE, y0: cy * CHUNK_SIZE, graphics });
       }
@@ -130,11 +138,14 @@ export class ChunkRenderer {
 
     const tileIndex = index(x, y);
     const terrain = this.world.layers.terrain[tileIndex] ?? 0;
-    const elevation = this.world.layers.elevation[tileIndex] ?? 0;
-    const color = TERRAIN_COLORS[terrain] ?? TERRAIN_COLORS[0];
+    const corners = tileCorners(this.world.cornerHeight, x, y);
+    const flat = TERRAIN_COLORS[terrain] ?? TERRAIN_COLORS[0];
+    // Sklon se promítne do jasu, jinak by svah vypadal jako rovina (§7).
+    const color = shade(flat, slopeLight(corners));
 
-    const origin = gridToScreen(x, y, elevation);
-    const points = diamondPoints(origin.x, origin.y);
+    // Vše ostatní na dlaždici — vozovka i překryvy — se kreslí do téhle plochy,
+    // ne do pravidelného diamantu. Na svahu by se od terénu odlepilo.
+    const points = tileQuad(x, y, corners);
 
     graphics
       .poly(points)
@@ -152,7 +163,7 @@ export class ChunkRenderer {
       // Bitmask se počítá z „je tam jakákoli silnice" — všechny typy se
       // navzájem napojují (§4). Šířku a barvu určuje typ vlastní dlaždice.
       const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
-      for (const polygon of roadPolygons(origin.x, origin.y, mask, ROAD_WIDTHS[roadType])) {
+      for (const polygon of roadPolygons(points, mask, ROAD_WIDTHS[roadType])) {
         graphics.poly(polygon).fill({ color: ROAD_COLORS[roadType] ?? ROAD_COLOR });
       }
     }

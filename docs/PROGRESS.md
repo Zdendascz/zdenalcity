@@ -1082,9 +1082,49 @@ nenulované rohy vody jeden, ignorovaný `maxHeight` jeden, nekopané řeky dva.
 Ten test na vodu byl napoprvé slabý — ptal se na nejnižší roh, takže mu
 uniklo, že hladina může být nakloněná; teď kontroluje nejvyšší.
 
+- [x] T30 — renderer svahů, re-bake chunků, řazení podle výšky (fáze 3b)
+
+Terén z T29 je konečně vidět. Dlaždice se přestala kreslit jako pravidelný
+diamant a je z ní **čtyřúhelník ze čtyř promítnutých rohů**. Sousedi sdílí rohy
+a počítají se ze stejných čísel, takže terén nikde nepraskne — hlídá to test.
+
+- **stínování podle sklonu.** Bez něj by svah vypadal jako rovina: izometrie
+  nemá perspektivu, která by tvar prozradila, a barva terénu je stejná. Světlo
+  svítí od severozápadu, přivrácené plochy jsou světlejší, odvrácené tmavší.
+  Plošina ve třetím patře **není svah**, takže se nestínuje
+- **vozovka jde po ploše dlaždice.** `roadPolygons` bere skutečné vrcholy
+  místo počátku diamantu, jinak by se na svahu od terénu odlepila. Střed se
+  počítá jako průměr rohů, takže geometrie sedí i na zkroucené dlaždici
+- **budovy sedí na výšce základny** (nejnižší roh) a s terénem se posunou
+- **řazení**: při shodné hloubce rozhoduje výška základny sestupně (§7). Dvě
+  budovy ve stejné hloubce, jedna na kopci a druhá pod ním, se v izometrii
+  překrývají a ta výš stojící je dál od pozorovatele
+
+**Chunky dostaly `zIndex` podle `cx + cy`.** Na ploché mapě to bylo jedno,
+protože diamanty do sebe zapadají bez přesahu a pořadí vzniku (po řádcích)
+nikoho netrápilo. S převýšením kopec přesahuje do sousedního chunku a ten se
+kreslil přes něj.
+
+**Re-bake**: `applyHeightChanges` zapíše nové výšky a označí, co se musí
+překreslit. Jeden roh drží **čtyři dlaždice**; kdyby se označila jen jedna,
+zůstal by na mapě viset zlom. Budovy na dotčených dlaždicích se hlásí zvlášť —
+kreslí je jiný renderer, který `dirty.tiles` nečte.
+
+Ověřeno v běžící hře **po pixelech**, protože panel prohlížeče byl schovaný a
+snímek obrazovky nešel pořídit. Přes `renderer.extract` vyšla stejná tráva na
+rovině jako RGB(107, 155, 74) a na jižním svahu (100, 144, 69) — poměr jasu
+0,93, přesně to, co předepisuje `slopeLight`. Zvednutí jednoho rohu o dvě patra
+rozhýbalo pět rohů, označilo dvanáct dlaždic a po překreslení **jenom jich**
+se barva změnila na (92, 133, 64).
+
+Testy: 6 nových v `tests/render.test.ts`, 3 v `tests/heights.test.ts`. Že
+koušou, ověřeno rozbitím: dlaždice bez výšek rohů shodí dva, nestínovaný svah
+jeden, budova bez základny jeden, označení jediné dlaždice jeden, nehlášené
+budovy jeden. **Pořadí chunků test nemá** — je to jedna vlastnost objektu Pixi
+a testy Pixi nespouští; ověřeno jen ve hře.
+
 ## Rozpracované
-_(T29 hotové, dál T30: renderer svahů, re-bake chunků při změně výšky,
-řazení podle výšky základny.)_
+_(T30 hotové, dál T31: picking od předu dozadu, náhrada `screenToGrid`.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -1202,6 +1242,13 @@ _(T29 hotové, dál T30: renderer svahů, re-bake chunků při změně výšky,
   bude co ukládat, musí terén umět renderer, picking i terraforming.
 - **Vrstva `elevation` je od T29 mrtvá.** Výšku nese `cornerHeight`; `elevation`
   zůstává v `Layers` i v savu jen proto, že ji odstraní až save verze 4 (T34).
+- **Kopec před budovou ji nezakryje.** Renderer kreslí nejdřív celý terén a pak
+  všechny budovy, takže budova je vždycky nad terénem. Správně by se muselo
+  řadit po dlaždicích dohromady s budovami, což by zrušilo smysl chunkování.
+  Ve hře to jde vidět jen na strmém svahu s budovou hned za ním.
+- **Overlay hrubé mřížky kopíruje terén jen po blocích 4×4.** Uvnitř bloku může
+  terén stoupat jinak než rovina mezi jeho rohy. Šestnáctkrát víc polygonů za
+  stejnou informaci nestojí za to — právě kvůli tomu ten overlay vznikl.
 - `vite.config.ts` je mimo `tsc --noEmit` (viz tabulka rozhodnutí).
 - **Save není bajtově reprodukovatelný, jen obsahově.** fflate zapisuje do ZIPu
   čas modifikace, takže dva savy z téhož stavu se liší v několika bajtech

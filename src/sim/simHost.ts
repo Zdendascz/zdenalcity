@@ -41,6 +41,8 @@ export interface ReadonlyWorldView {
   readonly demand: Readonly<DemandState>;
   /** Zátěž silnic pro overlay dopravy. Odvozená, do savu nepatří (R10). */
   readonly trafficLoad: Readonly<Float32Array>;
+  /** Patra v rozích — bez nich by renderer neuměl naklonit dlaždici (§7 fáze 3). */
+  readonly cornerHeight: Readonly<Uint8Array>;
 }
 
 /**
