@@ -1,0 +1,25 @@
+{
+  "id": "vanilla:pump_station",
+  "type": "building",
+  "category": "utility",
+  "name": "building.pump_station.name",
+  "description": "building.pump_station.desc",
+  "footprint": [1, 1],
+  "construction": {
+    "cost": 250,
+    "requiresRoad": false,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 25
+  },
+  "water": {
+    "range": 20
+  },
+  "graphics": {
+    "color": "#7fa8c8",
+    "heightLevels": 1,
+    "icon": "drop"
+  }
+}

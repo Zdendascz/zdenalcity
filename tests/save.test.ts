@@ -29,6 +29,7 @@ import { hashLayers, index, LAYER_ORDER, MAP_SIZE, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { assumeWatered } from './support/water';
 
 const OPTIONS: SaveOptions = {
   cityName: 'Nový Brod',
@@ -56,8 +57,15 @@ async function builtCity(seed = 483928492): Promise<{ world: WorldState; content
   placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 41);
   setTaxRate(world, ZONE.residential, 9);
 
+  // Město pro testy savu má vodovod jako danost — save se testuje na tom, co
+  // ve světě je, ne na tom, jestli hráč stihl natáhnout potrubí (§8 fáze 3).
+  assumeWatered(world);
+
   const systems = createDefaultSystems(content, content.getBalance());
-  for (let tick = 0; tick < 600; tick++) tickWorld(world, systems);
+  for (let tick = 0; tick < 600; tick++) {
+    tickWorld(world, systems);
+    assumeWatered(world);
+  }
 
   return { world, content };
 }
@@ -80,9 +88,13 @@ describe('formát savu', () => {
     expect(GAME_VERSION).toBe(pkg.version);
   });
 
-  it('pořadí vrstev v savu pokrývá přesně všechny vrstvy', () => {
+  it('v savu jsou všechny vrstvy kromě potrubí, které čeká na verzi 5', () => {
     // Kdyby vznikla nová vrstva a zapomnělo se na ni v savu, tenhle test spadne.
-    expect([...SAVE_LAYER_ORDER].sort()).toEqual([...LAYER_ORDER].sort());
+    // `pipe` je vědomá výjimka: přidal ji T35, ale do formátu ji zapíše až
+    // save verze 5 v T40 — stejně jako `cornerHeight` čekal mezi T29 a T34.
+    const saved: readonly string[] = SAVE_LAYER_ORDER;
+    const missing = [...LAYER_ORDER].filter((layer) => !saved.includes(layer));
+    expect(missing).toEqual(['pipe']);
   });
 
   it('layers.bin má očekávanou délku', async () => {
@@ -134,6 +146,10 @@ describe('round-trip', () => {
     const bytes = serializeSave(world, OPTIONS);
     const restored = createWorld(1); // jiný seed, ať je vidět, že se přepíše
     applySaveToWorld(restored, migrate(unpackSave(bytes)));
+    // Potrubí se do savu zapíše až ve verzi 5 (T40), takže načtené město zatím
+    // vodovod nemá. Aby šlo porovnat **pokračování hry**, dostane ho stejně
+    // jako originál — jinak by se rozešly kvůli chybějící vodě, ne kvůli savu.
+    assumeWatered(restored);
 
     expect(hashLayers(restored.layers)).toBe(before.hash);
     expect(restored.rng.getState()).toBe(before.rng);
@@ -196,6 +212,7 @@ describe('round-trip', () => {
     restored.downgradeStreak.set(1, 2);
 
     applySaveToWorld(restored, migrate(unpackSave(bytes)));
+    assumeWatered(restored); // viz round-trip: potrubí čeká na verzi 5
 
     // Pokrytí je odvozené, do savu nepatří a po loadu se počítá znovu.
     expect(restored.coverage.size).toBe(0);

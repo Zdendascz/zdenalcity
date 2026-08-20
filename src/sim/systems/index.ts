@@ -2,6 +2,7 @@ import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import type { WorldState } from '../world';
 import { createPowerSystem } from './power';
+import { createWaterDecaySystem, createWaterSystem } from './water';
 import { createDemandSystem } from './demand';
 import { createGrowthSystem } from './growth';
 import { createEconomySystem } from './economy';
@@ -39,6 +40,8 @@ export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Bala
   // Pořadí podle tabulky v architektuře §5: systémy fáze 2 jsou za těmi z fáze 1.
   return [
     createPowerSystem(catalogue),
+    // Voda hned za elektřinou: růst i chátrání z ní čtou ve stejném tiku.
+    createWaterSystem(catalogue, balance),
     // Pokrytí se musí přepočítat dřív, než z něj čte cena půdy a kriminalita.
     createServiceSystem(catalogue),
     createDemandSystem(catalogue, balance),
@@ -52,12 +55,15 @@ export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Bala
     createPollutionSystem(catalogue, balance),
     createCrimeSystem(balance),
     createHealthSystem(catalogue, balance),
+    createWaterDecaySystem(catalogue, balance),
     createLandValueSystem(balance),
   ];
 }
 
 export {
   createPowerSystem,
+  createWaterSystem,
+  createWaterDecaySystem,
   createDemandSystem,
   createEconomySystem,
   createGrowthSystem,

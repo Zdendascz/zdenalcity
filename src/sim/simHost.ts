@@ -2,6 +2,7 @@ import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from './catalogue';
 import type { ReadonlyCoarseLayers } from './coarse';
 import {
+  buildPipe,
   buildRoad,
   bulldoze,
   levelArea,
@@ -109,6 +110,8 @@ class MainThreadSimHost implements SimHost {
         );
       case 'set_tax_rate':
         return setTaxRate(this.world, cmd.zone, cmd.rate);
+      case 'build_pipe':
+        return buildPipe(this.world, cmd.x, cmd.y, this.balance);
       case 'terraform_corner':
         return terraformCorner(this.world, cmd.x, cmd.y, cmd.delta, this.balance);
       case 'level_area':

@@ -12,6 +12,7 @@ import type { BuildingCatalogue } from '@/sim/systems';
 import { createWorld, tickWorld, totalJobs, totalPopulation } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { assumeWatered } from './support/water';
 
 const HOUSE: Definition = {
   id: 'test:house',
@@ -412,6 +413,8 @@ describe('vanilla obsah v simulaci', () => {
     await content.load(createVanillaSource());
 
     const world = cityWithZone(7);
+    // Test je o růstu z reálných definic, ne o vodovodu (§8 fáze 3).
+    assumeWatered(world);
     run(world, content, 25);
 
     expect(world.buildings.size).toBeGreaterThan(0);

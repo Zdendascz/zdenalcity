@@ -49,6 +49,11 @@ export interface Layers {
   road: Uint8Array;
   buildingId: Uint16Array;
   power: Uint8Array;
+  /**
+   * Vodovodní potrubí, 0/1 (§8 fáze 3). Na rozdíl od elektřiny **budovy vodu
+   * nevedou** — potrubí musí být pod nimi položené výslovně.
+   */
+  pipe: Uint8Array;
 }
 
 /** Pohled na vrstvy pro renderer a UI — čtení ano, zápis chyba při typecheku. */
@@ -64,6 +69,7 @@ export const LAYER_ORDER = [
   'road',
   'buildingId',
   'power',
+  'pipe',
 ] as const;
 
 export type LayerName = (typeof LAYER_ORDER)[number];
@@ -75,7 +81,8 @@ export function createLayers(size: number): Layers {
     zone: new Uint8Array(cells), // 0 = bez zóny
     road: new Uint8Array(cells), // 0/1
     buildingId: new Uint16Array(cells), // 0 = prázdná dlaždice
-    power: new Uint8Array(cells), // 0/1
+    power: new Uint8Array(cells),
+    pipe: new Uint8Array(cells), // 0/1
   };
 }
 

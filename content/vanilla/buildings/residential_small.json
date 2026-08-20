@@ -9,6 +9,7 @@
     "cost": 100,
     "requiresRoad": true,
     "requiresPower": false,
+    "requiresWater": true,
     "allowedTerrain": [0, 2]
   },
   "economy": {

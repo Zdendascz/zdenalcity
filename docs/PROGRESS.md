@@ -1292,8 +1292,50 @@ jeden, nenačtená patra dva.
 
 **Fáze 3b je hotová** (T29–T34). Zbývá 3c: sítě a spokojenost.
 
+- [x] T35 — potrubí, vodní síť, vodárna a čerpací stanice, chátrání bez vody (3c)
+
+Začátek fáze 3c. Voda vypadá jako elektřina, ale **není to kopie s jiným
+jménem** — liší se ve třech věcech a každá je záměr:
+
+1. **Budovy vodu nevedou.** Elektřina teče přes silnice i budovy, voda jen
+   potrubím. Kdo chce mít pod domem vodu, musí tam potrubí položit.
+2. **Síť má dosah.** Voda dojde 24 dlaždic od vodárny. **Čerpací stanice** je
+   zdroj bez vlastní výroby: sama musí být napojená a odtud rozjíždí nový
+   dosah, takže síť prodlužuje po skocích. Odpojená stanice nedá vodu nikam —
+   to je pravidlo, které odhalil až mutační test.
+3. **Výsledek je runtime, ne vrstva.** `waterSupply` se po načtení spočítá
+   znovu ze zdrojů a potrubí, takže se nemůže rozejít se skutečností.
+
+- **`pipe` je nová vrstva** v plném rozlišení. Potrubí je pod zemí, takže smí
+  ležet pod silnicí i pod budovou — právě proto je vlastní vrstva, ne další
+  hodnota v `road`
+- **vodárna musí stát u vody** (`construction.nearWater`), **čerpací stanice**
+  ne — ta jen prodlužuje
+- **bez vody se nestaví a chátrá** (kritérium 17): parcela bez vody stavbu
+  odmítne, dům bez vody ztrácí obyvatele a po dvanácti vyhodnoceních prázdný
+  zůstane ruinou. Týká se jen toho, co vodu podle definice potřebuje —
+  elektrárna se obejde
+
+**Vanilla obsah tím dostal ostrou bránu:** všech 21 obytných, komerčních
+a průmyslových budov má `requiresWater: true`. Nové město tedy neroste, dokud
+hráč nepostaví vodárnu a nenatáhne potrubí. Je to přesně to, co §8 chce, ale je
+to velká změna hratelnosti — pět starších testů kvůli ní spadlo, protože
+zkoumají jinou mechaniku. Dostaly helper `assumeWatered`, který řekne „město
+vodovod má" a jde dál; vodovod samotný testuje `water.test.ts`, a ten si nic
+takového nedovolí.
+
+Ověřeno v běžící hře: zóna u pobřeží **6 400 tiků nevyrostla ani jednou budovu**.
+Po postavení vodárny a natažení potrubí (63 zavodněných dlaždic) se růst rozjel
+na 18 budov a **žádná z nich nebyla bez vody**. Cestou jsem si sám názorně
+předvedl, proč potrubí musí být souvislé: první rozvod vedl řadou, která je pod
+vodárnou mořem, takže se nenapojil a voda zůstala jen v jejím půdorysu.
+
+Testy: 15 v `tests/water.test.ts`. Že koušou, ověřeno rozbitím: voda mimo
+potrubí shodí tři, zrušený dosah dva, stanice jako samostatný zdroj jeden,
+stanice bez prodloužení jeden, stavba bez vody jeden, vodárna bez břehu jeden.
+
 ## Rozpracované
-_(3b hotová. Dál fáze 3c: T35 a výš — voda a kanalizace, spokojenost.)_
+_(T35 hotové, dál T36: podzemní pohled a nástroj na kladení potrubí.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -1405,6 +1447,13 @@ _(3b hotová. Dál fáze 3c: T35 a výš — voda a kanalizace, spokojenost.)_
 | 2026-08-14 | `systems/zoning.ts` nevznikl | Strom v architektuře §11 ho zmiňuje, ale v tabulce systémů §5 nemá řádek — zónování je příkaz, ne tikající systém. Vznikne v T5, pokud se ukáže, že ho potřebuje. |
 
 ## Známé problémy / technický dluh
+
+- **Potrubí se zatím neukládá do savu** (přijde ve verzi 5, T40). Načtené město
+  do té doby přijde o vodovod a začne chátrat — což je mimochodem přesně to
+  chování, které §10 pro migraci na v5 předepisuje, jen zatím bez hlášky.
+- **Nástroj na kladení potrubí ještě není v liště** (T36). Do té doby jde
+  potrubí položit jen příkazem `build_pipe`, takže ve hře je vodovod
+  nedosažitelný pro hráče, i když v simulaci funguje.
 
 - **Kopec před budovou ji nezakryje.** Renderer kreslí nejdřív celý terén a pak
   všechny budovy, takže budova je vždycky nad terénem. Správně by se muselo

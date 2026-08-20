@@ -107,6 +107,8 @@ describe('fázování systémů', () => {
     const systems = createDefaultSystems(NO_CONTENT, VANILLA_BALANCE);
     expect(systems.map((s) => [s.name, s.interval, s.offset])).toEqual([
       ['power', 1, 0],
+      // Voda hned za elektřinou, offset 1 kvůli jinému tiku flood fillu.
+      ['water', 1, 1],
       ['services', 1, 0],
       ['demand', 4, 1],
       ['growth', 12, 2],
@@ -116,6 +118,7 @@ describe('fázování systémů', () => {
       ['pollution', 8, 3],
       ['crime', 16, 11],
       ['health', 16, 13],
+      ['waterDecay', 16, 7],
       ['landValue', 16, 5],
     ]);
   });

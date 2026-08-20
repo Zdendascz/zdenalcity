@@ -9,6 +9,7 @@ import { createTrafficSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { assumeWatered } from './support/water';
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -209,6 +210,7 @@ describe('mosty (§7 fáze 3)', () => {
     if (!house || !shop) return;
 
     // Dům na levém břehu, práce na pravém — mezi nimi jen řeka.
+    assumeWatered(w); // test je o mostě, ne o vodovodu
     const built = placeDefinition(w, content, house.id, 27, 41, balance);
     expect(built.ok).toBe(true);
     for (const building of w.buildings.values()) building.population = 8;

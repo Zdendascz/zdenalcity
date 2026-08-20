@@ -126,6 +126,17 @@ const BUS: IconShape = [
   circle(0.7, 0.86, 0.1),
 ];
 
+/** Kapka — vodovod. */
+const DROP: IconShape = [
+  [
+    [0.5, 0.08],
+    [0.82, 0.55],
+    [0.68, 0.86],
+    [0.32, 0.86],
+    [0.18, 0.55],
+  ],
+];
+
 export const ICON_SHAPES: Readonly<Record<string, IconShape>> = {
   cross: CROSS,
   shield: SHIELD,
@@ -135,6 +146,7 @@ export const ICON_SHAPES: Readonly<Record<string, IconShape>> = {
   bin: BIN,
   bolt: BOLT,
   bus: BUS,
+  drop: DROP,
 };
 
 export function iconShape(name: string | undefined): IconShape | undefined {

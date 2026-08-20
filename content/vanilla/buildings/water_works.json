@@ -1,0 +1,30 @@
+{
+  "id": "vanilla:water_works",
+  "type": "building",
+  "category": "utility",
+  "name": "building.water_works.name",
+  "description": "building.water_works.desc",
+  "footprint": [3, 3],
+  "construction": {
+    "cost": 800,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "nearWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 90
+  },
+  "jobs": {
+    "capacity": 8
+  },
+  "water": {
+    "production": 600,
+    "range": 24
+  },
+  "graphics": {
+    "color": "#5f8fb4",
+    "heightLevels": 2,
+    "icon": "drop"
+  }
+}

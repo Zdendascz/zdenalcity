@@ -9,6 +9,7 @@ import { createGrowthSystem, createPowerSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { assumeWatered } from './support/water';
 
 const PLANT: Definition = {
   id: 'test:plant',
@@ -249,6 +250,8 @@ describe('vanilla elektrárna', () => {
 
     const world = withRoad(9);
     zoneArea(world, 15, 11, 8, 1, ZONE.residential);
+    // Tenhle test je o elektřině; vodovod si odpustíme (§8 fáze 3).
+    assumeWatered(world);
 
     const power = createPowerSystem(content);
     const growth = createGrowthSystem(content, VANILLA_BALANCE);

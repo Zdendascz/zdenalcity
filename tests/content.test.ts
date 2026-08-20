@@ -77,6 +77,7 @@ describe('vanilla obsah', () => {
       'vanilla:landfill',
       'vanilla:park_small',
       'vanilla:police_small',
+      'vanilla:pump_station',
       'vanilla:residential_court',
       'vanilla:residential_large',
       'vanilla:residential_medium',
@@ -87,6 +88,7 @@ describe('vanilla obsah', () => {
       'vanilla:school',
       'vanilla:transit_depot',
       'vanilla:transit_stop',
+      'vanilla:water_works',
     ]);
   });
 

@@ -1,9 +1,15 @@
 import type { Definition } from '@/content/schema';
 import { isFlatTile } from './heights';
-import { inBounds, index } from './layers';
+import { inBounds, index, TERRAIN } from './layers';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
-import { markBuildingDirty, markCoverageDirty, markPowerNetworkDirty, markTileDirty } from './world';
+import {
+  markBuildingDirty,
+  markCoverageDirty,
+  markPowerNetworkDirty,
+  markTileDirty,
+  markWaterNetworkDirty,
+} from './world';
 import type { Building, WorldState } from './world';
 
 /**
@@ -91,8 +97,50 @@ export function checkFootprint(
   if (definition.construction.requiresPower && !touchesPower(world, definition, x, y)) {
     return reject('error.needsPower');
   }
+  // Bez vody pod pozemkem se nestaví (§8 fáze 3, kritérium 17). Stačí jedna
+  // dlaždice půdorysu — stejné pravidlo, podle kterého má budova vodu.
+  if (definition.construction.requiresWater === true && !hasWater(world, definition, x, y)) {
+    return reject('error.needsWater');
+  }
+  // Vodárna musí stát u vody, ze které bere (§8 fáze 3).
+  if (definition.construction.nearWater === true && !touchesWater(world, definition, x, y)) {
+    return reject('error.needsShore');
+  }
 
   return OK;
+}
+
+/** Je pod půdorysem voda z vodovodu? Potrubí musí být položené, ne jen vedle. */
+export function hasWater(world: WorldState, definition: Definition, x: number, y: number): boolean {
+  const [width, depth] = definition.footprint;
+  for (let dy = 0; dy < depth; dy++) {
+    for (let dx = 0; dx < width; dx++) {
+      if (!inBounds(x + dx, y + dy)) continue;
+      if (world.waterSupply[index(x + dx, y + dy)] === 1) return true;
+    }
+  }
+  return false;
+}
+
+/** Sousedí footprint s vodní plochou? Vodárna z ní bere (§8 fáze 3). */
+export function touchesWater(
+  world: WorldState,
+  definition: Definition,
+  x: number,
+  y: number,
+): boolean {
+  const [width, depth] = definition.footprint;
+  for (let dy = -1; dy <= depth; dy++) {
+    for (let dx = -1; dx <= width; dx++) {
+      const onEdge = dx === -1 || dy === -1 || dx === width || dy === depth;
+      if (!onEdge) continue;
+      const tx = x + dx;
+      const ty = y + dy;
+      if (!inBounds(tx, ty)) continue;
+      if (world.layers.terrain[index(tx, ty)] === TERRAIN.water) return true;
+    }
+  }
+  return false;
 }
 
 /** Sousedí footprint aspoň jednou stranou se silnicí? */
@@ -180,6 +228,7 @@ export function placeBuilding(
 
   markBuildingDirty(world, building.id);
   markPowerNetworkDirty(world); // budova je vodič, síť se mění
+  markWaterNetworkDirty(world); // a mohla to být vodárna nebo čerpací stanice
   if (definition.service) markCoverageDirty(world);
   return building;
 }

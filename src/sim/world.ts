@@ -186,6 +186,21 @@ export interface WorldState {
    * Runtime-only — po loadu se síť přepočítá znovu.
    */
   powerNetworkDirty: boolean;
+
+  /**
+   * Kam došla voda potrubím, 0/1 na dlaždici. **Neukládá se** — dá se spočítat
+   * ze zdrojů a potrubí, takže uložená by se mohla rozejít se skutečností.
+   */
+  waterSupply: Uint8Array;
+  /** Budovy, ke kterým voda došla. Odvozené, do savu nepatří. */
+  watered: Set<number>;
+  /**
+   * Kolikrát po sobě byla budova bez vody. **Neukládá se** — po načtení savu
+   * začne počítadlo znovu, což chátrání nanejvýš o pár vyhodnocení odloží.
+   */
+  waterlessStreak: Map<number, number>;
+  /** Změnilo se potrubí nebo rozmístění vodáren? */
+  waterNetworkDirty: boolean;
 }
 
 export function createWorld(
@@ -229,7 +244,16 @@ export function createWorld(
     map: { seed: seed >>> 0, generated: false },
     downgradeStreak: new Map(),
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
+    waterSupply: new Uint8Array(MAP_SIZE * MAP_SIZE),
+    watered: new Set(),
+    waterlessStreak: new Map(),
+    waterNetworkDirty: false,
   };
+}
+
+/** Potrubí nebo vodárna se změnily — vodovod se musí přepočítat. */
+export function markWaterNetworkDirty(world: WorldState): void {
+  world.waterNetworkDirty = true;
 }
 
 /** Vodiče (silnice, budovy) se změnily — síť se musí přepočítat. */
@@ -323,6 +347,9 @@ export function removeBuilding(world: WorldState, buildingId: number): boolean {
 
   markBuildingDirty(world, buildingId);
   markPowerNetworkDirty(world); // budova byla vodič i možný zdroj
+  markWaterNetworkDirty(world);
+  world.watered.delete(buildingId);
+  world.waterlessStreak.delete(buildingId);
   // Zbouraná budova mohla být služba; přepočet je levný, rozlišovat se nevyplatí.
   markCoverageDirty(world);
   return true;

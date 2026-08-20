@@ -40,6 +40,13 @@ export interface BuildingDefinition {
     cost: number;
     requiresRoad: boolean;
     requiresPower: boolean;
+    /**
+     * Bez vody pod budovou nevyroste a chátrá (§8 fáze 3). Volitelné, aby ho
+     * nemusela deklarovat každá budova — chybějící znamená „vodu nepotřebuje".
+     */
+    requiresWater?: boolean;
+    /** Musí sousedit s vodní plochou — vodárna z ní bere (§8 fáze 3). */
+    nearWater?: boolean;
     allowedTerrain: readonly number[];
   };
   economy: { upkeep: number };
@@ -69,6 +76,12 @@ export interface BuildingDefinition {
     buildings: readonly string[];
   };
   power?: { production?: number; consumption?: number };
+  /**
+   * Vodovod (§8 fáze 3). `range` je dosah sítě v dlaždicích potrubí od téhle
+   * budovy — čerpací stanice je zdroj s dosahem, ale bez vlastní výroby,
+   * takže síť **prodlužuje**, nezakládá.
+   */
+  water?: { production?: number; consumption?: number; range?: number };
   environment?: { pollution?: number };
   graphics: {
     color: string;
@@ -109,6 +122,7 @@ const DEFINITION_SECTIONS = [
   'waste',
   'requirements',
   'power',
+  'water',
   'environment',
   'graphics',
 ];
@@ -177,6 +191,22 @@ function optionalInt(
 ): number | undefined {
   if (container[key] === undefined) return undefined;
   return requireInt(issues, container, key, field, min, max) ?? undefined;
+}
+
+/** Volitelný příznak; chybějící znamená `false`, ne chybu. */
+function optionalBoolean(
+  issues: ValidationIssue[],
+  container: Record<string, unknown>,
+  key: string,
+  field: string,
+): boolean {
+  const value = container[key];
+  if (value === undefined) return false;
+  if (typeof value !== 'boolean') {
+    issues.push({ field, message: 'musí být true nebo false' });
+    return false;
+  }
+  return value;
 }
 
 function requireBoolean(
@@ -271,6 +301,7 @@ export function validateDefinition(
   const economy = validateEconomy(issues, record);
   const graphics = validateGraphics(issues, record);
   const power = validatePower(issues, record);
+  const water = validateWater(issues, record);
   const environment = validateEnvironment(issues, record);
   const population = validateCapacity(issues, record, 'population');
   const jobs = validateCapacity(issues, record, 'jobs');
@@ -310,6 +341,7 @@ export function validateDefinition(
       ...(waste ? { waste } : {}),
       ...(requirements ? { requirements } : {}),
       ...(power ? { power } : {}),
+      ...(water ? { water } : {}),
       ...(environment ? { environment } : {}),
       graphics,
     },
@@ -371,7 +403,22 @@ function validateConstruction(
   if (cost === null || requiresRoad === null || requiresPower === null || !allowedTerrain) {
     return null;
   }
-  return { cost, requiresRoad, requiresPower, allowedTerrain };
+  const requiresWater = optionalBoolean(
+    issues,
+    section,
+    'requiresWater',
+    'construction.requiresWater',
+  );
+  const nearWater = optionalBoolean(issues, section, 'nearWater', 'construction.nearWater');
+
+  return {
+    cost,
+    requiresRoad,
+    requiresPower,
+    ...(requiresWater ? { requiresWater } : {}),
+    ...(nearWater ? { nearWater } : {}),
+    allowedTerrain,
+  };
 }
 
 function validateEconomy(
@@ -508,6 +555,29 @@ function validatePower(
   return {
     ...(production !== undefined ? { production } : {}),
     ...(consumption !== undefined ? { consumption } : {}),
+  };
+}
+
+function validateWater(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['water'] {
+  if (record['water'] === undefined) return undefined;
+  const section = requireRecord(issues, record, 'water', 'water');
+  if (!section) return undefined;
+
+  const production = optionalInt(issues, section, 'production', 'water.production', 0);
+  const consumption = optionalInt(issues, section, 'consumption', 'water.consumption', 0);
+  const range = optionalInt(issues, section, 'range', 'water.range', 0);
+
+  if (production === undefined && consumption === undefined && range === undefined) {
+    issues.push({ field: 'water', message: 'musí mít production, consumption nebo range' });
+  }
+
+  return {
+    ...(production !== undefined ? { production } : {}),
+    ...(consumption !== undefined ? { consumption } : {}),
+    ...(range !== undefined ? { range } : {}),
   };
 }
 

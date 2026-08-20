@@ -74,6 +74,8 @@
     "police": 0.9
   },
 
+  "water": { "defaultRange": 24, "pipeCost": 6, "decayStep": 2, "abandonAfter": 12 },
+
   "waste": { "perCitizen": 0.1, "toPollution": 0.02 },
 
   "health": {

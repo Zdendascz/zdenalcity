@@ -18,6 +18,7 @@ import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
   applyHeightChanges,
+  markWaterNetworkDirty,
   MAX_TAX_RATE,
   MIN_TAX_RATE,
   markCoverageDirty,
@@ -40,6 +41,7 @@ export type Command =
   | { type: 'place_building'; definitionId: string; x: number; y: number }
   | { type: 'set_tax_rate'; zone: ZoneType; rate: number }
   | { type: 'set_service_funding'; serviceClass: string; funding: number }
+  | { type: 'build_pipe'; x: number; y: number }
   | { type: 'terraform_corner'; x: number; y: number; delta: number }
   | { type: 'level_area'; x: number; y: number; w: number; h: number }
   | { type: 'set_speed'; speed: number };
@@ -321,6 +323,13 @@ export function bulldoze(
     return OK;
   }
 
+  if (world.layers.pipe[tile] === 1) {
+    world.layers.pipe[tile] = 0;
+    markTileDirty(world, x, y);
+    markWaterNetworkDirty(world);
+    return OK;
+  }
+
   // Vykácení lesa. Stojí peníze a je to **volba**: les do té doby zvedá cenu
   // půdy a pohlcuje znečištění, po vykácení zbude místo na stavbu (§2 fáze 3).
   if (world.layers.terrain[tile] === TERRAIN.forest) {
@@ -379,6 +388,37 @@ export function setTaxRate(world: WorldState, zone: ZoneType, rate: number): Com
     MIN_TAX_RATE,
     Math.min(MAX_TAX_RATE, Math.round(rate)),
   );
+  return OK;
+}
+
+/**
+ * Položí potrubí (§8 fáze 3).
+ *
+ * Na rozdíl od silnice se **neplete s ničím jiným na dlaždici**: potrubí je pod
+ * zemí, takže smí být pod budovou i pod vozovkou. Právě proto je vlastní vrstva
+ * a ne další hodnota v `road`.
+ */
+export function buildPipe(
+  world: WorldState,
+  x: number,
+  y: number,
+  balance?: Balance,
+): CommandResult {
+  if (!inBounds(x, y)) return reject('error.outOfBounds');
+
+  const tile = index(x, y);
+  if (world.layers.terrain[tile] === TERRAIN.water) return reject('error.pipeOnWater');
+  if (world.layers.pipe[tile] === 1) return reject('error.pipeExists');
+
+  const cost = balance?.water.pipeCost ?? 0;
+  if (world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  }
+
+  world.economy.funds -= cost;
+  world.layers.pipe[tile] = 1;
+  markTileDirty(world, x, y);
+  markWaterNetworkDirty(world);
   return OK;
 }
 
