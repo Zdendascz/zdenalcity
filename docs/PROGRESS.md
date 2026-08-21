@@ -1626,6 +1626,36 @@ Pět věcí, na které autor narazil při hraní, ne v testech.
   Do teď se hráč dozvěděl jen to, že mu nic neroste: silnice vedla, proud byl,
   poptávka byla kladná — a nic. Nejtišší způsob, jak se hra zasekne
 
+- [x] „Proč tu nic neroste" (hlášení autora)
+
+Autor třikrát po sobě narazil na město, které se přestalo hýbat, a pokaždé
+z jiného důvodu: bankrot, zóna bez vody, a nakonec **svah**. Růst vyžaduje
+rovinu (§7 fáze 3) a sám nic nesrovná — a na generované mapě je rovných jen
+**48 % dlaždic souše** (změřeno). Zóna na kopci tedy nevyroste nikdy a hra
+o tom mlčela.
+
+Odpověď není další jednotlivá hláška, ale jedno místo, které tu otázku umí
+zodpovědět:
+
+- **`growthBlocker(world, catalogue, balance, x, y)`** vrací lokalizační klíč
+  první podmínky, o kterou se parcela zarazí, nebo `null`. Ptá se **týmiž
+  funkcemi jako růst** — `roadReach`, `seedDefinitions`, `checkFootprint` —
+  takže panel nemůže tvrdit něco jiného, než co se doopravdy děje
+- **panel parcely** ho ukazuje jako první věc pod nadpisem, ještě před čísly
+- **hláška** se objeví, když ani jedna volná zónovaná parcela ze vzorku nejde
+  zastavět. Hlásí se **ta překážka, která drží parcely nejblíž hotova**, ne
+  nejčastější: velká zóna daleko od silnice by jinak přehlasovala pár parcel
+  u vozovky, kterým chybí jen rovina. Bankrot přebíjí všechno, protože zastaví
+  růst v celém městě
+- přibyl i řádek **„Voda: ano/ne"**, protože je to jediná podmínka, která
+  na mapě není vidět vůbec
+
+Ověřeno v běžící hře: zóna u silnice bez potrubí ohlásila „Bez vodovodu se tu
+stavět nedá", panel parcely totéž jako varování nahoře.
+
+Testy: 8 v `tests/diagnostics.test.ts`. Mutační ověření: čtyři mutanti
+(vynechaná kontrola půdorysu, bankrotu, dosahu silnice a zóny), všichni chyceni.
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_

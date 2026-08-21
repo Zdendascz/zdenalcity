@@ -4,11 +4,13 @@ import { ContentRegistry } from '@/content/registry';
 import { placeBuilding } from '@/sim/buildings';
 import { buildRoad, zoneArea } from '@/sim/commands';
 import { COARSE_CELLS, coarseIndex } from '@/sim/coarse';
-import { explainLandValue, explainParcel, landValueContext } from '@/sim/diagnostics';
+import { explainLandValue, explainParcel, growthBlocker, landValueContext, worstBlocker } from '@/sim/diagnostics';
+import { applyCornerChanges, planCornerHeight } from '@/sim/heights';
 import { ZONE } from '@/sim/layers';
 import { createDefaultSystems, createLandValueSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { assumeWatered } from './support/water';
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -137,5 +139,92 @@ describe('rozbor parcely', () => {
     const parcel = explainParcel(world, balance, 26, 32);
 
     expect(parcel.levels.nextThreshold).toBe(balance.levels.thresholds[3]);
+  });
+});
+
+describe('proč tu nic neroste', () => {
+  /**
+   * Nejtišší selhání celé hry: zóna u silnice, voda i proud, kasa v plusu —
+   * a nevyroste nic, protože je parcela na svahu. Autor to hlásil dvakrát,
+   * pokaždé z jiného důvodu, a pokaždé to nešlo nikde přečíst.
+   */
+  async function parcel(): Promise<{ world: WorldState; content: ContentRegistry }> {
+    const content = await vanilla();
+    const world = createWorld(1, content.getBalance().economy);
+    for (let x = 20; x <= 30; x++) buildRoad(world, x, 30);
+    zoneArea(world, 21, 31, 8, 2, ZONE.residential);
+    world.demand.residential = content.getBalance().demand.limit;
+    assumeWatered(world);
+    return { world, content };
+  }
+
+  it('na připravené parcele nic nebrání', async () => {
+    const { world, content } = await parcel();
+    expect(growthBlocker(world, content, content.getBalance(), 25, 31)).toBeNull();
+  });
+
+  it('svah pojmenuje jako svah', async () => {
+    const { world, content } = await parcel();
+    applyCornerChanges(world.cornerHeight, planCornerHeight(world.cornerHeight, 25, 31, 3));
+
+    expect(growthBlocker(world, content, content.getBalance(), 25, 31)).toBe('error.notFlat');
+  });
+
+  it('chybějící voda taky', async () => {
+    const { world, content } = await parcel();
+    world.waterSupply.fill(0);
+    world.watered.clear();
+
+    expect(growthBlocker(world, content, content.getBalance(), 25, 31)).toBe('error.needsWater');
+  });
+
+  it('mimo zónu, mimo dosah silnice i v bankrotu řekne proč', async () => {
+    const { world, content } = await parcel();
+    const balance = content.getBalance();
+
+    expect(growthBlocker(world, content, balance, 60, 60)).toBe('ui.parcel.blocked.noZone');
+    // Zónovaná parcela daleko od silnice.
+    zoneArea(world, 60, 60, 2, 2, ZONE.residential);
+    expect(growthBlocker(world, content, balance, 60, 60)).toBe(
+      'ui.parcel.blocked.tooFarFromRoad',
+    );
+
+    world.economy.funds = -1;
+    expect(growthBlocker(world, content, balance, 25, 31)).toBe('ui.parcel.blocked.bankrupt');
+  });
+
+  it('na postavené parcele nehlásí nic', async () => {
+    const { world, content } = await parcel();
+    const house = content.get('vanilla:residential_small');
+    if (!house) return;
+    placeBuilding(world, house, 25, 31);
+
+    expect(growthBlocker(world, content, content.getBalance(), 25, 31)).toBeNull();
+  });
+});
+
+describe('která překážka se hlásí', () => {
+  it('vyhraje ta, která drží parcely nejblíž hotova', () => {
+    // Velká zóna daleko od silnice by přehlasovala pár parcel u vozovky, které
+    // skoro staví — a hráč by dostal radu o něčem, co ho netrápí.
+    expect(
+      worstBlocker([
+        'ui.parcel.blocked.tooFarFromRoad',
+        'ui.parcel.blocked.tooFarFromRoad',
+        'ui.parcel.blocked.tooFarFromRoad',
+        'error.notFlat',
+      ]),
+    ).toBe('error.notFlat');
+  });
+
+  it('bankrot přebíjí všechno', () => {
+    // Radit „srovnej terén" městu, kterému růst stojí kvůli mínusu, je k ničemu.
+    expect(worstBlocker(['error.notFlat', 'ui.parcel.blocked.bankrupt'])).toBe(
+      'ui.parcel.blocked.bankrupt',
+    );
+  });
+
+  it('bez důvodů nehlásí nic', () => {
+    expect(worstBlocker([])).toBeNull();
   });
 });

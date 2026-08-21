@@ -4,7 +4,7 @@ import { ContentRegistry } from '@/content/registry';
 import { applySaveToWorld, collectLoadWarnings, readSaveMeta, unpackSave } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
 import { estimatePlacement } from '@/sim/commands';
-import { explainParcel } from '@/sim/diagnostics';
+import { explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
@@ -71,8 +71,11 @@ const CORNER_MARK_SIZE = 7;
 
 const DEFAULT_SPEED_INDEX = 1;
 
-/** Jak často se ptáme, jestli zóny mají vodu. Zhruba jednou za pět vteřin. */
+/** Jak často se ptáme, jestli je v zónách kde stavět. Zhruba jednou za pět vteřin. */
 const WATER_CHECK_FRAMES = 300;
+
+/** Kolik volných zónovaných parcel se při té kontrole prozkoumá. */
+const SAMPLED_ZONE_TILES = 200;
 
 /** Kolik obrazovkových bodů za vteřinu ujede mapa při držené šipce. */
 const PAN_SPEED = 900;
@@ -606,6 +609,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       parcel,
       building,
       building ? content.get(building.definitionId) : undefined,
+      growthBlocker(simWorld, content, content.getBalance(), tile.x, tile.y),
     );
   }
 
@@ -743,30 +747,46 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * to jednou přečte, ví, kde problém hledat.
    */
   let waterCheckIn = 0;
-  let warnedAboutWater = false;
+  const reportedBlockers = new Set<string>();
 
   /**
    * Zóna bez vody je nejtišší způsob, jak se hra zasekne: silnice vede, proud
    * je, poptávka je kladná — a nevyroste nic, protože pod parcelou nejsou
    * trubky. Nikde to nebylo vidět, dokud si hráč neklikl na konkrétní parcelu.
    */
-  function checkZonesWithoutWater(): void {
-    if (warnedAboutWater) return;
+  function checkZonesCannotGrow(): void {
+    const { zone, buildingId } = simWorld.layers;
+    const balance = content.getBalance();
 
-    let zoned = 0;
-    let watered = 0;
-    const { zone } = simWorld.layers;
-    for (let tile = 0; tile < zone.length; tile++) {
+    // Vzorek, ne celá mapa: `growthBlocker` pouští tytéž kontroly jako růst
+    // a na šestnácti tisících dlaždicích by to bylo znát.
+    const reasons: string[] = [];
+    let free = 0;
+    for (let tile = 0; tile < zone.length && free < SAMPLED_ZONE_TILES; tile++) {
       if ((zone[tile] ?? ZONE.none) === ZONE.none) continue;
-      zoned++;
-      if (simWorld.waterSupply[tile] === 1) watered++;
+      if (buildingId[tile] !== 0) continue;
+      free++;
+
+      const x = tile % MAP_SIZE;
+      const reason = growthBlocker(simWorld, content, balance, x, (tile - x) / MAP_SIZE);
+      // Jediná volná parcela, na které se stavět dá, znamená, že město běží.
+      if (reason === null) return;
+      reasons.push(reason);
     }
 
-    // Prázdné město ani město s natažením potrubím nemá co řešit.
-    if (zoned === 0 || watered > 0) return;
+    if (free === 0) return;
 
-    warnedAboutWater = true;
-    notifications.show(i18n.t('ui.notice.zonesWithoutWater'), 'error');
+    // Hlásí se ta překážka, která drží parcely nejblíž hotova, a každá jen
+    // jednou. Opakovat hráči totéž každých pár vteřin je otravné; jakmile
+    // jednu odstraní, dozví se o další.
+    const worst = worstBlocker(reasons);
+    if (worst === null || reportedBlockers.has(worst)) return;
+    // „Není poptávka" není závada, jen chvilkový stav — tím se hráč obtěžovat
+    // nemá.
+    if (worst === 'ui.parcel.blocked.noDemand') return;
+
+    reportedBlockers.add(worst);
+    notifications.show(i18n.t('ui.notice.nothingGrows', { reason: i18n.t(worst) }), 'error');
   }
 
   /** Poslední pozice kurzoru — cenovka se překresluje každý snímek. */
@@ -1119,7 +1139,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // mínusu, ne každý snímek.
     if (waterCheckIn-- <= 0) {
       waterCheckIn = WATER_CHECK_FRAMES;
-      checkZonesWithoutWater();
+      checkZonesCannotGrow();
     }
 
     const broke = world.economy.funds < 0;

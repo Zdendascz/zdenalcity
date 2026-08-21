@@ -36,6 +36,8 @@ export class BuildingInfo {
     parcel: ParcelExplanation,
     building: Building | undefined,
     definition: Definition | undefined,
+    /** Proč se na parcele nestaví — lokalizační klíč, nebo `null`. */
+    blocker: string | null = null,
   ): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
@@ -57,7 +59,7 @@ export class BuildingInfo {
     // Diagnostika parcely je pod každou budovou i pod prázdným polem — to je
     // ta část, ze které se hráč dozví, **proč** se tu nic neděje (§12).
     if (!building) {
-      this.appendParcel(parcel);
+      this.appendParcel(parcel, blocker);
       return;
     }
 
@@ -125,7 +127,7 @@ export class BuildingInfo {
       this.root.appendChild(el('p', 'sheet__warning', t('ui.info.noPowerWarning')));
     }
 
-    this.appendParcel(parcel);
+    this.appendParcel(parcel, blocker);
   }
 
   /**
@@ -134,10 +136,16 @@ export class BuildingInfo {
    * Tohle je podle §12 jediná věc, která z fáze 2 dělá hru místo tabulky —
    * pět neviditelných veličin jinak hráč nemá jak přečíst.
    */
-  private appendParcel(parcel: ParcelExplanation): void {
+  private appendParcel(parcel: ParcelExplanation, blocker: string | null): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
 
     this.root.appendChild(el('h3', 'sheet__subtitle', t('ui.parcel.title')));
+
+    // Nejdřív odpověď na otázku, se kterou sem hráč přišel: proč se tu nestaví.
+    // Teprve pod ní čísla, ze kterých se to dá odvodit.
+    if (blocker !== null) {
+      this.root.appendChild(el('p', 'sheet__warning', t(blocker)));
+    }
 
     const rows: [string, string][] = [
       ['ui.info.position', `${parcel.x}, ${parcel.y}`],

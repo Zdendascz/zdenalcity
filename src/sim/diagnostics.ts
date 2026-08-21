@@ -4,6 +4,9 @@ import { index, MAP_SIZE, ROAD, TERRAIN, ZONE } from './layers';
 import { coarseTerrainShare } from './terrain';
 import { categoryForZone } from './rci';
 import type { RciCategory } from './rci';
+import { checkFootprint } from './buildings';
+import type { BuildingCatalogue } from './catalogue';
+import { seedDefinitions } from './levels';
 import { roadReach } from './systems/growth';
 import { waterProximity } from './systems/landValue';
 import type { WorldState } from './world';
@@ -203,6 +206,100 @@ export interface ParcelExplanation {
   demand: number | null;
   /** Práh povýšení na další úroveň a úleva za poptávku (§8). */
   levels: { nextThreshold: number | null; demandRelief: number };
+}
+
+/**
+ * Proč na téhle parcele nic nevyroste. `null` znamená „nic nebrání".
+ *
+ * Ptá se **týmiž funkcemi jako růst**, ne vlastní kopií podmínek — jinak by
+ * panel časem začal tvrdit něco jiného, než co se doopravdy děje. Vrací rovnou
+ * lokalizační klíč chyby, takže hráč čte tutéž větu jako při ruční stavbě.
+ *
+ * Vzniklo to po hraní: autor měl zónu u silnice, vodu i proud, kasu v plusu —
+ * a nerostlo nic, protože parcela byla na svahu. Hra o tom mlčela a nedalo se
+ * to nikde zjistit.
+ */
+export function growthBlocker(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  balance: Balance,
+  x: number,
+  y: number,
+): string | null {
+  const tile = index(x, y);
+  if (world.layers.buildingId[tile] !== 0) return null; // stojí tu budova
+  if ((world.layers.road[tile] ?? 0) !== 0) return null; // vozovka, ne parcela
+
+  const zone = world.layers.zone[tile] ?? ZONE.none;
+  const category = categoryForZone(zone);
+  if (category === null) return 'ui.parcel.blocked.noZone';
+
+  // Bankrot zastaví růst v celém městě (§9 fáze 2).
+  if (world.economy.funds < 0) return 'ui.parcel.blocked.bankrupt';
+  if (world.demand[category] <= 0) return 'ui.parcel.blocked.noDemand';
+
+  const reach = roadReach(world, balance.growth.roadFactors.length - 1);
+  const distance = reach[tile] ?? 255;
+  if ((balance.growth.roadFactors[distance] ?? 0) === 0) return 'ui.parcel.blocked.tooFarFromRoad';
+
+  // Zbytek řeší tatáž kontrola, kterou pouští růst. Stačí, aby prošla jediná
+  // z nejmenších budov kategorie — přesně tak si vybírá i on.
+  const options = seedDefinitions(catalogue, category);
+  if (options.length === 0) return 'ui.parcel.blocked.noDefinition';
+
+  let first: string | null = null;
+  for (const definition of options) {
+    const result = checkFootprint(world, definition, x, y, {
+      requireZone: zone,
+      skipRoadCheck: true,
+    });
+    if (result.ok) return null;
+    first ??= result.reason;
+  }
+  return first;
+}
+
+/**
+ * Jak daleko se parcela dostala, než ji něco zastavilo.
+ *
+ * Podmínky se kontrolují v pořadí a **poslední z nich je ta zajímavá**: parcela
+ * bez zóny nebo bez silnice je ještě daleko, kdežto ta, které chybí jen rovina,
+ * je krok od hotova. Když se má hráči hlásit jediná věta, musí to být o téhle.
+ *
+ * Nejčastější důvod je špatné měřítko: velká zóna daleko od silnice přehlasuje
+ * pár parcel u vozovky, které skoro staví — a hráč dostane radu o něčem, co ho
+ * netrápí.
+ */
+const BLOCKER_DEPTH: Readonly<Record<string, number>> = {
+  'ui.parcel.blocked.noZone': 1,
+  'ui.parcel.blocked.noDemand': 2,
+  'ui.parcel.blocked.tooFarFromRoad': 3,
+  'error.wrongZone': 4,
+  'error.terrainNotAllowed': 5,
+  'error.notFlat': 6,
+  'error.needsWater': 7,
+};
+
+/**
+ * Ze sady důvodů vybere ten, který stojí za nahlášení.
+ *
+ * Bankrot přebíjí všechno: zastavuje růst v celém městě, takže radit hráči, ať
+ * někde srovná terén, by bylo k ničemu.
+ */
+export function worstBlocker(reasons: Iterable<string>): string | null {
+  let worst: string | null = null;
+  let depth = -1;
+
+  for (const reason of reasons) {
+    if (reason === 'ui.parcel.blocked.bankrupt') return reason;
+    const value = BLOCKER_DEPTH[reason] ?? 4;
+    if (value > depth) {
+      depth = value;
+      worst = reason;
+    }
+  }
+
+  return worst;
 }
 
 export function explainParcel(
