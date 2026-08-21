@@ -1,0 +1,36 @@
+{
+  "id": "vanilla:theatre",
+  "type": "building",
+  "category": "service",
+  "name": "building.theatre.name",
+  "description": "building.theatre.desc",
+  "footprint": [
+    2,
+    2
+  ],
+  "construction": {
+    "cost": 900,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 120
+  },
+  "jobs": {
+    "capacity": 12
+  },
+  "service": {
+    "class": "culture",
+    "radius": 7,
+    "strength": 70
+  },
+  "graphics": {
+    "color": "#b4708f",
+    "heightLevels": 1,
+    "icon": "masks"
+  }
+}

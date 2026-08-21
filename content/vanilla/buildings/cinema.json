@@ -1,0 +1,36 @@
+{
+  "id": "vanilla:cinema",
+  "type": "building",
+  "category": "service",
+  "name": "building.cinema.name",
+  "description": "building.cinema.desc",
+  "footprint": [
+    2,
+    2
+  ],
+  "construction": {
+    "cost": 600,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 80
+  },
+  "jobs": {
+    "capacity": 8
+  },
+  "service": {
+    "class": "culture",
+    "radius": 6,
+    "strength": 55
+  },
+  "graphics": {
+    "color": "#7a6fa8",
+    "heightLevels": 1,
+    "icon": "film"
+  }
+}

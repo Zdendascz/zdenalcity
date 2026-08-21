@@ -1430,8 +1430,34 @@ Testy: 6 v `tests/sewage.test.ts`. Že koušou, ověřeno rozbitím: kanalizace
 mimo znečištění shodí dva, nezapočtená kapacita čistírny dva, obě pojistky
 naráz dva.
 
+- [x] T38 — třídy `culture` a `social` (fáze 3c)
+
+Nejlevnější úkol celé fáze, a je to dobrá zpráva: **žádný nový kód** (R12).
+Obě třídy stojí nad mechanismem pokrytí z T13, takže přibyl jen obsah.
+
+- **`culture`** — muzeum (1 400, dosah 9), divadlo (900), kino (600) a výstavní
+  síň (300, dosah 4). Rozdíl mezi velkou a malou kulturou je v číslech
+  v JSONu, ne v kódu
+- **`social`** — společenské centrum (700) a domov pro seniory (1 100)
+- obě dostaly **váhu v ceně půdy** (0,45 a 0,35), takže se hned projeví; do
+  spokojenosti vstoupí v T39
+
+Jediné, co si vyžádalo řádky v `src/`, jsou **symboly na střechy**: sloup,
+masky, filmový pás, rám, dvě postavy a srdce. Sada tvarů je render-side a
+obsah do ní jen ukazuje jménem — kdyby chyběl, hlásí to test z T27.
+
+Ověřeno v běžící hře: šest nových tlačítek v liště, dva nové overlaye („Dosah
+kultury", „Dosah sounáležitosti") i dva posuvníky financování **vznikly samy
+z obsahu**, bez zásahu do kódu. Muzeum dalo v místě pokrytí 80, šedesát
+dlaždic daleko nulu, a cena půdy pod ním šla z 0 na **76**.
+
+Testy: 5 v `tests/culture.test.ts`. Netestují nový kód — testují, že žádný
+nebyl potřeba. Že koušou, ověřeno rozbitím: divadlo bez třídy služby shodí tři,
+kultura bez váhy v ceně půdy jeden a s ní i test popisků z T26.
+
 ## Rozpracované
-_(T37 hotové, dál T38: třídy služeb `culture` a `social`.)_
+_(T38 hotové, dál T39: spokojenost — vrstva, vzorec, škálování poptávky, HUD,
+overlay.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

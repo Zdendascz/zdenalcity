@@ -62,7 +62,9 @@
       "fire": 0.2,
       "health": 0.3,
       "education": 0.4,
-      "parks": 0.5
+      "parks": 0.5,
+    "culture": 0.45,
+    "social": 0.35
     }
   },
 

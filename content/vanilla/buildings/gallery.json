@@ -1,0 +1,36 @@
+{
+  "id": "vanilla:gallery",
+  "type": "building",
+  "category": "service",
+  "name": "building.gallery.name",
+  "description": "building.gallery.desc",
+  "footprint": [
+    1,
+    1
+  ],
+  "construction": {
+    "cost": 300,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 40
+  },
+  "jobs": {
+    "capacity": 4
+  },
+  "service": {
+    "class": "culture",
+    "radius": 4,
+    "strength": 45
+  },
+  "graphics": {
+    "color": "#9aa8c4",
+    "heightLevels": 1,
+    "icon": "frame"
+  }
+}

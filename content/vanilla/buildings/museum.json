@@ -1,0 +1,36 @@
+{
+  "id": "vanilla:museum",
+  "type": "building",
+  "category": "service",
+  "name": "building.museum.name",
+  "description": "building.museum.desc",
+  "footprint": [
+    3,
+    3
+  ],
+  "construction": {
+    "cost": 1400,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 180
+  },
+  "jobs": {
+    "capacity": 16
+  },
+  "service": {
+    "class": "culture",
+    "radius": 9,
+    "strength": 80
+  },
+  "graphics": {
+    "color": "#c9b18a",
+    "heightLevels": 2,
+    "icon": "column"
+  }
+}

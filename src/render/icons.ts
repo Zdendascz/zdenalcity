@@ -137,6 +137,98 @@ const DROP: IconShape = [
   ],
 ];
 
+/** Sloup s kladím — muzeum. */
+const COLUMN: IconShape = [
+  [
+    [0.12, 0.2],
+    [0.88, 0.2],
+    [0.88, 0.3],
+    [0.12, 0.3],
+  ],
+  [
+    [0.3, 0.3],
+    [0.42, 0.3],
+    [0.42, 0.82],
+    [0.3, 0.82],
+  ],
+  [
+    [0.58, 0.3],
+    [0.7, 0.3],
+    [0.7, 0.82],
+    [0.58, 0.82],
+  ],
+];
+
+/** Dvě masky — divadlo. */
+const MASKS: IconShape = [circle(0.34, 0.45, 0.24), circle(0.66, 0.6, 0.24)];
+
+/** Filmový pás — kino. */
+const FILM: IconShape = [
+  [
+    [0.18, 0.24],
+    [0.82, 0.24],
+    [0.82, 0.76],
+    [0.18, 0.76],
+  ],
+  [
+    [0.3, 0.36],
+    [0.7, 0.36],
+    [0.7, 0.44],
+    [0.3, 0.44],
+  ],
+  [
+    [0.3, 0.56],
+    [0.7, 0.56],
+    [0.7, 0.64],
+    [0.3, 0.64],
+  ],
+];
+
+/** Rám obrazu — výstavní síň. */
+const FRAME: IconShape = [
+  [
+    [0.16, 0.16],
+    [0.84, 0.16],
+    [0.84, 0.84],
+    [0.16, 0.84],
+  ],
+  [
+    [0.3, 0.3],
+    [0.7, 0.3],
+    [0.7, 0.7],
+    [0.3, 0.7],
+  ],
+];
+
+/** Dvě postavy vedle sebe — společenské centrum. */
+const PEOPLE: IconShape = [
+  circle(0.34, 0.32, 0.16),
+  [
+    [0.2, 0.52],
+    [0.48, 0.52],
+    [0.48, 0.9],
+    [0.2, 0.9],
+  ],
+  circle(0.68, 0.36, 0.14),
+  [
+    [0.56, 0.54],
+    [0.8, 0.54],
+    [0.8, 0.9],
+    [0.56, 0.9],
+  ],
+];
+
+/** Srdce — domov pro seniory. Péče, ne nemocnice; kříž patří zdravotnictví. */
+const HEART: IconShape = [
+  circle(0.35, 0.36, 0.2),
+  circle(0.65, 0.36, 0.2),
+  [
+    [0.16, 0.44],
+    [0.84, 0.44],
+    [0.5, 0.9],
+  ],
+];
+
 export const ICON_SHAPES: Readonly<Record<string, IconShape>> = {
   cross: CROSS,
   shield: SHIELD,
@@ -147,6 +239,12 @@ export const ICON_SHAPES: Readonly<Record<string, IconShape>> = {
   bolt: BOLT,
   bus: BUS,
   drop: DROP,
+  column: COLUMN,
+  masks: MASKS,
+  film: FILM,
+  frame: FRAME,
+  people: PEOPLE,
+  heart: HEART,
 };
 
 export function iconShape(name: string | undefined): IconShape | undefined {

@@ -56,6 +56,7 @@ describe('vanilla obsah', () => {
 
     const buildings = registry.getAll('building');
     expect(buildings.map((b) => b.id).sort()).toEqual([
+      'vanilla:cinema',
       'vanilla:clinic',
       'vanilla:coal_power_plant',
       'vanilla:commercial_arcade',
@@ -65,7 +66,9 @@ describe('vanilla obsah', () => {
       'vanilla:commercial_row',
       'vanilla:commercial_small',
       'vanilla:commercial_tower',
+      'vanilla:community_centre',
       'vanilla:fire_station',
+      'vanilla:gallery',
       'vanilla:incinerator',
       'vanilla:industrial_chemical',
       'vanilla:industrial_large',
@@ -75,6 +78,7 @@ describe('vanilla obsah', () => {
       'vanilla:industrial_works',
       'vanilla:industrial_yard',
       'vanilla:landfill',
+      'vanilla:museum',
       'vanilla:park_small',
       'vanilla:police_small',
       'vanilla:pump_station',
@@ -85,7 +89,9 @@ describe('vanilla obsah', () => {
       'vanilla:residential_small',
       'vanilla:residential_terrace',
       'vanilla:residential_tower',
+      'vanilla:retirement_home',
       'vanilla:school',
+      'vanilla:theatre',
       'vanilla:transit_depot',
       'vanilla:transit_stop',
       'vanilla:water_treatment',

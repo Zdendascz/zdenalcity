@@ -1,0 +1,36 @@
+{
+  "id": "vanilla:retirement_home",
+  "type": "building",
+  "category": "service",
+  "name": "building.retirement_home.name",
+  "description": "building.retirement_home.desc",
+  "footprint": [
+    3,
+    3
+  ],
+  "construction": {
+    "cost": 1100,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 200
+  },
+  "jobs": {
+    "capacity": 14
+  },
+  "service": {
+    "class": "social",
+    "radius": 6,
+    "strength": 65
+  },
+  "graphics": {
+    "color": "#c4a89a",
+    "heightLevels": 2,
+    "icon": "heart"
+  }
+}

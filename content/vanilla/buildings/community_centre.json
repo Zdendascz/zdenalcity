@@ -1,0 +1,36 @@
+{
+  "id": "vanilla:community_centre",
+  "type": "building",
+  "category": "service",
+  "name": "building.community_centre.name",
+  "description": "building.community_centre.desc",
+  "footprint": [
+    2,
+    2
+  ],
+  "construction": {
+    "cost": 700,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 100
+  },
+  "jobs": {
+    "capacity": 10
+  },
+  "service": {
+    "class": "social",
+    "radius": 7,
+    "strength": 75
+  },
+  "graphics": {
+    "color": "#8fb48f",
+    "heightLevels": 1,
+    "icon": "people"
+  }
+}
