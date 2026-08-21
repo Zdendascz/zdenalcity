@@ -260,6 +260,7 @@
   "ui.overlay.coverage.culture": "Culture reach",
   "ui.overlay.coverage.social": "Community reach",
   "ui.overlay.title": "Layers",
+  "ui.overlay.none": "No layer",
   "ui.view.surface": "Surface view",
   "ui.view.underground": "Underground view",
   "ui.overlay.traffic": "Traffic",

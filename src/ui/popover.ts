@@ -49,6 +49,20 @@ export interface PopoverOptions {
   showLabel?: boolean;
   /** Doplňková třída na kořen, kvůli barvám. */
   className?: string;
+  /**
+   * Nechat na tlačítku pořád tutéž ikonu.
+   *
+   * U nástrojů se ikona mění na to, co má hráč v ruce — to je smysl. U nabídky
+   * vrstev to ale znamenalo, že se z tlačítka „Vrstvy" stal blesk a nebylo
+   * poznat, že je to pořád ta nabídka. Hlásil to autor: zapnul elektřinu
+   * a neměl jak ji vypnout.
+   */
+  lockIcon?: boolean;
+  /**
+   * Položka, která znamená „nic vybráno". Tlačítko se u ní nerozsvítí, ale
+   * v seznamu je vidět jako zvolená.
+   */
+  neutralId?: string;
 }
 
 export class Popover {
@@ -136,10 +150,14 @@ export class Menu extends Popover {
   private readonly items = new Map<string, HTMLButtonElement>();
   private readonly icons = new Map<string, string>();
   private readonly defaultIcon: string;
+  private readonly lockIcon: boolean;
+  private readonly neutralId: string | undefined;
 
   constructor(options: PopoverOptions) {
     super(options);
     this.defaultIcon = options.icon;
+    this.lockIcon = options.lockIcon ?? false;
+    this.neutralId = options.neutralId;
     this.panel.classList.add('menu');
   }
 
@@ -168,7 +186,8 @@ export class Menu extends Popover {
     for (const [itemId, node] of this.items) {
       node.classList.toggle('is-active', itemId === id);
     }
-    this.setActive(id !== null);
+    this.setActive(id !== null && id !== this.neutralId);
+    if (this.lockIcon) return;
     this.setIcon((id === null ? undefined : this.icons.get(id)) ?? this.defaultIcon);
   }
 

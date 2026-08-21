@@ -186,7 +186,7 @@ export class Hud {
     for (const [id, node] of this.viewButtons) {
       node.classList.toggle('is-active', id === state.view);
     }
-    this.layerMenu?.setSelected(state.layer === 'none' ? null : state.layer);
+    this.layerMenu?.setSelected(state.layer);
     this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
 
     if (this.messageNode) {
@@ -304,15 +304,28 @@ export class Hud {
   }
 
   private buildLayers(): void {
-    const menu = new Menu({ icon: 'layers', label: this.i18n.t('ui.overlay.title') });
-    menu.setItems(
-      this.layers.map((layer) => ({
+    const menu = new Menu({
+      icon: 'layers',
+      label: this.i18n.t('ui.overlay.title'),
+      lockIcon: true,
+      neutralId: 'none',
+    });
+    menu.setItems([
+      // „Žádná" je první položka, ne skrytý trik. Vypnout vrstvu druhým
+      // kliknutím na tutéž položku sice jde, ale hráč to nemá jak uhodnout.
+      {
+        id: 'none',
+        label: this.i18n.t('ui.overlay.none'),
+        icon: 'layers',
+        onSelect: () => this.callbacks.onToggleLayer('none'),
+      },
+      ...this.layers.map((layer) => ({
         id: layer.id,
         label: this.i18n.t(layer.labelKey),
         icon: layer.icon,
         onSelect: () => this.callbacks.onToggleLayer(layer.id),
       })),
-    );
+    ]);
     this.layerMenu = menu;
     this.controls.appendChild(menu.root);
   }

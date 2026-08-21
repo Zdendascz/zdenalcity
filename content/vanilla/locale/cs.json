@@ -260,6 +260,7 @@
   "ui.overlay.coverage.culture": "Dosah kultury",
   "ui.overlay.coverage.social": "Dosah sounáležitosti",
   "ui.overlay.title": "Vrstvy",
+  "ui.overlay.none": "Žádná vrstva",
   "ui.view.surface": "Pohled na povrch",
   "ui.view.underground": "Pohled pod zem",
   "ui.overlay.traffic": "Doprava",

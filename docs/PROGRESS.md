@@ -1576,6 +1576,11 @@ ostatní čeká za ikonou.
   neměl jak poznat, že se vodovod vůbec staví; ptal se na to autor, ne test.
   Nástroj si navíc pohled přepne sám: potrubí pod zem, silnice a budovy zpátky
   na povrch. Buldozer zůstává výjimkou, protože pod zemí i nad ní dává smysl
+- **vrstvu jde vypnout položkou „Žádná vrstva"**, ne jen druhým kliknutím na
+  tutéž. A tlačítko nabídky si drží svou ikonu: když se z „Vrstev" stal blesk,
+  nebylo poznat, že je to pořád ta nabídka. Autor zapnul elektřinu a neměl jak
+  ji vypnout. U nástrojů se ikona mění dál — tam je to smysl, protože ukazuje,
+  co má hráč v ruce
 - **terraforming ukazuje roh, ne čtverec.** Zvedání a snižování hýbe rohem;
   rámeček kolem celé dlaždice ukazoval čtyři naráz a hráč netušil, který se
   pohne. Srovnání pracuje s plochou, takže tam čtverec zůstal
