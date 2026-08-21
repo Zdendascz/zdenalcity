@@ -90,6 +90,7 @@
   "ui.tool.terrain.raise": "Raise ground",
   "ui.tool.terrain.lower": "Lower ground",
   "ui.tool.terrain.level": "Level ground",
+  "ui.tool.terrain.fill": "Fill slope",
   "ui.tool.zone.residential": "Residential zone",
   "ui.tool.zone.commercial": "Commercial zone",
   "ui.tool.zone.industrial": "Industrial zone",

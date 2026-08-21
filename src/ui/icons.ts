@@ -55,6 +55,16 @@ const ARROW_DOWN: Shape = [
   bar(0.12, 0.82, 0.88, 0.92),
 ];
 
+/** Zeď z kvádrů dorovnaná k horní úrovni — dozdít svah. */
+const FILL: Shape = [
+  bar(0.08, 0.26, 0.92, 0.36),
+  bar(0.1, 0.42, 0.46, 0.56),
+  bar(0.54, 0.42, 0.9, 0.56),
+  bar(0.1, 0.62, 0.28, 0.76),
+  bar(0.36, 0.62, 0.64, 0.76),
+  bar(0.72, 0.62, 0.9, 0.76),
+];
+
 /** Rovina mezi dvěma značkami — srovnat terén. */
 const LEVEL: Shape = [bar(0.1, 0.44, 0.9, 0.56), bar(0.16, 0.2, 0.28, 0.44), bar(0.72, 0.56, 0.84, 0.8)];
 
@@ -249,6 +259,7 @@ const UI_SHAPES: Readonly<Record<string, Shape>> = {
   raise: ARROW_UP,
   lower: ARROW_DOWN,
   level: LEVEL,
+  fill: FILL,
   bulldoze: BULLDOZE,
   street: road(0),
   avenue: road(1),

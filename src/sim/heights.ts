@@ -83,6 +83,34 @@ export function tileBaseHeight(heights: Readonly<Uint8Array>, x: number, y: numb
 }
 
 /**
+ * Nejnižší a nejvyšší roh pod obdélníkem `w × h` dlaždic.
+ *
+ * Renderer z toho staví podezdívku: budova stojí horní plochou na **nejvyšším**
+ * rohu a zeď sahá k **nejnižšímu**, takže na svahu nikde nevisí ve vzduchu.
+ */
+export function areaHeightRange(
+  heights: Readonly<Uint8Array>,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): { min: number; max: number } {
+  let min = MAX_HEIGHT;
+  let max = 0;
+
+  for (let cy = y; cy <= y + h; cy++) {
+    for (let cx = x; cx <= x + w; cx++) {
+      if (!cornerInBounds(cx, cy)) continue;
+      const value = heights[cornerIndex(cx, cy)] ?? 0;
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+  }
+
+  return min > max ? { min: 0, max: 0 } : { min, max };
+}
+
+/**
  * Dvojice sousedních rohů, které porušují invariant.
  *
  * Vrací počet, ne `boolean`: při ladění generátoru je rozdíl mezi „jedna

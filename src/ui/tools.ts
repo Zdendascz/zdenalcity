@@ -20,7 +20,12 @@ export type ToolAction =
   | { kind: 'zone'; zone: ZoneType }
   | { kind: 'place'; definitionId: string }
   /** Terraforming: kladná delta zvedá, záporná sníží. Nula srovná oblast. */
-  | { kind: 'terraform'; delta: number };
+  | { kind: 'terraform'; delta: number }
+  /**
+   * Dozdění: plocha se zaveze na úroveň **nejvyššího** rohu, místo aby se
+   * odkopala na průměr. U kopce tak vznikne terasa nahoře, ne jáma dole.
+   */
+  | { kind: 'fill' };
 
 export interface ToolOption {
   id: string;

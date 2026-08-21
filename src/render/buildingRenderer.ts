@@ -12,8 +12,9 @@ import {
   UNPOWERED_SHADE,
   WALL_LEFT_SHADE,
   WALL_RIGHT_SHADE,
+  FOUNDATION_COLOR,
 } from './palette';
-import { MAX_HEIGHT, tileBaseHeight } from '@/sim/heights';
+import { areaHeightRange, MAX_HEIGHT } from '@/sim/heights';
 import { cuboidFaces, gridToScreen, LEVEL_H } from './projection';
 
 /**
@@ -128,18 +129,42 @@ export class BuildingRenderer {
     // znamenalo patnáctipatrový věžák, protože vyšší úroveň už má vyšší
     // `heightLevels` sama.
     const height = appearance.heightLevels * LEVEL_H;
-    // Budova stojí na rovině (§7 fáze 3), takže jí stačí jedno patro základny.
-    const base = tileBaseHeight(this.world.cornerHeight, building.x, building.y);
-    const faces = cuboidFaces(
-      building.x + BUILDING_INSET,
-      building.y + BUILDING_INSET,
-      width - BUILDING_INSET * 2,
-      depth - BUILDING_INSET * 2,
-      height,
-      base,
+
+    // Budova ze zóny smí stát i na svahu (rozhodnutí autora, T41). Stojí proto
+    // horní plochou na **nejvyšším** rohu půdorysu a chybějící kus ke dnu
+    // vyplní podezdívka — jinak by na kopci visela rohem ve vzduchu.
+    //
+    // Ruční stavby si parcelu srovnají, takže u nich vyjde rozdíl nula a
+    // podezdívka se nekreslí. Kód je jeden pro obojí.
+    const { min, max } = areaHeightRange(
+      this.world.cornerHeight,
+      building.x,
+      building.y,
+      width,
+      depth,
     );
+    const drop = (max - min) * LEVEL_H;
+
+    const insetX = building.x + BUILDING_INSET;
+    const insetY = building.y + BUILDING_INSET;
+    const insetW = width - BUILDING_INSET * 2;
+    const insetD = depth - BUILDING_INSET * 2;
+
+    const faces = cuboidFaces(insetX, insetY, insetW, insetD, height, max);
 
     view.clear();
+
+    if (drop > 0) {
+      // Podezdívka je **kámen, ne barva domu**: má být vidět, že je to terénní
+      // úprava pod stavbou, a ne že dům na svahu povyrostl o dvě patra.
+      const foundation = cuboidFaces(insetX, insetY, insetW, insetD, drop, min);
+      view
+        .poly(foundation.right)
+        .fill({ color: shade(FOUNDATION_COLOR, WALL_RIGHT_SHADE) })
+        .poly(foundation.left)
+        .fill({ color: shade(FOUNDATION_COLOR, WALL_LEFT_SHADE) });
+    }
+
     view
       .poly(faces.right)
       .fill({ color: shade(appearance.color, WALL_RIGHT_SHADE) })
@@ -152,7 +177,7 @@ export class BuildingRenderer {
       width: width - BUILDING_INSET * 2,
       depth: depth - BUILDING_INSET * 2,
       height,
-      base,
+      base: max,
     });
 
     // Hloubka se řídí **předním rohem** půdorysu, ne počátkem. Kdyby se řadilo
@@ -163,7 +188,7 @@ export class BuildingRenderer {
     // ve stejné hloubce, jedna na kopci a druhá pod ním, se v izometrii
     // překrývají a ta výš stojící je dál od pozorovatele, takže patří dozadu.
     view.zIndex =
-      (building.x + width + building.y + depth) * (MAX_HEIGHT + 1) + (MAX_HEIGHT - base);
+      (building.x + width + building.y + depth) * (MAX_HEIGHT + 1) + (MAX_HEIGHT - min);
   }
 
   /**

@@ -222,6 +222,14 @@ export interface Balance {
      * žádná pracovní místa, takže by nic nevyrostlo a místa by nikdy nevznikla.
      */
     minAccessFactor: number;
+    /**
+     * Násobitel váhy parcely na svahu (rozhodnutí autora, T41).
+     *
+     * Dům ze zóny na svahu stojí dráž, takže se tam staví méně ochotně —
+     * není to zákaz. Do T41 zákaz byl a na generované mapě tím byla necelá
+     * polovina souše nezastavitelná.
+     */
+    slopeFactor: number;
   };
 }
 
@@ -510,6 +518,7 @@ export function validateBalance(raw: unknown): {
       taxRange: num(issues, growth, 'taxRange', 'growth.taxRange', 1, 100),
       roadFactors,
       minAccessFactor: num(issues, growth, 'minAccessFactor', 'growth.minAccessFactor', 0, 1),
+      slopeFactor: num(issues, growth, 'slopeFactor', 'growth.slopeFactor', 0, 1),
     },
   };
 

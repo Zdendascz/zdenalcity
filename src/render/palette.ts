@@ -113,6 +113,12 @@ export const BRIDGE_COLOR = 0x8d8f99;
  * Podzemní pohled (§8 fáze 3). Terén se ztlumí na desetinu jasu, aby se
  * potrubí nemuselo prát s barvami trávy a vody — pod zemí je stejně tma.
  */
+/**
+ * Podezdívka pod budovou na svahu. Kámen, ne barva domu — je to terénní úprava
+ * a hráč má poznat, že dům nepovyrostl, jen se podezdil.
+ */
+export const FOUNDATION_COLOR = 0x8a8378;
+
 export const UNDERGROUND_TERRAIN_SHADE = 0.35;
 
 /**

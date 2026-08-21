@@ -1656,6 +1656,36 @@ stavět nedá", panel parcely totéž jako varování nahoře.
 Testy: 8 v `tests/diagnostics.test.ts`. Mutační ověření: čtyři mutanti
 (vynechaná kontrola půdorysu, bankrotu, dosahu silnice a zóny), všichni chyceni.
 
+- [x] Na svahu se staví (rozhodnutí autora)
+
+Zákaz stavby na svahu byl v zadání fáze 3 (§7, T33) a ukázal se jako chyba:
+na generované mapě je rovných jen **48 % dlaždic souše**, takže polovina mapy
+byla nezastavitelná a hráč neměl jak přijít na proč. Autor rozhodl, že zóny
+musí jít stavět na svahu. Platí od teď:
+
+- **zóna na svahu vyroste.** Růst už rovinu nekontroluje. Není to zadarmo:
+  svažitá parcela má v losu váhu `growth.slopeFactor` (0,7), takže se tam
+  staví **méně ochotně** — zóna na kopci roste pomaleji, ne vůbec, stejně jako
+  u dostupnosti práce (R6)
+- **„o 30 % dražší" je v losu, ne na účtu.** Domy ze zóny hráč neplatí, takže
+  peněžní přirážka by neměla kam sáhnout; v herních důsledcích je menší váha
+  totéž — na svahu se staví později a méně
+- **ruční stavby se dál srovnávají.** Elektrárna ani klinika se s podezdívkou
+  nepočítají a cenu srovnání hráč vidí předem, takže tam se nic nemění
+- **renderer kreslí podezdívku.** Budova stojí horní plochou na nejvyšším rohu
+  půdorysu a zeď sahá k nejnižšímu, aby na kopci nevisela rohem ve vzduchu.
+  Podezdívka je kamenná, ne v barvě domu — má být poznat, že je to terénní
+  úprava, a ne že dům povyrostl
+- **nový nástroj „Dozdít svah" (G).** Srovnání odkope na průměr, dozdění zaveze
+  na **nejvyšší** roh: u kopce tak vznikne terasa nahoře místo jámy dole
+
+Ověřeno v běžící hře: dvě svažité parcely (rohy 0/1/0/1 a 1/2/1/2) vyrostly
+v domy, jejich grafika má o dva polygony víc než dům na rovině (podezdívka),
+a dozdění změnilo [2,2,1,2] na [2,2,2,2] za 8 a [2,3,2,2] na [3,3,3,3] za 24.
+
+Testy: 2 v `tests/growth.test.ts`, upravený rozbor parcely. Panel parcely už
+svah jako překážku nehlásí — protože žádná není.
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_

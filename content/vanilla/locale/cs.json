@@ -90,6 +90,7 @@
   "ui.tool.terrain.raise": "Zvednout terén",
   "ui.tool.terrain.lower": "Snížit terén",
   "ui.tool.terrain.level": "Srovnat terén",
+  "ui.tool.terrain.fill": "Dozdít svah",
   "ui.tool.zone.residential": "Obytná zóna",
   "ui.tool.zone.commercial": "Komerční zóna",
   "ui.tool.zone.industrial": "Průmyslová zóna",

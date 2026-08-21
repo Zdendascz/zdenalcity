@@ -6,6 +6,7 @@ import { buildRoad, bulldoze, setTaxRate, zoneArea } from '@/sim/commands';
 import { coarseIndex } from '@/sim/coarse';
 import { hashLayers, index, TERRAIN, ZONE } from '@/sim/layers';
 import type { ZoneType } from '@/sim/layers';
+import { applyCornerChanges, isFlatTile, planCornerHeight } from '@/sim/heights';
 import { tryUpgrade } from '@/sim/levels';
 import { createGrowthSystem } from '@/sim/systems';
 import type { BuildingCatalogue } from '@/sim/systems';
@@ -422,5 +423,43 @@ describe('vanilla obsah v simulaci', () => {
       expect(building.definitionId).toBe('vanilla:residential_small');
     }
     expect(totalPopulation(world.buildings)).toBe(world.buildings.size * 8);
+  });
+});
+
+describe('stavba na svahu', () => {
+  /**
+   * Rozhodnutí autora (T41): zóna na kopci **musí** vyrůst. Do té doby růst
+   * vyžadoval rovinu a sám nic nesrovnal, takže na generované mapě byla
+   * necelá polovina souše nezastavitelná — a hra o tom mlčela.
+   */
+  it('dům ze zóny vyroste i na svahu', async () => {
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const world = createWorld(7, content.getBalance().economy);
+    for (let x = 20; x <= 30; x++) buildRoad(world, x, 30);
+    zoneArea(world, 20, 31, 10, 1, ZONE.residential);
+    // Svah přes celou zónu: žádná z parcel není rovná.
+    applyCornerChanges(world.cornerHeight, planCornerHeight(world.cornerHeight, 25, 32, 3));
+    expect([20, 22, 25, 28].some((x) => !isFlatTile(world.cornerHeight, x, 31))).toBe(true);
+
+    assumeWatered(world);
+    saturateDemand(world);
+
+    const systems = [createGrowthSystem(content, content.getBalance())];
+    for (let tick = 0; tick < 400; tick++) {
+      tickWorld(world, systems);
+      assumeWatered(world);
+      saturateDemand(world);
+    }
+
+    expect(world.buildings.size).toBeGreaterThan(0);
+  });
+
+  it('ale na rovině se staví ochotněji', () => {
+    // „O třicet procent dražší" se v losu projeví jako menší váha, ne jako
+    // účet — dům ze zóny hráč neplatí.
+    expect(VANILLA_BALANCE.growth.slopeFactor).toBeGreaterThan(0);
+    expect(VANILLA_BALANCE.growth.slopeFactor).toBeLessThan(1);
   });
 });

@@ -215,6 +215,15 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       action: { kind: 'terraform', delta: 0 },
     },
     {
+      id: 'terrain:fill',
+      labelKey: 'ui.tool.terrain.fill',
+      icon: 'fill',
+      hotkey: 'g',
+      groupKey: 'ui.menu.terrain',
+      groupIcon: 'raise',
+      action: { kind: 'fill' },
+    },
+    {
       id: 'zone:residential',
       labelKey: 'ui.tool.zone.residential',
       icon: 'zone',
@@ -574,6 +583,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     return activeTool.action.kind === 'terraform' && activeTool.action.delta !== 0;
   }
 
+
   /** Půdorys, který právě vybraný nástroj položí. Vše kromě budov je 1×1. */
   function activeFootprint(): readonly [number, number] {
     if (activeTool.action.kind !== 'place') return [1, 1];
@@ -834,6 +844,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         break;
       case 'pipe':
         dispatch({ type: 'build_pipe', x: tile.x, y: tile.y });
+        break;
+      case 'fill':
+        dispatch({ type: 'level_area', x: tile.x, y: tile.y, w: 1, h: 1, mode: 'fill' });
         break;
       case 'bulldoze':
         // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.

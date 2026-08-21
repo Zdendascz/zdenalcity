@@ -130,6 +130,7 @@
     "neutralTaxRate": 7,
     "taxRange": 20,
     "roadFactors": [1, 1, 0.6, 0.3],
-    "minAccessFactor": 0.15
+    "minAccessFactor": 0.15,
+    "slopeFactor": 0.7
   }
 }

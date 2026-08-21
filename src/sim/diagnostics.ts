@@ -249,9 +249,13 @@ export function growthBlocker(
 
   let first: string | null = null;
   for (const definition of options) {
+    // Rovina se nekontroluje: dům ze zóny stojí i na svahu (T41), jen se tam
+    // staví méně ochotně. Kdyby se tu kontrolovala, panel by hlásil překážku,
+    // která žádná není.
     const result = checkFootprint(world, definition, x, y, {
       requireZone: zone,
       skipRoadCheck: true,
+      skipFlatCheck: true,
     });
     if (result.ok) return null;
     first ??= result.reason;

@@ -163,11 +163,14 @@ describe('proč tu nic neroste', () => {
     expect(growthBlocker(world, content, content.getBalance(), 25, 31)).toBeNull();
   });
 
-  it('svah pojmenuje jako svah', async () => {
+  it('svah překážka není — na tom se stavět smí', async () => {
+    // Rozhodnutí autora (T41): dům ze zóny stojí i na kopci, jen se tam staví
+    // méně ochotně. Do té doby to byl zákaz a na generované mapě tím byla
+    // necelá polovina souše nezastavitelná.
     const { world, content } = await parcel();
     applyCornerChanges(world.cornerHeight, planCornerHeight(world.cornerHeight, 25, 31, 3));
 
-    expect(growthBlocker(world, content, content.getBalance(), 25, 31)).toBe('error.notFlat');
+    expect(growthBlocker(world, content, content.getBalance(), 25, 31)).toBeNull();
   });
 
   it('chybějící voda taky', async () => {

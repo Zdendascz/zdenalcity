@@ -122,7 +122,7 @@ class MainThreadSimHost implements SimHost {
       case 'terraform_corner':
         return terraformCorner(this.world, cmd.x, cmd.y, cmd.delta, this.balance);
       case 'level_area':
-        return levelArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, this.balance);
+        return levelArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, this.balance, cmd.mode);
       case 'set_service_funding':
         return setServiceFunding(this.world, cmd.serviceClass, cmd.funding);
       default:

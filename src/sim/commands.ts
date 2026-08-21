@@ -2,6 +2,7 @@ import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from './buildings';
 import type { BuildingCatalogue } from './catalogue';
 import {
+  areaHeightRange,
   cornerInBounds,
   cornerIndex,
   isTwistedTile,
@@ -44,7 +45,12 @@ export type Command =
   | { type: 'build_pipe'; x: number; y: number }
   | { type: 'remove_pipe'; x: number; y: number }
   | { type: 'terraform_corner'; x: number; y: number; delta: number }
-  | { type: 'level_area'; x: number; y: number; w: number; h: number }
+  /**
+   * `mode: 'fill'` dozdí plochu na **nejvyšší** roh místo srovnání na průměr.
+   * Svah tak nezmizí odkopáním, ale zavezením — hráč si tím rovná terasu
+   * v úrovni horní krajiny (rozhodnutí autora, T41).
+   */
+  | { type: 'level_area'; x: number; y: number; w: number; h: number; mode?: 'average' | 'fill' }
   | { type: 'set_speed'; speed: number };
 
 /** Má dlaždice aspoň jednoho silničního souseda? Odsud se staví mosty dál. */
@@ -520,6 +526,27 @@ export function estimateCornerHeight(
   return estimate(planCornerHeight(world.cornerHeight, x, y, current + delta), balance);
 }
 
+/** Jak se plocha srovnává: na průměr, nebo dozděním na nejvyšší roh. */
+export type LevelMode = 'average' | 'fill';
+
+/**
+ * Dozdění: plocha se srovná na **nejvyšší** roh, ne na průměr.
+ *
+ * Rozdíl je v tom, co se svahem udělá: srovnání ho odkope, dozdění ho zaveze.
+ * Hráč si tak může u kopce udělat terasu v úrovni horní krajiny, místo aby si
+ * ji musel vysekat dolů (rozhodnutí autora, T41).
+ */
+function planFilling(
+  world: WorldState,
+  x: number,
+  y: number,
+  width: number,
+  depth: number,
+): Map<number, number> {
+  const { max } = areaHeightRange(world.cornerHeight, x, y, width, depth);
+  return planLevelArea(world.cornerHeight, x, y, width, depth, max);
+}
+
 /** Kolik by stálo srovnání oblasti. Nic nemění — jen počítá. */
 export function estimateLevelArea(
   world: WorldState,
@@ -528,8 +555,10 @@ export function estimateLevelArea(
   w: number,
   h: number,
   balance?: Balance,
+  mode: LevelMode = 'average',
 ): TerraformEstimate {
-  return estimate(planLevelling(world, x, y, w, h), balance);
+  const changes = mode === 'fill' ? planFilling(world, x, y, w, h) : planLevelling(world, x, y, w, h);
+  return estimate(changes, balance);
 }
 
 function commit(world: WorldState, plan: TerraformEstimate): CommandResult {
@@ -567,7 +596,8 @@ export function levelArea(
   w: number,
   h: number,
   balance?: Balance,
+  mode: LevelMode = 'average',
 ): CommandResult {
   if (!inBounds(x, y)) return reject('error.outOfBounds');
-  return commit(world, estimateLevelArea(world, x, y, w, h, balance));
+  return commit(world, estimateLevelArea(world, x, y, w, h, balance, mode));
 }

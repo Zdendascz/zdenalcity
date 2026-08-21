@@ -2,6 +2,7 @@ import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from '../buildings';
 import type { BuildingCatalogue } from '../catalogue';
 import { COARSE_CELLS, coarseIndex } from '../coarse';
+import { isFlatTile } from '../heights';
 import { index, MAP_SIZE, ROAD, ZONE } from '../layers';
 import { seedDefinitions } from '../levels';
 import { categoryForZone, RCI_CATEGORIES } from '../rci';
@@ -151,10 +152,18 @@ function collectCandidates(
     if (roadFactor === 0) continue; // mimo dosah silnice se nestaví vůbec
 
     const x = tile % MAP_SIZE;
-    const cell = coarseIndex(x, (tile - x) / MAP_SIZE);
+    const y = (tile - x) / MAP_SIZE;
+    const cell = coarseIndex(x, y);
     const landValue = world.coarse.landValue[cell] ?? 0;
+    // Na svahu se staví dráž, takže se tam staví méně ochotně. Není to zákaz:
+    // zóna na kopci roste pomaleji, ne vůbec — stejná logika jako u dostupnosti
+    // práce (R6). Do T41 to zákaz byl a půlka mapy se tím stala nezastavitelnou.
+    const slopeFactor = isFlatTile(world.cornerHeight, x, y) ? 1 : balance.growth.slopeFactor;
     const weight =
-      Math.pow(landValue + 1, balance.growth.exponent) * roadFactor * (access[cell] ?? 1);
+      Math.pow(landValue + 1, balance.growth.exponent) *
+      roadFactor *
+      slopeFactor *
+      (access[cell] ?? 1);
     if (weight > 0) candidates.push({ tile, weight });
   }
 
@@ -246,10 +255,19 @@ function tryBuild(
   // Celý footprint musí ležet ve stejné zóně — dům nepřeteče do sousední čtvrti.
   // Sousedství se silnicí se **nekontroluje**: pro růst ho nahradil dosah, jinak
   // by parcela dvě dlaždice od vozovky nemohla vyrůst nikdy (§9).
+  //
+  // **Rovina se nekontroluje taky** (rozhodnutí autora, T41): dům ze zóny stojí
+  // i na svahu, jen je to dražší, a to už je v jeho váze v losu. Renderer mu
+  // dokreslí podezdívku. Ruční stavba se dál srovnává — u elektrárny nebo
+  // kliniky se s podezdívkou počítat nedá.
+  //
   // Důvod odmítnutí tady nikoho nezajímá: systém zkusí jiné místo příště.
-  if (!checkFootprint(world, definition, x, y, { requireZone: zone, skipRoadCheck: true }).ok) {
-    return;
-  }
+  const fits = checkFootprint(world, definition, x, y, {
+    requireZone: zone,
+    skipRoadCheck: true,
+    skipFlatCheck: true,
+  });
+  if (!fits.ok) return;
   // Prerekvizity definice (§7). Vanilla je nemá, ale mod je mít může.
   if (!checkRequirements(world, catalogue, definition, x, y, present).ok) return;
 
