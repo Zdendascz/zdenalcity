@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 4;
+export const CURRENT_FORMAT_VERSION = 5;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -28,6 +28,12 @@ export const SAVE_LAYER_ORDER = [
   'road',
   'buildingId',
   'power',
+  /**
+   * Potrubí, od verze 5. Přidané **na konec**, takže migrace jen připíše
+   * prázdnou vrstvu za stávající bajty — kdyby se vsunulo doprostřed, musel
+   * by se `layers.bin` přeskládat jako u zrušené `elevation` ve verzi 4.
+   */
+  'pipe',
 ] as const satisfies readonly (keyof Layers)[];
 
 /**

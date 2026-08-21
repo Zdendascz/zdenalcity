@@ -144,7 +144,9 @@ describe('fixtury savů', () => {
 
     // `layers.bin` se zkrátil přesně o jednu jednobajtovou vrstvu.
     expect(before.layers.byteLength - after.layers.byteLength).toBe(MAP_SIZE * MAP_SIZE);
-    expect(after.layers.byteLength).toBe(expectedLayersByteLength());
+    // Ve verzi 4 to bylo 6 vrstev; `pipe` přibyla až v pětce, takže tady se
+    // nesmí porovnávat s aktuální délkou — migrace popisuje minulost.
+    expect(after.layers.byteLength).toBe(MAP_SIZE * MAP_SIZE * 6);
   });
 
   it('vystřižení vrstvy nepřeházelo ty ostatní', () => {
@@ -162,6 +164,76 @@ describe('fixtury savů', () => {
     expect([...after.layers.subarray(0, cells)]).toEqual([...before.layers.subarray(0, cells)]);
     // …a zbytek se posunul o přesně jednu vrstvu doleva.
     expect([...after.layers.subarray(cells)]).toEqual([...before.layers.subarray(cells * 2)]);
+  });
+
+  it('migrace v4 → v5 připíše prázdné potrubí a nic jiného', () => {
+    const v4 = Object.entries(fixtures).find(([path]) => path.includes('v4.city'));
+    expect(v4).toBeDefined();
+    if (!v4) return;
+
+    const before = migrate(unpackSave(decode(v4[1] as string)), MIGRATIONS, 4);
+    const after = migrate(before, MIGRATIONS, 5);
+    const cells = MAP_SIZE * MAP_SIZE;
+
+    expect(after.meta.formatVersion).toBe(5);
+    expect(after.layers.byteLength - before.layers.byteLength).toBe(cells);
+    expect(after.layers.byteLength).toBe(expectedLayersByteLength());
+
+    // Stávající vrstvy zůstaly bajt po bajtu tam, kde byly…
+    expect([...after.layers.subarray(0, before.layers.byteLength)]).toEqual([...before.layers]);
+    // …a nová je prázdná: síť, kterou hráč nepostavil, se vymýšlet nesmí.
+    expect([...after.layers.subarray(before.layers.byteLength)].every((v) => v === 0)).toBe(true);
+
+    const world = createWorld(1);
+    applySaveToWorld(world, after);
+    expect([...world.layers.pipe].every((value) => value === 0)).toBe(true);
+  });
+
+  it('město po migraci na v5 dostane hlášku, ne tichou zkázu', async () => {
+    // §10: „Hráč o tom musí být zpraven hláškou při načtení, ne až úbytkem
+    // obyvatel." Bez potrubí přestane budovám téct voda a začnou chátrat.
+    const v4 = Object.entries(fixtures).find(([path]) => path.includes('v4.city'));
+    if (!v4) return;
+
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const save = migrate(unpackSave(decode(v4[1] as string)));
+    const warnings = collectLoadWarnings(save, content, content.getLoadedSources());
+
+    expect(warnings.waterlessBuildings).toBeGreaterThan(0);
+    // Není to zástupná jednička: tolik budov ve městě opravdu vodu potřebuje.
+    const needWater = save.entities.buildings.filter(
+      (b) => content.get(b.definitionId)?.construction.requiresWater === true,
+    ).length;
+    expect(warnings.waterlessBuildings).toBe(needWater);
+  });
+
+  it('fixtura v5 nese skutečné potrubí a voda po něm teče', async () => {
+    const v5 = Object.entries(fixtures).find(([path]) => path.includes('v5.city'));
+    expect(v5).toBeDefined();
+    if (!v5) return;
+
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const save = unpackSave(decode(v5[1] as string));
+    expect(save.meta.formatVersion).toBe(5);
+
+    const world = createWorld(1, content.getBalance().economy);
+    applySaveToWorld(world, migrate(save));
+
+    // Kdyby fixtura byla bez trubek, neověřila by na potrubí vůbec nic.
+    expect([...world.layers.pipe].filter(Boolean).length).toBeGreaterThan(20);
+
+    // Voda se po loadu dopočítá ze zdrojů a potrubí — a musí někam dotéct.
+    const systems = createDefaultSystems(content, content.getBalance());
+    for (let tick = 0; tick < 20; tick++) tickWorld(world, systems);
+    expect(world.watered.size).toBeGreaterThan(0);
+
+    // A město s vodovodem se nemá na co stěžovat.
+    const warnings = collectLoadWarnings(migrate(save), content, content.getLoadedSources());
+    expect(warnings.waterlessBuildings).toBe(0);
   });
 
   it('fixtura v4 nese skutečná patra, ne rovinu', () => {

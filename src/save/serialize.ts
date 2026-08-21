@@ -125,15 +125,21 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
  *
  * `meta.json` se ukládá **nekomprimovaně** (`level: 0`), aby se dal přečíst bez
  * dekomprese zbytku — seznam uložených her se tím vykreslí okamžitě (§8).
+ *
+ * Čas v hlavičkách položek je `meta.modifiedAt`, ne systémový čas. ZIP si ho
+ * ukládá u každého souboru, takže bez toho by dva savy téhož města vyšly
+ * pokaždé jinak — a fixtura by se nedala vygenerovat znovu a porovnat s tou
+ * v repozitáři. Vyplavalo to při psaní fixtury v5 (T40).
  */
 export function packSave(save: SaveData): Uint8Array {
+  const mtime = save.meta.modifiedAt;
   return zipSync({
-    [SAVE_FILES.meta]: [strToU8(JSON.stringify(save.meta, null, 2)), { level: 0 }],
-    [SAVE_FILES.layers]: [save.layers, { level: 9 }],
-    [SAVE_FILES.coarse]: [save.coarse, { level: 9 }],
-    [SAVE_FILES.heights]: [save.heights, { level: 9 }],
-    [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level: 9 }],
-    [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level: 9 }],
+    [SAVE_FILES.meta]: [strToU8(JSON.stringify(save.meta, null, 2)), { level: 0, mtime }],
+    [SAVE_FILES.layers]: [save.layers, { level: 9, mtime }],
+    [SAVE_FILES.coarse]: [save.coarse, { level: 9, mtime }],
+    [SAVE_FILES.heights]: [save.heights, { level: 9, mtime }],
+    [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level: 9, mtime }],
+    [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level: 9, mtime }],
   });
 }
 

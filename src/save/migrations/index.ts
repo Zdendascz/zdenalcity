@@ -115,11 +115,48 @@ function dropElevationLayer(layers: Uint8Array): Uint8Array {
   return out;
 }
 
+/**
+ * Verze 4 → 5 (§10 zadání fáze 3).
+ *
+ * Verze 5 přidala **potrubí**. Starý save žádné nemá a nemá ho odkud vzít,
+ * takže dostane prázdnou síť: bajty `layers.bin` se jen prodlouží o jednu
+ * jednobajtovou vrstvu nul na konci.
+ *
+ * Důsledek je nepříjemný a **je to záměr**: načtené město je rázem bez vody
+ * a začne chátrat, dokud hráč potrubí nepoloží. Alternativou by bylo tiše
+ * předstírat, že staré město vodovod má — tedy vyrobit síť, kterou hráč
+ * nikdy nepostavil. Hráč se to musí dozvědět **hláškou při načtení**, ne až
+ * úbytkem obyvatel; hlídá to `collectLoadWarnings`.
+ */
+const migrateV4ToV5: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 5 },
+  layers: appendEmptyLayer(save.layers),
+});
+
+/**
+ * Připíše na konec `layers.bin` jednu prázdnou jednobajtovou vrstvu.
+ *
+ * Délka verze 4 je tu natvrdo ze stejného důvodu jako u `dropElevationLayer`:
+ * migrace **popisuje minulost, ne současnost**. Kdyby četla aktuální
+ * `SAVE_LAYER_ORDER`, začala by se chovat jinak, jakmile přibude verze 6.
+ */
+function appendEmptyLayer(layers: Uint8Array): Uint8Array {
+  const cells = MAP_SIZE * MAP_SIZE;
+  const expected = cells * 6; // 5 vrstev, z toho `buildingId` dvoubajtová
+  if (layers.byteLength !== expected) return layers; // cizí velikost mapy neřešíme
+
+  const out = new Uint8Array(expected + cells);
+  out.set(layers, 0);
+  return out;
+}
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
   2: migrateV2ToV3,
   3: migrateV3ToV4,
+  4: migrateV4ToV5,
 };
 
 /**

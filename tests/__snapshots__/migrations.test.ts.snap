@@ -7,3 +7,5 @@ exports[`fixtury savů > v2.city.base64 se načte do aktuální verze formátu 1
 exports[`fixtury savů > v3.city.base64 se načte do aktuální verze formátu 1`] = `"cd2f37df"`;
 
 exports[`fixtury savů > v4.city.base64 se načte do aktuální verze formátu 1`] = `"8d305bfa"`;
+
+exports[`fixtury savů > v5.city.base64 se načte do aktuální verze formátu 1`] = `"3eafcd07"`;

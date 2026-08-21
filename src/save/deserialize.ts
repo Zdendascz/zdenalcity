@@ -307,6 +307,16 @@ export interface LoadWarnings {
   missingSources: SaveSourceInfo[];
   /** Definice, na které se odkazují budovy v savu, ale registr je nezná. */
   missingDefinitions: string[];
+  /**
+   * Kolik budov ve městě vodu potřebuje, ale síť je prázdná (§10, verze 5).
+   *
+   * Typicky save z verze 4, kterému migrace potrubí nedoplnila — takové město
+   * začne po načtení chátrat a hráč to musí vědět **hned**, ne až mu ubudou
+   * obyvatelé. Podmínka je ale schválně na datech, ne na verzi: město bez
+   * jediné trubky je stejně tak marné, ať se do téhle situace dostalo
+   * jakkoli.
+   */
+  waterlessBuildings: number;
 }
 
 /**
@@ -329,7 +339,18 @@ export function collectLoadWarnings(
     ),
   ].sort();
 
-  return { missingSources, missingDefinitions };
+  // Vrstva potrubí je v `layers.bin` poslední, takže stačí sáhnout na její
+  // konec — rozbalovat celý save kvůli jednomu „je tam vůbec něco?“ ne.
+  const cells = MAP_SIZE * MAP_SIZE;
+  const pipes = save.layers.subarray(save.layers.byteLength - cells);
+  const hasPipes = pipes.some((value) => value !== 0);
+  const waterlessBuildings = hasPipes
+    ? 0
+    : save.entities.buildings.filter(
+        (building) => catalogue.get(building.definitionId)?.construction.requiresWater === true,
+      ).length;
+
+  return { missingSources, missingDefinitions, waterlessBuildings };
 }
 
 /**
@@ -390,6 +411,15 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   // Spokojenost se taky neukládá (R10). Nulou začít nesmí — načtené město
   // by na první pohled vypadalo jako zoufalé — proto výchozí neutrál.
   world.happiness.fill(NEUTRAL_HAPPINESS);
+
+  // Voda je odvozená z potrubí a zdrojů, takže se stejně jako doprava musí
+  // **vynulovat**, ne nechat přetéct: zavodněné budovy minulého města mají
+  // jiná id a počítadlo chátrání by načtenému městu strhlo obyvatele za
+  // sucho, které se stalo někde jinde.
+  world.waterSupply.fill(0);
+  world.watered.clear();
+  world.waterlessStreak.clear();
+  world.waterNetworkDirty = true;
 
   // Původ mapy: co save neví, bereme jako ruční mapu (migrace to doplňuje stejně).
   world.map = save.meta.map

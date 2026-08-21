@@ -1501,9 +1501,52 @@ vyhlazení, průměr přes všechny buňky prošel, protože i park má obyvatel
 tedy nemá, ale testovací dům jich měl osm ještě před růstem. Po přepsání
 (vstupy nastavené rukou, jen systém spokojenosti, žádné jiné) chytá všech deset.
 
+- [x] T40 — save v5, migrace, fixtura (fáze 3c)
+
+Poslední technický úkol fáze 3. Do savu přibyla vrstva `pipe` a tím se splatil
+dluh z T35: uložené město dosud přišlo o vodovod a začalo chátrat.
+
+- `pipe` je v `SAVE_LAYER_ORDER` **na konci**, takže migrace jen připíše
+  prázdnou vrstvu za stávající bajty. Kdyby se vsunula doprostřed, musel by se
+  `layers.bin` přeskládat jako u zrušené `elevation` ve verzi 4
+- migrace v4 → v5 **nevymýšlí síť**, kterou hráč nepostavil. Načtené staré město
+  je bez vody a začne chátrat — přesně jak §10 předepisuje
+- …a **dozví se to hláškou**, ne až úbytkem obyvatel. Podmínka je schválně na
+  datech, ne na verzi savu: „ani jedna trubka a budovy, které vodu potřebují“ je
+  stejně marná situace, ať se do ní město dostalo jakkoli
+- `applySaveToWorld` navíc **nuluje vodní stav** — supply, seznam zavodněných
+  i počítadlo sucha. Byl to stejný únik jako u dopravy v T28: zavodněné budovy
+  minulého města mají jiná id a načtenému městu by se strhávalo za sucho, které
+  se stalo jinde
+
+**Save nebyl bajtově stabilní** a přišlo se na to až při psaní fixtury: ZIP si
+u každé položky ukládá čas a fflate tam dával systémový. Dva savy téhož města
+tak vyšly pokaždé jinak a fixtura se nedala vygenerovat znovu a porovnat.
+Teď se bere `meta.modifiedAt`.
+
+Fixtura `v5.city.base64` je skutečné odehrané město (seed 1, 4 000 tiků):
+12 budov, 78 obyvatel, 41 trubek, vodárna u břehu, park a policie, financování
+policie 80 %. Vygenerovalo ji dočasné `tests/_fixturegen.test.ts`, které se po
+vygenerování smazalo — v repozitáři zůstal jen výsledek.
+
+Ověřeno v běžící hře:
+- 20 trubek → uložit → smazat → načíst → **zase 20**, a síť označená
+  k přepočtu
+- fixtura v4 nahraná do hry přes tlačítko „Načíst ze souboru“: 16 budov,
+  52 obyvatel, **0 trubek** a notifikace „Načtené město nemá vodovod: 14 budov
+  začne bez vody chátrat.“ Po 2 000 krocích **52 → 26 obyvatel** a jedna ruina,
+  takže hláška nelže
+
+Testy: 33 v `save.test.ts` (+3), 32 v `migrations.test.ts` (+3). Mutační
+ověření: deset mutantů, **dva přežili** — reset vodního stavu se testoval proti
+čerstvému světu, kde jsou ty hodnoty nulové tak jako tak, a bajtovou stabilitu
+prošel i systémový čas, protože dvě uložení ve stejné vteřině vyjdou stejně.
+Po opravě (minulé město dostane vodovod; datum se čte přímo z DOS hlavičky ZIPu)
+chytá všech deset.
+
 ## Rozpracované
-_(T39 hotové, dál T40: save v5 — do savu přibude potrubí, migrace musí podle
-§10 hlásit chybějící vodárnu.)_
+_(T40 hotové. Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
+ne technický úkol.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace
@@ -1615,10 +1658,6 @@ _(T39 hotové, dál T40: save v5 — do savu přibude potrubí, migrace musí po
 | 2026-08-14 | `systems/zoning.ts` nevznikl | Strom v architektuře §11 ho zmiňuje, ale v tabulce systémů §5 nemá řádek — zónování je příkaz, ne tikající systém. Vznikne v T5, pokud se ukáže, že ho potřebuje. |
 
 ## Známé problémy / technický dluh
-
-- **Potrubí se zatím neukládá do savu** (přijde ve verzi 5, T40). Načtené město
-  do té doby přijde o vodovod a začne chátrat — což je mimochodem přesně to
-  chování, které §10 pro migraci na v5 předepisuje, jen zatím bez hlášky.
 
 - **Kopec před budovou ji nezakryje.** Renderer kreslí nejdřív celý terén a pak
   všechny budovy, takže budova je vždycky nad terénem. Správně by se muselo

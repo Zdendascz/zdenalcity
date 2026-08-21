@@ -336,6 +336,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         missing.length > 0
           ? { key: 'ui.save.missingContent', params: { list: missing.join(', ') } }
           : { key: 'ui.save.loaded' };
+
+      // Město po migraci z verze 4 nemá jedinou trubku a začne chátrat.
+      // Hláška v řádku o uložení by se ztratila mezi „Načteno“ — tohle patří
+      // do notifikací, protože to hráč musí vědět dřív, než mu ubudou lidi.
+      if (warnings.waterlessBuildings > 0) {
+        notifications.show(
+          i18n.t('ui.save.noWaterNetwork', { count: warnings.waterlessBuildings }),
+          'error',
+        );
+      }
     } catch (error) {
       message = {
         key: 'ui.save.failed',

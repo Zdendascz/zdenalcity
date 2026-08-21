@@ -24,7 +24,14 @@ import { packLayers, serializeSave, toSaveData } from '@/save/serialize';
 import type { SaveOptions } from '@/save/serialize';
 import { COARSE_CELLS } from '@/sim/coarse';
 import { applyCornerChanges, countViolations, planCornerHeight } from '@/sim/heights';
-import { buildRoad, placeDefinition, setServiceFunding, setTaxRate, zoneArea } from '@/sim/commands';
+import {
+  buildPipe,
+  buildRoad,
+  placeDefinition,
+  setServiceFunding,
+  setTaxRate,
+  zoneArea,
+} from '@/sim/commands';
 import { hashLayers, index, LAYER_ORDER, MAP_SIZE, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
@@ -56,9 +63,13 @@ async function builtCity(seed = 483928492): Promise<{ world: WorldState; content
   for (let x = 22; x <= 40; x++) buildRoad(world, x, 39);
   placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 41);
   setTaxRate(world, ZONE.residential, 9);
+  // Potrubí pod celou hlavní ulicí. Od verze 5 je vrstva `pipe` v savu, takže
+  // ji testovací město musí mít doopravdy položenou, ne jen předstíranou.
+  for (let x = 20; x <= 45; x++) buildPipe(world, x, 40);
 
-  // Město pro testy savu má vodovod jako danost — save se testuje na tom, co
-  // ve světě je, ne na tom, jestli hráč stihl natáhnout potrubí (§8 fáze 3).
+  // Vodárna na téhle mapě stát nemůže — je to holá tráva bez břehu — takže
+  // samotné zavodnění zůstává danost. Save se testuje na tom, co ve světě je,
+  // ne na tom, jestli hráč stihl postavit vodárnu (§8 fáze 3).
   assumeWatered(world);
 
   const systems = createDefaultSystems(content, content.getBalance());
@@ -88,21 +99,21 @@ describe('formát savu', () => {
     expect(GAME_VERSION).toBe(pkg.version);
   });
 
-  it('v savu jsou všechny vrstvy kromě potrubí, které čeká na verzi 5', () => {
+  it('v savu jsou všechny vrstvy, žádná nezůstala stranou', () => {
     // Kdyby vznikla nová vrstva a zapomnělo se na ni v savu, tenhle test spadne.
-    // `pipe` je vědomá výjimka: přidal ji T35, ale do formátu ji zapíše až
-    // save verze 5 v T40 — stejně jako `cornerHeight` čekal mezi T29 a T34.
+    // Do verze 4 tu byla výjimka `pipe`; T40 ji zrušil, takže seznam je prázdný
+    // a nová vrstva se bez nové verze formátu neprotáhne.
     const saved: readonly string[] = SAVE_LAYER_ORDER;
     const missing = [...LAYER_ORDER].filter((layer) => !saved.includes(layer));
-    expect(missing).toEqual(['pipe']);
+    expect(missing).toEqual([]);
   });
 
   it('layers.bin má očekávanou délku', async () => {
     const { world } = await builtCity();
     expect(packLayers(world.layers).byteLength).toBe(expectedLayersByteLength());
-    // 5 vrstev, z toho jedna dvoubajtová. Šestá (`elevation`) zmizela ve
-    // verzi 4 — výšku od T29 nese `heights.bin`.
-    expect(expectedLayersByteLength()).toBe(MAP_SIZE * MAP_SIZE * 6);
+    // 6 vrstev, z toho jedna dvoubajtová. `elevation` zmizela ve verzi 4
+    // (výšku nese `heights.bin`), `pipe` přibyla ve verzi 5.
+    expect(expectedLayersByteLength()).toBe(MAP_SIZE * MAP_SIZE * 7);
   });
 
   it('meta.json je v ZIPu nekomprimovaná, aby se dala číst samostatně', async () => {
@@ -146,9 +157,9 @@ describe('round-trip', () => {
     const bytes = serializeSave(world, OPTIONS);
     const restored = createWorld(1); // jiný seed, ať je vidět, že se přepíše
     applySaveToWorld(restored, migrate(unpackSave(bytes)));
-    // Potrubí se do savu zapíše až ve verzi 5 (T40), takže načtené město zatím
-    // vodovod nemá. Aby šlo porovnat **pokračování hry**, dostane ho stejně
-    // jako originál — jinak by se rozešly kvůli chybějící vodě, ne kvůli savu.
+    // Obě města mají vodu jako danost, protože na téhle mapě nemá vodárna kde
+    // stát (viz `builtCity`). Kdyby ji dostalo jen jedno, rozešla by se kvůli
+    // chybějící vodě, ne kvůli savu — a to by tenhle test netestoval.
     assumeWatered(restored);
 
     expect(hashLayers(restored.layers)).toBe(before.hash);
@@ -167,6 +178,8 @@ describe('round-trip', () => {
     for (let tick = 0; tick < 120; tick++) {
       tickWorld(world, systems);
       tickWorld(restored, systems);
+      assumeWatered(world);
+      assumeWatered(restored);
     }
     expect(hashLayers(restored.layers)).toBe(hashLayers(world.layers));
     expect(restored.rng.getState()).toBe(world.rng.getState());
@@ -210,9 +223,21 @@ describe('round-trip', () => {
     restored.coarse.landValue.fill(200);
     restored.coarse.crime.fill(200);
     restored.downgradeStreak.set(1, 2);
+    // Vodovod minulého města: budovy s cizími id a rozvedená voda tam, kde
+    // v načtené mapě žádná trubka nevede.
+    restored.waterSupply.fill(1);
+    restored.watered.add(4242);
+    restored.waterlessStreak.set(4242, 7);
 
     applySaveToWorld(restored, migrate(unpackSave(bytes)));
-    assumeWatered(restored); // viz round-trip: potrubí čeká na verzi 5
+
+    // Voda je odvozená (R10), takže se po loadu **nuluje**, ne dědí.
+    expect(restored.watered.size).toBe(0);
+    expect(restored.waterlessStreak.size).toBe(0);
+    expect([...restored.waterSupply].every((value) => value === 0)).toBe(true);
+    expect(restored.waterNetworkDirty).toBe(true);
+
+    assumeWatered(restored); // viz round-trip: vodárna nemá na téhle mapě břeh
 
     // Pokrytí je odvozené, do savu nepatří a po loadu se počítá znovu.
     expect(restored.coverage.size).toBe(0);
@@ -229,6 +254,8 @@ describe('round-trip', () => {
     for (let tick = 0; tick < 60; tick++) {
       tickWorld(world, systems);
       tickWorld(restored, systems);
+      assumeWatered(world);
+      assumeWatered(restored);
     }
     expect([...restored.coarse.landValue]).toEqual([...world.coarse.landValue]);
   });
@@ -290,6 +317,41 @@ describe('round-trip', () => {
 
     expect(restored.cornerHeight).toEqual(before);
     expect(countViolations(restored.cornerHeight)).toBe(0);
+  });
+
+  it('potrubí přežije round-trip (verze 5)', async () => {
+    // Do verze 4 se `pipe` neukládala vůbec: uložené město přišlo o vodovod
+    // a začalo chátrat. Tohle je ten dluh, který T40 splácí.
+    const { world } = await builtCity();
+    const before = Uint8Array.from(world.layers.pipe);
+    expect([...before].filter(Boolean).length).toBeGreaterThan(10);
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(unpackSave(serializeSave(world, OPTIONS))));
+
+    expect(restored.layers.pipe).toEqual(before);
+    // A síť se po loadu musí přepočítat — voda sama se neukládá (R10).
+    expect(restored.waterNetworkDirty).toBe(true);
+    expect(restored.watered.size).toBe(0);
+    expect([...restored.waterSupply].every((value) => value === 0)).toBe(true);
+  });
+
+  it('save dvou stejných stavů je bajtově stejný', async () => {
+    // ZIP si u každé položky ukládá čas. Dokud se bral systémový, lišily se dva
+    // savy téhož města — a fixtura se nedala vygenerovat znovu a porovnat.
+    const { world } = await builtCity();
+    expect([...serializeSave(world, OPTIONS)]).toEqual([...serializeSave(world, OPTIONS)]);
+  });
+
+  it('čas v ZIPu je z meta.modifiedAt, ne ze systémových hodin', async () => {
+    // Dvě uložení ve stejné vteřině vyjdou stejně i se systémovým časem, takže
+    // předchozí test sám o sobě nestačí. Tenhle přečte datum přímo z hlavičky
+    // první položky: DOS formát, rok od 1980 v horních sedmi bitech.
+    const { world } = await builtCity();
+    const bytes = serializeSave(world, { ...OPTIONS, modifiedAt: '2001-09-11T08:46:00.000Z' });
+
+    const date = (bytes[12] ?? 0) | ((bytes[13] ?? 0) << 8);
+    expect(1980 + ((date >> 9) & 0x7f)).toBe(2001);
   });
 
   it('vrstva elevation je pryč a nikdo ji nehledá (verze 4)', () => {
@@ -490,6 +552,8 @@ describe('chybějící obsah při načtení', () => {
 
     expect(warnings.missingSources).toEqual([]);
     expect(warnings.missingDefinitions).toEqual([]);
+    // Město má potrubí položené, takže se nemá na co stěžovat.
+    expect(warnings.waterlessBuildings).toBe(0);
   });
 });
 
