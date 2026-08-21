@@ -186,6 +186,12 @@ export interface ParcelExplanation {
    */
   jobAccessFactor: number;
   cityJobAccessFactor: number;
+  /**
+   * Je pod parcelou voda? Bez ní tu nevyroste **nic** (§8 fáze 3) a je to
+   * nejčastější důvod, proč zóna zůstane prázdná i s dobrou silnicí, proudem
+   * i poptávkou. Neviditelná podmínka, takže patří do panelu (§12).
+   */
+  water: boolean;
   pollution: number;
   crime: number;
   /** Spokojenost v této čtvrti, 0–255. Kdo ji nevidí, neví, co spravit (§12). */
@@ -235,6 +241,7 @@ export function explainParcel(
     roadFactor,
     jobAccessFactor: world.jobAccessCells[cell] ?? 1,
     cityJobAccessFactor: world.cityJobAccess,
+    water: world.waterSupply[tile] === 1,
     pollution: world.coarse.pollution[cell] ?? 0,
     crime: world.coarse.crime[cell] ?? 0,
     happiness: world.happiness[cell] ?? 0,

@@ -17,7 +17,12 @@ import {
   shade,
   TERRAIN_COLORS,
   TILE_EDGE_SHADE,
+  UNDERGROUND_BUILDING_ALPHA,
+  UNDERGROUND_BUILDING_COLOR,
+  UNDERGROUND_ROAD_ALPHA,
+  UNDERGROUND_ROAD_COLOR,
   UNDERGROUND_TERRAIN_SHADE,
+  UNDERGROUND_ZONE_ALPHA,
   WATER_SUPPLY_ALPHA,
   WATER_SUPPLY_COLOR,
   ZONE_COLOR_BY_VALUE,
@@ -170,16 +175,19 @@ export class ChunkRenderer {
       .fill({ color })
       .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
 
-    if (underground) {
-      // Pod zemí zóny ani vozovka nezajímají — jen kudy vede voda a kam došla.
-      this.drawUnderground(graphics, points, tileIndex, x, y);
-      return;
-    }
-
     const zone = this.world.layers.zone[tileIndex] ?? 0;
     const zoneColor = ZONE_COLOR_BY_VALUE[zone];
     if (zone !== 0 && zoneColor !== undefined) {
-      graphics.poly(points).fill({ color: zoneColor, alpha: ZONE_OVERLAY_ALPHA });
+      // Pod zemí zůstává zóna vidět jen jako náznak: je to hlavní důvod, proč
+      // se tam potrubí vede, takže úplně zmizet nesmí.
+      graphics
+        .poly(points)
+        .fill({ color: zoneColor, alpha: underground ? UNDERGROUND_ZONE_ALPHA : ZONE_OVERLAY_ALPHA });
+    }
+
+    if (underground) {
+      this.drawUnderground(graphics, points, tileIndex, x, y);
+      return;
     }
 
     const roadType = this.world.layers.road[tileIndex] ?? ROAD.none;
@@ -220,6 +228,25 @@ export class ChunkRenderer {
     x: number,
     y: number,
   ): void {
+    // Půdorys domu: budovy se pod zemí nekreslí, ale hráč potřebuje vědět,
+    // kam vodu vede. Bez toho tam byla jen tma.
+    if (this.world.layers.buildingId[tileIndex] !== 0) {
+      graphics
+        .poly(points)
+        .fill({ color: UNDERGROUND_BUILDING_COLOR, alpha: UNDERGROUND_BUILDING_ALPHA });
+    }
+
+    // Vozovka jako matný stín — podle ní se hráč na mapě orientuje.
+    const roadType = this.world.layers.road[tileIndex] ?? ROAD.none;
+    if (roadType !== ROAD.none) {
+      const roadMaskBits = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
+      for (const polygon of roadPolygons(points, roadMaskBits, ROAD_WIDTHS[roadType])) {
+        graphics
+          .poly(polygon)
+          .fill({ color: UNDERGROUND_ROAD_COLOR, alpha: UNDERGROUND_ROAD_ALPHA });
+      }
+    }
+
     if (this.world.waterSupply[tileIndex] === 1) {
       graphics.poly(points).fill({ color: WATER_SUPPLY_COLOR, alpha: WATER_SUPPLY_ALPHA });
     }

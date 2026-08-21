@@ -1602,6 +1602,30 @@ Testy: 9 v `tests/ui.test.ts`. Hlídají to, co by se rozbilo potichu —
 chybějící ikona vykreslí prázdné tlačítko, chybějící překlad syrový klíč
 a přeházené pořadí rozsype rolety.
 
+- [x] Ovládání a čitelnost po hraní (hlášení autora)
+
+Pět věcí, na které autor narazil při hraní, ne v testech.
+
+- **šipky posouvají mapu.** Drží se, ne ťuká: opakování klávesy má v systému
+  vlastní prodlevu a mapa by škubala. Rychlost je konstantní **na obrazovce**,
+  ne ve světě — jinak by při oddálení létala a při přiblížení se nehnula
+- **obnovení stránky město nesmaže.** Ukládá se do `localStorage` při odchodu
+  ze stránky i při přepnutí panelu; dialog nové hry pak nabídne „Pokračovat".
+  Je to týž ZIP jako do souboru, jen v base64, takže migrace platí stejně (P7).
+  Nečitelný autosave se zahodí a hra začne nové město — spadnout na startu
+  kvůli poškozenému úložišti by znamenalo, že se hráč do hry nedostane vůbec
+- **rámeček u kurzoru kopíruje dlaždici, ne čtverec pod ní.** Byl to jeden
+  plochý kosočtverec v jedné výšce, takže na svahu ležel vedle místa, kam hráč
+  mířil. Teď se kreslí z **jejích čtyř rohů**, a u víc dlaždic každá zvlášť —
+  u budovy 4×4 je tak vidět, které parcely zabere
+- **pod zemí je vidět povrch.** Silnice, zóny i půdorysy budov se kreslí matně
+  jako obrysy. Předtím tam byla jen tmavá plocha a hráč neměl podle čeho vést
+  potrubí — hlásil to autor obrázkem prázdné obrazovky
+- **zóna bez vody to konečně řekne.** Panel parcely má řádek „Voda: ano/ne"
+  a když má město zóny a ani jedna z nich není zavodněná, vyskočí hláška.
+  Do teď se hráč dozvěděl jen to, že mu nic neroste: silnice vedla, proud byl,
+  poptávka byla kladná — a nic. Nejtišší způsob, jak se hra zasekne
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_

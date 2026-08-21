@@ -18,6 +18,16 @@ import type { I18n } from './i18n';
 export interface NewGame {
   cityName: string;
   seed: number;
+  /**
+   * Hráč chce pokračovat v rozehraném městě, ne zakládat nové. Jméno a seed
+   * si pak hra vezme ze savu, ne odsud.
+   */
+  resume?: boolean;
+}
+
+export interface NewGameOptions {
+  /** Je co obnovit? Bez toho se tlačítko „Pokračovat" vůbec neukáže. */
+  canResume: boolean;
 }
 
 /** Barvy náhledu odpovídají paletě rendereru; index = hodnota vrstvy terénu. */
@@ -47,6 +57,7 @@ export function showNewGameDialog(
   parent: HTMLElement,
   i18n: I18n,
   balance: Balance,
+  options: NewGameOptions = { canResume: false },
 ): Promise<NewGame> {
   const t = (key: string) => i18n.t(key);
   let resolveGame: (game: NewGame) => void = () => {};
@@ -114,6 +125,18 @@ export function showNewGameDialog(
   }
 
   const actions = el('div', 'dialog__actions');
+
+  // Pokračovat je první volba, když je v čem: kdo si obnovil stránku, chce
+  // zpátky svoje město, ne nové.
+  if (options.canResume) {
+    const resume = button('chip chip--primary', () => {
+      overlay.remove();
+      resolveGame({ cityName: '', seed, resume: true });
+    });
+    resume.textContent = t('ui.newGame.resume');
+    actions.appendChild(resume);
+  }
+
   const reroll = button('chip', () => {
     seed = randomSeed();
     draw();
@@ -128,7 +151,7 @@ export function showNewGameDialog(
     draw();
   });
 
-  const start = button('chip chip--primary', () => {
+  const start = button(options.canResume ? 'chip' : 'chip chip--primary', () => {
     overlay.remove();
     resolveGame({ cityName: nameInput.value.trim() || t('ui.newGame.defaultCityName'), seed });
   });

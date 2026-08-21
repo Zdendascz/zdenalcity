@@ -114,6 +114,20 @@ export const BRIDGE_COLOR = 0x8d8f99;
  * potrubí nemuselo prát s barvami trávy a vody — pod zemí je stejně tma.
  */
 export const UNDERGROUND_TERRAIN_SHADE = 0.35;
+
+/**
+ * Obrysy povrchu v podzemním pohledu.
+ *
+ * Bez nich byla pod zemí jen tmavá plocha a hráč neměl podle čeho vést
+ * potrubí — nepoznal, kde má silnici, kde zónu a kde dům. Jsou schválně
+ * **matné**: mají sloužit k orientaci, ne přebít trubky, kvůli kterým se
+ * pod zem přepíná.
+ */
+export const UNDERGROUND_ROAD_COLOR = 0x000000;
+export const UNDERGROUND_ROAD_ALPHA = 0.35;
+export const UNDERGROUND_BUILDING_COLOR = 0xd8d8dc;
+export const UNDERGROUND_BUILDING_ALPHA = 0.22;
+export const UNDERGROUND_ZONE_ALPHA = 0.18;
 /** Potrubí. Modrá jako voda, ale světlejší, ať je vidět na tmavém terénu. */
 export const PIPE_COLOR = 0x67b6e8;
 /** Šířka trubky jako podíl dlaždice. Užší než vozovka — je to trubka. */

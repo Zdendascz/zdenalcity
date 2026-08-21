@@ -117,6 +117,7 @@
   "ui.newGame.seed": "Seed mapy",
   "ui.newGame.reroll": "Jiná mapa",
   "ui.newGame.start": "Založit město",
+  "ui.newGame.resume": "Pokračovat",
   "ui.newGame.stats": "Souše {land} %, vygenerováno za {ms} ms.",
 
   "ui.hud.funds": "Kasa",
@@ -239,6 +240,10 @@
 
   "ui.parcel.title": "Rozbor parcely",
   "ui.parcel.road": "Silnice",
+  "ui.parcel.water": "Voda",
+  "ui.parcel.waterYes": "ano",
+  "ui.parcel.waterNo": "ne — bez potrubí tu nic nevyroste",
+  "ui.notice.zonesWithoutWater": "Zóny nemají vodu, takže v nich nic nevyroste. Postav vodárnu u břehu a natáhni k zónám potrubí (nástroj Potrubí v nabídce Vodovod).",
   "ui.parcel.roadDistance": "{distance} dlaždice, skóre × {factor} %",
   "ui.parcel.roadTooFar": "mimo dosah — tady nic nevyroste",
   "ui.parcel.jobAccess": "Dostupnost práce",

@@ -117,6 +117,7 @@
   "ui.newGame.seed": "Map seed",
   "ui.newGame.reroll": "Another map",
   "ui.newGame.start": "Found the city",
+  "ui.newGame.resume": "Continue",
   "ui.newGame.stats": "Land {land} %, generated in {ms} ms.",
 
   "ui.hud.funds": "Funds",
@@ -239,6 +240,10 @@
 
   "ui.parcel.title": "Parcel breakdown",
   "ui.parcel.road": "Road",
+  "ui.parcel.water": "Water",
+  "ui.parcel.waterYes": "yes",
+  "ui.parcel.waterNo": "no — nothing grows without pipes",
+  "ui.notice.zonesWithoutWater": "The zones have no water, so nothing will grow there. Build a water works on the shore and run pipes to the zones (the Pipe tool in the Water menu).",
   "ui.parcel.roadDistance": "{distance} tiles, score × {factor} %",
   "ui.parcel.roadTooFar": "out of reach — nothing grows here",
   "ui.parcel.jobAccess": "Access to jobs",

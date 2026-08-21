@@ -1,14 +1,14 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
-import { applySaveToWorld, collectLoadWarnings, unpackSave } from '@/save/deserialize';
+import { applySaveToWorld, collectLoadWarnings, readSaveMeta, unpackSave } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
 import { estimatePlacement } from '@/sim/commands';
 import { explainParcel } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
-import { cornerIndex, tileBaseHeight } from '@/sim/heights';
+import { cornerIndex, tileCorners } from '@/sim/heights';
 import { index, MAP_SIZE, ZONE } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
@@ -28,6 +28,7 @@ import { Hud } from '@/ui/hud';
 import type { OverlayOption } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
+import { clearAutosave, hasAutosave, loadAutosave, storeAutosave } from '@/ui/autosave';
 import { downloadBytes, readFileBytes } from '@/ui/saveFile';
 import { showNewGameDialog } from '@/ui/newGameDialog';
 import { Toolbar } from '@/ui/toolbar';
@@ -59,7 +60,7 @@ import {
   unhappinessValue,
 } from './palette';
 import { pickTile } from './picking';
-import { footprintQuad, gridToScreen } from './projection';
+import { gridToScreen, tileQuad } from './projection';
 
 /** Jeden krok kolečka = násobitel zoomu. */
 const ZOOM_STEP = 1.15;
@@ -69,6 +70,20 @@ const CORNER_MARK_COLOR = 0xffffff;
 const CORNER_MARK_SIZE = 7;
 
 const DEFAULT_SPEED_INDEX = 1;
+
+/** Jak často se ptáme, jestli zóny mají vodu. Zhruba jednou za pět vteřin. */
+const WATER_CHECK_FRAMES = 300;
+
+/** Kolik obrazovkových bodů za vteřinu ujede mapa při držené šipce. */
+const PAN_SPEED = 900;
+
+/** Kam která šipka posouvá pohled. Klíč je `KeyboardEvent.code`. */
+const PAN_KEYS: Readonly<Record<string, readonly [number, number] | undefined>> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+};
 
 interface Message {
   key: string;
@@ -295,14 +310,35 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   // Hra začíná dialogem: hráč si vybere jméno města a seed a rovnou vidí, jakou
   // mapu dostane (§3 fáze 3). Teprve pak vzniká svět.
-  const newGame = await showNewGameDialog(mount, i18n, content.getBalance());
+  const newGame = await showNewGameDialog(mount, i18n, content.getBalance(), {
+    canResume: hasAutosave(),
+  });
 
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
   const simWorld = createWorld(newGame.seed, content.getBalance().economy);
-  applyGeneratedMap(simWorld, generateTerrain(newGame.seed, content.getBalance()));
-  // Ze seedu jde tenhle terén kdykoli vygenerovat znovu, tak ať to save ví.
-  simWorld.map = { seed: newGame.seed, generated: true };
+
+  // Obnovení rozehraného města. Nečitelný autosave se **zahodí a hra začne
+  // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,
+  // že se hráč do hry nedostane vůbec.
+  let cityName = newGame.cityName;
+  const resumed = newGame.resume ? loadAutosave() : null;
+  let restored = false;
+  if (resumed) {
+    try {
+      applySaveToWorld(simWorld, migrate(unpackSave(resumed)));
+      cityName = readSaveMeta(resumed).city.name;
+      restored = true;
+    } catch {
+      clearAutosave();
+    }
+  }
+
+  if (!restored) {
+    applyGeneratedMap(simWorld, generateTerrain(newGame.seed, content.getBalance()));
+    // Ze seedu jde tenhle terén kdykoli vygenerovat znovu, tak ať to save ví.
+    simWorld.map = { seed: newGame.seed, generated: true };
+  }
   const host = createSimHost(
     simWorld,
     createDefaultSystems(content, content.getBalance()),
@@ -417,7 +453,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   function saveOptions() {
     return {
-      cityName: newGame.cityName,
+      cityName,
       createdAt,
       modifiedAt: new Date().toISOString(),
       playtimeSeconds: Math.round((Date.now() - startedAt) / 1000),
@@ -454,6 +490,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
   }
 
+  /**
+   * Uloží město do prohlížeče, aby ho obnovení stránky nesmazalo.
+   *
+   * Volá se při odchodu ze stránky a jednou za čas i během hry — `pagehide`
+   * sám nestačí, prohlížeč ho po pádu karty nezavolá.
+   */
+  function autosaveNow(): void {
+    try {
+      storeAutosave(serializeSave(simWorld, saveOptions()));
+    } catch {
+      // Rozehranou hru neshodí ani plné úložiště.
+    }
+  }
+
   function quickSaveNow(): void {
     quickSave = serializeSave(simWorld, saveOptions());
     message = { key: 'ui.save.saved', params: { size: (quickSave.byteLength / 1024).toFixed(1) } };
@@ -477,6 +527,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let lastPointerX = 0;
   let lastPointerY = 0;
   let spaceDown = false;
+
+  /**
+   * Držené šipky. Ne jednorázový posun na `keydown`: opakování klávesy má
+   * v systému vlastní prodlevu i frekvenci, takže by mapa škubala. Takhle se
+   * posouvá plynule podle času snímku.
+   */
+  const panKeys = new Set<string>();
   let speedIndex = DEFAULT_SPEED_INDEX;
   let paintButton: number | null = null;
   let lastPaintedTile = -1;
@@ -677,6 +734,41 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   /** Byla kasa v mínusu už minulý snímek? Hláška patří k přechodu, ne ke stavu. */
   let wasBroke = false;
 
+  /**
+   * Odpočet snímků do další kontroly „zóny bez vody" a příznak, že se hláška
+   * už objevila.
+   *
+   * Kontrola prochází celou vrstvu zón, takže se nedělá každý snímek. Hlásí se
+   * **jednou za město**: opakovat hráči totéž každou minutu je otravné, a když
+   * to jednou přečte, ví, kde problém hledat.
+   */
+  let waterCheckIn = 0;
+  let warnedAboutWater = false;
+
+  /**
+   * Zóna bez vody je nejtišší způsob, jak se hra zasekne: silnice vede, proud
+   * je, poptávka je kladná — a nevyroste nic, protože pod parcelou nejsou
+   * trubky. Nikde to nebylo vidět, dokud si hráč neklikl na konkrétní parcelu.
+   */
+  function checkZonesWithoutWater(): void {
+    if (warnedAboutWater) return;
+
+    let zoned = 0;
+    let watered = 0;
+    const { zone } = simWorld.layers;
+    for (let tile = 0; tile < zone.length; tile++) {
+      if ((zone[tile] ?? ZONE.none) === ZONE.none) continue;
+      zoned++;
+      if (simWorld.waterSupply[tile] === 1) watered++;
+    }
+
+    // Prázdné město ani město s natažením potrubím nemá co řešit.
+    if (zoned === 0 || watered > 0) return;
+
+    warnedAboutWater = true;
+    notifications.show(i18n.t('ui.notice.zonesWithoutWater'), 'error');
+  }
+
   /** Poslední pozice kurzoru — cenovka se překresluje každý snímek. */
   let pointerX = 0;
   let pointerY = 0;
@@ -847,6 +939,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       return;
     }
 
+    if (PAN_KEYS[event.code]) {
+      // Šipky by jinak odrolovaly stránku.
+      event.preventDefault();
+      panKeys.add(event.code);
+      return;
+    }
+
     // Ostatní klávesy nesmí zasahovat do ovládání prvků v HUDu.
     if (event.target instanceof HTMLElement && event.target.closest('.hud')) return;
 
@@ -907,6 +1006,21 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   window.addEventListener('keyup', (event) => {
     if (event.code === 'Space') spaceDown = false;
+    panKeys.delete(event.code);
+  });
+
+  // Při přepnutí jinam pustí prohlížeč klávesy bez `keyup` a mapa by ujížděla.
+  window.addEventListener('blur', () => {
+    panKeys.clear();
+    spaceDown = false;
+  });
+
+  // `pagehide` pokrývá obnovení stránky, zavření karty i odchod jinam.
+  // `visibilitychange` navíc přepnutí na jiný panel, po kterém se karta často
+  // už neprobudí.
+  window.addEventListener('pagehide', autosaveNow);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') autosaveNow();
   });
 
   app.ticker.add((ticker) => {
@@ -927,6 +1041,22 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     buildingRenderer.update(dirty);
     coarseOverlay.update(dirty.coarseChanged);
     trafficOverlay.update();
+
+    // Šipky posouvají **konstantní rychlostí na obrazovce**, ne v souřadnicích
+    // světa: při oddálení by jinak mapa létala a při přiblížení se sotva hnula.
+    if (panKeys.size > 0) {
+      const step = (PAN_SPEED * deltaMS) / 1000;
+      let dx = 0;
+      let dy = 0;
+      for (const code of panKeys) {
+        const direction = PAN_KEYS[code];
+        if (direction) {
+          dx += direction[0];
+          dy += direction[1];
+        }
+      }
+      if (dx !== 0 || dy !== 0) pan(camera, -dx * step, -dy * step);
+    }
 
     worldContainer.scale.set(camera.zoom);
     worldContainer.position.set(
@@ -957,25 +1087,25 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
       priceTag.hide();
     } else if (hoveredTile) {
-      // Rámeček kreslí **celý půdorys**, ne jen dlaždici pod kurzorem — u budovy
-      // 4×4 jinak není poznat, kam se vlastně položí. Pro 1×1 vyjde přesně
-      // diamant dlaždice.
+      // Rámeček kreslí **každou dlaždici půdorysu zvlášť a podle jejích čtyř
+      // rohů**. Dřív to byl jeden plochý kosočtverec v jedné výšce, takže na
+      // svahu ležel vedle dlaždice, na kterou hráč mířil — a u budovy 4×4
+      // nebylo poznat, které dlaždice vlastně zabere.
       const [width, depth] = activeFootprint();
       const blocked = !placementFits(hoveredTile, width, depth);
       const color = blocked ? HOVER_BLOCKED_COLOR : HOVER_COLOR;
 
-      hover
-        .poly(
-          footprintQuad(
-            hoveredTile.x,
-            hoveredTile.y,
-            width,
-            depth,
-            tileBaseHeight(world.cornerHeight, hoveredTile.x, hoveredTile.y),
-          ),
-        )
-        .fill({ color, alpha: HOVER_FILL_ALPHA })
-        .stroke({ color, alpha: HOVER_LINE_ALPHA, width: 2 / camera.zoom });
+      for (let dy = 0; dy < depth; dy++) {
+        for (let dx = 0; dx < width; dx++) {
+          const x = hoveredTile.x + dx;
+          const y = hoveredTile.y + dy;
+          if (x >= MAP_SIZE || y >= MAP_SIZE) continue;
+          hover
+            .poly(tileQuad(x, y, tileCorners(world.cornerHeight, x, y)))
+            .fill({ color, alpha: HOVER_FILL_ALPHA })
+            .stroke({ color, alpha: HOVER_LINE_ALPHA, width: 2 / camera.zoom });
+        }
+      }
 
       // Cena **předem** (§12 kritérium 14). Srovnání parcely se nemá objevit
       // až na účtu — hráč musí vidět, kolik ho svah bude stát, dřív než klikne.
@@ -987,6 +1117,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Bankrot zastaví veškerý růst (§9 fáze 2) a do teď o tom hra mlčela:
     // hráč viděl jen město, které se přestalo hýbat. Hlásí se při přechodu do
     // mínusu, ne každý snímek.
+    if (waterCheckIn-- <= 0) {
+      waterCheckIn = WATER_CHECK_FRAMES;
+      checkZonesWithoutWater();
+    }
+
     const broke = world.economy.funds < 0;
     if (broke !== wasBroke) {
       wasBroke = broke;

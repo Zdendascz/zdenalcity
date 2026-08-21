@@ -145,6 +145,13 @@ export class BuildingInfo {
       ['ui.overlay.happiness', `${Math.round((parcel.happiness / 255) * 100)} %`],
     ];
 
+    // Voda: druhá podmínka, bez které se nestaví, a na rozdíl od silnice není
+    // na mapě vidět vůbec.
+    rows.push([
+      'ui.parcel.water',
+      t(parcel.water ? 'ui.parcel.waterYes' : 'ui.parcel.waterNo'),
+    ]);
+
     // Dosah silnice — nejčastější důvod, proč zóna zůstane prázdná.
     rows.push([
       'ui.parcel.road',

@@ -5,6 +5,7 @@ import { createLayerOptions, createTools, createViewOptions } from '@/render/app
 import { I18n } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
 import { uiIconShape } from '@/ui/icons';
+import { fromBase64, toBase64 } from '@/ui/autosave';
 import { groupTools } from '@/ui/toolbar';
 
 /**
@@ -133,5 +134,20 @@ describe('pohledy a vrstvy', () => {
 
     const police = layers.find((layer) => layer.id === 'coverage:police');
     expect(police?.icon).toBe(content.get('vanilla:police_small')?.graphics.icon);
+  });
+});
+
+describe('automatické uložení', () => {
+  it('base64 přežije i velký save', () => {
+    // `String.fromCharCode(...bytes)` na desítkách tisíc bajtů přeteče
+    // zásobník — proto se kóduje po blocích. Reálný save je zhruba tahle velký.
+    const bytes = new Uint8Array(120_000);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31) % 256;
+
+    expect([...fromBase64(toBase64(bytes))]).toEqual([...bytes]);
+  });
+
+  it('prázdné pole projde taky', () => {
+    expect(fromBase64(toBase64(new Uint8Array(0))).length).toBe(0);
   });
 });
