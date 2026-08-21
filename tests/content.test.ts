@@ -88,6 +88,7 @@ describe('vanilla obsah', () => {
       'vanilla:school',
       'vanilla:transit_depot',
       'vanilla:transit_stop',
+      'vanilla:water_treatment',
       'vanilla:water_works',
     ]);
   });

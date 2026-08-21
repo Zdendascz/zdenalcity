@@ -78,6 +78,8 @@
 
   "waste": { "perCitizen": 0.1, "toPollution": 0.02 },
 
+  "sewage": { "perCitizen": 0.14, "toPollution": 0.03 },
+
   "health": {
     "coverageThreshold": 20,
     "declineStep": 1,

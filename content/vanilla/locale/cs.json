@@ -58,6 +58,8 @@
   "building.transit_stop.name": "Zastávka MHD",
   "building.water_works.name": "Vodárna",
   "building.water_works.desc": "Bere vodu z jezera nebo moře a tlačí ji do potrubí.",
+  "building.water_treatment.name": "Čistírna odpadních vod",
+  "building.water_treatment.desc": "Zpracuje splašky celého města. Co nestihne, skončí v půdě a v řece.",
   "building.pump_station.name": "Čerpací stanice",
   "building.pump_station.desc": "Sama vodu nevyrábí, ale prodlouží dosah sítě dál od vodárny.",
   "building.transit_stop.desc": "Lidé v okolí přesednou z aut, takže na silnicích ubude dopravy.",

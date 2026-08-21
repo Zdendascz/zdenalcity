@@ -1393,8 +1393,45 @@ Testy: 2 v `tests/renderLayers.test.ts`, 1 v `tests/roadTypes.test.ts`. Že
 koušou, ověřeno rozbitím: řazení světového kontejneru shodí jeden, chunky
 přidané napřímo do rodiče jeden, návrat porovnání s jedničkou jeden.
 
+- [x] T37 — kanalizace jako kapacita, čistírna (fáze 3c)
+
+Kanalizace **není druhá síť trubek** (R9), ale celoměstská kapacita přesně po
+vzoru odpadů z fáze 2: populace vyrobí splašky, čistírna část spolkne a zbytek
+se přičte do zdrojového bufferu znečištění po celé mapě. Druhá kreslená síť by
+znamenala další nástroj, další podzemní pohled a další flood fill za velmi
+malou hloubku navíc.
+
+- **`sewage: { capacity }`** na definici, **`sewage: { perCitizen, toPollution }`**
+  v balancu. Stejný tvar jako odpady schválně — je to táž mechanika
+- **čistírna** (`vanilla:water_treatment`, 1 200 / 160 za měsíc, kapacita 300)
+  musí stát u vody, protože někam to vypouštět musí, a **sama trochu kouří**
+- opuštěná čistírna nečistí, stejně jako opuštěná skládka nezpracovává odpad
+
+Ověřeno v běžící hře oběma směry. Město o 600 obyvatelích vyrobí 84 jednotek
+splašků; bez čistírny je znečištění **3 081** v součtu přes mapu a i v rohu
+vzdáleném přes sto dlaždic od nejbližšího domu svítí **2**. Po postavení jediné
+čistírny — schválně na opačném konci mapy — spadl součet na **7** a roh na
+**nulu**. To je akceptační kritérium 3c č. 19.
+
+**Poznámka k jedné mutaci.** `Math.max(0, …)` na nevyčištěném zbytku je
+**nadbytečný**: o kus níž stojí `if (cityWide > 0)`, takže záporný přebytek se
+nikdy neuplatní. Mutace ho odstranila a žádný test nespadl — a nemohl, jsou to
+ekvivalentní varianty. Nechal jsem ho tam, protože říká úmysl u toho členu
+samotného, a doplnil test, který chytí odstranění **obou** pojistek naráz:
+velká čistírna nesmí celoměstsky **ubírat** znečištění, jinak by čistila vzduch
+nad továrnami na druhém konci mapy.
+
+Ten test jsem musel dvakrát opravit, oba důvody stojí za zapamatování: měřená
+buňka byla nasycená na 255, takže odečet neměl kde být vidět, a v čistém městě
+se záporný člen ztratil v ořezu na nule. Teď se měří **součet přes celou mapu**
+ve městě plném chemiček.
+
+Testy: 6 v `tests/sewage.test.ts`. Že koušou, ověřeno rozbitím: kanalizace
+mimo znečištění shodí dva, nezapočtená kapacita čistírny dva, obě pojistky
+naráz dva.
+
 ## Rozpracované
-_(Opravy hotové, dál T37: kanalizace jako kapacita a čistírna.)_
+_(T37 hotové, dál T38: třídy služeb `culture` a `social`.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

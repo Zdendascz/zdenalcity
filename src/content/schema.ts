@@ -82,6 +82,11 @@ export interface BuildingDefinition {
    * takže síť **prodlužuje**, nezakládá.
    */
   water?: { production?: number; consumption?: number; range?: number };
+  /**
+   * Kapacita čistírny odpadních vod (§8 fáze 3). Kanalizace se **nekreslí** —
+   * je to celoměstská kapacita po vzoru odpadů (R9), ne druhá síť trubek.
+   */
+  sewage?: { capacity: number };
   environment?: { pollution?: number };
   graphics: {
     color: string;
@@ -123,6 +128,7 @@ const DEFINITION_SECTIONS = [
   'requirements',
   'power',
   'water',
+  'sewage',
   'environment',
   'graphics',
 ];
@@ -302,6 +308,7 @@ export function validateDefinition(
   const graphics = validateGraphics(issues, record);
   const power = validatePower(issues, record);
   const water = validateWater(issues, record);
+  const sewage = validateSewage(issues, record);
   const environment = validateEnvironment(issues, record);
   const population = validateCapacity(issues, record, 'population');
   const jobs = validateCapacity(issues, record, 'jobs');
@@ -342,6 +349,7 @@ export function validateDefinition(
       ...(requirements ? { requirements } : {}),
       ...(power ? { power } : {}),
       ...(water ? { water } : {}),
+      ...(sewage ? { sewage } : {}),
       ...(environment ? { environment } : {}),
       graphics,
     },
@@ -579,6 +587,18 @@ function validateWater(
     ...(consumption !== undefined ? { consumption } : {}),
     ...(range !== undefined ? { range } : {}),
   };
+}
+
+function validateSewage(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['sewage'] {
+  if (record['sewage'] === undefined) return undefined;
+  const section = requireRecord(issues, record, 'sewage', 'sewage');
+  if (!section) return undefined;
+
+  const capacity = requireInt(issues, section, 'capacity', 'sewage.capacity', 0);
+  return capacity === null ? undefined : { capacity };
 }
 
 function validateEnvironment(

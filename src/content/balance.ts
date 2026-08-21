@@ -128,6 +128,13 @@ export interface Balance {
 
   waste: { perCitizen: number; toPollution: number };
 
+  /**
+   * Kanalizace (§8 fáze 3, R9). Stejný tvar jako odpady schválně: je to táž
+   * mechanika — město něco vyrobí, kapacita to spolkne a zbytek se propíše
+   * do znečištění.
+   */
+  sewage: { perCitizen: number; toPollution: number };
+
   /** Vodovod (§8 fáze 3). */
   water: {
     /** Dosah sítě v dlaždicích potrubí, když ho definice neurčí sama. */
@@ -247,6 +254,7 @@ export function validateBalance(raw: unknown): {
   const landValue = section(issues, root, 'landValue');
   const crime = section(issues, root, 'crime');
   const waste = section(issues, root, 'waste');
+  const sewage = section(issues, root, 'sewage');
   const water = section(issues, root, 'water');
   const health = section(issues, root, 'health');
   const levels = section(issues, root, 'levels');
@@ -410,6 +418,10 @@ export function validateBalance(raw: unknown): {
       pipeCost: num(issues, water, 'pipeCost', 'water.pipeCost', 0, 100000),
       decayStep: num(issues, water, 'decayStep', 'water.decayStep', 0, 1000),
       abandonAfter: num(issues, water, 'abandonAfter', 'water.abandonAfter', 1, 1000),
+    },
+    sewage: {
+      perCitizen: num(issues, sewage, 'perCitizen', 'sewage.perCitizen', 0, 100),
+      toPollution: num(issues, sewage, 'toPollution', 'sewage.toPollution', 0, 100),
     },
     waste: {
       perCitizen: num(issues, waste, 'perCitizen', 'waste.perCitizen', 0, 100),

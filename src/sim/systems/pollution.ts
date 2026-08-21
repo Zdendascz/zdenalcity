@@ -31,6 +31,7 @@ export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Bal
       const sources = new Float32Array(COARSE_CELLS);
       let population = 0;
       let wasteCapacity = 0;
+      let sewageCapacity = 0;
 
       for (const building of world.buildings.values()) {
         // Opuštěná budova nevyrábí, netopí ani neodváží odpad — nekouří,
@@ -42,6 +43,7 @@ export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Bal
         if (!definition) continue;
 
         wasteCapacity += definition.waste?.capacity ?? 0;
+        sewageCapacity += definition.sewage?.capacity ?? 0;
 
         const emitted = definition.environment?.pollution ?? 0;
         if (emitted <= 0) continue;
@@ -55,7 +57,16 @@ export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Bal
 
       const generatedWaste = population * balance.waste.perCitizen;
       const unhandledWaste = Math.max(0, generatedWaste - wasteCapacity);
-      const cityWide = unhandledWaste * balance.waste.toPollution;
+
+      // Kanalizace je **celoměstská kapacita**, ne druhá síť trubek (R9).
+      // Nevyčištěná odpadní voda skončí v řece a v půdě, takže se — stejně
+      // jako odpad — rozpustí do znečištění po celé mapě (§8 fáze 3).
+      const generatedSewage = population * balance.sewage.perCitizen;
+      const unhandledSewage = Math.max(0, generatedSewage - sewageCapacity);
+
+      const cityWide =
+        unhandledWaste * balance.waste.toPollution +
+        unhandledSewage * balance.sewage.toPollution;
       if (cityWide > 0) {
         for (let cell = 0; cell < sources.length; cell++) {
           sources[cell] = (sources[cell] ?? 0) + cityWide;

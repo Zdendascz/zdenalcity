@@ -58,6 +58,8 @@
   "building.transit_stop.name": "Transit Stop",
   "building.water_works.name": "Waterworks",
   "building.water_works.desc": "Draws water from a lake or the sea and pushes it into the pipes.",
+  "building.water_treatment.name": "Sewage Works",
+  "building.water_treatment.desc": "Treats the city's waste water. Whatever it cannot take ends up in the soil and the river.",
   "building.pump_station.name": "Pumping Station",
   "building.pump_station.desc": "Produces no water of its own, but carries the network further from the waterworks.",
   "building.transit_stop.desc": "People nearby leave the car at home, so the roads carry less traffic.",

@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:water_treatment",
+  "type": "building",
+  "category": "utility",
+  "name": "building.water_treatment.name",
+  "description": "building.water_treatment.desc",
+  "footprint": [3, 3],
+  "construction": {
+    "cost": 1200,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "nearWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 160
+  },
+  "jobs": {
+    "capacity": 12
+  },
+  "sewage": {
+    "capacity": 300
+  },
+  "environment": {
+    "pollution": 8
+  },
+  "graphics": {
+    "color": "#6f8f7a",
+    "heightLevels": 1,
+    "icon": "drop"
+  }
+}
