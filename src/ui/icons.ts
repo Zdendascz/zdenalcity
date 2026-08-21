@@ -112,6 +112,13 @@ const EYE: Shape = [
   ],
 ];
 
+/** Trubka s přírubami — potrubí. */
+const PIPE: Shape = [
+  bar(0.06, 0.4, 0.94, 0.6),
+  bar(0.2, 0.28, 0.32, 0.72),
+  bar(0.68, 0.28, 0.8, 0.72),
+];
+
 /** Trubka pod povrchem — podzemní pohled. */
 const UNDERGROUND: Shape = [bar(0.08, 0.2, 0.92, 0.3), bar(0.08, 0.52, 0.42, 0.64), bar(0.58, 0.52, 0.92, 0.64), bar(0.42, 0.52, 0.58, 0.9)];
 
@@ -247,6 +254,7 @@ const UI_SHAPES: Readonly<Record<string, Shape>> = {
   avenue: road(1),
   highway: road(2),
   zone: ZONE,
+  pipe: PIPE,
   smoke: SMOKE,
   surface: EYE,
   underground: UNDERGROUND,

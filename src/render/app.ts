@@ -232,6 +232,18 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupIcon: 'bulldoze',
       action: { kind: 'bulldoze' },
     },
+    // Potrubí patří do nabídky Vodovod, mezi vodárnu a čerpací stanici —
+    // hráč hledá vodovod na jednom místě, ne ve dvou.
+    {
+      id: 'pipe',
+      labelKey: 'ui.tool.pipe',
+      icon: 'pipe',
+      hotkey: 'w',
+      groupKey: 'ui.menu.water',
+      groupIcon: 'drop',
+      cost: content.getBalance().water.pipeCost,
+      action: { kind: 'pipe' },
+    },
   ];
 
   // Vše, co nevyroste ze zóny, staví hráč ručně. Nabídku i ikonu nese definice;
@@ -593,6 +605,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   function selectTool(tool: ToolOption): void {
     activeTool = tool;
     toolbar.setActive(tool.id);
+
+    // Nástroj si přepne pohled sám. Potrubí je pod zemí vidět, nad zemí ne —
+    // hráč by kladl trubky poslepu a nikdo by mu neřekl proč. A naopak: kdo
+    // sáhne po silnici nebo budově, chce zase vidět povrch.
+    //
+    // Buldozer je schválně výjimka: pod zemí bourá trubky, nad zemí domy, a to
+    // je jediný nástroj, u kterého má smysl obojí.
+    if (tool.action.kind === 'pipe') setView('underground');
+    else if (tool.action.kind !== 'bulldoze') setView('surface');
   }
 
   const toolbar = new Toolbar(hud.toolsSlot, i18n, tools, activeTool.id, selectTool);
@@ -694,12 +715,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     switch (action.kind) {
       case 'road':
-        // V podzemním pohledu klade stavební nástroj potrubí, ne silnici (§8).
-        if (viewMode === 'underground') {
-          dispatch({ type: 'build_pipe', x: tile.x, y: tile.y });
-        } else {
-          dispatch({ type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType });
-        }
+        dispatch({ type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType });
+        break;
+      case 'pipe':
+        dispatch({ type: 'build_pipe', x: tile.x, y: tile.y });
         break;
       case 'bulldoze':
         // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.

@@ -86,6 +86,7 @@
   "ui.tool.road.highway": "Dálnice",
   "ui.tool.pipe": "Potrubí",
   "ui.tool.bulldoze": "Bourání",
+  "ui.tool.pipe": "Potrubí",
   "ui.tool.terrain.raise": "Zvednout terén",
   "ui.tool.terrain.lower": "Snížit terén",
   "ui.tool.terrain.level": "Srovnat terén",

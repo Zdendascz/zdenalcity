@@ -9,6 +9,13 @@ import type { ZoneType } from '@/sim/layers';
  */
 export type ToolAction =
   | { kind: 'road'; roadType: number }
+  /**
+   * Potrubí. **Vlastní nástroj, ne přepnutý stavební**: do T41 kladl trubky
+   * nástroj silnice, když byl zapnutý podzemní pohled, jenže lišta u toho dál
+   * hlásila „Ulice, 10" a účtovala šest. Rozhraní lhalo a hráč neměl jak
+   * poznat, že se vodovod vůbec staví.
+   */
+  | { kind: 'pipe' }
   | { kind: 'bulldoze' }
   | { kind: 'zone'; zone: ZoneType }
   | { kind: 'place'; definitionId: string }

@@ -69,8 +69,11 @@ describe('paleta nástrojů', () => {
     const groups = groupTools(createTools(await vanilla()));
     const byKey = new Map(groups.map((group) => [group.key, group]));
 
-    // Vodárna, čerpací stanice a čistírna patří k sobě; elektrárna jinam.
-    expect(byKey.get('ui.menu.water')?.tools).toHaveLength(3);
+    // Vodárna, čerpací stanice, čistírna a potrubí patří k sobě; elektrárna jinam.
+    expect(byKey.get('ui.menu.water')?.tools).toHaveLength(4);
+    // Potrubí **musí** být v paletě jako samostatný nástroj. Dokud jím byla
+    // přepnutá silnice, lišta hlásila „Ulice, 10" a účtovala šest.
+    expect(byKey.get('ui.menu.water')?.tools.map((tool) => tool.action.kind)).toContain('pipe');
     expect(byKey.get('ui.menu.power')?.tools).toHaveLength(1);
     expect(byKey.get('ui.menu.culture')?.tools).toHaveLength(4);
     expect(byKey.get('ui.menu.waste')?.tools).toHaveLength(2);

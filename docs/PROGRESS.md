@@ -1570,6 +1570,12 @@ ostatní čeká za ikonou.
   jedna sada tvarů pro celou hru, žádné obrázky ani knihovna ikon
   (architektura §6). Tlačítko muzea tak nese přesně ten znak, který bude mít
   na střeše, a dosah služby v nabídce vrstev taky
+- **potrubí má vlastní nástroj** v nabídce Vodovod, vedle vodárny. Do téhle
+  opravy ho kladl nástroj silnice, když byl zapnutý podzemní pohled — lišta
+  u toho ale dál hlásila „Ulice, 10" a účtovala šest. Rozhraní lhalo a hráč
+  neměl jak poznat, že se vodovod vůbec staví; ptal se na to autor, ne test.
+  Nástroj si navíc pohled přepne sám: potrubí pod zem, silnice a budovy zpátky
+  na povrch. Buldozer zůstává výjimkou, protože pod zemí i nad ní dává smysl
 - **terraforming ukazuje roh, ne čtverec.** Zvedání a snižování hýbe rohem;
   rámeček kolem celé dlaždice ukazoval čtyři naráz a hráč netušil, který se
   pohne. Srovnání pracuje s plochou, takže tam čtverec zůstal
