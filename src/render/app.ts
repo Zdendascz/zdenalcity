@@ -25,6 +25,7 @@ import { PriceTag } from '@/ui/priceTag';
 import { Notifications } from '@/ui/notifications';
 import { formatNumber } from '@/ui/format';
 import { Hud } from '@/ui/hud';
+import type { OverlayOption } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
 import { downloadBytes, readFileBytes } from '@/ui/saveFile';
@@ -63,6 +64,10 @@ import { footprintQuad, gridToScreen } from './projection';
 /** Jeden krok kolečka = násobitel zoomu. */
 const ZOOM_STEP = 1.15;
 
+/** Značka rohu při terraformingu: bílá, aby ji nešlo splést s ničím v terénu. */
+const CORNER_MARK_COLOR = 0xffffff;
+const CORNER_MARK_SIZE = 7;
+
 const DEFAULT_SPEED_INDEX = 1;
 
 interface Message {
@@ -85,89 +90,180 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
   };
 }
 
-/** Nástroje: pevné plus infrastruktura z obsahu. Žádné jméno budovy v kódu (P5). */
-function createTools(content: ContentRegistry): ToolOption[] {
+/**
+ * Pohled na svět: povrch, nebo podzemí.
+ *
+ * **Není to overlay a nesmí s nimi sdílet jeden slot.** Podzemí mění i to, co
+ * dělá stavební nástroj a buldozer (§8 fáze 3), takže když si hráč zapne
+ * pokrytí policie, nemá mu to pod rukama přepnout ruční kladení potrubí zpět
+ * na silnice. Dřív to jeden slot byl a přesně tohle dělal.
+ */
+export function createViewOptions(): OverlayOption[] {
+  return [
+    { id: 'surface', labelKey: 'ui.view.surface', icon: 'surface' },
+    { id: 'underground', labelKey: 'ui.view.underground', icon: 'underground' },
+  ];
+}
+
+/** Diagnostické vrstvy: šest veličin plus dosah každé třídy služeb. */
+export function createLayerOptions(content: ContentRegistry): OverlayOption[] {
+  return [
+    { id: 'power', labelKey: 'ui.overlay.power', icon: 'bolt' },
+    { id: 'pollution', labelKey: 'ui.overlay.pollution', icon: 'smoke' },
+    { id: 'landValue', labelKey: 'ui.overlay.landValue', icon: 'coins' },
+    { id: 'crime', labelKey: 'ui.overlay.crime', icon: 'shield' },
+    { id: 'happiness', labelKey: 'ui.overlay.happiness', icon: 'heart' },
+    { id: 'traffic', labelKey: 'ui.overlay.traffic', icon: 'street' },
+    // Ikonu dosahu služby nese obsah: je to týž symbol, jaký má budova na
+    // střeše, takže hráč nemusí luštit, čí dosah zrovna svítí (P5).
+    ...serviceClassesOf(content).map((serviceClass) => ({
+      id: `coverage:${serviceClass}`,
+      labelKey: `ui.overlay.coverage.${serviceClass}`,
+      icon: classIconsOf(content).get(serviceClass) ?? 'layers',
+    })),
+  ];
+}
+
+/** Třídy služeb, které v načteném obsahu opravdu existují, v pevném pořadí. */
+export function serviceClassesOf(content: ContentRegistry): string[] {
+  return [
+    ...new Set(
+      content
+        .getAll('building')
+        .map((definition) => definition.service?.class)
+        .filter((serviceClass): serviceClass is string => serviceClass !== undefined),
+    ),
+  ].sort();
+}
+
+/** Symbol třídy služby: ten, který její první budova nosí na střeše (P5). */
+export function classIconsOf(content: ContentRegistry): Map<string, string> {
+  const icons = new Map<string, string>();
+  for (const definition of content.getAll('building')) {
+    const serviceClass = definition.service?.class;
+    const icon = definition.graphics.icon;
+    if (serviceClass && icon && !icons.has(serviceClass)) icons.set(serviceClass, icon);
+  }
+  return icons;
+}
+
+/**
+ * Nástroje: pevné plus budovy z obsahu. Žádné jméno budovy v kódu (P5).
+ *
+ * Zařazení do nabídky i ikonu určuje obsah (`menu`, `graphics.icon`). Kód jen
+ * seskupuje podle té hodnoty, takže mod se svou třídou služeb dostane vlastní
+ * roletu bez jediného řádku navíc.
+ */
+export function createTools(content: ContentRegistry): ToolOption[] {
+  const roadTypes = content.getBalance().traffic.roadTypes;
   const tools: ToolOption[] = [
     // Typy silnic jdou z balancu, ne z kódu: přidat čtvrtý je změna JSONu
     // a jednoho lokalizačního klíče (§4 fáze 3).
-    ...content.getBalance().traffic.roadTypes.map((road, order) => ({
+    ...roadTypes.map((road, order) => ({
       id: `road:${road.id}`,
       labelKey: `ui.tool.road.${road.id}`,
+      icon: road.id,
       ...(order === 0 ? { hotkey: 'q' } : {}),
-      groupKey: 'ui.tool.group.build',
+      groupKey: 'ui.menu.road',
+      groupIcon: roadTypes[0]?.id ?? 'street',
+      cost: road.cost,
       action: { kind: 'road' as const, roadType: order + 1 },
     })),
     {
-      id: 'bulldoze',
-      labelKey: 'ui.tool.bulldoze',
-      hotkey: 'x',
-      groupKey: 'ui.tool.group.build',
-      action: { kind: 'bulldoze' },
-    },
-    {
       id: 'terrain:raise',
       labelKey: 'ui.tool.terrain.raise',
+      icon: 'raise',
       hotkey: 'e',
-      groupKey: 'ui.tool.group.terrain',
+      groupKey: 'ui.menu.terrain',
+      groupIcon: 'raise',
       action: { kind: 'terraform', delta: 1 },
     },
     {
       id: 'terrain:lower',
       labelKey: 'ui.tool.terrain.lower',
+      icon: 'lower',
       hotkey: 'd',
-      groupKey: 'ui.tool.group.terrain',
+      groupKey: 'ui.menu.terrain',
+      groupIcon: 'raise',
       action: { kind: 'terraform', delta: -1 },
     },
     {
       id: 'terrain:level',
       labelKey: 'ui.tool.terrain.level',
+      icon: 'level',
       hotkey: 'f',
-      groupKey: 'ui.tool.group.terrain',
+      groupKey: 'ui.menu.terrain',
+      groupIcon: 'raise',
       action: { kind: 'terraform', delta: 0 },
     },
     {
       id: 'zone:residential',
       labelKey: 'ui.tool.zone.residential',
+      icon: 'zone',
       hotkey: 'r',
-      groupKey: 'ui.tool.group.zones',
+      groupKey: 'ui.menu.zone',
+      groupIcon: 'zone',
       action: { kind: 'zone', zone: ZONE.residential },
     },
     {
       id: 'zone:commercial',
       labelKey: 'ui.tool.zone.commercial',
+      icon: 'zone',
       hotkey: 'c',
-      groupKey: 'ui.tool.group.zones',
+      groupKey: 'ui.menu.zone',
+      groupIcon: 'zone',
       action: { kind: 'zone', zone: ZONE.commercial },
     },
     {
       id: 'zone:industrial',
       labelKey: 'ui.tool.zone.industrial',
+      icon: 'zone',
       hotkey: 'i',
-      groupKey: 'ui.tool.group.zones',
+      groupKey: 'ui.menu.zone',
+      groupIcon: 'zone',
       action: { kind: 'zone', zone: ZONE.industrial },
+    },
+    {
+      id: 'bulldoze',
+      labelKey: 'ui.tool.bulldoze',
+      icon: 'bulldoze',
+      hotkey: 'x',
+      groupKey: 'ui.tool.bulldoze',
+      groupIcon: 'bulldoze',
+      action: { kind: 'bulldoze' },
     },
   ];
 
-  // Vše, co nevyroste ze zóny, staví hráč ručně. Kategorie jde z obsahu,
-  // takže nová třída budov přidá tlačítko bez zásahu do kódu (P5).
-  const manual: [string, string][] = [
-    ['utility', 'ui.tool.group.utility'],
-    ['service', 'ui.tool.group.service'],
-  ];
-
-  for (const [category, groupKey] of manual) {
-    content.byCategory(category).forEach((definition, order) => {
-      tools.push({
-        id: `place:${definition.id}`,
-        labelKey: definition.name, // popisek pojmenuje obsah, ne kód
-        hotkey: order === 0 && category === 'utility' ? 'u' : undefined,
-        groupKey,
-        action: { kind: 'place', definitionId: definition.id },
-      });
-    });
+  // Vše, co nevyroste ze zóny, staví hráč ručně. Nabídku i ikonu nese definice;
+  // budova bez `menu` skončí v nabídce podle své kategorie, aby se neztratila.
+  const manual = [...content.byCategory('utility'), ...content.byCategory('service')];
+  const firstIcon = new Map<string, string>();
+  for (const definition of manual) {
+    const menu = definition.menu ?? definition.category;
+    if (!firstIcon.has(menu)) firstIcon.set(menu, definition.graphics.icon ?? 'gear');
   }
 
-  return tools;
+  manual.forEach((definition, order) => {
+    const menu = definition.menu ?? definition.category;
+    tools.push({
+      id: `place:${definition.id}`,
+      labelKey: definition.name, // popisek pojmenuje obsah, ne kód
+      icon: definition.graphics.icon ?? 'gear',
+      ...(order === 0 ? { hotkey: 'u' } : {}),
+      groupKey: `ui.menu.${menu}`,
+      groupIcon: firstIcon.get(menu) ?? 'gear',
+      cost: definition.construction.cost,
+      action: { kind: 'place' as const, definitionId: definition.id },
+    });
+  });
+
+  // Nabídky musí jít v liště za sebou; obsah je seřazený podle id, ne podle
+  // nabídky, takže se pořadí srovná tady.
+  const order = new Map<string, number>();
+  for (const tool of tools) {
+    if (!order.has(tool.groupKey)) order.set(tool.groupKey, order.size);
+  }
+  return tools.sort((a, b) => (order.get(a.groupKey) ?? 0) - (order.get(b.groupKey) ?? 0));
 }
 
 export async function startApp(mount: HTMLElement): Promise<SimHost> {
@@ -210,15 +306,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const worldContainer = new Container();
   app.stage.addChild(worldContainer);
 
-  // Třídy služeb, které v načteném obsahu opravdu existují, v pevném pořadí.
-  const serviceClasses = [
-    ...new Set(
-      content
-        .getAll('building')
-        .map((definition) => definition.service?.class)
-        .filter((serviceClass): serviceClass is string => serviceClass !== undefined),
-    ),
-  ].sort();
+  const serviceClasses = serviceClassesOf(content);
 
   /**
    * Nespokojenost pro overlay: `HAPPINESS_CLEAN_AT` a výš je nula, odtud to
@@ -404,6 +492,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     dispatch({ type: 'set_tax_rate', zone, rate: world.economy.taxRates[category] + delta });
   }
 
+  /**
+   * Ukazuje se u kurzoru roh místo dlaždice?
+   *
+   * Jen u zvedání a snižování. Srovnání pracuje s celou plochou pod budovou,
+   * takže tam čtverec sedí.
+   */
+  function cornerTool(): boolean {
+    return activeTool.action.kind === 'terraform' && activeTool.action.delta !== 0;
+  }
+
   /** Půdorys, který právě vybraný nástroj položí. Vše kromě budov je 1×1. */
   function activeFootprint(): readonly [number, number] {
     if (activeTool.action.kind !== 'place') return [1, 1];
@@ -442,43 +540,36 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     );
   }
 
-  /** Diagnostické pohledy: čtyři veličiny plus dosah každé třídy služeb. */
-  const overlays = [
-    { id: 'power', labelKey: 'ui.overlay.power' },
-    { id: 'pollution', labelKey: 'ui.overlay.pollution' },
-    { id: 'landValue', labelKey: 'ui.overlay.landValue' },
-    { id: 'crime', labelKey: 'ui.overlay.crime' },
-    { id: 'happiness', labelKey: 'ui.overlay.happiness' },
-    { id: 'traffic', labelKey: 'ui.overlay.traffic' },
-    // Podzemí není překryv, ale jiný pohled na svět. Přepínač je vedle nich,
-    // protože se tak chová: vždycky nejvýš jeden (§8 fáze 3).
-    { id: 'underground', labelKey: 'ui.overlay.underground' },
-    ...serviceClasses.map((serviceClass) => ({
-      id: `coverage:${serviceClass}`,
-      labelKey: `ui.overlay.coverage.${serviceClass}`,
-    })),
-  ];
+  const views = createViewOptions();
+  const layers = createLayerOptions(content);
 
-  let overlayMode = 'none';
+  let viewMode = 'surface';
+  let layerMode = 'none';
 
-  function toggleOverlay(id: string): void {
-    overlayMode = overlayMode === id ? 'none' : id;
+  function applyViewAndLayer(): void {
     // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu
     // a doprava svou vlastní v plném rozlišení.
     const chunkMode: OverlayMode =
-      overlayMode === 'power' ? 'power' : overlayMode === 'underground' ? 'underground' : 'none';
+      viewMode === 'underground' ? 'underground' : layerMode === 'power' ? 'power' : 'none';
     chunkRenderer.setOverlay(chunkMode);
-    const coarseId =
-      overlayMode === 'power' || overlayMode === 'traffic' || overlayMode === 'underground'
-        ? 'none'
-        : overlayMode;
+    const coarseId = layerMode === 'power' || layerMode === 'traffic' ? 'none' : layerMode;
     coarseOverlay.setActive(coarseId);
-    trafficOverlay.setVisible(overlayMode === 'traffic');
+    trafficOverlay.setVisible(layerMode === 'traffic');
     // Budovy v podzemním pohledu překáží — hráč se dívá pod ně.
-    buildingRenderer.setVisible(overlayMode !== 'underground');
+    buildingRenderer.setVisible(viewMode !== 'underground');
   }
 
-  const hud = new Hud(hudRoot, i18n, world, SPEEDS, overlays, serviceClasses, {
+  function setView(id: string): void {
+    viewMode = id;
+    applyViewAndLayer();
+  }
+
+  function toggleLayer(id: string): void {
+    layerMode = layerMode === id ? 'none' : id;
+    applyViewAndLayer();
+  }
+
+  const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, {
     onSpeed: setSpeed,
     onTaxChange: changeTax,
     onQuickSave: quickSaveNow,
@@ -491,7 +582,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onOpenFile: (file) => {
       void readFileBytes(file).then(loadFromBytes);
     },
-    onToggleOverlay: toggleOverlay,
+    onToggleLayer: toggleLayer,
+    onSetView: setView,
     onToggleBudget: () => budgetPanel.toggle(),
     onFundingChange: (serviceClass, funding) =>
       dispatch({ type: 'set_service_funding', serviceClass, funding }),
@@ -603,7 +695,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     switch (action.kind) {
       case 'road':
         // V podzemním pohledu klade stavební nástroj potrubí, ne silnici (§8).
-        if (overlayMode === 'underground') {
+        if (viewMode === 'underground') {
           dispatch({ type: 'build_pipe', x: tile.x, y: tile.y });
         } else {
           dispatch({ type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType });
@@ -611,7 +703,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         break;
       case 'bulldoze':
         // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.
-        if (overlayMode === 'underground') {
+        if (viewMode === 'underground') {
           dispatch({ type: 'remove_pipe', x: tile.x, y: tile.y });
         } else {
           dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
@@ -752,22 +844,22 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const key = event.key.toLowerCase();
 
     if (key === 'p') {
-      toggleOverlay('power');
+      toggleLayer('power');
       return;
     }
 
     if (key === 'o') {
-      toggleOverlay('pollution');
+      toggleLayer('pollution');
       return;
     }
 
     if (key === 'l') {
-      toggleOverlay('landValue');
+      toggleLayer('landValue');
       return;
     }
 
     if (key === 'k') {
-      toggleOverlay('crime');
+      toggleLayer('crime');
       return;
     }
 
@@ -821,7 +913,28 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     );
 
     hover.clear();
-    if (hoveredTile) {
+    if (hoveredTile && cornerTool()) {
+      // Zvedání a snižování hýbe **rohem**, ne dlaždicí. Rámeček kolem celého
+      // čtverce by ukazoval čtyři rohy naráz a hráč by netušil, který z nich
+      // se pohne — proto se místo něj rozsvítí ten jeden.
+      const corner = nearestCorner(hoveredTile, pointerX, pointerY);
+      const at = gridToScreen(corner.x, corner.y, world.cornerHeight[cornerIndex(corner.x, corner.y)] ?? 0);
+      // Velikost v obrazovkových bodech, ne ve světových: značka má být stejně
+      // čitelná při plném přiblížení i oddálení.
+      const radius = CORNER_MARK_SIZE / camera.zoom;
+
+      hover
+        .poly([
+          at.x, at.y - radius,
+          at.x + radius, at.y,
+          at.x, at.y + radius,
+          at.x - radius, at.y,
+        ])
+        .fill({ color: CORNER_MARK_COLOR, alpha: 0.9 })
+        .stroke({ color: 0x000000, alpha: 0.5, width: 1 / camera.zoom });
+
+      priceTag.hide();
+    } else if (hoveredTile) {
       // Rámeček kreslí **celý půdorys**, ne jen dlaždici pod kurzorem — u budovy
       // 4×4 jinak není poznat, kam se vlastně položí. Pro 1×1 vyjde přesně
       // diamant dlaždice.
@@ -856,7 +969,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     hud.update({
       speedIndex,
-      overlay: overlayMode,
+      layer: layerMode,
+      view: viewMode,
       budgetVisible: budgetPanel.isVisible(),
       poweredBuildings,
       funding: simWorld.serviceFunding,

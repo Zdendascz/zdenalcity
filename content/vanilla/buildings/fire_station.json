@@ -2,6 +2,7 @@
   "id": "vanilla:fire_station",
   "type": "building",
   "category": "service",
+  "menu": "fire",
   "name": "building.fire_station.name",
   "description": "building.fire_station.desc",
   "footprint": [2, 2],

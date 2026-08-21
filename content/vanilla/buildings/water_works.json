@@ -2,6 +2,7 @@
   "id": "vanilla:water_works",
   "type": "building",
   "category": "utility",
+  "menu": "water",
   "name": "building.water_works.name",
   "description": "building.water_works.desc",
   "footprint": [3, 3],

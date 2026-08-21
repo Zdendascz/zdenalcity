@@ -2,6 +2,7 @@
   "id": "vanilla:water_treatment",
   "type": "building",
   "category": "utility",
+  "menu": "water",
   "name": "building.water_treatment.name",
   "description": "building.water_treatment.desc",
   "footprint": [3, 3],

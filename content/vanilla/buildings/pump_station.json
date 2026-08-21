@@ -2,6 +2,7 @@
   "id": "vanilla:pump_station",
   "type": "building",
   "category": "utility",
+  "menu": "water",
   "name": "building.pump_station.name",
   "description": "building.pump_station.desc",
   "footprint": [1, 1],

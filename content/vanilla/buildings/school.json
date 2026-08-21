@@ -2,6 +2,7 @@
   "id": "vanilla:school",
   "type": "building",
   "category": "service",
+  "menu": "education",
   "name": "building.school.name",
   "description": "building.school.desc",
   "footprint": [3, 3],

@@ -2,6 +2,7 @@
   "id": "vanilla:transit_stop",
   "type": "building",
   "category": "service",
+  "menu": "transit",
   "name": "building.transit_stop.name",
   "description": "building.transit_stop.desc",
   "footprint": [1, 1],

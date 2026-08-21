@@ -2,6 +2,7 @@
   "id": "vanilla:police_small",
   "type": "building",
   "category": "service",
+  "menu": "police",
   "name": "building.police_small.name",
   "description": "building.police_small.desc",
   "footprint": [2, 2],

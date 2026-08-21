@@ -2,6 +2,7 @@
   "id": "vanilla:museum",
   "type": "building",
   "category": "service",
+  "menu": "culture",
   "name": "building.museum.name",
   "description": "building.museum.desc",
   "footprint": [

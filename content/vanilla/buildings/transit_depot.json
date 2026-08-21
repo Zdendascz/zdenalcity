@@ -2,6 +2,7 @@
   "id": "vanilla:transit_depot",
   "type": "building",
   "category": "service",
+  "menu": "transit",
   "name": "building.transit_depot.name",
   "description": "building.transit_depot.desc",
   "footprint": [3, 3],

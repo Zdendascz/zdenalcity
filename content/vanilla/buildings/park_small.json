@@ -2,6 +2,7 @@
   "id": "vanilla:park_small",
   "type": "building",
   "category": "service",
+  "menu": "parks",
   "name": "building.park_small.name",
   "description": "building.park_small.desc",
   "footprint": [1, 1],

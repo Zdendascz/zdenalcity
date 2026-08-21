@@ -2,6 +2,7 @@
   "id": "vanilla:landfill",
   "type": "building",
   "category": "service",
+  "menu": "waste",
   "name": "building.landfill.name",
   "description": "building.landfill.desc",
   "footprint": [3, 3],

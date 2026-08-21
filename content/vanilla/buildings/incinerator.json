@@ -2,6 +2,7 @@
   "id": "vanilla:incinerator",
   "type": "building",
   "category": "service",
+  "menu": "waste",
   "name": "building.incinerator.name",
   "description": "building.incinerator.desc",
   "footprint": [3, 3],

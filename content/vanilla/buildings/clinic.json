@@ -2,6 +2,7 @@
   "id": "vanilla:clinic",
   "type": "building",
   "category": "service",
+  "menu": "health",
   "name": "building.clinic.name",
   "description": "building.clinic.desc",
   "footprint": [2, 2],

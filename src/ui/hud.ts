@@ -5,7 +5,9 @@ import { averageHappiness } from '@/sim/systems/happiness';
 import { totalJobs, totalPopulation } from '@/sim/world';
 import { button, el } from './dom';
 import { formatNumber } from './format';
+import { iconSvg } from './icons';
 import type { I18n } from './i18n';
+import { Menu, Popover } from './popover';
 
 /** 1 tik = 1 den, 30 dní = měsíc, 12 měsíců = rok (§5). */
 const DAYS_PER_MONTH = 30;
@@ -18,22 +20,28 @@ export interface HudCallbacks {
   onQuickLoad(): void;
   onDownload(): void;
   onOpenFile(file: File): void;
-  onToggleOverlay(id: string): void;
+  /** Vrstva se přepíná: druhé kliknutí na tutéž ji zhasne. */
+  onToggleLayer(id: string): void;
+  /** Pohled se nastavuje: povrch a podzemí jsou dva stavy, ne přepínač. */
+  onSetView(id: string): void;
   onToggleBudget(): void;
   onFundingChange(serviceClass: string, funding: number): void;
   onLanguageChange(language: string): void;
 }
 
-/** Diagnostický pohled nabízený v HUDu. Popisek je lokalizační klíč. */
+/** Položka nabídky pohledů nebo vrstev. Popisek je lokalizační klíč. */
 export interface OverlayOption {
   id: string;
   labelKey: string;
+  icon: string;
 }
 
 export interface HudState {
   speedIndex: number;
-  /** Id zapnutého overlaye, nebo `'none'`. */
-  overlay: string;
+  /** Id zapnuté diagnostické vrstvy, nebo `'none'`. */
+  layer: string;
+  /** `'surface'` nebo `'underground'`. */
+  view: string;
   budgetVisible: boolean;
   poweredBuildings: number;
   /** Financování podle třídy služby, 0–1. */
@@ -55,7 +63,14 @@ const DEMAND_ROWS: readonly { labelKey: string; category: 'residential' | 'comme
 ];
 
 /**
- * Herní HUD. Veškerý text jde přes `i18n.t()` — v tomhle souboru není ani jedno
+ * Herní HUD.
+ *
+ * Pravidlo celého rozhraní: **na obrazovce je vidět jen to, co hráč sleduje
+ * průběžně** — kasa, obyvatelé, spokojenost, poptávka, rychlost. Všechno
+ * ostatní čeká za ikonou. Daně, financování, uložení i rozpočet jsou věci,
+ * ke kterým se hráč vrací jednou za čas, a nemají důvod trvale ukrajovat mapu.
+ *
+ * Veškerý text jde přes `i18n.t()` — v tomhle souboru není ani jedno
  * uživatelsky viditelné slovo (§10).
  */
 export class Hud {
@@ -68,20 +83,23 @@ export class Hud {
   private readonly callbacks: HudCallbacks;
 
   private readonly top: HTMLElement;
-  private readonly panels: HTMLElement;
+  private readonly controls: HTMLElement;
 
   private readonly values = new Map<string, HTMLElement>();
   private readonly speedButtons: HTMLButtonElement[] = [];
-  private readonly overlayButtons = new Map<string, HTMLButtonElement>();
+  private readonly viewButtons = new Map<string, HTMLButtonElement>();
+  private layerMenu: Menu | null = null;
   private budgetButton: HTMLButtonElement | null = null;
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
-  private readonly overlays: readonly OverlayOption[];
+  private readonly views: readonly OverlayOption[];
+  private readonly layers: readonly OverlayOption[];
   private readonly serviceClasses: readonly string[];
   private readonly fundingInputs = new Map<string, HTMLInputElement>();
   private lastState: HudState = {
     speedIndex: 1,
-    overlay: 'none',
+    layer: 'none',
+    view: 'surface',
     budgetVisible: false,
     poweredBuildings: 0,
     funding: new Map(),
@@ -93,23 +111,25 @@ export class Hud {
     i18n: I18n,
     view: ReadonlyWorldView,
     speeds: readonly number[],
-    overlays: readonly OverlayOption[],
+    views: readonly OverlayOption[],
+    layers: readonly OverlayOption[],
     serviceClasses: readonly string[],
     callbacks: HudCallbacks,
   ) {
     this.i18n = i18n;
     this.view = view;
     this.speeds = speeds;
-    this.overlays = overlays;
+    this.views = views;
+    this.layers = layers;
     this.serviceClasses = serviceClasses;
     this.callbacks = callbacks;
 
     this.top = el('div', 'hud__top');
     const bottom = el('div', 'hud__bottom');
     this.toolsSlot = el('div', 'hud__tools');
-    this.panels = el('div', 'hud__panels');
+    this.controls = el('div', 'hud__controls');
 
-    bottom.append(this.toolsSlot, this.panels);
+    bottom.append(this.toolsSlot, this.controls);
     parent.append(this.top, bottom);
 
     this.build();
@@ -163,9 +183,10 @@ export class Hud {
       this.setValue(`funding-${serviceClass}`, `${percent} %`);
     }
 
-    for (const [id, node] of this.overlayButtons) {
-      node.classList.toggle('is-active', id === state.overlay);
+    for (const [id, node] of this.viewButtons) {
+      node.classList.toggle('is-active', id === state.view);
     }
+    this.layerMenu?.setSelected(state.layer === 'none' ? null : state.layer);
     this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
 
     if (this.messageNode) {
@@ -181,19 +202,24 @@ export class Hud {
 
   private build(): void {
     this.top.replaceChildren();
-    this.panels.replaceChildren();
+    this.controls.replaceChildren();
     this.values.clear();
     this.speedButtons.length = 0;
-    this.overlayButtons.clear();
+    this.viewButtons.clear();
     this.fundingInputs.clear();
 
     this.buildStats();
     this.buildDemand();
+
     this.buildSpeed();
+    this.buildViews();
+    this.buildLayers();
     this.buildTaxes();
     this.buildFunding();
+    this.buildBudget();
     this.buildSave();
-    this.buildMisc();
+    this.buildLanguage();
+    this.buildMessage();
   }
 
   private buildStats(): void {
@@ -221,7 +247,6 @@ export class Hud {
 
   private buildDemand(): void {
     const panel = el('div', 'demand');
-    panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.hud.demand')));
 
     const bars = el('div', 'demand__bars');
     for (const row of DEMAND_ROWS) {
@@ -232,6 +257,7 @@ export class Hud {
 
       const value = el('span', 'demand__value', '0');
       column.append(track, el('span', 'demand__label', this.i18n.t(row.labelKey)), value);
+      column.title = `${this.i18n.t('ui.hud.demand')}: ${this.i18n.t(row.labelKey)}`;
       bars.appendChild(column);
 
       this.values.set(`demand-bar-${row.category}`, bar);
@@ -242,26 +268,58 @@ export class Hud {
     this.top.appendChild(panel);
   }
 
+  /** Rychlost je jediná věc z ovládání, která je pořád vidět — mění se často. */
   private buildSpeed(): void {
-    const panel = el('div', 'panel');
-    panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.speed.label')));
-
-    const row = el('div', 'panel__row');
+    const group = el('div', 'segmented');
     this.speeds.forEach((speed, index) => {
       const label = speed === 0 ? this.i18n.t('ui.speed.pause') : this.i18n.t('ui.speed.value', { speed });
-      const node = button('chip', () => this.callbacks.onSpeed(index));
+      const node = button('segmented__button', () => this.callbacks.onSpeed(index));
       node.textContent = label;
-      row.appendChild(node);
+      node.title = `${this.i18n.t('ui.speed.label')}: ${label}`;
+      group.appendChild(node);
       this.speedButtons.push(node);
     });
+    this.controls.appendChild(group);
+  }
 
-    panel.appendChild(row);
-    this.panels.appendChild(panel);
+  /**
+   * Povrch a podzemí. **Není to overlay**, je to jiný pohled na svět: mění se
+   * v něm i to, co dělá stavební nástroj a buldozer (§8 fáze 3). Proto stojí
+   * zvlášť a ne v seznamu diagnostických vrstev, kam to dřív bylo naskládané.
+   */
+  private buildViews(): void {
+    const group = el('div', 'segmented');
+    for (const view of this.views) {
+      const label = this.i18n.t(view.labelKey);
+      const node = button('segmented__button segmented__button--icon', () =>
+        this.callbacks.onSetView(view.id),
+      );
+      node.appendChild(iconSvg(view.icon));
+      node.title = label;
+      node.setAttribute('aria-label', label);
+      group.appendChild(node);
+      this.viewButtons.set(view.id, node);
+    }
+    this.controls.appendChild(group);
+  }
+
+  private buildLayers(): void {
+    const menu = new Menu({ icon: 'layers', label: this.i18n.t('ui.overlay.title') });
+    menu.setItems(
+      this.layers.map((layer) => ({
+        id: layer.id,
+        label: this.i18n.t(layer.labelKey),
+        icon: layer.icon,
+        onSelect: () => this.callbacks.onToggleLayer(layer.id),
+      })),
+    );
+    this.layerMenu = menu;
+    this.controls.appendChild(menu.root);
   }
 
   private buildTaxes(): void {
-    const panel = el('div', 'panel');
-    panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.tax.title')));
+    const popover = new Popover({ icon: 'coins', label: this.i18n.t('ui.tax.title') });
+    popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.tax.title')));
 
     for (const row of TAX_ROWS) {
       const line = el('div', 'panel__row');
@@ -279,10 +337,10 @@ export class Hud {
       plus.title = this.i18n.t('ui.tax.increase');
 
       line.append(minus, value, plus);
-      panel.appendChild(line);
+      popover.panel.appendChild(line);
     }
 
-    this.panels.appendChild(panel);
+    this.controls.appendChild(popover.root);
   }
 
   /**
@@ -292,8 +350,8 @@ export class Hud {
   private buildFunding(): void {
     if (this.serviceClasses.length === 0) return;
 
-    const panel = el('div', 'panel');
-    panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.funding.title')));
+    const popover = new Popover({ icon: 'sliders', label: this.i18n.t('ui.funding.title') });
+    popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.funding.title')));
 
     for (const serviceClass of this.serviceClasses) {
       const row = el('div', 'panel__row');
@@ -314,15 +372,25 @@ export class Hud {
       this.values.set(`funding-${serviceClass}`, value);
 
       row.append(slider, value);
-      panel.appendChild(row);
+      popover.panel.appendChild(row);
     }
 
-    this.panels.appendChild(panel);
+    this.controls.appendChild(popover.root);
+  }
+
+  private buildBudget(): void {
+    const label = this.i18n.t('ui.budget.toggle');
+    const node = button('toolbar__button', () => this.callbacks.onToggleBudget());
+    node.appendChild(iconSvg('chart'));
+    node.title = label;
+    node.setAttribute('aria-label', label);
+    this.budgetButton = node;
+    this.controls.appendChild(node);
   }
 
   private buildSave(): void {
-    const panel = el('div', 'panel');
-    panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.save.title')));
+    const popover = new Popover({ icon: 'save', label: this.i18n.t('ui.save.title') });
+    popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.save.title')));
 
     const row = el('div', 'panel__row');
     const quickSave = button('chip', () => this.callbacks.onQuickSave());
@@ -349,44 +417,32 @@ export class Hud {
     open.textContent = this.i18n.t('ui.save.open');
     fileRow.append(download, open, input);
 
-    const message = el('div', 'panel__message is-empty');
-    this.messageNode = message;
-
-    panel.append(row, fileRow, message);
-    this.panels.appendChild(panel);
+    popover.panel.append(row, fileRow);
+    this.controls.appendChild(popover.root);
   }
 
-  private buildMisc(): void {
-    const panel = el('div', 'panel');
+  private buildLanguage(): void {
+    const popover = new Popover({ icon: 'globe', label: this.i18n.t('ui.language.label') });
+    popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.language.label')));
 
-    const overlayRow = el('div', 'panel__row');
-    for (const overlay of this.overlays) {
-      const node = button('chip', () => this.callbacks.onToggleOverlay(overlay.id));
-      node.textContent = this.i18n.t(overlay.labelKey);
-      overlayRow.appendChild(node);
-      this.overlayButtons.set(overlay.id, node);
-    }
-
-    const budget = button('chip', () => this.callbacks.onToggleBudget());
-    budget.textContent = this.i18n.t('ui.budget.toggle');
-    this.budgetButton = budget;
-
-    const languageRow = el('div', 'panel__row');
-    languageRow.appendChild(el('span', 'panel__label', this.i18n.t('ui.language.label')));
-
-    const select = el('select', 'select');
     for (const language of this.i18n.getLanguages()) {
-      const option = el('option');
-      option.value = language;
-      option.textContent = language;
-      option.selected = language === this.i18n.getLanguage();
-      select.appendChild(option);
+      const node = button('chip', () => this.callbacks.onLanguageChange(language));
+      node.textContent = language;
+      node.classList.toggle('is-active', language === this.i18n.getLanguage());
+      popover.panel.appendChild(node);
     }
-    select.addEventListener('change', () => this.callbacks.onLanguageChange(select.value));
-    languageRow.appendChild(select);
 
-    panel.append(overlayRow, budget, languageRow);
-    this.panels.appendChild(panel);
+    this.controls.appendChild(popover.root);
+  }
+
+  /**
+   * Hláška o uložení. Visí nad lištou, ne v panelu uložení — ten je teď
+   * zavřený a hráč by se o výsledku nedozvěděl.
+   */
+  private buildMessage(): void {
+    const message = el('div', 'hud__message is-empty');
+    this.messageNode = message;
+    this.controls.appendChild(message);
   }
 }
 

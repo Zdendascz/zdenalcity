@@ -2,6 +2,7 @@
   "id": "vanilla:community_centre",
   "type": "building",
   "category": "service",
+  "menu": "social",
   "name": "building.community_centre.name",
   "description": "building.community_centre.desc",
   "footprint": [

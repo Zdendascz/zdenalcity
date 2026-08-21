@@ -26,6 +26,13 @@ export interface BuildingDefinition {
   id: string;
   type: 'building';
   category: string;
+  /**
+   * Do které nabídky v liště budova patří. **Obsah, ne kód** (P5): kód jen
+   * seskupuje podle téhle hodnoty a popisek bere z `ui.menu.<menu>`.
+   *
+   * Chybí u všeho, co hráč nestaví ručně — zóny si domy staví samy.
+   */
+  menu?: string;
   /** Lokalizační klíč, nikdy text (§10). */
   name: string;
   description: string;
@@ -115,6 +122,7 @@ const DEFINITION_SECTIONS = [
   'id',
   'type',
   'category',
+  'menu',
   'name',
   'description',
   'footprint',
@@ -298,6 +306,10 @@ export function validateDefinition(
   }
 
   const category = requireString(issues, record, 'category', 'category', NAMESPACE);
+  let menu: string | undefined;
+  if (record['menu'] !== undefined) {
+    menu = requireString(issues, record, 'menu', 'menu', NAMESPACE) ?? undefined;
+  }
   const name = requireString(issues, record, 'name', 'name', LOCALE_KEY);
   const description = requireString(issues, record, 'description', 'description', LOCALE_KEY);
 
@@ -336,6 +348,7 @@ export function validateDefinition(
       id,
       type: 'building',
       category,
+      ...(menu === undefined ? {} : { menu }),
       name,
       description,
       footprint,

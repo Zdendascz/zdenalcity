@@ -1544,8 +1544,49 @@ prošel i systémový čas, protože dvě uložení ve stejné vteřině vyjdou 
 Po opravě (minulé město dostane vodovod; datum se čte přímo z DOS hlavičky ZIPu)
 chytá všech deset.
 
+- [x] Přestavba rozhraní (po hlášení autora, mezi T40 a T41)
+
+Hlášení znělo, že GUI zabírá většinu obrazovky — a bylo to tak: dvacet tlačítek
+s texty ve třech řadách, k tomu čtyři trvale rozbalené panely a řada osmnácti
+overlayů. Z mapy zbýval pruh.
+
+Pravidlo, podle kterého je to přestavěné: **trvale je vidět jen to, co hráč
+sleduje průběžně** — kasa, obyvatelé, spokojenost, poptávka, rychlost. Všechno
+ostatní čeká za ikonou.
+
+- **nástroje v roletách podle typu** — silnice, terén, zóny a pak jedna nabídka
+  na každou třídu služeb i druh infrastruktury. Zařazení nese **obsah** (nové
+  pole `menu` v definici), ne kód, takže mod se svou třídou dostane vlastní
+  roletu bez řádku navíc (P5)
+- **roleta s jedinou položkou se nerozbaluje.** Z buldozeru by byla jen
+  kliknutí navíc; popisek takového tlačítka je jméno budovy, ne nabídky
+- **pohled zvlášť od vrstev.** Povrch a podzemí mění i to, co dělá stavební
+  nástroj a buldozer (§8 fáze 3) — sdílet jeden slot s diagnostickými vrstvami
+  znamenalo, že zapnutí pokrytí policie hráči pod rukama přepnulo kladení
+  potrubí zpět na silnice. Teď jsou to dva nezávislé stavy
+- **daně, financování, uložení, rozpočet a jazyk** jsou roletky u pravého
+  okraje. Otevřený je vždycky nejvýš jeden panel a klik do mapy ho zavře
+- **ikony** se kreslí ze **stejných polygonů jako symboly na střechách** —
+  jedna sada tvarů pro celou hru, žádné obrázky ani knihovna ikon
+  (architektura §6). Tlačítko muzea tak nese přesně ten znak, který bude mít
+  na střeše, a dosah služby v nabídce vrstev taky
+- **terraforming ukazuje roh, ne čtverec.** Zvedání a snižování hýbe rohem;
+  rámeček kolem celé dlaždice ukazoval čtyři naráz a hráč netušil, který se
+  pohne. Srovnání pracuje s plochou, takže tam čtverec zůstal
+
+Změřeno v běžící hře na okně 1280×720: rozhraní zabírá **8,7 % plochy**
+(předtím prakticky vše kromě horní třetiny). Lišta nástrojů má 578×40 px
+a 15 tlačítek místo dvaceti popsaných ve třech řadách. Ověřeno i chování:
+výběr z rolety zavře panel a propíše se do ikony tlačítka, podzemní pohled
+a vrstva kriminality drží zapnuté **současně**, a značka u kurzoru měří
+15×15 px u zvedání proti 68×36 u srovnání a silnice.
+
+Testy: 9 v `tests/ui.test.ts`. Hlídají to, co by se rozbilo potichu —
+chybějící ikona vykreslí prázdné tlačítko, chybějící překlad syrový klíč
+a přeházené pořadí rozsype rolety.
+
 ## Rozpracované
-_(T40 hotové. Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
+_(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_
 
 ## Backlog

@@ -2,6 +2,7 @@
   "id": "vanilla:coal_power_plant",
   "type": "building",
   "category": "utility",
+  "menu": "power",
   "name": "building.coal_power_plant.name",
   "description": "building.coal_power_plant.desc",
   "footprint": [4, 4],

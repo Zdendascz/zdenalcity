@@ -2,6 +2,7 @@
   "id": "vanilla:gallery",
   "type": "building",
   "category": "service",
+  "menu": "culture",
   "name": "building.gallery.name",
   "description": "building.gallery.desc",
   "footprint": [
