@@ -127,6 +127,11 @@ body {
   font-weight: 600;
 }
 
+/* Záporná kasa není detail: v mínusu se zastaví všechen růst. */
+.stat__value.is-alarm {
+  color: #e86b6b;
+}
+
 /* --- poptávka ----------------------------------------------------------- */
 
 .demand__bars {

@@ -674,6 +674,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     return best;
   }
 
+  /** Byla kasa v mínusu už minulý snímek? Hláška patří k přechodu, ne ke stavu. */
+  let wasBroke = false;
+
   /** Poslední pozice kurzoru — cenovka se překresluje každý snímek. */
   let pointerX = 0;
   let pointerY = 0;
@@ -979,6 +982,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       showPlacementPrice(hoveredTile);
     } else {
       priceTag.hide();
+    }
+
+    // Bankrot zastaví veškerý růst (§9 fáze 2) a do teď o tom hra mlčela:
+    // hráč viděl jen město, které se přestalo hýbat. Hlásí se při přechodu do
+    // mínusu, ne každý snímek.
+    const broke = world.economy.funds < 0;
+    if (broke !== wasBroke) {
+      wasBroke = broke;
+      if (broke) notifications.show(i18n.t('ui.notice.bankrupt'), 'error');
     }
 
     let poweredBuildings = 0;

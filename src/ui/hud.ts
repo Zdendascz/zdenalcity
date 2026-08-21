@@ -144,12 +144,22 @@ export class Hud {
 
     const { economy, demand, tick, buildings } = this.view;
 
+    const population = totalPopulation(buildings);
+
     this.setValue('funds', formatNumber(economy.funds));
-    this.setValue('population', formatNumber(totalPopulation(buildings)));
+    this.values.get('funds')?.classList.toggle('is-alarm', economy.funds < 0);
+    this.setValue('population', formatNumber(population));
     this.setValue('jobs', formatNumber(totalJobs(buildings)));
     // Spokojenost se ukazuje v procentech, ne v 0–255: hráč nemá důvod vědět,
     // že vrstva je bajtová.
-    this.setValue('happiness', `${Math.round((averageHappiness(this.view) / 255) * 100)} %`);
+    //
+    // A dokud ve městě nikdo nebydlí, není **co** měřit. Nula tam znamenala
+    // „všichni jsou nešťastní" a hráč sháněl, čím ji zvednout, i když jediný
+    // problém bylo, že se do města nikdo nenastěhoval.
+    this.setValue(
+      'happiness',
+      population === 0 ? '–' : `${Math.round((averageHappiness(this.view) / 255) * 100)} %`,
+    );
     this.setValue(
       'balance',
       `+${formatNumber(economy.lastIncome)} / −${formatNumber(economy.lastExpenses)}`,

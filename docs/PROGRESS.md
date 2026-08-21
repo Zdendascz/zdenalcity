@@ -1581,6 +1581,12 @@ ostatní čeká za ikonou.
   nebylo poznat, že je to pořád ta nabídka. Autor zapnul elektřinu a neměl jak
   ji vypnout. U nástrojů se ikona mění dál — tam je to smysl, protože ukazuje,
   co má hráč v ruce
+- **spokojenost prázdného města je „–", ne 0 %.** Nula tam znamenala „všichni
+  jsou nešťastní" a autor sháněl, čím ji zvednout, i když jediný problém byl,
+  že se do města nikdo nenastěhoval. Není co měřit, tak se nic neměří
+- **bankrot je vidět a slyšet.** Záporná kasa zastaví veškerý růst (§9 fáze 2)
+  a hra o tom mlčela — město se prostě přestalo hýbat. Teď je kasa červená
+  a při přechodu do mínusu vyskočí hláška
 - **terraforming ukazuje roh, ne čtverec.** Zvedání a snižování hýbe rohem;
   rámeček kolem celé dlaždice ukazoval čtyři naráz a hráč netušil, který se
   pohne. Srovnání pracuje s plochou, takže tam čtverec zůstal
@@ -1710,6 +1716,16 @@ ne technický úkol.)_
 | 2026-08-14 | `systems/zoning.ts` nevznikl | Strom v architektuře §11 ho zmiňuje, ale v tabulce systémů §5 nemá řádek — zónování je příkaz, ne tikající systém. Vznikne v T5, pokud se ukáže, že ho potřebuje. |
 
 ## Známé problémy / technický dluh
+
+- **Z bankrotu není cesta zpátky.** Daně platí jen obyvatelé a pracovní místa
+  v zónách; služby a infrastruktura nevydělávají nic. Město, které utratí vše
+  na elektrárnu, vodárnu a kliniku dřív, než mu vyroste první dům, má příjem
+  nula, údržbu pár set měsíčně a růst zastavený kvůli mínusu — a **nemá jak se
+  z toho dostat**, protože bourání údržbu snižuje, ale peníze nepřidá. Narazil
+  na to autor při hraní: kasa −1 066, nula obyvatel, 58 míst, bilance +0/−536.
+  Hláška o bankrotu na to teď aspoň upozorní, ale řešení je rozhodnutí o
+  designu — nabízí se vypnout službám údržbu, když na ně nejsou peníze
+  (přestanou fungovat, ale nezadluží), nebo půjčka. Patří to k T41.
 
 - **Kopec před budovou ji nezakryje.** Renderer kreslí nejdřív celý terén a pak
   všechny budovy, takže budova je vždycky nad terénem. Správně by se muselo

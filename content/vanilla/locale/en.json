@@ -161,6 +161,7 @@
   "ui.save.empty": "Nothing saved yet",
   "ui.save.failed": "Save could not be read: {reason}",
   "ui.save.noWaterNetwork": "The loaded city has no water network: {count} buildings will decay without water. Build a water works and pipes.",
+  "ui.notice.bankrupt": "The treasury is in the red — nothing new will be built until it is back at zero. Demolish what you do not need, or raise taxes.",
   "ui.save.missingContent": "Missing content: {list}",
 
   "ui.cost.spent": "−{amount}",
