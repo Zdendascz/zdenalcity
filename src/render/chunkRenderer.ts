@@ -7,6 +7,7 @@ import {
   BRIDGE_COLOR,
   BRIDGE_RAIL_COLOR,
   PIPE_COLOR,
+  PIPE_DRY_COLOR,
   PIPE_WIDTH,
   POWER_OFF_COLOR,
   POWER_ON_COLOR,
@@ -253,9 +254,12 @@ export class ChunkRenderer {
 
     if (this.world.layers.pipe[tileIndex] !== 1) return;
 
+    // Suchá trubka je šedá, zavodněná modrá. Bez toho vypadá síť, která nikam
+    // nedosáhla, přesně jako ta funkční.
+    const wet = this.world.waterSupply[tileIndex] === 1;
     const mask = roadMask((nx, ny) => this.isPipe(nx, ny), x, y);
     for (const polygon of roadPolygons(points, mask, PIPE_WIDTH)) {
-      graphics.poly(polygon).fill({ color: PIPE_COLOR });
+      graphics.poly(polygon).fill({ color: wet ? PIPE_COLOR : PIPE_DRY_COLOR });
     }
   }
 

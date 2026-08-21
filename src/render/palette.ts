@@ -135,7 +135,15 @@ export const UNDERGROUND_BUILDING_COLOR = 0xd8d8dc;
 export const UNDERGROUND_BUILDING_ALPHA = 0.22;
 export const UNDERGROUND_ZONE_ALPHA = 0.18;
 /** Potrubí. Modrá jako voda, ale světlejší, ať je vidět na tmavém terénu. */
+/**
+ * Trubka, ve které teče voda.
+ *
+ * Suchá má vlastní barvu, a je to důležitější, než se zdá: hráč natáhne
+ * potrubí, ono nikam nedosáhne — protože je moc dlouhé nebo nevede ke zdroji —
+ * a na obrazovce to vypadá úplně stejně jako fungující síť. Hlásil to autor.
+ */
 export const PIPE_COLOR = 0x67b6e8;
+export const PIPE_DRY_COLOR = 0x7b7f86;
 /** Šířka trubky jako podíl dlaždice. Užší než vozovka — je to trubka. */
 export const PIPE_WIDTH = 0.24;
 /** Nádech na dlaždicích, kam voda opravdu dotekla. */

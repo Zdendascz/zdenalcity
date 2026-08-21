@@ -1686,6 +1686,23 @@ a dozdění změnilo [2,2,1,2] na [2,2,2,2] za 8 a [2,3,2,2] na [3,3,3,3] za 24.
 Testy: 2 v `tests/growth.test.ts`, upravený rozbor parcely. Panel parcely už
 svah jako překážku nehlásí — protože žádná není.
 
+- [x] Suchou trubku jde poznat od zavodněné (hlášení autora)
+
+Potrubí se kreslilo pořád stejně modře, ať v něm voda byla, nebo ne. Síť, která
+nikam nedosáhla — protože je moc dlouhá nebo nevede ke zdroji — vypadala úplně
+stejně jako funkční. **Suchá trubka je teď šedá, zavodněná modrá.**
+
+Ověřeno v běžící hře: deset trubek bez zdroje se vykreslilo jen šedě, po
+zavodnění poloviny se objevily obě barvy.
+
+Při té příležitosti změřeno a potvrzeno: **voda existuje výhradně v dlaždicích,
+pod kterými je trubka** (`vodaMimoTrubku = 0`). Je to podle §8 fáze 3 záměr —
+odlišuje to vodovod od elektřiny — ale v praxi to znamená, že pod každou
+parcelou musí být trubka. Autor na to narazil: potrubí u zóny mělo, ale ne
+**pod** ní, a hra hlásila „bez vodovodu se tu stavět nedá". Hláška nelhala,
+jen se dá snadno přečíst jako „vodovod tu vůbec není". Jestli má potrubí
+zavodňovat i sousední dlaždice, je rozhodnutí o designu — patří k T41.
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_
