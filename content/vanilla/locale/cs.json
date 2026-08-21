@@ -108,6 +108,7 @@
 
   "ui.hud.funds": "Kasa",
   "ui.hud.population": "Obyvatel",
+  "ui.hud.happiness": "Spokojenost",
   "ui.hud.jobs": "Práce",
   "ui.hud.balance": "Měsíční bilance",
   "ui.hud.dateLabel": "Datum",
@@ -246,6 +247,7 @@
   "ui.overlay.coverage.social": "Dosah sounáležitosti",
   "ui.overlay.underground": "Pod zemí",
   "ui.overlay.traffic": "Doprava",
+  "ui.overlay.happiness": "Spokojenost",
   "ui.overlay.crime": "Kriminalita",
   "ui.overlay.coverage.police": "Dosah policie",
   "ui.overlay.coverage.transit": "Dosah MHD",

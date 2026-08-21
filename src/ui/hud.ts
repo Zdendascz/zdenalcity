@@ -1,6 +1,7 @@
 import type { ZoneType } from '@/sim/layers';
 import { ZONE } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
+import { averageHappiness } from '@/sim/systems/happiness';
 import { totalJobs, totalPopulation } from '@/sim/world';
 import { button, el } from './dom';
 import { formatNumber } from './format';
@@ -126,6 +127,9 @@ export class Hud {
     this.setValue('funds', formatNumber(economy.funds));
     this.setValue('population', formatNumber(totalPopulation(buildings)));
     this.setValue('jobs', formatNumber(totalJobs(buildings)));
+    // Spokojenost se ukazuje v procentech, ne v 0–255: hráč nemá důvod vědět,
+    // že vrstva je bajtová.
+    this.setValue('happiness', `${Math.round((averageHappiness(this.view) / 255) * 100)} %`);
     this.setValue(
       'balance',
       `+${formatNumber(economy.lastIncome)} / −${formatNumber(economy.lastExpenses)}`,
@@ -198,6 +202,7 @@ export class Hud {
       ['funds', 'ui.hud.funds'],
       ['population', 'ui.hud.population'],
       ['jobs', 'ui.hud.jobs'],
+      ['happiness', 'ui.hud.happiness'],
       ['powered', 'ui.hud.powered'],
       ['balance', 'ui.hud.balance'],
       // Popisek a hodnota mají vlastní klíče: `ui.hud.date` je celá věta s

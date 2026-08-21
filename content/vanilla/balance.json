@@ -82,6 +82,29 @@
 
   "sewage": { "perCitizen": 0.14, "toPollution": 0.03 },
 
+  "happiness": {
+    "base": 120,
+    "smoothing": 0.2,
+    "landValue": 0.35,
+    "pollution": 0.5,
+    "crime": 0.5,
+    "congestion": 20,
+    "tax": 2.5,
+    "unemployment": 60,
+    "minDemandFactor": 0.3,
+    "weights": {
+      "parks": 0.4,
+      "culture": 0.5,
+      "social": 0.5,
+      "health": 0.3,
+      "education": 0.3,
+      "police": 0.2,
+      "fire": 0.15,
+      "transit": 0.25
+    }
+  },
+
+
   "health": {
     "coverageThreshold": 20,
     "declineStep": 1,

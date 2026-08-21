@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import type { WorldState } from '../world';
+import { happinessDemandFactor } from './happiness';
 import type { System } from './index';
 
 /**
@@ -14,6 +15,11 @@ import type { System } from './index';
  * - komerční: kladná, když je víc lidí než obchodů
  *
  * Čísla jsou provizorní balanc, ne výsledek ladění — na to je T10.
+ *
+ * Od T39 se **kladná** obytná poptávka násobí spokojeností města (§9). Jen
+ * kladná: záporná poptávka znamená „bytů je dost“ a to s náladou nesouvisí —
+ * kdyby se násobila i ta, nespokojené město by hlásilo menší přebytek, tedy
+ * přesný opak toho, co se v něm děje.
  */
 
 export function createDemandSystem(catalogue: BuildingCatalogue, balance: Balance): System {
@@ -43,7 +49,11 @@ export function createDemandSystem(catalogue: BuildingCatalogue, balance: Balanc
 
       const workers = population * workerRatio;
 
-      world.demand.residential = clampDemand(baseResidential + (jobs - workers));
+      const rawResidential = baseResidential + (jobs - workers);
+      const happiness = happinessDemandFactor(world, balance);
+      world.demand.residential = clampDemand(
+        rawResidential > 0 ? rawResidential * happiness : rawResidential,
+      );
       world.demand.industrial = clampDemand(workers - jobs);
       world.demand.commercial = clampDemand(population * commercePerCapita - commercialJobs);
     },

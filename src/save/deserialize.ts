@@ -7,6 +7,7 @@ import { MAP_SIZE } from '@/sim/layers';
 import type { Layers } from '@/sim/layers';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
+import { NEUTRAL_HAPPINESS } from '@/sim/world';
 import type { Building, DemandState, EconomyState, WorldState } from '@/sim/world';
 import {
   SAVE_COARSE_LAYER_ORDER,
@@ -385,6 +386,10 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   world.jobAccessCells = new Float32Array(COARSE_CELLS).fill(1);
   world.cityJobAccess = 1;
   world.trafficCursor = save.state.trafficCursor;
+
+  // Spokojenost se taky neukládá (R10). Nulou začít nesmí — načtené město
+  // by na první pohled vypadalo jako zoufalé — proto výchozí neutrál.
+  world.happiness.fill(NEUTRAL_HAPPINESS);
 
   // Původ mapy: co save neví, bereme jako ruční mapu (migrace to doplňuje stejně).
   world.map = save.meta.map

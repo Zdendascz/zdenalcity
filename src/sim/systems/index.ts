@@ -10,6 +10,7 @@ import { createPollutionSystem } from './pollution';
 import { createLandValueSystem } from './landValue';
 import { createServiceSystem } from './services';
 import { createCrimeSystem } from './crime';
+import { createHappinessSystem } from './happiness';
 import { createHealthSystem } from './health';
 import { createTrafficSystem } from './traffic';
 import { createLevelSystem } from './levels';
@@ -57,6 +58,9 @@ export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Bala
     createHealthSystem(catalogue, balance),
     createWaterDecaySystem(catalogue, balance),
     createLandValueSystem(balance),
+    // Spokojenost je poslední: čte úplně všechno ostatní, takže musí běžet
+    // až za tím, co ji tvoří.
+    createHappinessSystem(balance),
   ];
 }
 
@@ -71,6 +75,7 @@ export {
   createLandValueSystem,
   createServiceSystem,
   createCrimeSystem,
+  createHappinessSystem,
   createHealthSystem,
   createLevelSystem,
   createTrafficSystem,

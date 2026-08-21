@@ -24,7 +24,7 @@ import {
   TILE_H,
   TILE_W,
 } from '@/render/projection';
-import { shade, TERRAIN_COLORS } from '@/render/palette';
+import { HAPPINESS_CLEAN_AT, shade, TERRAIN_COLORS, unhappinessValue } from '@/render/palette';
 import { roadMask, roadPolygons, ROAD_E, ROAD_N, ROAD_S, ROAD_W } from '@/render/roads';
 import { MAP_SIZE, TERRAIN } from '@/sim/layers';
 
@@ -469,5 +469,26 @@ describe('symboly na střechách', () => {
     for (const icon of new Set(icons)) {
       expect(iconShape(icon), `chybí tvar pro icon: ${icon}`).toBeDefined();
     }
+  });
+});
+
+describe('overlay spokojenosti', () => {
+  it('spokojenou čtvrť nemaluje vůbec', () => {
+    expect(unhappinessValue(HAPPINESS_CLEAN_AT)).toBe(0);
+    expect(unhappinessValue(255)).toBe(0);
+  });
+
+  it('čím hůř, tím silněji', () => {
+    const řada = [190, 128, 76, 0].map(unhappinessValue);
+    for (let i = 1; i < řada.length; i++) {
+      expect(řada[i]).toBeGreaterThan(řada[i - 1] ?? 0);
+    }
+    expect(unhappinessValue(0)).toBe(255);
+  });
+
+  it('běžné hodnoty využijí většinu stupnice', () => {
+    // Toho si všimlo až měření pixelů: první verze škálovala od 128, takže
+    // rozdíl mezi „ujde to“ a „zle“ byl v obrázku skoro neviditelný.
+    expect(unhappinessValue(76) - unhappinessValue(130)).toBeGreaterThan(60);
   });
 });

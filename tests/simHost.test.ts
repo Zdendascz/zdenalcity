@@ -117,9 +117,12 @@ describe('fázování systémů', () => {
       ['traffic', 8, 4],
       ['pollution', 8, 3],
       ['crime', 16, 11],
-      ['health', 16, 13],
+      // Zdravotnictví uhnulo z 13 na 15: tu si od T39 bere spokojenost.
+      ['health', 16, 15],
       ['waterDecay', 16, 7],
       ['landValue', 16, 5],
+      // Spokojenost úplně nakonec — čte výstupy všech ostatních (§9).
+      ['happiness', 16, 13],
     ]);
   });
 });

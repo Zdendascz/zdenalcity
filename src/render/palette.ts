@@ -44,6 +44,37 @@ export const CRIME_COLOR = 0xd94f4f;
 export const CRIME_MAX_ALPHA = 0.8;
 
 /**
+ * Nespokojenost. Overlay maluje **problém, ne pochvalu** — stejně jako
+ * znečištění a kriminalita. Spokojená čtvrť zůstane čistá, aby bylo vidět,
+ * kde se to kazí.
+ */
+export const HAPPINESS_COLOR = 0xd98f3f;
+export const HAPPINESS_MAX_ALPHA = 0.75;
+
+/**
+ * Od jaké spokojenosti overlay přestane malovat úplně.
+ *
+ * Není to 255: takovou hodnotu nemá ani vzorná čtvrť, takže by mapa byla
+ * pořád celá oranžová a rozdíly by se v tom ztratily. Dvoustovka odpovídá
+ * čtvrti, se kterou opravdu není co řešit — a rozdíl mezi 130 a 76, tedy mezi
+ * „ujde to“ a „zle“, zabere většinu stupnice.
+ */
+export const HAPPINESS_CLEAN_AT = 200;
+
+/**
+ * Spokojenost → síla, kterou ji overlay maluje.
+ *
+ * Vlastní funkce, ne dva řádky v `app.ts`: první verze škálovala od 128 a
+ * mapa vyšla skoro prázdná, protože reálné hodnoty se drží kolem stovky.
+ * Vyšlo to najevo až měřením pixelů ve hře — s funkcí to chytne test.
+ */
+export function unhappinessValue(happiness: number): number {
+  const above = HAPPINESS_CLEAN_AT - happiness;
+  if (above <= 0) return 0;
+  return Math.min(255, Math.round(above * (255 / HAPPINESS_CLEAN_AT)));
+}
+
+/**
  * Overlay dopravy: od volné zelené po ucpanou červenou. Škála má stupně, ne
  * plynulý přechod — hráč potřebuje poznat „tady už je zle", ne odhadovat odstín.
  */

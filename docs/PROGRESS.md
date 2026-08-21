@@ -1455,9 +1455,55 @@ Testy: 5 v `tests/culture.test.ts`. Netestují nový kód — testují, že žá
 nebyl potřeba. Že koušou, ověřeno rozbitím: divadlo bez třídy služby shodí tři,
 kultura bez váhy v ceně půdy jeden a s ní i test popisků z T26.
 
+- [x] T39 — spokojenost (fáze 3c)
+
+Poslední odvozená veličina fáze 3 a jediná, kterou hráč sleduje průběžně: skládá
+se ze **všeho ostatního** — pokrytí službami, cena půdy, znečištění, kriminalita,
+kolony, daně, nezaměstnanost.
+
+- vrstva `world.happiness` na hrubé mřížce, **runtime-only** (R10). Neukládá se
+  ani do v4, ani do v5 — je odvozená ze stavu, který uložený je
+- systém `happiness` každých 16 tiků, offset 13, **úplně poslední** v pořadí:
+  čte výstupy všech ostatních
+- **zdravotnictví uhnulo z offsetu 13 na 15.** Třináctku si vybralo jen jako
+  první volnou; smysl offsetů je, aby dvě šestnáctky nespadly do jednoho tiku
+- obytná poptávka se násobí průměrnou spokojeností, **jen když je kladná**.
+  Záporná znamená „bytů je dost" a s náladou nesouvisí — kdyby se násobila,
+  nespokojené město by hlásilo menší přebytek, tedy přesný opak skutečnosti
+- podlaha násobitele **0,3, ne 0** (R6): nespokojené město roste pomaleji, ne
+  vůbec. Nula by hru zamkla přesně ve chvíli, kdy se hráč snaží situaci otočit
+- **spokojenost nevstupuje do ceny půdy.** Cena půdy do ní ano, obráceně ne —
+  jinak by vznikla kladná zpětná vazba (R2)
+- nové město i načtený save začínají na **128, ne na nule**: nula znamená „tady
+  se nedá žít" a to o městě, kde ještě nikdo nebydlí, neplatí
+- průměr se počítá **jen z obydlených buněk** — prázdná polovina mapy nemá koho
+  potěšit ani naštvat a stáhla by každé město k základní hodnotě
+
+Ověřeno v běžící hře (mapa je skoro celá skála a les, takže město stálo na
+srovnané a vykácené ploše s vodárnou u břehu a potrubím podél silnic):
+24 obyvatel, 28 míst, průměr **109 → v HUDu „Spokojenost 43 %"**. Daň 20 %
+srazila průměr na **76** a obytnou poptávku z 22 na 18; daň 2 % zvedla průměr
+na **120** a poptávku na 23 — přesně tak, jak vychází vzorec (36 × 0,51 = 18,
+36 × 0,63 = 23).
+
+**Overlay se poprvé kreslil skoro naprázdno** a chytlo to až měření pixelů:
+maloval jen to, co je pod 128, jenže reálné hodnoty se drží kolem stovky.
+Po přeškálování (čistá čtvrť od 200 výš) je gradient monotónní — změřený
+průměrný červený kanál 97 → 102 → 129 → 159 → 186 pro spokojenost
+255 → 190 → 128 → 60 → 0. Vzorec proto **není dva řádky v `app.ts`**, ale
+funkce `unhappinessValue` s testem. Overlay maluje **problém, ne pochvalu**,
+stejně jako znečištění a kriminalita.
+
+Testy: 16 v `tests/happiness.test.ts`, 3 v `tests/render.test.ts`. Mutační
+ověření: deset mutantů, **prvních pět přežilo** — testy měřily vazby přes cenu
+půdy místo přímo (kriminalita, pokrytí), test vyhlazení šel splnit i bez
+vyhlazení, průměr přes všechny buňky prošel, protože i park má obyvatele…
+tedy nemá, ale testovací dům jich měl osm ještě před růstem. Po přepsání
+(vstupy nastavené rukou, jen systém spokojenosti, žádné jiné) chytá všech deset.
+
 ## Rozpracované
-_(T38 hotové, dál T39: spokojenost — vrstva, vzorec, škálování poptávky, HUD,
-overlay.)_
+_(T39 hotové, dál T40: save v5 — do savu přibude potrubí, migrace musí podle
+§10 hlásit chybějící vodárnu.)_
 
 ## Backlog
 - [ ] T5 — zóny, růst budov, populace

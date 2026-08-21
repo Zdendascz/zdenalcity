@@ -23,8 +23,15 @@ import type { System } from './index';
  * Konstanty jdou z `balance.json` (§10).
  */
 const INTERVAL = 16;
-/** Offset mimo cenu půdy (5) i kriminalitu (11). */
-const OFFSET = 13;
+/**
+ * Offset mimo cenu půdy (5), kriminalitu (11) i spokojenost (13).
+ *
+ * Třináctku uvolnil T39: spokojenost ji má v zadání fáze 3 a zdravotnictví
+ * si ji vybralo jen jako první volné číslo. Smysl offsetů je, aby drahé
+ * systémy nespadly do stejného tiku — dvě šestnáctky na jednom offsetu ten
+ * smysl ruší.
+ */
+const OFFSET = 15;
 
 export function createHealthSystem(catalogue: BuildingCatalogue, balance: Balance): System {
   return {

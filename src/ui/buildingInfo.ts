@@ -142,6 +142,7 @@ export class BuildingInfo {
     const rows: [string, string][] = [
       ['ui.info.position', `${parcel.x}, ${parcel.y}`],
       ['ui.overlay.landValue', `${parcel.landValue.current}`],
+      ['ui.overlay.happiness', `${Math.round((parcel.happiness / 255) * 100)} %`],
     ];
 
     // Dosah silnice — nejčastější důvod, proč zóna zůstane prázdná.

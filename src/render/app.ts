@@ -16,7 +16,8 @@ import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
 import { computeBudget } from '@/sim/systems/economy';
-import { createWorld } from '@/sim/world';
+import { COARSE_CELLS } from '@/sim/coarse';
+import { createWorld, NEUTRAL_HAPPINESS } from '@/sim/world';
 import { BudgetPanel } from '@/ui/budgetPanel';
 import { BuildingInfo } from '@/ui/buildingInfo';
 import { CostPopup } from '@/ui/costPopup';
@@ -44,6 +45,8 @@ import {
   COVERAGE_MAX_ALPHA,
   CRIME_COLOR,
   CRIME_MAX_ALPHA,
+  HAPPINESS_COLOR,
+  HAPPINESS_MAX_ALPHA,
   HOVER_BLOCKED_COLOR,
   HOVER_COLOR,
   HOVER_FILL_ALPHA,
@@ -52,6 +55,7 @@ import {
   LAND_VALUE_MAX_ALPHA,
   POLLUTION_COLOR,
   POLLUTION_MAX_ALPHA,
+  unhappinessValue,
 } from './palette';
 import { pickTile } from './picking';
 import { footprintQuad, gridToScreen } from './projection';
@@ -216,6 +220,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     ),
   ].sort();
 
+  /**
+   * Nespokojenost pro overlay: `HAPPINESS_CLEAN_AT` a výš je nula, odtud to
+   * lineárně roste až k 255 na dně stupnice.
+   *
+   * Overlaye v téhle hře kreslí problémy — kdyby tenhle maloval spokojenost,
+   * nejsilněji by svítily čtvrti, se kterými není co dělat, a ta jediná, kde
+   * se něco děje, by zůstala prázdná.
+   */
+  const unhappiness = new Uint8Array(COARSE_CELLS);
+  const unhappinessLayer = (): Uint8Array => {
+    for (let cell = 0; cell < unhappiness.length; cell++) {
+      const value = world.happiness[cell] ?? NEUTRAL_HAPPINESS;
+      unhappiness[cell] = unhappinessValue(value);
+    }
+    return unhappiness;
+  };
+
   const chunkRenderer = new ChunkRenderer(world, worldContainer);
   const buildingRenderer = new BuildingRenderer(
     world,
@@ -237,6 +258,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       values: () => world.coarse.landValue,
     },
     { id: 'crime', color: CRIME_COLOR, maxAlpha: CRIME_MAX_ALPHA, values: () => world.coarse.crime },
+    {
+      id: 'happiness',
+      color: HAPPINESS_COLOR,
+      maxAlpha: HAPPINESS_MAX_ALPHA,
+      values: unhappinessLayer,
+    },
     // Dosah každé třídy, která ve hře existuje. Seznam jde z obsahu, ne z kódu —
     // mod se svou třídou dostane přepínač zadarmo (P5).
     ...serviceClasses.map((serviceClass) => ({
@@ -411,6 +438,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     { id: 'pollution', labelKey: 'ui.overlay.pollution' },
     { id: 'landValue', labelKey: 'ui.overlay.landValue' },
     { id: 'crime', labelKey: 'ui.overlay.crime' },
+    { id: 'happiness', labelKey: 'ui.overlay.happiness' },
     { id: 'traffic', labelKey: 'ui.overlay.traffic' },
     // Podzemí není překryv, ale jiný pohled na svět. Přepínač je vedle nich,
     // protože se tak chová: vždycky nejvýš jeden (§8 fáze 3).

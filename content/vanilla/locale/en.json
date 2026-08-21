@@ -108,6 +108,7 @@
 
   "ui.hud.funds": "Funds",
   "ui.hud.population": "Population",
+  "ui.hud.happiness": "Happiness",
   "ui.hud.jobs": "Jobs",
   "ui.hud.balance": "Monthly balance",
   "ui.hud.dateLabel": "Date",
@@ -246,6 +247,7 @@
   "ui.overlay.coverage.social": "Community reach",
   "ui.overlay.underground": "Underground",
   "ui.overlay.traffic": "Traffic",
+  "ui.overlay.happiness": "Happiness",
   "ui.overlay.crime": "Crime",
   "ui.overlay.coverage.police": "Police reach",
   "ui.overlay.coverage.transit": "Transit reach",

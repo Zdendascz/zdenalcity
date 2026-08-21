@@ -38,6 +38,15 @@ export interface Building {
   abandoned: boolean;
 }
 
+/**
+ * Spokojenost čerstvě založeného města, 0–255.
+ *
+ * **Není to nula.** Nula znamená „tady se nedá žít“ a to o městě, kde ještě
+ * nikdo nebydlí, neplatí — overlay by hned po založení hlásil katastrofu.
+ * Stejnou hodnotu dostane vrstva i po načtení savu, protože se neukládá (R10).
+ */
+export const NEUTRAL_HAPPINESS = 128;
+
 export const MIN_TAX_RATE = 0;
 export const MAX_TAX_RATE = 20;
 
@@ -201,6 +210,13 @@ export interface WorldState {
   waterlessStreak: Map<number, number>;
   /** Změnilo se potrubí nebo rozmístění vodáren? */
   waterNetworkDirty: boolean;
+
+  /**
+   * Spokojenost na hrubé mřížce, 0–255 (§9 fáze 3). **Neukládá se** (R10) —
+   * je odvozená ze stavu, který se ukládá, takže by se v savu mohla rozejít
+   * se skutečností.
+   */
+  happiness: Uint8Array;
 }
 
 export function createWorld(
@@ -248,6 +264,7 @@ export function createWorld(
     watered: new Set(),
     waterlessStreak: new Map(),
     waterNetworkDirty: false,
+    happiness: new Uint8Array(COARSE_CELLS).fill(NEUTRAL_HAPPINESS),
   };
 }
 

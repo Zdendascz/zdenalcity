@@ -188,6 +188,8 @@ export interface ParcelExplanation {
   cityJobAccessFactor: number;
   pollution: number;
   crime: number;
+  /** Spokojenost v této čtvrti, 0–255. Kdo ji nevidí, neví, co spravit (§12). */
+  happiness: number;
   landValue: LandValueExplanation;
   /** Pokrytí všech tříd, které ve městě existují. */
   coverage: { serviceClass: string; value: number }[];
@@ -235,6 +237,7 @@ export function explainParcel(
     cityJobAccessFactor: world.cityJobAccess,
     pollution: world.coarse.pollution[cell] ?? 0,
     crime: world.coarse.crime[cell] ?? 0,
+    happiness: world.happiness[cell] ?? 0,
     landValue: explainLandValue(world, balance, cell, landValueContext(world, balance)),
     coverage: [...world.coverage.keys()]
       .sort()

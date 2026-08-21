@@ -135,6 +135,28 @@ export interface Balance {
    */
   sewage: { perCitizen: number; toPollution: number };
 
+  /**
+   * Spokojenost (§9 fáze 3). Váhy tříd služeb jsou otevřený seznam ze
+   * stejného důvodu jako u ceny půdy — třídy jsou obsah, ne kód.
+   */
+  happiness: {
+    /** Odkud se začíná, než se přičte a odečte všechno ostatní. */
+    base: number;
+    smoothing: number;
+    landValue: number;
+    pollution: number;
+    crime: number;
+    congestion: number;
+    tax: number;
+    unemployment: number;
+    /**
+     * Nejnižší násobitel obytné poptávky při nulové spokojenosti. **Není to
+     * nula schválně**: nespokojené město má růst pomaleji, ne stát.
+     */
+    minDemandFactor: number;
+    weights: Readonly<Record<string, number>>;
+  };
+
   /** Vodovod (§8 fáze 3). */
   water: {
     /** Dosah sítě v dlaždicích potrubí, když ho definice neurčí sama. */
@@ -255,6 +277,7 @@ export function validateBalance(raw: unknown): {
   const crime = section(issues, root, 'crime');
   const waste = section(issues, root, 'waste');
   const sewage = section(issues, root, 'sewage');
+  const happiness = section(issues, root, 'happiness');
   const water = section(issues, root, 'water');
   const health = section(issues, root, 'health');
   const levels = section(issues, root, 'levels');
@@ -274,6 +297,23 @@ export function validateBalance(raw: unknown): {
       if (weights[required] === undefined) {
         issues.push({ field: `landValue.weights.${required}`, message: 'chybí' });
       }
+    }
+  }
+
+  const happinessWeights: Record<string, number> = {};
+  const rawHappinessWeights = happiness ? asRecord(happiness['weights']) : null;
+  if (!rawHappinessWeights) {
+    issues.push({ field: 'happiness.weights', message: 'chybí, nebo není objekt' });
+  } else {
+    for (const key of Object.keys(rawHappinessWeights).sort()) {
+      happinessWeights[key] = num(
+        issues,
+        rawHappinessWeights,
+        key,
+        `happiness.weights.${key}`,
+        -10,
+        10,
+      );
     }
   }
 
@@ -418,6 +458,18 @@ export function validateBalance(raw: unknown): {
       pipeCost: num(issues, water, 'pipeCost', 'water.pipeCost', 0, 100000),
       decayStep: num(issues, water, 'decayStep', 'water.decayStep', 0, 1000),
       abandonAfter: num(issues, water, 'abandonAfter', 'water.abandonAfter', 1, 1000),
+    },
+    happiness: {
+      base: num(issues, happiness, 'base', 'happiness.base', 0, 255),
+      smoothing: num(issues, happiness, 'smoothing', 'happiness.smoothing', 0, 1),
+      landValue: num(issues, happiness, 'landValue', 'happiness.landValue', 0, 100),
+      pollution: num(issues, happiness, 'pollution', 'happiness.pollution', 0, 100),
+      crime: num(issues, happiness, 'crime', 'happiness.crime', 0, 100),
+      congestion: num(issues, happiness, 'congestion', 'happiness.congestion', 0, 1000),
+      tax: num(issues, happiness, 'tax', 'happiness.tax', 0, 100),
+      unemployment: num(issues, happiness, 'unemployment', 'happiness.unemployment', 0, 1000),
+      minDemandFactor: num(issues, happiness, 'minDemandFactor', 'happiness.minDemandFactor', 0, 1),
+      weights: happinessWeights,
     },
     sewage: {
       perCitizen: num(issues, sewage, 'perCitizen', 'sewage.perCitizen', 0, 100),
