@@ -25,6 +25,8 @@ export interface HudCallbacks {
   /** Pohled se nastavuje: povrch a podzemí jsou dva stavy, ne přepínač. */
   onSetView(id: string): void;
   onToggleBudget(): void;
+  /** Zprůhlednit budovy, aby šlo vidět a klikat na to pod nimi. */
+  onToggleGhost(): void;
   onFundingChange(serviceClass: string, funding: number): void;
   onLanguageChange(language: string): void;
 }
@@ -43,6 +45,8 @@ export interface HudState {
   /** `'surface'` nebo `'underground'`. */
   view: string;
   budgetVisible: boolean;
+  /** Jsou budovy průhledné? */
+  ghost: boolean;
   poweredBuildings: number;
   /** Kolik proudu město vyrábí a kolik ho potřebuje. */
   powerProduced: number;
@@ -93,6 +97,7 @@ export class Hud {
   private readonly viewButtons = new Map<string, HTMLButtonElement>();
   private layerMenu: Menu | null = null;
   private budgetButton: HTMLButtonElement | null = null;
+  private ghostButton: HTMLButtonElement | null = null;
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
   private readonly views: readonly OverlayOption[];
@@ -104,6 +109,7 @@ export class Hud {
     layer: 'none',
     view: 'surface',
     budgetVisible: false,
+    ghost: false,
     poweredBuildings: 0,
     powerProduced: 0,
     powerNeeded: 0,
@@ -209,6 +215,7 @@ export class Hud {
     }
     this.layerMenu?.setSelected(state.layer);
     this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
+    this.ghostButton?.classList.toggle('is-active', state.ghost);
 
     if (this.messageNode) {
       this.messageNode.textContent = state.message;
@@ -234,6 +241,7 @@ export class Hud {
 
     this.buildSpeed();
     this.buildViews();
+    this.buildGhost();
     this.buildLayers();
     this.buildTaxes();
     this.buildFunding();
@@ -323,6 +331,20 @@ export class Hud {
       this.viewButtons.set(view.id, node);
     }
     this.controls.appendChild(group);
+  }
+
+  /**
+   * Průhlednost budov. Sedí vedle pohledů, protože je to totéž zrnem: mění se
+   * jím, co je vidět, ne co se ve městě děje.
+   */
+  private buildGhost(): void {
+    const label = this.i18n.t('ui.view.ghost');
+    const node = button('toolbar__button', () => this.callbacks.onToggleGhost());
+    node.appendChild(iconSvg('ghost'));
+    node.title = label;
+    node.setAttribute('aria-label', label);
+    this.ghostButton = node;
+    this.controls.appendChild(node);
   }
 
   private buildLayers(): void {

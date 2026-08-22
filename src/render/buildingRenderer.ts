@@ -48,6 +48,9 @@ const BUILDING_INSET = 0.12;
  * a musely by se ořezávat na hranici chunku. Každá je vlastní `Graphics`
  * a řadí se back-to-front podle `x + y`.
  */
+/** Jak moc budovy zprůhlední. Dost na to, aby pod nimi šla vidět vozovka. */
+const GHOST_ALPHA = 0.35;
+
 export class BuildingRenderer {
   private readonly world: ReadonlyWorldView;
   private readonly container: Container;
@@ -71,6 +74,17 @@ export class BuildingRenderer {
    */
   setVisible(visible: boolean): void {
     this.container.visible = visible;
+  }
+
+  /**
+   * Zprůhlední budovy, aby bylo vidět, co je pod nimi.
+   *
+   * Ve vyrostlém městě zakryje blok 3×3 celou křižovatku a hráč nemá jak
+   * trefit silnici, kterou chce vylepšit. Skrýt je úplně nejde — pak by
+   * nevěděl, kam smí stavět; průhledné je oboje naráz.
+   */
+  setGhost(ghost: boolean): void {
+    this.container.alpha = ghost ? GHOST_ALPHA : 1;
   }
 
   update(dirty: DirtySet): void {

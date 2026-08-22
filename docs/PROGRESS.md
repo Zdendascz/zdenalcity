@@ -1821,6 +1821,35 @@ Druhý nový test plní kritérium fáze 3: **5000 tiků včetně dopravy a gene
 dvakrát za sebou, porovnává vrstvy, hrubé vrstvy, stav RNG, kurzor dopravy
 i seznam budov.
 
+- [x] Tažení myší, průhledné budovy, kontextová nabídka (zadání autora)
+
+**Zóny, silnice a potrubí se kreslí tažením** a použijí se **až při puštění**.
+Do teď se malovalo volnou rukou po dlaždicích: u zóny to znamenalo klikat
+dvacetkrát, u silnice z toho vznikaly schody, jak kurzor uhýbal. Teď se táhne
+obdélník (zóny) nebo lomená čára (silnice, potrubí) — nejdřív po ose x, pak po
+y, protože úhlopříčka v izometrii vypadá jako schodiště a napojení silnic z ní
+je na nic.
+
+- náhled kreslí **každou dotčenou dlaždici podle jejích rohů**, takže je vidět
+  přesně, kam až tažení sahá
+- u kurzoru se ukazuje **cena celého tažení**, ne jedné dlaždice
+- zóna jde do simulace **jedním příkazem**; silnice a potrubí po dlaždicích,
+  ale hlásí se jen první odmítnutí — dvacet stejných hlášek za jedno tažení by
+  hráč nepřečetl
+- buldozer a terén zůstávají na okamžité odezvě, tam ji hráč čeká
+- tažení, které opustí plátno, se zahodí
+
+**Přepínač průhledných budov** vedle pohledů. Ve vyrostlém městě zakryje blok
+3×3 celou křižovatku a silnici pod ním nejde trefit. Skrýt budovy úplně by
+znamenalo nevědět, kam se smí stavět, takže se jen zprůhlední na 35 %.
+
+**Kontextová nabídka prohlížeče je zablokovaná na celém dokumentu**, ne jen nad
+plátnem. Nabídka vyskočená nad HUDem překrývá hru stejně jako nad mapou.
+
+Ověřeno v běžící hře: tažení zóny přes 6×3 vyznačilo 15 polí (zbytek terén
+nepustil) a během tažení nezměnilo ani jedno; silnice a potrubí totéž;
+průhlednost přepíná krytí 1 ↔ 0,35; `contextmenu` nad HUDem je zrušené.
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_

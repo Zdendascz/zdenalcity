@@ -550,6 +550,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let paintButton: number | null = null;
   let lastPaintedTile = -1;
 
+  /**
+   * Odkud se táhne. Zóny, silnice a potrubí se **nekreslí hned**: hráč vidí
+   * náhled a použije se, až pustí tlačítko. Klikání po jedné dlaždici je
+   * u čtvrti o dvaceti polích trest, a volná ruka u silnice dělá schody.
+   */
+  let dragAnchor: { x: number; y: number } | null = null;
+
   const tools = createTools(content);
   let activeTool: ToolOption = tools[0] as ToolOption;
 
@@ -583,6 +590,51 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     return activeTool.action.kind === 'terraform' && activeTool.action.delta !== 0;
   }
 
+
+  /**
+   * Kreslí se tímhle nástrojem tažením?
+   *
+   * `area` je obdélník (zóny), `line` lomená čára (silnice, potrubí). Buldozer
+   * ani terén sem nepatří: tam je okamžitá odezva to, co hráč čeká.
+   */
+  function dragKind(): 'area' | 'line' | null {
+    const kind = activeTool.action.kind;
+    if (kind === 'zone') return 'area';
+    if (kind === 'road' || kind === 'pipe') return 'line';
+    return null;
+  }
+
+  /**
+   * Dlaždice, kterých se tažení dotkne.
+   *
+   * Čára je **lomená, ne úhlopříčná**: nejdřív se jde po ose x, pak po y.
+   * Úhlopříčka by v izometrii vypadala jako schodiště a napojení silnic by
+   * z ní bylo na nic.
+   */
+  function dragTiles(): { x: number; y: number }[] {
+    if (!dragAnchor || !hoveredTile) return [];
+    const kind = dragKind();
+    if (kind === null) return [];
+
+    const x0 = Math.min(dragAnchor.x, hoveredTile.x);
+    const x1 = Math.max(dragAnchor.x, hoveredTile.x);
+    const y0 = Math.min(dragAnchor.y, hoveredTile.y);
+    const y1 = Math.max(dragAnchor.y, hoveredTile.y);
+
+    const tiles: { x: number; y: number }[] = [];
+    if (kind === 'area') {
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) tiles.push({ x, y });
+      }
+      return tiles;
+    }
+
+    for (let x = x0; x <= x1; x++) tiles.push({ x, y: dragAnchor.y });
+    for (let y = y0; y <= y1; y++) {
+      if (y !== dragAnchor.y) tiles.push({ x: hoveredTile.x, y });
+    }
+    return tiles;
+  }
 
   /** Půdorys, který právě vybraný nástroj položí. Vše kromě budov je 1×1. */
   function activeFootprint(): readonly [number, number] {
@@ -628,6 +680,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   let viewMode = 'surface';
   let layerMode = 'none';
+  let ghostBuildings = false;
 
   function applyViewAndLayer(): void {
     // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu
@@ -640,6 +693,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     trafficOverlay.setVisible(layerMode === 'traffic');
     // Budovy v podzemním pohledu překáží — hráč se dívá pod ně.
     buildingRenderer.setVisible(viewMode !== 'underground');
+    buildingRenderer.setGhost(ghostBuildings);
   }
 
   function setView(id: string): void {
@@ -668,6 +722,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onToggleLayer: toggleLayer,
     onSetView: setView,
     onToggleBudget: () => budgetPanel.toggle(),
+    onToggleGhost: () => {
+      ghostBuildings = !ghostBuildings;
+      applyViewAndLayer();
+    },
     onFundingChange: (serviceClass, funding) =>
       dispatch({ type: 'set_service_funding', serviceClass, funding }),
     onLanguageChange: (language) => i18n.setLanguage(language),
@@ -912,6 +970,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     paintButton = event.button;
     lastPaintedTile = tile.y * MAP_SIZE + tile.x;
+
+    // Nástroje s náhledem se použijí až při puštění; ostatní hned.
+    if (dragKind() !== null) {
+      dragAnchor = { x: tile.x, y: tile.y };
+      return;
+    }
+
     applyTool(tile, event.offsetX, event.offsetY);
   });
 
@@ -928,7 +993,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     // Malování tažením: dokud je tlačítko dole, každá nová dlaždice dostane
     // stejný nástroj. Bez toho by se zóna vyznačovala klikáním po jedné.
-    if (paintButton !== null && hoveredTile) {
+    if (paintButton !== null && hoveredTile && dragAnchor === null) {
       const tile = hoveredTile.y * MAP_SIZE + hoveredTile.x;
       if (tile !== lastPaintedTile) {
         lastPaintedTile = tile;
@@ -937,7 +1002,57 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
   });
 
+  /**
+   * Zóna se pokládá **jedním příkazem**, ne dlaždici po dlaždici: `zoneArea`
+   * přeskočí, co nejde, a odmítnutí ohlásí jednou. Dvacet hlášek „tady to
+   * nejde" za jedno tažení by hráč nepřečetl.
+   */
+  function commitDrag(): void {
+    const tiles = dragTiles();
+    const anchor = dragAnchor;
+    dragAnchor = null;
+    if (!anchor || tiles.length === 0) return;
+
+    const action = activeTool.action;
+    if (action.kind === 'zone') {
+      const xs = tiles.map((tile) => tile.x);
+      const ys = tiles.map((tile) => tile.y);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      dispatch({
+        type: 'zone',
+        x,
+        y,
+        w: Math.max(...xs) - x + 1,
+        h: Math.max(...ys) - y + 1,
+        zone: action.zone,
+      });
+      return;
+    }
+
+    // Silnice a potrubí: každá dlaždice je vlastní příkaz, ale hlásí se jen
+    // první odmítnutí — jinak by most přes řeku vyplivl deset stejných hlášek.
+    if (action.kind !== 'road' && action.kind !== 'pipe') return;
+
+    let complained = false;
+    for (const tile of tiles) {
+      const command: Command =
+        action.kind === 'pipe'
+          ? { type: 'build_pipe', x: tile.x, y: tile.y }
+          : { type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType };
+      const result = host.dispatch(command);
+      if (!result.ok && !complained) {
+        complained = true;
+        notifications.show(i18n.t(result.reason, result.params));
+      }
+    }
+  }
+
   function endDrag(event: PointerEvent): void {
+    if (dragAnchor !== null && paintButton === 0) {
+      commitDrag();
+    }
+    dragAnchor = null;
     paintButton = null;
     lastPaintedTile = -1;
     if (dragPointerId !== event.pointerId) return;
@@ -950,6 +1065,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   canvas.addEventListener('pointerleave', () => {
     hoveredTile = null;
     paintButton = null;
+    // Tažení, které opustilo plátno, se zahodí. Dokreslit ho naslepo by
+    // znamenalo zónu tam, kam hráč nevidí.
+    dragAnchor = null;
   });
 
   canvas.addEventListener(
@@ -962,8 +1080,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     { passive: false },
   );
 
-  // Bez tohohle by pravé tlačítko při bourání otevřelo kontextové menu.
-  canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+  // Pravé tlačítko je herní ovládání — otevírá panel parcely a ruší tažení.
+  // Blokuje se proto na celém dokumentu, ne jen na plátně: nabídka vyskočená
+  // nad HUDem překrývá hru úplně stejně jako nad mapou.
+  document.addEventListener('contextmenu', (event) => event.preventDefault());
 
   window.addEventListener('keydown', (event) => {
     if (event.code === 'Space') {
@@ -1101,7 +1221,27 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     );
 
     hover.clear();
-    if (hoveredTile && cornerTool()) {
+    if (dragAnchor !== null) {
+      // Náhled tažení: každá dotčená dlaždice zvlášť, podle svých rohů.
+      // Hráč musí vidět, kam až sahá, dřív než pustí tlačítko.
+      const tiles = dragTiles();
+      for (const tile of tiles) {
+        if (tile.x >= MAP_SIZE || tile.y >= MAP_SIZE) continue;
+        hover
+          .poly(tileQuad(tile.x, tile.y, tileCorners(world.cornerHeight, tile.x, tile.y)))
+          .fill({ color: HOVER_COLOR, alpha: HOVER_FILL_ALPHA })
+          .stroke({ color: HOVER_COLOR, alpha: HOVER_LINE_ALPHA, width: 2 / camera.zoom });
+      }
+
+      // Cena celého tažení, ne jedné dlaždice — u dvaceti polí je to rozdíl,
+      // který hráč potřebuje vidět předem.
+      const each = activeTool.cost ?? 0;
+      if (each > 0 && tiles.length > 0) {
+        priceTag.show(pointerX, pointerY, formatNumber(each * tiles.length));
+      } else {
+        priceTag.hide();
+      }
+    } else if (hoveredTile && cornerTool()) {
       // Zvedání a snižování hýbe **rohem**, ne dlaždicí. Rámeček kolem celého
       // čtverce by ukazoval čtyři rohy naráz a hráč by netušil, který z nich
       // se pohne — proto se místo něj rozsvítí ten jeden.
@@ -1201,6 +1341,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       layer: layerMode,
       view: viewMode,
       budgetVisible: budgetPanel.isVisible(),
+      ghost: ghostBuildings,
       poweredBuildings,
       funding: simWorld.serviceFunding,
       message: message ? i18n.t(message.key, message.params) : '',

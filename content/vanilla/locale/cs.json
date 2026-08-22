@@ -331,6 +331,7 @@
   "ui.overlay.none": "Žádná vrstva",
   "ui.view.surface": "Pohled na povrch",
   "ui.view.underground": "Pohled pod zem",
+  "ui.view.ghost": "Průhledné budovy",
   "ui.overlay.traffic": "Doprava",
   "ui.overlay.happiness": "Spokojenost",
   "ui.overlay.crime": "Kriminalita",

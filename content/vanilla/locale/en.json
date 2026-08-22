@@ -331,6 +331,7 @@
   "ui.overlay.none": "No layer",
   "ui.view.surface": "Surface view",
   "ui.view.underground": "Underground view",
+  "ui.view.ghost": "See-through buildings",
   "ui.overlay.traffic": "Traffic",
   "ui.overlay.happiness": "Happiness",
   "ui.overlay.crime": "Crime",

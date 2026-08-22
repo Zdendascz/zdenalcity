@@ -110,6 +110,19 @@ const ZONE: Shape = [
   ],
 ];
 
+/** Dům jen z obrysu — průhledné budovy. */
+const GHOST: Shape = [
+  bar(0.12, 0.36, 0.88, 0.44),
+  bar(0.12, 0.44, 0.2, 0.9),
+  bar(0.8, 0.44, 0.88, 0.9),
+  bar(0.12, 0.82, 0.88, 0.9),
+  [
+    [0.5, 0.1],
+    [0.94, 0.36],
+    [0.06, 0.36],
+  ],
+];
+
 /** Oko — pohled na povrch. */
 const EYE: Shape = [
   [
@@ -268,6 +281,7 @@ const UI_SHAPES: Readonly<Record<string, Shape>> = {
   pipe: PIPE,
   smoke: SMOKE,
   surface: EYE,
+  ghost: GHOST,
   underground: UNDERGROUND,
   layers: LAYERS,
   coins: COINS,
