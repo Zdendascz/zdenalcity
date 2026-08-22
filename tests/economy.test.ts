@@ -316,10 +316,13 @@ describe('stavba za peníze', () => {
     const world = createWorld(1);
     for (let x = 5; x <= 15; x++) buildRoad(world, x, 10);
 
+    const cost = content.get('vanilla:coal_power_plant')?.construction.cost ?? 0;
     placeDefinition(world, content, 'vanilla:coal_power_plant', 5, 11);
 
+    // Cena jde z obsahu, ne z čísla v testu — balanc se ladí a test o tom
+    // nemá padat.
     expect(world.buildings.size).toBe(1);
-    expect(world.economy.funds).toBe(STARTING_FUNDS - 4000);
+    expect(world.economy.funds).toBe(STARTING_FUNDS - cost);
   });
 
   it('bez peněz se nepostaví nic', async () => {
@@ -328,12 +331,13 @@ describe('stavba za peníze', () => {
 
     const world = createWorld(1);
     for (let x = 5; x <= 15; x++) buildRoad(world, x, 10);
-    world.economy.funds = 3999;
+    const funds = (content.get('vanilla:coal_power_plant')?.construction.cost ?? 0) - 1;
+    world.economy.funds = funds;
 
     placeDefinition(world, content, 'vanilla:coal_power_plant', 5, 11);
 
     expect(world.buildings.size).toBe(0);
-    expect(world.economy.funds).toBe(3999);
+    expect(world.economy.funds).toBe(funds);
   });
 });
 
@@ -486,10 +490,14 @@ describe('důsledek elektřiny', () => {
     expect(house?.power?.consumption).toBeLessThan(shop?.power?.consumption ?? 0);
     expect(shop?.power?.consumption).toBeLessThan(factory?.power?.consumption ?? 0);
 
-    // Jedna elektrárna uživí desítky domů, ale řádově míň fabrik.
+    // Jedna elektrárna uživí stovky domů, ale řádově míň fabrik.
+    //
+    // Čísla přepsal autor po hraní: se šesti tisíci vyšlo 22 budov na
+    // elektrárnu a dvanáct elektráren zabralo skoro tolik místa jako zbytek
+    // města. Osmdesát fabrik na jednu je nová hranice (T41).
     const production = plant?.power?.production ?? 0;
-    expect(Math.floor(production / (house?.power?.consumption ?? 1))).toBe(60);
-    expect(Math.floor(production / (factory?.power?.consumption ?? 1))).toBe(20);
+    expect(Math.floor(production / (house?.power?.consumption ?? 1))).toBe(240);
+    expect(Math.floor(production / (factory?.power?.consumption ?? 1))).toBe(80);
   });
 });
 

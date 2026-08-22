@@ -113,7 +113,7 @@ describe('vanilla obsah', () => {
     await registry.load(createVanillaSource());
 
     const plant = registry.get('vanilla:coal_power_plant');
-    expect(plant?.power?.production).toBe(6000);
+    expect(plant?.power?.production).toBe(24000);
     expect(plant?.construction.allowedTerrain).toEqual([0, 2]);
     expect(plant?.footprint).toEqual([4, 4]);
   });

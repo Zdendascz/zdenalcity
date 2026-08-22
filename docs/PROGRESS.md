@@ -1738,6 +1738,34 @@ i jako přerušené vedení, což je úplně jiná oprava. HUD proto nově ukazu
 řádek **„Proud 12 000 / 17 720"**, při schodku červeně, a při přechodu do
 nedostatku vyskočí hláška s oběma čísly. Ověřeno na tomtéž savu.
 
+- [x] Elektrárna: nový balanc (rozhodnutí autora)
+
+Autor poslal město, kde dvanáct elektráren zabíralo skoro tolik místa jako
+zbytek města — a pořád nestačily. Změřeno v jeho savu: 12 elektráren,
+72 000 výroby, 208 spotřebitelů, **průměrná spotřeba 272 na budovu**, tedy
+**22 budov na elektrárnu**. Odhad autora („21") seděl.
+
+Nové hodnoty podle jeho zadání:
+
+| | dřív | teď |
+|---|---|---|
+| výroba | 6 000 | **24 000** |
+| cena | 4 000 | **6 000** |
+| údržba | 60 | **120** |
+
+24 000 je přesně **80 průmyslových budov** (300 každá), tedy nejtěžšího
+běžného odběratele; průměrné budovy z jeho města uživí 88.
+
+Jeho město se spotřebou 56 500 tím spadne z **10 elektráren na 3**, ze 160
+dlaždic na 48. **Proud tím ale zlevnil**, ne zdražil: na 1 000 jednotek stojí
+stavba 250 místo 667 a údržba 5 místo 10. Zdvojnásobená údržba nevyrovná
+čtyřnásobný výkon. Kdyby měl proud stát na jednotku stejně jako dřív, musela
+by být údržba 480 a cena 16 000 — to je věc dalšího ladění, ne tohohle
+rozhodnutí.
+
+Testy na cenu elektrárny si ji teď berou **z obsahu**, ne z čísla v testu:
+balanc se ladí a test o tom nemá padat.
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_
