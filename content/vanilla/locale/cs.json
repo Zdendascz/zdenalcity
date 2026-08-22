@@ -205,6 +205,7 @@
   "ui.info.unknownDefinition": "Tuhle budovu neumí žádný načtený obsah popsat — nejspíš chybí mod.",
   "ui.info.abandonedWarning": "Budova je opuštěná. Nic nevydělává, nic nestojí a kazí okolí — sama nezmizí, musíš ji zbourat.",
   "ui.info.noPowerWarning": "Bez proudu je budova mimo provoz: nevydělává, ale ani nic nestojí.",
+  "ui.info.dryRelayWarning": "K téhle čerpací stanici voda nedoteče, takže síť neprodlužuje. Stanice není zdroj — musí stát na potrubí, kam voda došla.",
 
   "error.outOfBounds": "Mimo mapu.",
   "error.water": "Na vodu se stavět nedá.",

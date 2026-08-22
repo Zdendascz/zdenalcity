@@ -9,6 +9,32 @@ import { dateParts } from './hud';
 import type { I18n } from './i18n';
 
 /**
+ * Stojí tu čerpací stanice, ke které voda nedoteče?
+ *
+ * Relé pozná podle toho, že má dosah, ale žádnou výrobu. Vodárna sem nepatří —
+ * ta si vodu bere z plochy vedle sebe, ne z potrubí.
+ */
+function isIdleRelay(
+  world: WorldState,
+  definition: Definition,
+  building: Readonly<Building>,
+): boolean {
+  const water = definition.water;
+  if (!water || (water.range ?? 0) <= 0 || (water.production ?? 0) > 0) return false;
+
+  const [width, depth] = definition.footprint;
+  for (let dy = 0; dy < depth; dy++) {
+    for (let dx = 0; dx < width; dx++) {
+      const x = building.x + dx;
+      const y = building.y + dy;
+      if (x >= world.size || y >= world.size) continue;
+      if (world.waterSupply[y * world.size + x] === 1) return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Detail budovy po kliknutí pravým tlačítkem.
  *
  * Ukazuje, co budova městu nese a co stojí, jak je na tom s proudem a odkdy
@@ -125,6 +151,14 @@ export class BuildingInfo {
       this.root.appendChild(el('p', 'sheet__warning', t('ui.info.abandonedWarning')));
     } else if (!building.powered && consumption > 0) {
       this.root.appendChild(el('p', 'sheet__warning', t('ui.info.noPowerWarning')));
+    }
+
+    // Čerpací stanice je **relé, ne zdroj**: sama vodu nevyrábí, jen prodlužuje
+    // dosah sítě — a to jen tehdy, když k ní voda po potrubí doteče. Stanice
+    // položená o jedinou dlaždici za hranicí dosahu nedělá vůbec nic a vypadá
+    // úplně stejně jako fungující. Přesně na tom uvízlo město autora.
+    if (isIdleRelay(world, definition, building)) {
+      this.root.appendChild(el('p', 'sheet__warning', t('ui.info.dryRelayWarning')));
     }
 
     this.appendParcel(parcel, blocker);

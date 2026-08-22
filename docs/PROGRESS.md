@@ -1703,6 +1703,26 @@ parcelou musí být trubka. Autor na to narazil: potrubí u zóny mělo, ale ne
 jen se dá snadno přečíst jako „vodovod tu vůbec není". Jestli má potrubí
 zavodňovat i sousední dlaždice, je rozhodnutí o designu — patří k T41.
 
+- [x] Čerpací stanice, ke které voda nedoteče, to řekne (rozbor savu autora)
+
+Autor poslal rozehrané město s otázkou, jestli je v pořádku. Bylo — až na jednu
+věc, kterou hra nijak nedávala najevo:
+
+- 312 obyvatel, 61 budov, kasa 41 280, poptávka po průmyslu **+32**
+- 26 volných průmyslových parcel, **všechny s potrubím pod sebou**
+- a přesto na nich nic nerostlo, protože z těch 159 trubek bylo **104 mokrých
+  a 55 suchých** — dosah sítě končil přesně před průmyslem
+- příčina: **čerpací stanice na (39,13) stála o jedinou dlaždici za hranicí
+  dosahu.** Relé se zapojí, jen když k němu voda po potrubí doteče; tahle
+  stanice tam jen stála a nedělala nic. Druhá stanice (55,16) na vodě stála
+  a fungovala
+- ověřeno přesunem: stanice o dlaždici na sever, na (39,12), a mokrých trubek
+  je **149 místo 104**, vodu má 24 z 26 průmyslových parcel
+
+Stanice bez vody vypadala úplně stejně jako funkční. Panel budovy proto nově
+varuje: „K téhle čerpací stanici voda nedoteče, takže síť neprodlužuje."
+Ověřeno na tomtéž savu — suchá stanice varování má, funkční ne.
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_
