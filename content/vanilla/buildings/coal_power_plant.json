@@ -13,7 +13,7 @@
     "allowedTerrain": [0, 2]
   },
   "economy": {
-    "upkeep": 120
+    "upkeep": 240
   },
   "jobs": {
     "capacity": 20

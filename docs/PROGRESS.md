@@ -1751,17 +1751,23 @@ Nové hodnoty podle jeho zadání:
 |---|---|---|
 | výroba | 6 000 | **24 000** |
 | cena | 4 000 | **6 000** |
-| údržba | 60 | **120** |
+| údržba | 60 | **240** |
 
 24 000 je přesně **80 průmyslových budov** (300 každá), tedy nejtěžšího
 běžného odběratele; průměrné budovy z jeho města uživí 88.
 
 Jeho město se spotřebou 56 500 tím spadne z **10 elektráren na 3**, ze 160
-dlaždic na 48. **Proud tím ale zlevnil**, ne zdražil: na 1 000 jednotek stojí
-stavba 250 místo 667 a údržba 5 místo 10. Zdvojnásobená údržba nevyrovná
-čtyřnásobný výkon. Kdyby měl proud stát na jednotku stejně jako dřív, musela
-by být údržba 480 a cena 16 000 — to je věc dalšího ladění, ne tohohle
-rozhodnutí.
+dlaždic na 48.
+
+Údržba je 240, ne 120: při zdvojnásobení by proud na jednotku **zlevnil**
+(5 místo 10 za 1 000), protože dvojnásobná údržba nevyrovná čtyřnásobný výkon.
+Autor si vyžádal, ať provoz zůstane na původní úrovni, tedy 10 za 1 000 —
+a stavba ať zlevní, což je jediné, co se tím opravdu mění (250 místo 667).
+
+Pozor na zrnitost: tři velké elektrárny vyrobí 72 000, tedy o 15 500 víc, než
+město spotřebuje, takže reálná měsíční údržba vyjde 720 místo dřívějších 600.
+Za jednotku proudu je to stejné, za město o něco dražší — velké bloky se hůř
+trefují do potřeby.
 
 Testy na cenu elektrárny si ji teď berou **z obsahu**, ne z čísla v testu:
 balanc se ladí a test o tom nemá padat.
