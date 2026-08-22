@@ -130,6 +130,8 @@
   "ui.hud.date": "Rok {year}, měsíc {month}, den {day}",
   "ui.hud.demand": "Poptávka",
   "ui.hud.powered": "Pod proudem",
+  "ui.hud.power": "Proud",
+  "ui.notice.powerShortage": "Elektrárny nestačí: vyrábíš {produced}, město potřebuje {needed}. Postav další elektrárnu.",
 
   "ui.demand.residential": "O",
   "ui.demand.commercial": "K",

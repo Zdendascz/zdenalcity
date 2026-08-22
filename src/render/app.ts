@@ -748,6 +748,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   /** Byla kasa v mínusu už minulý snímek? Hláška patří k přechodu, ne ke stavu. */
   let wasBroke = false;
 
+  /** Totéž pro nedostatek proudu. */
+  let hadPowerShortage = false;
+
   /**
    * Odpočet snímků do další kontroly „zóny bez vody" a příznak, že se hláška
    * už objevila.
@@ -1161,12 +1164,39 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       if (broke) notifications.show(i18n.t('ui.notice.bankrupt'), 'error');
     }
 
+    // Výroba a spotřeba proudu. Hráč do teď viděl jen zlomek „65/86" a neměl
+    // jak zjistit, jestli mu chybí vedení, nebo elektrárna — dvě úplně jiné
+    // opravy. Autor na to narazil s dvěma elektrárnami a dvaceti tmavými domy.
     let poweredBuildings = 0;
+    let powerProduced = 0;
+    let powerNeeded = 0;
     for (const building of world.buildings.values()) {
       if (building.powered) poweredBuildings++;
+      if (building.abandoned) continue;
+      const definition = content.get(building.definitionId);
+      powerProduced += definition?.power?.production ?? 0;
+      powerNeeded += definition?.power?.consumption ?? 0;
+    }
+
+    // Hlásí se při přechodu do nedostatku, ne každý snímek. Když hráč postaví
+    // elektrárnu a město zase přeroste, ozve se to znovu.
+    const shortage = powerNeeded > powerProduced;
+    if (shortage !== hadPowerShortage) {
+      hadPowerShortage = shortage;
+      if (shortage) {
+        notifications.show(
+          i18n.t('ui.notice.powerShortage', {
+            produced: formatNumber(powerProduced),
+            needed: formatNumber(powerNeeded),
+          }),
+          'error',
+        );
+      }
     }
 
     hud.update({
+      powerProduced,
+      powerNeeded,
       speedIndex,
       layer: layerMode,
       view: viewMode,

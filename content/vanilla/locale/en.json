@@ -130,6 +130,8 @@
   "ui.hud.date": "Year {year}, month {month}, day {day}",
   "ui.hud.demand": "Demand",
   "ui.hud.powered": "Powered",
+  "ui.hud.power": "Power",
+  "ui.notice.powerShortage": "Not enough power: you produce {produced}, the city needs {needed}. Build another plant.",
 
   "ui.demand.residential": "R",
   "ui.demand.commercial": "C",

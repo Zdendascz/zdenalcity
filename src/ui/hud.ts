@@ -44,6 +44,9 @@ export interface HudState {
   view: string;
   budgetVisible: boolean;
   poweredBuildings: number;
+  /** Kolik proudu město vyrábí a kolik ho potřebuje. */
+  powerProduced: number;
+  powerNeeded: number;
   /** Financování podle třídy služby, 0–1. */
   funding: ReadonlyMap<string, number>;
   /** Už přeložená hláška o uložení či načtení. Prázdná = nic nezobrazovat. */
@@ -102,6 +105,8 @@ export class Hud {
     view: 'surface',
     budgetVisible: false,
     poweredBuildings: 0,
+    powerProduced: 0,
+    powerNeeded: 0,
     funding: new Map(),
     message: '',
   };
@@ -165,7 +170,13 @@ export class Hud {
       `+${formatNumber(economy.lastIncome)} / −${formatNumber(economy.lastExpenses)}`,
     );
     this.setValue('date', this.i18n.t('ui.hud.date', dateParts(tick)));
+    // Zlomek sám o sobě neřekne, co s tím: „65/86" může znamenat chybějící
+    // vedení i chybějící elektrárnu. Čísla vedle sebe to rozhodnou.
     this.setValue('powered', `${state.poweredBuildings}/${buildings.size}`);
+    this.setValue('power', `${formatNumber(state.powerProduced)} / ${formatNumber(state.powerNeeded)}`);
+    this.values
+      .get('power')
+      ?.classList.toggle('is-alarm', state.powerNeeded > state.powerProduced);
 
     for (const row of DEMAND_ROWS) {
       const value = demand[row.category];
@@ -240,6 +251,7 @@ export class Hud {
       ['jobs', 'ui.hud.jobs'],
       ['happiness', 'ui.hud.happiness'],
       ['powered', 'ui.hud.powered'],
+      ['power', 'ui.hud.power'],
       ['balance', 'ui.hud.balance'],
       // Popisek a hodnota mají vlastní klíče: `ui.hud.date` je celá věta s
       // parametry, jako popisek by se vypsala i se zástupnými symboly.

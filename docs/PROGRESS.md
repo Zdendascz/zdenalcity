@@ -1723,6 +1723,21 @@ Stanice bez vody vypadala úplně stejně jako funkční. Panel budovy proto nov
 varuje: „K téhle čerpací stanici voda nedoteče, takže síť neprodlužuje."
 Ověřeno na tomtéž savu — suchá stanice varování má, funkční ne.
 
+- [x] Proud je vidět v číslech, ne jen jako zlomek (rozbor savu autora)
+
+Autor poslal město se dvěma elektrárnami a dvaceti tmavými budovami s otázkou,
+jak je možné, že dvě elektrárny zvládnou jen 65 budov. Změřeno v jeho savu:
+
+- výroba **12 000** (2 × 6 000), spotřeba **17 720**, schodek **−5 720**
+- 65 budov pod proudem (11 880), 20 bez proudu — 15 průmyslových a 5 komerčních
+- **všech 20 je na síti**, takže nechybí vedení, ale kapacita. Město prostě
+  přerostlo své dvě elektrárny; třetí (6 000) by na 18 000 stačila
+
+Chyba to nebyla, ale hra to neuměla říct: „Pod proudem 65/86" se dá číst
+i jako přerušené vedení, což je úplně jiná oprava. HUD proto nově ukazuje
+řádek **„Proud 12 000 / 17 720"**, při schodku červeně, a při přechodu do
+nedostatku vyskočí hláška s oběma čísly. Ověřeno na tomtéž savu.
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_
