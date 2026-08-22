@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:residential_quarter",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_quarter.name",
+  "description": "building.residential_quarter.desc",
+  "footprint": [3, 3],
+  "level": 3,
+  "construction": {
+    "cost": 2700,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 135
+  },
+  "population": {
+    "capacity": 198
+  },
+  "power": {
+    "consumption": 2340
+  },
+  "environment": {
+    "pollution": 0
+  },
+  "graphics": {
+    "color": "#5c8bc3",
+    "heightLevels": 5
+  }
+}

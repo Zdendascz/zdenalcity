@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:industrial_complex",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_complex.name",
+  "description": "building.industrial_complex.desc",
+  "footprint": [3, 3],
+  "level": 3,
+  "construction": {
+    "cost": 5400,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 324
+  },
+  "jobs": {
+    "capacity": 297
+  },
+  "power": {
+    "consumption": 7010
+  },
+  "environment": {
+    "pollution": 60
+  },
+  "graphics": {
+    "color": "#b99a58",
+    "heightLevels": 5
+  }
+}

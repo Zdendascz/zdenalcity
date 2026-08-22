@@ -1,0 +1,34 @@
+{
+  "id": "vanilla:university",
+  "type": "building",
+  "category": "service",
+  "menu": "education",
+  "name": "building.university.name",
+  "description": "building.university.desc",
+  "footprint": [3, 3],
+  "construction": {
+    "cost": 4200,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 620
+  },
+  "jobs": {
+    "capacity": 60
+  },
+  "service": {
+    "class": "education",
+    "radius": 20,
+    "strength": 150
+  },
+  "power": {
+    "consumption": 1200
+  },
+  "graphics": {
+    "color": "#b89a4e",
+    "heightLevels": 3,
+    "icon": "book"
+  }
+}

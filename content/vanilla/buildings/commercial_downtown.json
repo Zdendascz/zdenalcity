@@ -1,0 +1,38 @@
+{
+  "id": "vanilla:commercial_downtown",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_downtown.name",
+  "description": "building.commercial_downtown.desc",
+  "footprint": [3, 3],
+  "level": 5,
+  "construction": {
+    "cost": 10260,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 513
+  },
+  "jobs": {
+    "capacity": 297
+  },
+  "power": {
+    "consumption": 7010
+  },
+  "environment": {
+    "pollution": 10
+  },
+  "graphics": {
+    "color": "#40986b",
+    "heightLevels": 10
+  },
+  "requirements": {
+    "services": {
+      "education": 70
+    },
+    "buildings": []
+  }
+}

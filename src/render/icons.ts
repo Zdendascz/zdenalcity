@@ -229,9 +229,38 @@ const HEART: IconShape = [
   ],
 ];
 
+/** Mříže — věznice. */
+const BARS: IconShape = [
+  [
+    [0.12, 0.16],
+    [0.88, 0.16],
+    [0.88, 0.26],
+    [0.12, 0.26],
+  ],
+  [
+    [0.2, 0.26],
+    [0.3, 0.26],
+    [0.3, 0.88],
+    [0.2, 0.88],
+  ],
+  [
+    [0.45, 0.26],
+    [0.55, 0.26],
+    [0.55, 0.88],
+    [0.45, 0.88],
+  ],
+  [
+    [0.7, 0.26],
+    [0.8, 0.26],
+    [0.8, 0.88],
+    [0.7, 0.88],
+  ],
+];
+
 export const ICON_SHAPES: Readonly<Record<string, IconShape>> = {
   cross: CROSS,
   shield: SHIELD,
+  bars: BARS,
   flame: FLAME,
   book: BOOK,
   tree: TREE,

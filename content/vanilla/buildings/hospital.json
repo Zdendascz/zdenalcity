@@ -1,0 +1,34 @@
+{
+  "id": "vanilla:hospital",
+  "type": "building",
+  "category": "service",
+  "menu": "health",
+  "name": "building.hospital.name",
+  "description": "building.hospital.desc",
+  "footprint": [3, 3],
+  "construction": {
+    "cost": 2200,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 380
+  },
+  "jobs": {
+    "capacity": 40
+  },
+  "service": {
+    "class": "health",
+    "radius": 16,
+    "strength": 130
+  },
+  "power": {
+    "consumption": 800
+  },
+  "graphics": {
+    "color": "#e8e8ec",
+    "heightLevels": 3,
+    "icon": "cross"
+  }
+}

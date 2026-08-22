@@ -67,6 +67,19 @@ export interface BuildingDefinition {
    */
   service?: { class: string; radius: number; strength: number };
   /**
+   * Druhá, **záporná** stopa budovy v okolí — stejný mechanismus jako služba,
+   * jen se počítá s tím, že váha její třídy v ceně půdy bude záporná.
+   *
+   * Existuje kvůli věznici (§6 fáze 2): je to policejní budova, takže sráží
+   * kriminalitu jako každá jiná, ale zároveň nikdo nechce bydlet vedle ní.
+   * Jednu třídu na budovu by obojí nezvládlo.
+   *
+   * Kód o žádné konkrétní třídě neví — jméno i váhu určuje obsah (P5).
+   * Financování se na ni nevztahuje: úsporami na policii se sousedům výhled
+   * na věznici nezlepší.
+   */
+  nuisance?: { class: string; radius: number; strength: number };
+  /**
    * Zpracování odpadu. Nemá pokrytí ani dosah — jen kapacitu, která se sčítá
    * celoměstsky (§6 zadání fáze 2).
    */
@@ -132,6 +145,7 @@ const DEFINITION_SECTIONS = [
   'population',
   'jobs',
   'service',
+  'nuisance',
   'waste',
   'requirements',
   'power',
@@ -325,6 +339,7 @@ export function validateDefinition(
   const population = validateCapacity(issues, record, 'population');
   const jobs = validateCapacity(issues, record, 'jobs');
   const service = validateService(issues, record);
+  const nuisance = validateService(issues, record, 'nuisance');
   const waste = validateWaste(issues, record);
   const requirements = validateRequirements(issues, record);
 
@@ -358,6 +373,7 @@ export function validateDefinition(
       ...(population ? { population } : {}),
       ...(jobs ? { jobs } : {}),
       ...(service ? { service } : {}),
+      ...(nuisance ? { nuisance } : {}),
       ...(waste ? { waste } : {}),
       ...(requirements ? { requirements } : {}),
       ...(power ? { power } : {}),
@@ -486,15 +502,16 @@ function validateCapacity(
 function validateService(
   issues: ValidationIssue[],
   record: Record<string, unknown>,
+  field: 'service' | 'nuisance' = 'service',
 ): BuildingDefinition['service'] {
-  if (record['service'] === undefined) return undefined;
-  const section = requireRecord(issues, record, 'service', 'service');
+  if (record[field] === undefined) return undefined;
+  const section = requireRecord(issues, record, field, field);
   if (!section) return undefined;
 
-  const serviceClass = requireString(issues, section, 'class', 'service.class', NAMESPACE);
+  const serviceClass = requireString(issues, section, 'class', `${field}.class`, NAMESPACE);
   // Dosah je v buňkách hrubé mřížky, ta má 32 buněk na stranu.
-  const radius = requireInt(issues, section, 'radius', 'service.radius', 1, 32);
-  const strength = requireInt(issues, section, 'strength', 'service.strength', 1, 255);
+  const radius = requireInt(issues, section, 'radius', `${field}.radius`, 1, 32);
+  const strength = requireInt(issues, section, 'strength', `${field}.strength`, 1, 255);
 
   return serviceClass !== null && radius !== null && strength !== null
     ? { class: serviceClass, radius, strength }

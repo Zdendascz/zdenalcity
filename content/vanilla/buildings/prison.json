@@ -1,0 +1,39 @@
+{
+  "id": "vanilla:prison",
+  "type": "building",
+  "category": "service",
+  "menu": "police",
+  "name": "building.prison.name",
+  "description": "building.prison.desc",
+  "footprint": [3, 3],
+  "construction": {
+    "cost": 3000,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 420
+  },
+  "jobs": {
+    "capacity": 45
+  },
+  "service": {
+    "class": "police",
+    "radius": 22,
+    "strength": 140
+  },
+  "nuisance": {
+    "class": "prison",
+    "radius": 7,
+    "strength": 200
+  },
+  "power": {
+    "consumption": 900
+  },
+  "graphics": {
+    "color": "#8a8a94",
+    "heightLevels": 2,
+    "icon": "bars"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "vanilla:commercial_mall",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_mall.name",
+  "description": "building.commercial_mall.desc",
+  "footprint": [3, 3],
+  "level": 4,
+  "construction": {
+    "cost": 6480,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 324
+  },
+  "jobs": {
+    "capacity": 216
+  },
+  "power": {
+    "consumption": 5100
+  },
+  "environment": {
+    "pollution": 8
+  },
+  "graphics": {
+    "color": "#48a172",
+    "heightLevels": 7
+  },
+  "requirements": {
+    "services": {
+      "education": 40
+    },
+    "buildings": []
+  }
+}

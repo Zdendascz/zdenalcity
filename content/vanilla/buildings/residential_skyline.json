@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:residential_skyline",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_skyline.name",
+  "description": "building.residential_skyline.desc",
+  "footprint": [3, 3],
+  "level": 5,
+  "construction": {
+    "cost": 6840,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 342
+  },
+  "population": {
+    "capacity": 396
+  },
+  "power": {
+    "consumption": 4670
+  },
+  "environment": {
+    "pollution": 0
+  },
+  "graphics": {
+    "color": "#4b7cb6",
+    "heightLevels": 10
+  }
+}

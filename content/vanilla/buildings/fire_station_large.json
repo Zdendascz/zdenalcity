@@ -1,0 +1,34 @@
+{
+  "id": "vanilla:fire_station_large",
+  "type": "building",
+  "category": "service",
+  "menu": "fire",
+  "name": "building.fire_station_large.name",
+  "description": "building.fire_station_large.desc",
+  "footprint": [2, 2],
+  "construction": {
+    "cost": 1300,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 240
+  },
+  "jobs": {
+    "capacity": 22
+  },
+  "service": {
+    "class": "fire",
+    "radius": 16,
+    "strength": 110
+  },
+  "power": {
+    "consumption": 440
+  },
+  "graphics": {
+    "color": "#c2603f",
+    "heightLevels": 2,
+    "icon": "flame"
+  }
+}

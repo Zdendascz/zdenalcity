@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:residential_spire",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_spire.name",
+  "description": "building.residential_spire.desc",
+  "footprint": [2, 2],
+  "level": 5,
+  "construction": {
+    "cost": 3040,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 152
+  },
+  "population": {
+    "capacity": 176
+  },
+  "power": {
+    "consumption": 2080
+  },
+  "environment": {
+    "pollution": 0
+  },
+  "graphics": {
+    "color": "#4b7cb6",
+    "heightLevels": 8
+  }
+}

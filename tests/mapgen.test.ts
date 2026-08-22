@@ -18,7 +18,19 @@ function share(terrain: Uint8Array, type: number): number {
 }
 
 /** Je souš jedna souvislá plocha? Průchod do šířky z první nevodní dlaždice. */
-function landIsConnected(terrain: Uint8Array): boolean {
+/**
+ * Dá se ze souše dojít všude?
+ *
+ * `bridgeSpan` je nejdelší vodní úsek, který se dá překlenout mostem. Nula
+ * znamená „žádné mosty" — tak se ověřuje mapa bez řek.
+ */
+/** Tentýž balanc, jen bez koryt — slouží jako srovnávací základ. */
+const WITHOUT_RIVERS = {
+  ...VANILLA_BALANCE,
+  map: { ...VANILLA_BALANCE.map, rivers: 0 },
+};
+
+function landIsConnected(terrain: Uint8Array, bridgeSpan = 3): boolean {
   const start = terrain.findIndex((value) => value !== TERRAIN.water);
   if (start < 0) return false;
 
@@ -40,8 +52,15 @@ function landIsConnected(terrain: Uint8Array): boolean {
       [0, 1],
       [-1, 0],
     ] as const) {
-      const nx = x + dx;
-      const ny = y + dy;
+      let nx = x + dx;
+      let ny = y + dy;
+      // Přeskoč souvislý pruh vody, pokud se do mostu vejde.
+      let span = 0;
+      while (inBounds(nx, ny) && terrain[index(nx, ny)] === TERRAIN.water && span < bridgeSpan) {
+        nx += dx;
+        ny += dy;
+        span++;
+      }
       if (!inBounds(nx, ny)) continue;
       const next = index(nx, ny);
       if (seen[next] === 1 || terrain[next] === TERRAIN.water) continue;
@@ -77,11 +96,24 @@ describe('generátor mapy', () => {
   });
 
   it('souš je souvislá na 200 náhodných seedech (R7)', { timeout: 30000 }, () => {
-    // Ostrov bez mostu — a mosty jsou až 3b — znamená kus mapy, kam se hráč
-    // nikdy nedostane. Proto je to invariant, ne přání.
+    // Ostrov, na který se hráč nedostane, je kus mapy k ničemu. Proto je to
+    // invariant, ne přání.
+    //
+    // Od zapnutí řek (3b) se souš smí dělit **korytem**, protože přes ně vede
+    // most. Souvislost se tedy počítá s tím, že se voda dá překlenout — ale
+    // jen úzká: přes moře most nevede.
     for (let seed = 1; seed <= 200; seed++) {
       const { terrain } = generateTerrain(seed * 7919, VANILLA_BALANCE);
       expect(landIsConnected(terrain), `seed ${seed * 7919}`).toBe(true);
+    }
+  });
+
+  it('bez řek je souš souvislá i bez mostů', { timeout: 30000 }, () => {
+    // Kontrola, že mosty nezakrývají chybu: mapa bez koryt musí být souvislá
+    // i bez jediného přemostění.
+    for (let seed = 1; seed <= 60; seed++) {
+      const { terrain } = generateTerrain(seed * 7919, WITHOUT_RIVERS);
+      expect(landIsConnected(terrain, 0), `seed ${seed * 7919}`).toBe(true);
     }
   });
 
@@ -108,10 +140,13 @@ describe('generátor mapy', () => {
 
       // Nahoře je strop nastavená hladina plus utopené ostrovy, dole pojistka,
       // že snižování hladiny nesmí moře vysušit úplně.
+      // Nahoře hladina plus utopené ostrovy plus koryta řek, dole pojistka,
+      // že snižování hladiny nesmí moře vysušit úplně.
       const drowned = 1 - VANILLA_BALANCE.map.minLandShare;
+      const riverbeds = 0.05;
       expect(water, `seed ${seed}: voda`).toBeGreaterThan(0.05);
       expect(water, `seed ${seed}: voda`).toBeLessThanOrEqual(
-        VANILLA_BALANCE.map.seaLevel + drowned,
+        VANILLA_BALANCE.map.seaLevel + drowned + riverbeds,
       );
     }
   });
@@ -198,17 +233,11 @@ describe('patra terénu (§7 fáze 3)', () => {
 });
 
 describe('řeky (R7)', () => {
-  /** Vanilla má řeky vypnuté, dokud nebudou mosty — test si je zapne sám. */
-  const WITH_RIVERS = {
-    ...VANILLA_BALANCE,
-    map: { ...VANILLA_BALANCE.map, rivers: 2 },
-  };
+  it('vanilla je má, protože mosty jsou hotové (T33)', () => {
+    expect(VANILLA_BALANCE.map.rivers).toBeGreaterThan(0);
 
-  it('vanilla je zatím nemá, protože chybí mosty (T33)', () => {
-    expect(VANILLA_BALANCE.map.rivers).toBe(0);
-
-    const bare = generateTerrain(555, VANILLA_BALANCE);
-    const wet = generateTerrain(555, WITH_RIVERS);
+    const bare = generateTerrain(555, WITHOUT_RIVERS);
+    const wet = generateTerrain(555, VANILLA_BALANCE);
     let bareWater = 0;
     let wetWater = 0;
     for (const value of bare.terrain) if (value === TERRAIN.water) bareWater++;
@@ -219,7 +248,7 @@ describe('řeky (R7)', () => {
 
   it('koryto teče z kopce dolů a invariant zůstane celý', { timeout: 20000 }, () => {
     for (let seed = 1; seed <= 25; seed++) {
-      const { terrain, cornerHeight } = generateTerrain(seed * 1009, WITH_RIVERS);
+      const { terrain, cornerHeight } = generateTerrain(seed * 1009, VANILLA_BALANCE);
       expect(countViolations(cornerHeight), `seed ${seed}`).toBe(0);
 
       // Voda nikde neleží výš než souš kolem ní o víc než patro — jinak by
@@ -241,8 +270,8 @@ describe('řeky (R7)', () => {
     // Slepá stružka končící uprostřed pole vypadá jako chyba generátoru.
     // Porovnává se s mapou bez řek, takže se rozliší, co je koryto a co moře.
     for (let seed = 1; seed <= 15; seed++) {
-      const bare = generateTerrain(seed * 2003, VANILLA_BALANCE).terrain;
-      const wet = generateTerrain(seed * 2003, WITH_RIVERS).terrain;
+      const bare = generateTerrain(seed * 2003, WITHOUT_RIVERS).terrain;
+      const wet = generateTerrain(seed * 2003, VANILLA_BALANCE).terrain;
 
       const river: number[] = [];
       for (let tile = 0; tile < wet.length; tile++) {

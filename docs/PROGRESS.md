@@ -1772,6 +1772,55 @@ trefují do potřeby.
 Testy na cenu elektrárny si ji teď berou **z obsahu**, ne z čísla v testu:
 balanc se ladí a test o tom nemá padat.
 
+- [x] Doplnění zadání: věznice, řeky, úrovně, velké služby, vzdělání, testy
+
+Po průchodu zadávací dokumentací proti kódu si autor vyžádal doplnit šest
+chybějících bodů.
+
+**Věznice a záporná stopa v okolí** (§6 fáze 2). Jedna budova nemohla být
+zároveň policejní službou a nepříjemným sousedem, protože třída je jedna.
+Přibyla proto volitelná sekce `nuisance` — **týž mechanismus jako služba**,
+jen se nefinancuje, protože škrty na policii sousedům výhled na věznici
+nezlepší. Kód o žádné třídě neví: věznice hlásí `police` do pokrytí
+a `prison` do obtěžování, a `landValue.weights.prison = −0,55` udělá zbytek.
+Záporné váhy schéma umělo už dřív, jen je nikdo nepoužil.
+
+**Řeky** (R7). Vanilla je má zapnuté (`map.rivers: 2`), protože mosty jsou
+hotové od T33. Dvě věci si to vyžádalo:
+
+- **koryto klesá rovnou na nulu**, ne po schodech. Sousední dlaždice sdílejí
+  rohy, takže klesající řeka by potřebovala společný roh zároveň ve třech
+  i ve dvou. Voda by se naklonila a vypadala jako vodopád ve vzduchu
+- **odříznuté ostrůvky se zaplaví.** Koryto umí utnout pár dlaždic od pevniny;
+  most se tam nevyplatí a hráč o nich neví. Pod 24 dlaždic jdou pod vodu,
+  větší kusy zůstanou — přes řeku vede most
+
+Test souvislosti souše proto nově počítá s tím, že se úzká voda dá překlenout;
+vedle něj je druhý, který mapu **bez řek** kontroluje bez jediného mostu, aby
+mosty nezakrývaly chybu generátoru.
+
+**Úrovně 4 a 5 a půdorysy 3×2 a 3×3.** Mechanismus je uměl od T16, ale obsah
+končil na třetí úrovni a 2×2, takže prahy 170 a 210 byly mrtvá čísla. Přibylo
+18 definic — šest na kategorii — a žebříček teď vede od domku 1×1 až po
+panorama 3×3 s 396 obyvateli. Kapacity i ceny navazují na řadu, která
+v obsahu už byla.
+
+**Velké varianty služeb** (§6 fáze 2): policejní ředitelství, velká zbrojnice,
+nemocnice, střední škola, vysoká škola, velký park.
+
+**Vzdělání jako brána** vyšších úrovní obchodu a průmyslu — podle zadání
+„nejzajímavější vazba fáze 2". Úroveň 4 chce pokrytí 40, úroveň 5 sedmdesát.
+Obytná zástavba podmínku nemá: lidé se stěhují za bydlením, ne za školou.
+
+**Testy.** Golden test běžel 500 tiků **bez systémů**, takže hlídal silnice
+a příkazy, ne růst. Přibyl golden nad **celým městem**: 1000 tiků plné sestavy
+na generované mapě, snapshot hashů plus čitelná čísla (56 budov, 180 obyvatel,
+96 míst). Místo pro město se v něm **hledá**, nesází natvrdo — generátor se
+ladí a souřadnice, které dnes padnou na louku, můžou zítra padnout do jezera.
+Druhý nový test plní kritérium fáze 3: **5000 tiků včetně dopravy a generátoru**
+dvakrát za sebou, porovnává vrstvy, hrubé vrstvy, stav RNG, kurzor dopravy
+i seznam budov.
+
 ## Rozpracované
 _(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
 ne technický úkol.)_

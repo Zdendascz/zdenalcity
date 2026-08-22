@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:residential_estate",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_estate.name",
+  "description": "building.residential_estate.desc",
+  "footprint": [3, 3],
+  "level": 4,
+  "construction": {
+    "cost": 4320,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 216
+  },
+  "population": {
+    "capacity": 288
+  },
+  "power": {
+    "consumption": 3400
+  },
+  "environment": {
+    "pollution": 0
+  },
+  "graphics": {
+    "color": "#5484bd",
+    "heightLevels": 7
+  }
+}

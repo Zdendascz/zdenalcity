@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:commercial_plaza",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_plaza.name",
+  "description": "building.commercial_plaza.desc",
+  "footprint": [3, 3],
+  "level": 3,
+  "construction": {
+    "cost": 4050,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 202
+  },
+  "jobs": {
+    "capacity": 153
+  },
+  "power": {
+    "consumption": 3610
+  },
+  "environment": {
+    "pollution": 6
+  },
+  "graphics": {
+    "color": "#4faa79",
+    "heightLevels": 5
+  }
+}

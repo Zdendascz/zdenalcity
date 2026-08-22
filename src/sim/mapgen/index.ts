@@ -3,7 +3,6 @@ import {
   CORNER_SIZE,
   cornerIndex,
   createCornerHeights,
-  MAX_HEIGHT,
   relaxHeights,
   tileBaseHeight,
 } from '../heights';
@@ -196,8 +195,40 @@ function carveRivers(rng: Rng, terrain: Uint8Array, heights: Uint8Array, balance
     carveOne(rng, terrain, heights, start);
   }
 
+  // Koryto umí odříznout pár dlaždic od zbytku pevniny. Most se na takový
+  // ostrůvek nevyplatí a hráč o něm ani neví, takže se zaplaví — stejně jako
+  // ostrovy při tvorbě pobřeží. Větší kusy zůstanou: přes řeku vede most.
+  drownScraps(terrain, heights);
   relaxHeights(heights);
 }
+
+/**
+ * Zaplaví ostrůvky menší než `SCRAP_TILES`, které vznikly korytem řeky.
+ *
+ * Nepočítá se největší komponenta, ale **velikost**: řeka může rozdělit mapu
+ * na dvě velké části a to je v pořádku — přes koryto se dá postavit most.
+ * Odříznutá trojice dlaždic uprostřed vody most nikdy neuvidí.
+ */
+function drownScraps(terrain: Uint8Array, heights: Uint8Array): void {
+  const { componentOf, sizes } = landComponents(terrain);
+  for (let tile = 0; tile < terrain.length; tile++) {
+    const id = componentOf[tile];
+    if (id === undefined || id < 0) continue;
+    if ((sizes[id] ?? 0) >= SCRAP_TILES) continue;
+
+    terrain[tile] = TERRAIN.water;
+    // Zaplavená dlaždice musí klesnout na hladinu, jinak by voda zůstala
+    // ležet na kopci.
+    const x = tile % MAP_SIZE;
+    const y = (tile - x) / MAP_SIZE;
+    for (const [dx, dy] of TILE_CORNERS) {
+      heights[cornerIndex(x + dx, y + dy)] = 0;
+    }
+  }
+}
+
+/** Pod tolik dlaždic je ostrůvek k ničemu a zaplaví se. */
+const SCRAP_TILES = 24;
 
 /** Jedna řeka od pramene dolů. Vrací délku koryta v dlaždicích. */
 function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: number): number {
@@ -245,15 +276,19 @@ function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: num
 
   // Koryto se zapíše až teď: cesta se mohla zaseknout a nedokončená řeka
   // uprostřed pole vypadá jako chyba generátoru.
-  let level = MAX_HEIGHT;
+  //
+  // Celé koryto klesne **na nulu**, ne po schodech dolů. Sousední dlaždice
+  // sdílejí rohy, takže klesající řeka by musela mít každou dlaždici v jiné
+  // výšce — a to nejde: společný roh nemůže být zároveň ve třech i ve dvou.
+  // Voda by se naklonila a vypadala jako vodopád visící ve vzduchu. Nulou se
+  // řeka srovná s mořem, do kterého stejně teče, a `relaxHeights` z toho udělá
+  // údolí.
   for (const at of path) {
     terrain[at] = TERRAIN.water;
     const x = at % MAP_SIZE;
     const y = (at - x) / MAP_SIZE;
-    level = Math.min(level, tileBaseHeight(heights, x, y));
     for (const [dx, dy] of TILE_CORNERS) {
-      const corner = cornerIndex(x + dx, y + dy);
-      heights[corner] = Math.min(heights[corner] ?? 0, level);
+      heights[cornerIndex(x + dx, y + dy)] = 0;
     }
   }
 

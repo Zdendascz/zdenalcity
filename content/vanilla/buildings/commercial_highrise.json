@@ -1,0 +1,38 @@
+{
+  "id": "vanilla:commercial_highrise",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_highrise.name",
+  "description": "building.commercial_highrise.desc",
+  "footprint": [2, 2],
+  "level": 5,
+  "construction": {
+    "cost": 4560,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 228
+  },
+  "jobs": {
+    "capacity": 132
+  },
+  "power": {
+    "consumption": 3120
+  },
+  "environment": {
+    "pollution": 10
+  },
+  "graphics": {
+    "color": "#40986b",
+    "heightLevels": 8
+  },
+  "requirements": {
+    "services": {
+      "education": 70
+    },
+    "buildings": []
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "vanilla:industrial_park",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_park.name",
+  "description": "building.industrial_park.desc",
+  "footprint": [3, 3],
+  "level": 5,
+  "construction": {
+    "cost": 13680,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 821
+  },
+  "jobs": {
+    "capacity": 558
+  },
+  "power": {
+    "consumption": 13170
+  },
+  "environment": {
+    "pollution": 92
+  },
+  "graphics": {
+    "color": "#ac884a",
+    "heightLevels": 10
+  },
+  "requirements": {
+    "services": {
+      "education": 70
+    },
+    "buildings": []
+  }
+}

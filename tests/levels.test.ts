@@ -645,14 +645,26 @@ describe('vanilla žebříček (§13 krok 5)', () => {
     const younger = [placeBuilding(world, house, 6, 7), placeBuilding(world, house, 7, 7)];
     run(4);
 
-    // Pohltil je a stojí na čtyřech parcelách (§13 krok 5).
-    expect(content.get(building.definitionId)?.footprint).toEqual([2, 2]);
-    expect(building.level).toBe(3);
+    // Pohltil je a stojí nejmíň na čtyřech parcelách (§13 krok 5). Od doplnění
+    // žebříčku na pět úrovní se rozrůstá dál, takže se tu neověřuje přesný
+    // půdorys, ale to, co ten krok znamená: sousedi zmizeli a dům je větší.
+    const footprint = content.get(building.definitionId)?.footprint ?? [1, 1];
+    expect(footprint[0] * footprint[1]).toBeGreaterThanOrEqual(4);
+    expect(building.level).toBeGreaterThanOrEqual(3);
     for (const neighbour of younger) {
       expect(world.buildings.has(neighbour.id)).toBe(false);
     }
     expect(world.buildings.size).toBe(1);
     expect(building.population).toBeGreaterThan((house.population?.capacity ?? 0) * 4);
+
+    // A na špičkové parcele dojde až na konec žebříčku (§8 fáze 2: úrovně 1–5).
+    for (let x = 4; x < 12; x++) {
+      for (let y = 4; y < 12; y++) setLandValue(world, x, y, 255);
+    }
+    run(20);
+    expect(building.level).toBe(5);
+    const top = content.get(building.definitionId);
+    expect(top?.footprint).toEqual([3, 3]);
   });
 });
 

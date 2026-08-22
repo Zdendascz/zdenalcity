@@ -37,21 +37,30 @@ export function createServiceSystem(catalogue: BuildingCatalogue): System {
       for (const id of [...world.buildings.keys()].sort((a, b) => a - b)) {
         const building = world.buildings.get(id);
         const definition = building && catalogue.get(building.definitionId);
-        const service = definition?.service;
-        if (!building || !definition || !service) continue;
+        if (!building || !definition) continue;
 
-        const funding = serviceFunding(world, service.class);
-        const radius = service.radius * funding;
-        const strength = service.strength * funding;
-        if (radius <= 0 || strength <= 0) continue;
+        // Služba i obtěžování jsou tentýž mechanismus; liší se jen tím, že na
+        // obtěžování se financování nevztahuje — škrty na policii sousedům
+        // věznice z okolí neodstraní.
+        for (const [source, funded] of [
+          [definition.service, true],
+          [definition.nuisance, false],
+        ] as const) {
+          if (!source) continue;
 
-        let field = accumulated.get(service.class);
-        if (!field) {
-          field = new Float32Array(COARSE_CELLS);
-          accumulated.set(service.class, field);
+          const funding = funded ? serviceFunding(world, source.class) : 1;
+          const radius = source.radius * funding;
+          const strength = source.strength * funding;
+          if (radius <= 0 || strength <= 0) continue;
+
+          let field = accumulated.get(source.class);
+          if (!field) {
+            field = new Float32Array(COARSE_CELLS);
+            accumulated.set(source.class, field);
+          }
+
+          addCoverage(field, building, definition.footprint, radius, strength);
         }
-
-        addCoverage(field, building, definition.footprint, radius, strength);
       }
 
       writeCoverage(world, accumulated);

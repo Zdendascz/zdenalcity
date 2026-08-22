@@ -1,0 +1,38 @@
+{
+  "id": "vanilla:industrial_smelter",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_smelter.name",
+  "description": "building.industrial_smelter.desc",
+  "footprint": [2, 2],
+  "level": 5,
+  "construction": {
+    "cost": 6080,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 365
+  },
+  "jobs": {
+    "capacity": 248
+  },
+  "power": {
+    "consumption": 5850
+  },
+  "environment": {
+    "pollution": 92
+  },
+  "graphics": {
+    "color": "#ac884a",
+    "heightLevels": 8
+  },
+  "requirements": {
+    "services": {
+      "education": 70
+    },
+    "buildings": []
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "vanilla:park_large",
+  "type": "building",
+  "category": "service",
+  "menu": "parks",
+  "name": "building.park_large.name",
+  "description": "building.park_large.desc",
+  "footprint": [2, 2],
+  "construction": {
+    "cost": 400,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 60
+  },
+  "jobs": {
+    "capacity": 4
+  },
+  "service": {
+    "class": "parks",
+    "radius": 12,
+    "strength": 120
+  },
+  "power": {
+    "consumption": 80
+  },
+  "graphics": {
+    "color": "#5f9a5f",
+    "heightLevels": 1,
+    "icon": "tree"
+  }
+}

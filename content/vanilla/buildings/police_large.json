@@ -1,0 +1,34 @@
+{
+  "id": "vanilla:police_large",
+  "type": "building",
+  "category": "service",
+  "menu": "police",
+  "name": "building.police_large.name",
+  "description": "building.police_large.desc",
+  "footprint": [2, 2],
+  "construction": {
+    "cost": 1400,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 260
+  },
+  "jobs": {
+    "capacity": 24
+  },
+  "service": {
+    "class": "police",
+    "radius": 18,
+    "strength": 110
+  },
+  "power": {
+    "consumption": 480
+  },
+  "graphics": {
+    "color": "#6f7fa8",
+    "heightLevels": 2,
+    "icon": "shield"
+  }
+}

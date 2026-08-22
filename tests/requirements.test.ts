@@ -206,9 +206,10 @@ describe('podmínky platí pro růst, povýšení i ruční stavbu', () => {
 });
 
 describe('vanilla obsah', () => {
-  it('jediná podmíněná budova je zastávka MHD, a čeká na vozovnu (§6 fáze 3)', async () => {
-    // Mechanismus vznikl v T19 a rok ležel ladem; MHD je jeho první ostré
-    // použití. Kdyby podmínku dostalo něco dalšího, ať je to vidět tady.
+  it('podmínku má zastávka MHD a vyšší úrovně obchodu i průmyslu', async () => {
+    // Mechanismus vznikl v T19 a dlouho ležel ladem. Ostrá použití jsou dvě:
+    // vozovna u zastávky (§6 fáze 3) a **vzdělání jako brána** vyšších úrovní
+    // C a I — podle §6 fáze 2 „nejzajímavější vazba fáze 2".
     const content = new ContentRegistry();
     await content.load(createVanillaSource());
 
@@ -224,9 +225,26 @@ describe('vanilla obsah', () => {
       })
       .map((building) => building.id);
 
-    expect(gated).toEqual(['vanilla:transit_stop']);
+    expect(gated).toContain('vanilla:transit_stop');
     expect(content.get('vanilla:transit_stop')?.requirements?.buildings).toEqual([
       'vanilla:transit_depot',
     ]);
+
+    // Vzdělání drží úrovně 4 a 5 u obchodu i průmyslu; obytná zástavba ne —
+    // lidé se stěhují za bydlením, ne za školou.
+    const educationGated = gated.filter(
+      (id) => (content.get(id)?.requirements?.services['education'] ?? 0) > 0,
+    );
+    expect(educationGated.length).toBeGreaterThan(0);
+    for (const id of educationGated) {
+      const definition = content.get(id);
+      expect(['commercial', 'industrial']).toContain(definition?.category);
+      expect(definition?.level).toBeGreaterThanOrEqual(4);
+    }
+    expect(
+      content.getAll('building').some(
+        (b) => b.category === 'residential' && (b.requirements?.services['education'] ?? 0) > 0,
+      ),
+    ).toBe(false);
   });
 });

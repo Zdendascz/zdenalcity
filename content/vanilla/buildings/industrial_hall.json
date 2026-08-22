@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:industrial_hall",
+  "type": "building",
+  "category": "industrial",
+  "name": "building.industrial_hall.name",
+  "description": "building.industrial_hall.desc",
+  "footprint": [3, 2],
+  "level": 3,
+  "construction": {
+    "cost": 3600,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 216
+  },
+  "jobs": {
+    "capacity": 198
+  },
+  "power": {
+    "consumption": 4670
+  },
+  "environment": {
+    "pollution": 60
+  },
+  "graphics": {
+    "color": "#b99a58",
+    "heightLevels": 4
+  }
+}

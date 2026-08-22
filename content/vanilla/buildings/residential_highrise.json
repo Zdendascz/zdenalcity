@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:residential_highrise",
+  "type": "building",
+  "category": "residential",
+  "name": "building.residential_highrise.name",
+  "description": "building.residential_highrise.desc",
+  "footprint": [2, 2],
+  "level": 4,
+  "construction": {
+    "cost": 1920,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 96
+  },
+  "population": {
+    "capacity": 128
+  },
+  "power": {
+    "consumption": 1510
+  },
+  "environment": {
+    "pollution": 0
+  },
+  "graphics": {
+    "color": "#5484bd",
+    "heightLevels": 6
+  }
+}

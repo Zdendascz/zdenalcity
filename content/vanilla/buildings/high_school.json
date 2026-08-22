@@ -1,0 +1,34 @@
+{
+  "id": "vanilla:high_school",
+  "type": "building",
+  "category": "service",
+  "menu": "education",
+  "name": "building.high_school.name",
+  "description": "building.high_school.desc",
+  "footprint": [2, 2],
+  "construction": {
+    "cost": 1800,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 300
+  },
+  "jobs": {
+    "capacity": 26
+  },
+  "service": {
+    "class": "education",
+    "radius": 14,
+    "strength": 100
+  },
+  "power": {
+    "consumption": 520
+  },
+  "graphics": {
+    "color": "#c9b06a",
+    "heightLevels": 2,
+    "icon": "book"
+  }
+}

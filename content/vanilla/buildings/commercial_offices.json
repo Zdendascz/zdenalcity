@@ -1,0 +1,38 @@
+{
+  "id": "vanilla:commercial_offices",
+  "type": "building",
+  "category": "commercial",
+  "name": "building.commercial_offices.name",
+  "description": "building.commercial_offices.desc",
+  "footprint": [2, 2],
+  "level": 4,
+  "construction": {
+    "cost": 2880,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "requiresWater": true,
+    "allowedTerrain": [0, 2]
+  },
+  "economy": {
+    "upkeep": 144
+  },
+  "jobs": {
+    "capacity": 96
+  },
+  "power": {
+    "consumption": 2270
+  },
+  "environment": {
+    "pollution": 8
+  },
+  "graphics": {
+    "color": "#48a172",
+    "heightLevels": 6
+  },
+  "requirements": {
+    "services": {
+      "education": 40
+    },
+    "buildings": []
+  }
+}
