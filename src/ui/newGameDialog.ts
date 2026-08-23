@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
-import { DEFAULT_MAP_SIZE, TERRAIN } from '@/sim/layers';
+import { DEFAULT_MAP_SIZE, MAP_SIZES, TERRAIN } from '@/sim/layers';
+import type { MapSize } from '@/sim/layers';
 import { generateTerrain } from '@/sim/mapgen';
 import { button, el } from './dom';
 import type { I18n } from './i18n';
@@ -18,6 +19,8 @@ import type { I18n } from './i18n';
 export interface NewGame {
   cityName: string;
   seed: number;
+  /** Hrana mapy v dlaždicích. Vybírá se v dialogu, dál ji nese `world.size`. */
+  size: MapSize;
   /**
    * Hráč chce pokračovat v rozehraném městě, ne zakládat nové. Jméno a seed
    * si pak hra vezme ze savu, ne odsud.
@@ -31,16 +34,25 @@ export interface NewGameOptions {
 }
 
 /** Barvy náhledu odpovídají paletě rendereru; index = hodnota vrstvy terénu. */
-const PREVIEW_COLORS: Readonly<Record<number, string>> = {
-  [TERRAIN.grass]: '#6b9b4a',
-  [TERRAIN.water]: '#3a6ea5',
-  [TERRAIN.sand]: '#d6c48a',
-  [TERRAIN.rock]: '#8a8a8a',
-  [TERRAIN.forest]: '#3f6b34',
-  [TERRAIN.marsh]: '#6d7a55',
+const PREVIEW_RGB: Readonly<Record<number, readonly [number, number, number]>> = {
+  [TERRAIN.grass]: [0x6b, 0x9b, 0x4a],
+  [TERRAIN.water]: [0x3a, 0x6e, 0xa5],
+  [TERRAIN.sand]: [0xd6, 0xc4, 0x8a],
+  [TERRAIN.rock]: [0x8a, 0x8a, 0x8a],
+  [TERRAIN.forest]: [0x3f, 0x6b, 0x34],
+  [TERRAIN.marsh]: [0x6d, 0x7a, 0x55],
 };
 
-const PREVIEW_SCALE = 3;
+const BLACK = [0, 0, 0] as const;
+
+/**
+ * Od téhle velikosti se u volby ukáže varování.
+ *
+ * 512 × 512 je 262 144 dlaždic, šestnáctkrát víc než výchozí mapa. Zadání
+ * (R20) s tím počítá jako s jiným režimem, ne s jiným číslem — hráč to má
+ * vědět **předem**, ne až mu město začne trhat.
+ */
+const HEAVY_SIZE = 512;
 
 /** Seed je uint32, aby se vešel do savu i do `Rng` beze změny významu. */
 function randomSeed(): number {
@@ -78,6 +90,13 @@ export function showNewGameDialog(
   nameLabel.appendChild(nameInput);
   form.appendChild(nameLabel);
 
+  // Velikost mapy: čtyři pevné volby, ne posuvník. Mezivelikosti by nic
+  // nepřinesly a save i mřížky se od nich odvozují (§2 fáze 4).
+  const sizeLabel = el('div', 'dialog__field');
+  sizeLabel.appendChild(el('span', undefined, t('ui.newGame.size')));
+  const sizeChips = el('div', 'dialog__sizes');
+  sizeLabel.appendChild(sizeChips);
+
   const seedLabel = el('label', 'dialog__field');
   seedLabel.appendChild(el('span', undefined, t('ui.newGame.seed')));
   const seedInput = el('input', 'dialog__input');
@@ -87,16 +106,35 @@ export function showNewGameDialog(
   form.appendChild(seedLabel);
 
   dialog.appendChild(form);
+  dialog.appendChild(sizeLabel);
 
   const canvas = el('canvas', 'dialog__preview');
-  canvas.width = DEFAULT_MAP_SIZE * PREVIEW_SCALE;
-  canvas.height = DEFAULT_MAP_SIZE * PREVIEW_SCALE;
   dialog.appendChild(canvas);
 
   const note = el('p', 'dialog__note');
   dialog.appendChild(note);
 
   let seed = randomSeed();
+  let size: MapSize = DEFAULT_MAP_SIZE as MapSize;
+
+  const chips = new Map<MapSize, HTMLButtonElement>();
+  for (const option of MAP_SIZES) {
+    const chip = button('chip', () => {
+      size = option;
+      markChips();
+      draw();
+    });
+    chip.textContent = `${option}×${option}`;
+    if (option >= HEAVY_SIZE) chip.title = t('ui.newGame.size.heavy');
+    chips.set(option, chip);
+    sizeChips.appendChild(chip);
+  }
+
+  function markChips(): void {
+    for (const [option, chip] of chips) {
+      chip.classList.toggle('is-active', option === size);
+    }
+  }
 
   function draw(): void {
     seedInput.value = String(seed);
@@ -105,30 +143,34 @@ export function showNewGameDialog(
     if (!context) return;
 
     const started = performance.now();
-    const { terrain } = generateTerrain(seed, balance);
+    const { terrain } = generateTerrain(seed, balance, size);
 
-    // Kreslí se po dlaždicích; 16 384 obdélníků je pod milisekundu a odpadá
-    // tím práce s ImageData a jejím pořadím kanálů.
-    for (let y = 0; y < DEFAULT_MAP_SIZE; y++) {
-      for (let x = 0; x < DEFAULT_MAP_SIZE; x++) {
-        context.fillStyle =
-          PREVIEW_COLORS[terrain[y * DEFAULT_MAP_SIZE + x] ?? TERRAIN.grass] ??
-          '#000';
-        context.fillRect(
-          x * PREVIEW_SCALE,
-          y * PREVIEW_SCALE,
-          PREVIEW_SCALE,
-          PREVIEW_SCALE,
-        );
-      }
+    // Jeden pixel na dlaždici; roztažení na 384 bodů obstará CSS
+    // (`image-rendering: pixelated`). Do T43 se kreslily obdélníky, což u
+    // 16 384 dlaždic nikoho nebolelo — u 262 144 by to bylo čtvrt milionu
+    // volání `fillRect` při každém přepnutí velikosti.
+    canvas.width = size;
+    canvas.height = size;
+    const image = context.createImageData(size, size);
+    for (let tile = 0; tile < terrain.length; tile++) {
+      const rgb = PREVIEW_RGB[terrain[tile] ?? TERRAIN.grass] ?? BLACK;
+      const at = tile * 4;
+      image.data[at] = rgb[0];
+      image.data[at + 1] = rgb[1];
+      image.data[at + 2] = rgb[2];
+      image.data[at + 3] = 255;
     }
+    context.putImageData(image, 0, 0);
 
     let land = 0;
     for (const value of terrain) if (value !== TERRAIN.water) land++;
-    note.textContent = i18n.t('ui.newGame.stats', {
+    const stats = i18n.t('ui.newGame.stats', {
       land: Math.round((land / terrain.length) * 100),
       ms: Math.round(performance.now() - started),
     });
+    // Varování se lepí za statistiku, ne místo ní: hráč potřebuje obojí.
+    note.textContent = size >= HEAVY_SIZE ? `${stats} ${t('ui.newGame.size.heavy')}` : stats;
+    note.classList.toggle('is-warning', size >= HEAVY_SIZE);
   }
 
   const actions = el('div', 'dialog__actions');
@@ -138,7 +180,7 @@ export function showNewGameDialog(
   if (options.canResume) {
     const resume = button('chip chip--primary', () => {
       overlay.remove();
-      resolveGame({ cityName: '', seed, resume: true });
+      resolveGame({ cityName: '', seed, size, resume: true });
     });
     resume.textContent = t('ui.newGame.resume');
     actions.appendChild(resume);
@@ -160,13 +202,18 @@ export function showNewGameDialog(
 
   const start = button(options.canResume ? 'chip' : 'chip chip--primary', () => {
     overlay.remove();
-    resolveGame({ cityName: nameInput.value.trim() || t('ui.newGame.defaultCityName'), seed });
+    resolveGame({
+      cityName: nameInput.value.trim() || t('ui.newGame.defaultCityName'),
+      seed,
+      size,
+    });
   });
   start.textContent = t('ui.newGame.start');
   actions.appendChild(start);
 
   dialog.appendChild(actions);
   parent.appendChild(overlay);
+  markChips();
   draw();
 
   return new Promise<NewGame>((resolve) => {

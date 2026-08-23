@@ -81,6 +81,30 @@ describe('svět jiné velikosti', () => {
   });
 });
 
+describe('nabídka v dialogu nové hry', () => {
+  it('nabízí čtyři velikosti a výchozí je mezi nimi', () => {
+    expect([...MAP_SIZES]).toEqual([128, 192, 256, 512]);
+    expect(MAP_SIZES).toContain(DEFAULT_MAP_SIZE);
+  });
+
+  it.each(MAP_SIZES)('svět o hraně %i se dá založit i vygenerovat', (size) => {
+    // Dialog nabízí čtyři tlačítka; tenhle test je jediné místo, kde se
+    // ověří, že za každým z nich stojí mapa, která opravdu vznikne.
+    // Samotný dialog je DOM a ten se tu netestuje — jsdom není závislost.
+    const world = createWorld(3, undefined, size);
+    applyGeneratedMap(world, generateTerrain(3, VANILLA_BALANCE, size));
+
+    expect(world.size).toBe(size);
+    expect(world.layers.terrain.length).toBe(size * size);
+    // Mapa nesmí být samá voda ani samá souš — jinak není co hrát.
+    let land = 0;
+    for (const value of world.layers.terrain) if (value !== TERRAIN.water) land++;
+    const share = land / world.layers.terrain.length;
+    expect(share).toBeGreaterThan(0.3);
+    expect(share).toBeLessThan(0.95);
+  }, 30000);
+});
+
 describe('generátor na jiné velikosti', () => {
   it.each(SIZES)('vygeneruje mapu %i s vodou na nule', (size) => {
     const map = generateTerrain(12345, VANILLA_BALANCE, size);

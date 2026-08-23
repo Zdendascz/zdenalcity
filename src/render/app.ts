@@ -14,7 +14,7 @@ import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
 import { cornerIndex, tileCorners } from '@/sim/heights';
-import { DEFAULT_MAP_SIZE, index, ZONE } from '@/sim/layers';
+import { index, ZONE } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
@@ -338,11 +338,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
-  const simWorld = createWorld(
-    newGame.seed,
-    content.getBalance().economy,
-    DEFAULT_MAP_SIZE,
-  );
+  const simWorld = createWorld(newGame.seed, content.getBalance().economy, newGame.size);
 
   // Obnovení rozehraného města. Nečitelný autosave se **zahodí a hra začne
   // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,

@@ -677,7 +677,12 @@ body {
   font-size: 14px;
 }
 
-/* Náhled je bitmapa 128×128; bez tohohle by ho prohlížeč rozmazal. */
+.dialog__sizes {
+  display: flex;
+  gap: 6px;
+}
+
+/* Náhled je bitmapa o hraně mapy; bez tohohle by ho prohlížeč rozmazal. */
 .dialog__preview {
   width: 384px;
   height: 384px;
@@ -689,6 +694,11 @@ body {
   margin: 0;
   font-size: 12px;
   color: var(--text-dim);
+}
+
+/* Varování u velké mapy. Nemá křičet, jen se odlišit od běžné statistiky. */
+.dialog__note.is-warning {
+  color: #e0b64a;
 }
 
 .dialog__actions {

@@ -166,6 +166,8 @@
   "ui.newGame.cityName": "City name",
   "ui.newGame.defaultCityName": "Newbridge",
   "ui.newGame.seed": "Map seed",
+  "ui.newGame.size": "Map size",
+  "ui.newGame.size.heavy": "The largest map is sixteen times the default — it may stutter on a weaker machine.",
   "ui.newGame.reroll": "Another map",
   "ui.newGame.start": "Found the city",
   "ui.newGame.resume": "Continue",
