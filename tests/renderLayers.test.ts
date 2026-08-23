@@ -1,3 +1,10 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Pixi si při importu sáhne na `navigator` (`isSafari`), takže tenhle soubor
+ * potřebuje DOM. Je to pragma pro jeden soubor, ne globální nastavení —
+ * simulační testy tím zůstávají ve `node` a neplatí za jsdom časem.
+ */
 import { describe, expect, it } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import {
