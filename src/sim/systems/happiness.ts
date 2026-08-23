@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { COARSE_FACTOR } from '../coarse';
+import { strongestModifier } from '../disasters/effects';
 import { coarseCongestion } from '../diagnostics';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -79,6 +80,11 @@ export function createHappinessSystem(balance: Balance): System {
         raw -= (world.coarse.pollution[cell] ?? 0) * happiness.pollution;
         raw -= (world.coarse.crime[cell] ?? 0) * happiness.crime;
         raw -= (congestion[cell] ?? 0) * happiness.congestion;
+
+        // Srážka z katastrof jde **do surové hodnoty**, ne až na výsledek:
+        // spokojenost se k ní pak vyhlazuje jako ke všemu ostatnímu a po
+        // skončení pohromy se stejně pozvolna vrací.
+        raw -= strongestModifier(world, 'happinessPenalty', cell, 0, undefined, Math.max);
 
         const previous = world.happiness[cell] ?? 0;
         const next = previous + (raw - previous) * happiness.smoothing;

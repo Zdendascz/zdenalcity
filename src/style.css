@@ -677,6 +677,18 @@ body {
   font-size: 14px;
 }
 
+/* Zaškrtávátko v dialogu: popisek vedle, ne pod. */
+.dialog__field--check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Roletka katastrof má vlastní barvu — je to jediné tlačítko, které škodí. */
+.popover--alarm .popover__button {
+  border-color: rgb(232 107 107 / 45%);
+}
+
 .dialog__sizes {
   display: flex;
   gap: 6px;

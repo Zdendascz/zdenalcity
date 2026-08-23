@@ -16,6 +16,82 @@ export interface RoadTypeBalance {
   upkeep: number;
 }
 
+/** Veličina, podle které se katastrofa škáluje nebo podmiňuje (§3 fáze 4). */
+export type DisasterMetric =
+  | 'none'
+  | 'buildings'
+  | 'population'
+  | 'roadTiles'
+  | 'coastTiles'
+  | 'forestTiles'
+  | 'flatShare'
+  | 'industrialBuildings'
+  | 'residentialBuildings'
+  | 'heavyIndustry'
+  | 'powerPlants'
+  | 'riskySlopes';
+
+const DISASTER_METRICS: readonly DisasterMetric[] = [
+  'none',
+  'buildings',
+  'population',
+  'roadTiles',
+  'coastTiles',
+  'forestTiles',
+  'flatShare',
+  'industrialBuildings',
+  'residentialBuildings',
+  'heavyIndustry',
+  'powerPlants',
+  'riskySlopes',
+];
+
+/**
+ * Měřítkový faktor: `clamp(offset + tvar(metrika / dělitel), min, max)`.
+ *
+ * Jeden zápis pro všechny — katalog jim říká `sizeFactor`, `coastFactor`,
+ * `forestFactor` nebo `slopeFactor`, ale počítají se stejně. Kdyby měl každý
+ * vlastní tvar, byly by v kódu čtyři skoro stejné funkce.
+ */
+export interface ScaleBalance {
+  metric: DisasterMetric;
+  /** `sqrt` tlumí růst u velkých měst, `linear` ne. */
+  curve: 'sqrt' | 'linear';
+  divisor: number;
+  offset: number;
+  min: number;
+  max: number;
+}
+
+/** Jeden sčítanec faktoru typu. */
+export interface RiskTermBalance {
+  /** Jméno ukazatele; `uncovered:fire` a spol. nesou třídu za dvojtečkou. */
+  indicator: string;
+  weight: number;
+  /**
+   * Když je zadané, počítá se **o kolik ukazatel chybí** pod tuhle hodnotu.
+   * Používá to rezerva elektrické sítě: nad prahem nepřispívá nic, pod ním
+   * roste strmě. Bez toho by ta strmost musela být v kódu.
+   */
+  below?: number;
+}
+
+export interface DisasterBalance {
+  baseMonthlyChance: number;
+  maxMonthlyChance: number;
+  /** Období hájení v tikách (R17). */
+  cooldownTicks: number;
+  /** Přírodní katastrofy mají faktor typu vždycky 1 — správa města na ně nemá vliv. */
+  natural: boolean;
+  concurrent: { metric: DisasterMetric; divisor: number; min: number; max: number };
+  scale?: ScaleBalance;
+  /** Rok má 360 tiků. `from > to` se čte jako okno přes Silvestra. */
+  season?: { from: number; to: number; inFactor: number; outFactor: number };
+  /** Bez čeho katastrofa nevznikne — pobřeží u povodně, les u lesního požáru. */
+  require: readonly { metric: DisasterMetric; min: number }[];
+  risk: readonly RiskTermBalance[];
+}
+
 export interface Balance {
   /**
    * Ekonomika. Původně konstanty fáze 1 v kódu — přesunuty sem, aby šel balanc
@@ -204,6 +280,17 @@ export interface Balance {
   };
 
   /** Čte se od T18 (přepis růstu). */
+  /**
+   * Katastrofy (§3 fáze 4). Všech patnáct je **data**, ne kód (P5) — mechanika
+   * každé z nich je vlastní, ale kdy a jak často udeří, se ladí odsud.
+   */
+  disasters: {
+    /** Strop faktoru typu (R16). Společný všem, jinak by nerozpojoval smyčku. */
+    maxRiskMultiplier: number;
+    indicators: { uncoveredBelow: number; denseLevel: number; ageTicks: number };
+    types: Readonly<Record<string, DisasterBalance>>;
+  };
+
   growth: {
     exponent: number;
     demandPerAttempt: number;
@@ -356,6 +443,9 @@ export function validateBalance(raw: unknown): {
     });
   }
 
+  const disasters = section(issues, root, 'disasters');
+  const disasterTypes = validateDisasters(issues, disasters);
+
   const roadTypes: RoadTypeBalance[] = [];
   const rawRoadTypes = traffic?.['roadTypes'];
   if (!Array.isArray(rawRoadTypes) || rawRoadTypes.length === 0) {
@@ -383,6 +473,43 @@ export function validateBalance(raw: unknown): {
   }
 
   const balance: Balance = {
+    disasters: {
+      maxRiskMultiplier: num(
+        issues,
+        disasters,
+        'maxRiskMultiplier',
+        'disasters.maxRiskMultiplier',
+        1,
+        100,
+      ),
+      indicators: {
+        uncoveredBelow: num(
+          issues,
+          disasters ? asRecord(disasters['indicators']) : null,
+          'uncoveredBelow',
+          'disasters.indicators.uncoveredBelow',
+          0,
+          255,
+        ),
+        denseLevel: num(
+          issues,
+          disasters ? asRecord(disasters['indicators']) : null,
+          'denseLevel',
+          'disasters.indicators.denseLevel',
+          1,
+          5,
+        ),
+        ageTicks: num(
+          issues,
+          disasters ? asRecord(disasters['indicators']) : null,
+          'ageTicks',
+          'disasters.indicators.ageTicks',
+          0,
+          1000000,
+        ),
+      },
+      types: disasterTypes,
+    },
     economy: {
       taxableValuePerUnit: num(
         issues,
@@ -523,4 +650,200 @@ export function validateBalance(raw: unknown): {
   };
 
   return { balance: issues.length > 0 ? null : balance, issues };
+}
+
+/**
+ * Katastrofy z balancu.
+ *
+ * Kontroluje se **tvar, ne smysl**: že metrika existuje, že pravděpodobnost je
+ * v rozsahu 0–1, že strop není pod základem. Jestli je 0,02 měsíčně málo nebo
+ * moc, se pozná hraním, ne validací.
+ *
+ * Neznámá metrika je chyba, ne varování. Překlep v `buildigns` by jinak tiše
+ * znamenal „škáluj podle nuly", tedy katastrofu, která nikdy nepřijde.
+ */
+function validateDisasters(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): Record<string, DisasterBalance> {
+  const out: Record<string, DisasterBalance> = {};
+  const rawTypes = disasters ? asRecord(disasters['types']) : null;
+  if (!rawTypes) {
+    if (disasters) issues.push({ field: 'disasters.types', message: 'chybí, nebo není objekt' });
+    return out;
+  }
+
+  // Setříděné klíče, ať jsou hlášky ve stabilním pořadí.
+  for (const kind of Object.keys(rawTypes).sort()) {
+    const where = `disasters.types.${kind}`;
+    const record = asRecord(rawTypes[kind]);
+    if (!record) {
+      issues.push({ field: where, message: 'musí být objekt' });
+      continue;
+    }
+
+    const base = num(issues, record, 'baseMonthlyChance', `${where}.baseMonthlyChance`, 0, 1);
+    const cap = num(issues, record, 'maxMonthlyChance', `${where}.maxMonthlyChance`, 0, 1);
+    if (cap < base) {
+      issues.push({ field: `${where}.maxMonthlyChance`, message: 'strop nesmí být pod základem' });
+    }
+
+    const natural = record['natural'];
+    if (typeof natural !== 'boolean') {
+      issues.push({ field: `${where}.natural`, message: 'musí být true nebo false' });
+    }
+
+    out[kind] = {
+      baseMonthlyChance: base,
+      maxMonthlyChance: cap,
+      cooldownTicks: num(issues, record, 'cooldownTicks', `${where}.cooldownTicks`, 0, 100000),
+      natural: natural === true,
+      concurrent: validateConcurrent(issues, record, where),
+      ...(record['scale'] === undefined
+        ? {}
+        : { scale: validateScale(issues, asRecord(record['scale']), `${where}.scale`) }),
+      ...(record['season'] === undefined
+        ? {}
+        : { season: validateSeason(issues, asRecord(record['season']), `${where}.season`) }),
+      require: validateRequire(issues, record['require'], `${where}.require`),
+      risk: validateRisk(issues, record['risk'], `${where}.risk`, natural === true),
+    };
+  }
+
+  return out;
+}
+
+function metric(
+  issues: ValidationIssue[],
+  container: Record<string, unknown> | null,
+  key: string,
+  field: string,
+): DisasterMetric {
+  const value = container?.[key];
+  if (typeof value !== 'string' || !DISASTER_METRICS.includes(value as DisasterMetric)) {
+    issues.push({ field, message: `neznámá veličina; povolené: ${DISASTER_METRICS.join(', ')}` });
+    return 'none';
+  }
+  return value as DisasterMetric;
+}
+
+function validateConcurrent(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+  where: string,
+): DisasterBalance['concurrent'] {
+  const raw = asRecord(record['concurrent']);
+  if (!raw) {
+    issues.push({ field: `${where}.concurrent`, message: 'chybí, nebo není objekt' });
+    return { metric: 'none', divisor: 1, min: 1, max: 1 };
+  }
+  const min = num(issues, raw, 'min', `${where}.concurrent.min`, 1, 100);
+  const max = num(issues, raw, 'max', `${where}.concurrent.max`, 1, 100);
+  if (max < min) {
+    issues.push({ field: `${where}.concurrent.max`, message: 'nesmí být pod min' });
+  }
+  return {
+    metric: metric(issues, raw, 'metric', `${where}.concurrent.metric`),
+    divisor: num(issues, raw, 'divisor', `${where}.concurrent.divisor`, 1, 1000000),
+    min,
+    max,
+  };
+}
+
+function validateScale(
+  issues: ValidationIssue[],
+  raw: Record<string, unknown> | null,
+  where: string,
+): ScaleBalance {
+  if (!raw) {
+    issues.push({ field: where, message: 'musí být objekt' });
+    return { metric: 'none', curve: 'linear', divisor: 1, offset: 0, min: 1, max: 1 };
+  }
+  const curve = raw['curve'];
+  if (curve !== 'sqrt' && curve !== 'linear') {
+    issues.push({ field: `${where}.curve`, message: "musí být 'sqrt' nebo 'linear'" });
+  }
+  return {
+    metric: metric(issues, raw, 'metric', `${where}.metric`),
+    curve: curve === 'sqrt' ? 'sqrt' : 'linear',
+    divisor: num(issues, raw, 'divisor', `${where}.divisor`, 0.000001, 1000000),
+    offset: num(issues, raw, 'offset', `${where}.offset`, -10, 10),
+    min: num(issues, raw, 'min', `${where}.min`, 0, 100),
+    max: num(issues, raw, 'max', `${where}.max`, 0, 100),
+  };
+}
+
+function validateSeason(
+  issues: ValidationIssue[],
+  raw: Record<string, unknown> | null,
+  where: string,
+): NonNullable<DisasterBalance['season']> {
+  if (!raw) {
+    issues.push({ field: where, message: 'musí být objekt' });
+    return { from: 0, to: 0, inFactor: 1, outFactor: 1 };
+  }
+  return {
+    from: num(issues, raw, 'from', `${where}.from`, 0, 359),
+    to: num(issues, raw, 'to', `${where}.to`, 0, 360),
+    inFactor: num(issues, raw, 'inFactor', `${where}.inFactor`, 0, 20),
+    outFactor: num(issues, raw, 'outFactor', `${where}.outFactor`, 0, 20),
+  };
+}
+
+function validateRequire(
+  issues: ValidationIssue[],
+  raw: unknown,
+  where: string,
+): { metric: DisasterMetric; min: number }[] {
+  if (!Array.isArray(raw)) {
+    issues.push({ field: where, message: 'musí být pole (klidně prázdné)' });
+    return [];
+  }
+  return raw.map((entry, i) => {
+    const record = asRecord(entry);
+    if (!record) {
+      issues.push({ field: `${where}[${i}]`, message: 'musí být objekt' });
+      return { metric: 'none' as DisasterMetric, min: 0 };
+    }
+    return {
+      metric: metric(issues, record, 'metric', `${where}[${i}].metric`),
+      min: num(issues, record, 'min', `${where}[${i}].min`, 0, 1000000),
+    };
+  });
+}
+
+function validateRisk(
+  issues: ValidationIssue[],
+  raw: unknown,
+  where: string,
+  natural: boolean,
+): RiskTermBalance[] {
+  if (!Array.isArray(raw)) {
+    issues.push({ field: where, message: 'musí být pole (klidně prázdné)' });
+    return [];
+  }
+  // Přírodní katastrofa se sčítanci rizika je zmatek, ne chyba obsahu: faktor
+  // typu je u ní z definice 1, takže by je nikdo nikdy nepřečetl.
+  if (natural && raw.length > 0) {
+    issues.push({ field: where, message: 'přírodní katastrofa nemá faktor typu, seznam musí být prázdný' });
+  }
+
+  return raw.map((entry, i) => {
+    const record = asRecord(entry);
+    if (!record) {
+      issues.push({ field: `${where}[${i}]`, message: 'musí být objekt' });
+      return { indicator: '', weight: 0 };
+    }
+    const indicator = record['indicator'];
+    if (typeof indicator !== 'string' || indicator.length === 0) {
+      issues.push({ field: `${where}[${i}].indicator`, message: 'musí být neprázdný řetězec' });
+    }
+    return {
+      indicator: typeof indicator === 'string' ? indicator : '',
+      weight: num(issues, record, 'weight', `${where}[${i}].weight`, -100, 100),
+      ...(record['below'] === undefined
+        ? {}
+        : { below: num(issues, record, 'below', `${where}[${i}].below`, 0, 1) }),
+    };
+  });
 }

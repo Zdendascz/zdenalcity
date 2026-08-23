@@ -1,5 +1,6 @@
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseCellsOf, coarseIndex, coarseSizeOf } from '../coarse';
+import { strongestModifier } from '../disasters/effects';
 import { serviceFunding } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -125,7 +126,11 @@ function writeCoverage(world: WorldState, accumulated: Map<string, Float32Array>
       world.coverage.set(serviceClass, target);
     }
     for (let cell = 0; cell < target.length; cell++) {
-      target[cell] = Math.max(0, Math.min(255, Math.round(field[cell] ?? 0)));
+      // Potlačení z katastrof se uplatní **až tady**, po přepočtu. Kdyby ho
+      // zapsala katastrofa rovnou do vrstvy, první běh tohohle systému by ho
+      // přepsal a hráč by si stávky ani nevšiml.
+      const factor = strongestModifier(world, 'suppressService', cell, 1, serviceClass);
+      target[cell] = Math.max(0, Math.min(255, Math.round((field[cell] ?? 0) * factor)));
     }
   }
 

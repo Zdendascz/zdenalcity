@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { coarseCellsOf, coarseIndex } from '../coarse';
+import { strongestModifier } from '../disasters/effects';
 import { coverageOf } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -77,7 +78,13 @@ export function createCrimeSystem(balance: Balance): System {
 
         // Zaokrouhlení ve směru pohybu — stejný důvod jako u ceny půdy.
         const stepped = delta > 0 ? Math.ceil(next) : Math.floor(next);
-        crime[cell] = Math.max(0, Math.min(255, stepped));
+
+        // Katastrofy kriminalitu buď přiostří (nepokoje), nebo jí drží dno
+        // (válka gangů). Dno se nedá přeplatit policií — právě proto je válka
+        // gangů nejdelší katastrofa v katalogu.
+        const spike = strongestModifier(world, 'spikeCrime', cell, 0, undefined, Math.max);
+        const floor = strongestModifier(world, 'crimeFloor', cell, 0, undefined, Math.max);
+        crime[cell] = Math.max(0, Math.min(255, Math.max(stepped + spike, floor)));
       }
 
       world.dirty.coarseChanged = true;

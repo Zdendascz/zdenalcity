@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { COARSE_FACTOR, coarseInBounds, coarseSizeOf } from '../coarse';
+import { strongestModifier } from '../disasters/effects';
 import { landValueContext, landValueRaw } from '../diagnostics';
 import { index, TERRAIN } from '../layers';
 import type { WorldState } from '../world';
@@ -41,7 +42,9 @@ export function createLandValueSystem(balance: Balance): System {
         // Vzorec je jeden a sdílí ho diagnostika parcely (§12) — jinak by hráči
         // ukazovala rozpis, podle kterého se ve skutečnosti nehraje. `null`
         // znamená „sčítance nesbírej"; panel si o ně řekne, systém ne.
-        const raw = landValueRaw(world, balance, cell, context, null);
+        const raw =
+          landValueRaw(world, balance, cell, context, null) -
+          strongestModifier(world, 'landValuePenalty', cell, 0, undefined, Math.max);
         const current = landValue[cell] ?? 0;
         const delta = raw - current;
         const next = current + delta * smoothing;

@@ -14,6 +14,8 @@ import { createHappinessSystem } from './happiness';
 import { createHealthSystem } from './health';
 import { createTrafficSystem } from './traffic';
 import { createLevelSystem } from './levels';
+import { createDisasterSystem } from '../disasters/scheduler';
+import { DisasterRegistry } from '../disasters/registry';
 
 export interface System {
   readonly name: string;
@@ -37,9 +39,17 @@ export function shouldRun(tick: number, interval: number, offset: number): boole
  * Všechny systémy potřebují obsah, takže je registr funkce, ne konstanta.
  * Systém si katalog uzavře do closure a `run(world)` zůstává beze změny.
  */
-export function createDefaultSystems(catalogue: BuildingCatalogue, balance: Balance): System[] {
+export function createDefaultSystems(
+  catalogue: BuildingCatalogue,
+  balance: Balance,
+  disasters: DisasterRegistry = new DisasterRegistry(),
+): System[] {
   // Pořadí podle tabulky v architektuře §5: systémy fáze 2 jsou za těmi z fáze 1.
   return [
+    // Katastrofy jako první: co udeřilo v minulém tiku, se má propsat dřív,
+    // než na to zareaguje elektřina, voda a všechno ostatní. Plánovač zároveň
+    // nechává vypršet dočasné postihy, které si ostatní systémy vzápětí čtou.
+    createDisasterSystem(catalogue, balance, disasters),
     createPowerSystem(catalogue),
     // Voda hned za elektřinou: růst i chátrání z ní čtou ve stejném tiku.
     createWaterSystem(catalogue, balance),

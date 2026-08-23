@@ -20,6 +20,8 @@ import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
+import { DisasterRegistry } from '@/sim/disasters/registry';
+import { startDisaster } from '@/sim/disasters/scheduler';
 import { computeBudget } from '@/sim/systems/economy';
 import { coarseCellsOf } from '@/sim/coarse';
 import { createWorld, NEUTRAL_HAPPINESS } from '@/sim/world';
@@ -339,6 +341,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
   const simWorld = createWorld(newGame.seed, content.getBalance().economy, newGame.size);
+  // Přepínač z dialogu (R18). Týká se jen plánovače — menu katastrof pod něj
+  // nespadá, jinak by si hráč, který si je vypnul, neměl jak nic vyzkoušet.
+  simWorld.disasters.enabled = newGame.disasters;
+
+  /**
+   * Registr katastrof.
+   *
+   * Po T47 je prázdný: kostra stojí, ale spustit ještě není co — jednotlivé
+   * pohromy přidávají T48 až T54. Prázdný registr je platný stav, plánovač
+   * v něm prostě nemá o čem losovat.
+   */
+  const disasterRegistry = new DisasterRegistry();
 
   // Obnovení rozehraného města. Nečitelný autosave se **zahodí a hra začne
   // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,
@@ -366,7 +380,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
   const host = createSimHost(
     simWorld,
-    createDefaultSystems(content, content.getBalance()),
+    createDefaultSystems(content, content.getBalance(), disasterRegistry),
     content,
     content.getBalance(),
   );
@@ -731,7 +745,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     applyViewAndLayer();
   }
 
-  const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, {
+  /**
+   * Katastrofa čekající na místo.
+   *
+   * Menu ji jen nabije; spustí se až tam, kam hráč klikne. Bez toho by se
+   * musela spouštět „někde", což je u tornáda a povodně bezcenné — celý smysl
+   * menu je vyzkoušet si je tam, kde na to má město reagovat.
+   */
+  let armedDisaster: string | null = null;
+
+  const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, disasterRegistry.kinds(), {
     onSpeed: setSpeed,
     onTaxChange: changeTax,
     onQuickSave: quickSaveNow,
@@ -754,6 +777,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onFundingChange: (serviceClass, funding) =>
       dispatch({ type: 'set_service_funding', serviceClass, funding }),
     onLanguageChange: (language) => i18n.setLanguage(language),
+    onArmDisaster: (kind) => {
+      armedDisaster = kind;
+      message = { key: 'ui.disaster.armed', params: { name: i18n.t(`ui.disaster.${kind}`) } };
+    },
   });
 
   function selectTool(tool: ToolOption): void {
@@ -931,6 +958,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   /** Veškeré hráčské akce jdou přes dispatch — renderer na WorldState nesahá. */
   function applyTool(tile: { x: number; y: number }, viewX: number, viewY: number): void {
+    // Nabitá katastrofa přebíjí nástroj v ruce a spotřebuje se jedním kliknutím.
+    if (armedDisaster !== null) {
+      const kind = armedDisaster;
+      armedDisaster = null;
+      startDisaster(simWorld, content, content.getBalance(), disasterRegistry, kind, tile.x, tile.y);
+      message = { key: 'ui.disaster.started', params: { name: i18n.t(`ui.disaster.${kind}`) } };
+      return;
+    }
+
     const action = activeTool.action;
     const fundsBefore = world.economy.funds;
 
@@ -1425,6 +1461,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       quickLoadNow,
       selectTool,
       tools,
+      // Registr katastrof: bez něj nejde z konzole ověřit, že menu a ruční
+      // spuštění fungují, dokud v něm po T47 nic není.
+      disasterRegistry,
     };
   }
 

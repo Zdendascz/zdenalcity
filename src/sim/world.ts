@@ -1,4 +1,6 @@
 import { coarseCellsOf, createCoarseLayers } from './coarse';
+import { createDisasterState } from './disasters/state';
+import type { DisasterState } from './disasters/state';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
 import { createLayers, DEFAULT_MAP_SIZE, inBounds, index } from './layers';
@@ -255,6 +257,25 @@ export interface WorldState {
    * „přepočítej"; vyprazdňuje ji `markTerrainChanged()`.
    */
   terrainShares: Map<number, Float32Array>;
+
+  /**
+   * Katastrofy (§3 fáze 4): přepínač, hájení, běžící pohromy a dočasné postihy.
+   * Vlastní stav si drží `disasters/state.ts`.
+   */
+  disasters: DisasterState;
+
+  /**
+   * Intenzita ohně na dlaždici, 0–255. Vlastní vrstvu má oheň jako jediný
+   * kromě záplavy (R14) — obojí je proces na desítky tiků a musí se ukládat.
+   *
+   * `undefined`, dokud vrstvu nezaloží T48. Efekt `ignite()` do té doby jen
+   * vrátí nulu; je to vědomý dluh, ne opomenutí.
+   */
+  fire?: Uint8Array;
+  /** Hloubka zaplavení. Přidává T49. */
+  flood?: Uint8Array;
+  /** Trosky (R15). Přidává T50. */
+  rubble?: Uint8Array;
 }
 
 /**
@@ -317,6 +338,7 @@ export function createWorld(
     zonedTiles: new Set(),
     waterNear: null,
     terrainShares: new Map(),
+    disasters: createDisasterState(),
   };
 }
 
@@ -396,6 +418,13 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.zonedTiles.clear();
   world.waterNear = null;
   world.terrainShares.clear();
+  // Vrstvy katastrof patří ke staré mřížce. Běžící pohromy taky — jejich
+  // souřadnice by v nové mapě ukazovaly někam jinam.
+  if (world.fire) world.fire = new Uint8Array(size * size);
+  if (world.flood) world.flood = new Uint8Array(size * size);
+  if (world.rubble) world.rubble = new Uint8Array(size * size);
+  world.disasters.active.length = 0;
+  world.disasters.modifiers.length = 0;
   world.dirty.fullRedraw = true;
   world.dirty.coarseChanged = true;
 }

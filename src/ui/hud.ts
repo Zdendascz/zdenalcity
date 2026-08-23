@@ -29,6 +29,13 @@ export interface HudCallbacks {
   onToggleGhost(): void;
   onFundingChange(serviceClass: string, funding: number): void;
   onLanguageChange(language: string): void;
+  /**
+   * Ruční spuštění katastrofy z menu (§6 fáze 4).
+   *
+   * Nepodléhá ani hájení, ani přepínači z R18 — je to zároveň jediný rozumný
+   * způsob, jak katastrofy ladit.
+   */
+  onArmDisaster(kind: string): void;
 }
 
 /** Položka nabídky pohledů nebo vrstev. Popisek je lokalizační klíč. */
@@ -103,6 +110,8 @@ export class Hud {
   private readonly views: readonly OverlayOption[];
   private readonly layers: readonly OverlayOption[];
   private readonly serviceClasses: readonly string[];
+  /** Druhy katastrof, které umí registr spustit. Prázdné = menu se neukáže. */
+  private readonly disasters: readonly string[];
   private readonly fundingInputs = new Map<string, HTMLInputElement>();
   private lastState: HudState = {
     speedIndex: 1,
@@ -125,6 +134,7 @@ export class Hud {
     views: readonly OverlayOption[],
     layers: readonly OverlayOption[],
     serviceClasses: readonly string[],
+    disasters: readonly string[],
     callbacks: HudCallbacks,
   ) {
     this.i18n = i18n;
@@ -133,6 +143,7 @@ export class Hud {
     this.views = views;
     this.layers = layers;
     this.serviceClasses = serviceClasses;
+    this.disasters = disasters;
     this.callbacks = callbacks;
 
     this.top = el('div', 'hud__top');
@@ -243,6 +254,7 @@ export class Hud {
     this.buildViews();
     this.buildGhost();
     this.buildLayers();
+    this.buildDisasters();
     this.buildTaxes();
     this.buildFunding();
     this.buildBudget();
@@ -371,6 +383,33 @@ export class Hud {
       })),
     ]);
     this.layerMenu = menu;
+    this.controls.appendChild(menu.root);
+  }
+
+  /**
+   * Menu katastrof.
+   *
+   * Seznam si bere z registru, takže roste, jak přibývají pohromy (T48–T54).
+   * **Prázdný registr znamená žádné tlačítko** — po T47 je kostra hotová, ale
+   * spustit ještě není co a prázdná roletka by jen mátla.
+   */
+  private buildDisasters(): void {
+    if (this.disasters.length === 0) return;
+
+    const menu = new Menu({
+      icon: 'disaster',
+      label: this.i18n.t('ui.disaster.title'),
+      lockIcon: true,
+      className: 'popover--alarm',
+    });
+    menu.setItems(
+      this.disasters.map((kind) => ({
+        id: kind,
+        label: this.i18n.t(`ui.disaster.${kind}`),
+        icon: 'disaster',
+        onSelect: () => this.callbacks.onArmDisaster(kind),
+      })),
+    );
     this.controls.appendChild(menu.root);
   }
 

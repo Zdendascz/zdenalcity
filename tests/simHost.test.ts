@@ -112,6 +112,9 @@ describe('fázování systémů', () => {
   it('registrované systémy mají intervaly a offsety podle architektury §5', () => {
     const systems = createDefaultSystems(NO_CONTENT, VANILLA_BALANCE);
     expect(systems.map((s) => [s.name, s.interval, s.offset])).toEqual([
+      // Katastrofy první: co udeřilo, se má propsat dřív, než na to zareaguje
+      // zbytek města. Hází se ale jen jednou za měsíc, uvnitř systému.
+      ['disasters', 1, 0],
       ['power', 1, 0],
       // Voda hned za elektřinou, offset 1 kvůli jinému tiku flood fillu.
       ['water', 1, 1],

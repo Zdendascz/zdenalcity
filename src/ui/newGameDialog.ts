@@ -22,6 +22,13 @@ export interface NewGame {
   /** Hrana mapy v dlaždicích. Vybírá se v dialogu, dál ji nese `world.size`. */
   size: MapSize;
   /**
+   * Smějí přijít katastrofy? (R18)
+   *
+   * Vypnutí se týká jen plánovače — ruční spuštění z menu jde pořád, jinak
+   * by si hráč, který si je vypnul, neměl jak vyzkoušet, o co přišel.
+   */
+  disasters: boolean;
+  /**
    * Hráč chce pokračovat v rozehraném městě, ne zakládat nové. Jméno a seed
    * si pak hra vezme ze savu, ne odsud.
    */
@@ -97,6 +104,15 @@ export function showNewGameDialog(
   const sizeChips = el('div', 'dialog__sizes');
   sizeLabel.appendChild(sizeChips);
 
+  // Katastrofy jdou vypnout hned při zakládání města (R18). Kdo si chce
+  // stavět a ne hasit, nemá důvod se to dozvídat až po prvním požáru.
+  const disasterLabel = el('label', 'dialog__field dialog__field--check');
+  const disasterInput = el('input');
+  disasterInput.type = 'checkbox';
+  disasterInput.checked = true;
+  disasterLabel.appendChild(disasterInput);
+  disasterLabel.appendChild(el('span', undefined, t('ui.newGame.disasters')));
+
   const seedLabel = el('label', 'dialog__field');
   seedLabel.appendChild(el('span', undefined, t('ui.newGame.seed')));
   const seedInput = el('input', 'dialog__input');
@@ -107,6 +123,7 @@ export function showNewGameDialog(
 
   dialog.appendChild(form);
   dialog.appendChild(sizeLabel);
+  dialog.appendChild(disasterLabel);
 
   const canvas = el('canvas', 'dialog__preview');
   dialog.appendChild(canvas);
@@ -180,7 +197,7 @@ export function showNewGameDialog(
   if (options.canResume) {
     const resume = button('chip chip--primary', () => {
       overlay.remove();
-      resolveGame({ cityName: '', seed, size, resume: true });
+      resolveGame({ cityName: '', seed, size, disasters: disasterInput.checked, resume: true });
     });
     resume.textContent = t('ui.newGame.resume');
     actions.appendChild(resume);
@@ -206,6 +223,7 @@ export function showNewGameDialog(
       cityName: nameInput.value.trim() || t('ui.newGame.defaultCityName'),
       seed,
       size,
+      disasters: disasterInput.checked,
     });
   });
   start.textContent = t('ui.newGame.start');

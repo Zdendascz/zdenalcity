@@ -146,6 +146,25 @@ const PIPE: Shape = [
 const UNDERGROUND: Shape = [bar(0.08, 0.2, 0.92, 0.3), bar(0.08, 0.52, 0.42, 0.64), bar(0.58, 0.52, 0.92, 0.64), bar(0.42, 0.52, 0.58, 0.9)];
 
 /** Tři listy nad sebou — diagnostické vrstvy. */
+/**
+ * Katastrofa: plamen. Jeden tvar pro celou nabídku — patnáct vlastních ikon
+ * by z roletky udělalo hádanku a hráč stejně čte popisky.
+ */
+const DISASTER: Shape = [
+  [
+    [0.5, 0.06],
+    [0.66, 0.3],
+    [0.6, 0.44],
+    [0.78, 0.4],
+    [0.86, 0.62],
+    [0.7, 0.9],
+    [0.3, 0.9],
+    [0.14, 0.62],
+    [0.3, 0.3],
+    [0.38, 0.5],
+  ],
+];
+
 const LAYERS: Shape = [
   [
     [0.5, 0.08],
@@ -284,6 +303,7 @@ const UI_SHAPES: Readonly<Record<string, Shape>> = {
   ghost: GHOST,
   underground: UNDERGROUND,
   layers: LAYERS,
+  disaster: DISASTER,
   coins: COINS,
   sliders: SLIDERS,
   save: SAVE,
