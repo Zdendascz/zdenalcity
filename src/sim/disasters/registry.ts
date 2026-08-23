@@ -40,8 +40,13 @@ export interface Disaster {
   /** Jeden krok. Volá se každý tik, dokud katastrofa neskončí. */
   tick(context: DisasterContext, active: ActiveDisaster): void;
 
-  /** Skončila? Plánovač ji pak uklidí a zruší její dočasné postihy. */
-  isFinished(active: ActiveDisaster): boolean;
+  /**
+   * Skončila? Plánovač ji pak uklidí a zruší její dočasné postihy.
+   *
+   * Bere svět, protože konec bývá jeho vlastnost, ne vlastnost evidence:
+   * lesní požár končí, až když nic nehoří, ne až doběhne odpočet.
+   */
+  isFinished(world: WorldState, active: ActiveDisaster): boolean;
 
   /**
    * Zapisuje se `lastOccurrence` až při skončení?

@@ -6,6 +6,9 @@ import type { DirtySet } from '@/sim/world';
 import {
   BRIDGE_COLOR,
   BRIDGE_RAIL_COLOR,
+  FIRE_COLORS,
+  FIRE_MAX_ALPHA,
+  FIRE_MIN_ALPHA,
   PIPE_COLOR,
   PIPE_DRY_COLOR,
   PIPE_WIDTH,
@@ -326,6 +329,30 @@ export class ChunkRenderer {
     if (this.overlay === 'power') {
       this.drawPowerOverlay(graphics, points, tileIndex);
     }
+
+    // Oheň úplně nahoru, přes silnici i překryvy. Není to diagnostická vrstva,
+    // kterou si hráč zapíná — je to věc, na kterou musí reagovat hned.
+    this.drawFire(graphics, points, tileIndex);
+  }
+
+  /**
+   * Plamen na hořící dlaždici.
+   *
+   * Barva i průhlednost rostou s intenzitou, protože právě podle ní se pozná,
+   * kde se rozhoduje: dlaždice s nízkou intenzitou hasiči uhasí, ta s vysokou
+   * shoří. Kdyby všechen oheň vypadal stejně, hráč by nevěděl, kam poslat
+   * buldozer dřív.
+   */
+  private drawFire(graphics: Graphics, points: number[], tileIndex: number): void {
+    const intensity = this.world.fire[tileIndex] ?? 0;
+    if (intensity === 0) return;
+
+    const share = intensity / 255;
+    const step = Math.min(FIRE_COLORS.length - 1, Math.floor(share * FIRE_COLORS.length));
+    graphics.poly(points).fill({
+      color: FIRE_COLORS[step] ?? FIRE_COLORS[0],
+      alpha: FIRE_MIN_ALPHA + (FIRE_MAX_ALPHA - FIRE_MIN_ALPHA) * share,
+    });
   }
 
   /**

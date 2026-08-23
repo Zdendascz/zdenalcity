@@ -79,7 +79,7 @@ function testDisaster(kind: string, length = 1, origin: { x: number; y: number }
     tick: (_context, active) => {
       active.state['ticks'] = ((active.state['ticks'] as number) ?? 0) + 1;
     },
-    isFinished: (active) => ((active.state['ticks'] as number) ?? 0) >= length,
+    isFinished: (_world, active) => ((active.state['ticks'] as number) ?? 0) >= length,
   };
 }
 
@@ -137,6 +137,19 @@ describe('katalog katastrof v balancu', () => {
     const result = validateBalance(raw);
     expect(result.balance).toBeNull();
     expect(result.issues.some((i) => i.field.includes('scale.metric'))).toBe(true);
+  });
+
+  it('validace odmítne hořlavost bez paliva', () => {
+    // Obsah dlaždice, který má hořlavost a nemá palivo, by hořel donekonečna:
+    // intenzita by rostla, palivo by nikdy nedošlo a budova by nikdy neshořela
+    // ani se nezachránila.
+    const raw = rawBalance();
+    const disasters = raw['disasters'] as Record<string, unknown>;
+    const fire = disasters['fire'] as Record<string, unknown>;
+    delete (fire['fuel'] as Record<string, unknown>)['forest'];
+
+    const result = validateBalance(raw);
+    expect(result.issues.some((i) => i.field === 'disasters.fire.fuel.forest')).toBe(true);
   });
 
   it('validace odmítne strop pod základem', () => {

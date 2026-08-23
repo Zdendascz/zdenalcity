@@ -167,7 +167,7 @@
   "ui.newGame.disasters": "Disasters",
   "ui.disaster.title": "Disasters",
   "ui.disaster.armed": "{name}: click the map where it should strike.",
-  "ui.disaster.started": "{name} has begun.",
+  "ui.disaster.started": "Started: {name}.",
   "ui.disaster.fire": "Fire",
   "ui.disaster.flood": "Flood",
   "ui.disaster.tornado": "Tornado",

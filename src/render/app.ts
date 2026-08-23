@@ -22,6 +22,7 @@ import type { SimHost } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
 import { DisasterRegistry } from '@/sim/disasters/registry';
 import { startDisaster } from '@/sim/disasters/scheduler';
+import { createFireDisaster, createWildfireDisaster } from '@/sim/disasters/fire';
 import { computeBudget } from '@/sim/systems/economy';
 import { coarseCellsOf } from '@/sim/coarse';
 import { createWorld, NEUTRAL_HAPPINESS } from '@/sim/world';
@@ -353,6 +354,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * v něm prostě nemá o čem losovat.
    */
   const disasterRegistry = new DisasterRegistry();
+  disasterRegistry.register(createFireDisaster());
+  disasterRegistry.register(createWildfireDisaster());
 
   // Obnovení rozehraného města. Nečitelný autosave se **zahodí a hra začne
   // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,
@@ -957,16 +960,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   /** Veškeré hráčské akce jdou přes dispatch — renderer na WorldState nesahá. */
-  function applyTool(tile: { x: number; y: number }, viewX: number, viewY: number): void {
-    // Nabitá katastrofa přebíjí nástroj v ruce a spotřebuje se jedním kliknutím.
-    if (armedDisaster !== null) {
-      const kind = armedDisaster;
-      armedDisaster = null;
-      startDisaster(simWorld, content, content.getBalance(), disasterRegistry, kind, tile.x, tile.y);
-      message = { key: 'ui.disaster.started', params: { name: i18n.t(`ui.disaster.${kind}`) } };
-      return;
-    }
+  /**
+   * Spustí nabitou katastrofu, je-li nějaká. Vrací `true`, když se to stalo.
+   *
+   * Musí se to vyhodnotit **dřív než tažení**: nástroje jako zóna nebo silnice
+   * odkládají zásah na puštění tlačítka, takže by se katastrofa nespustila
+   * vůbec a hráč by z menu klikal do prázdna.
+   */
+  function triggerArmedDisaster(tile: { x: number; y: number }): boolean {
+    if (armedDisaster === null) return false;
+    const kind = armedDisaster;
+    armedDisaster = null;
+    startDisaster(simWorld, content, content.getBalance(), disasterRegistry, kind, tile.x, tile.y);
+    message = { key: 'ui.disaster.started', params: { name: i18n.t(`ui.disaster.${kind}`) } };
+    return true;
+  }
 
+  function applyTool(tile: { x: number; y: number }, viewX: number, viewY: number): void {
     const action = activeTool.action;
     const fundsBefore = world.economy.funds;
 
@@ -1038,6 +1048,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       showBuildingAt(tile);
       return;
     }
+
+    if (triggerArmedDisaster(tile)) return;
 
     paintButton = event.button;
     lastPaintedTile = tile.y * world.size + tile.x;

@@ -267,11 +267,18 @@ export interface WorldState {
   /**
    * Intenzita ohně na dlaždici, 0–255. Vlastní vrstvu má oheň jako jediný
    * kromě záplavy (R14) — obojí je proces na desítky tiků a musí se ukládat.
-   *
-   * `undefined`, dokud vrstvu nezaloží T48. Efekt `ignite()` do té doby jen
-   * vrátí nulu; je to vědomý dluh, ne opomenutí.
    */
-  fire?: Uint8Array;
+  fire: Uint8Array;
+  /**
+   * Zbývající palivo hořící dlaždice v ohňových ticích.
+   *
+   * Oheň je **závod**: buď intenzita klesne na nulu dřív, než dojde palivo,
+   * nebo budova shoří. Palivo se proto musí pamatovat — bez něj by hořelo
+   * všechno stejně dlouho a hasiči by neměli co dohánět.
+   */
+  fuel: Uint8Array;
+  /** 1 = lesní požár. Šíří se jinak a po vyhoření zbude tráva, ne trosky. */
+  fireFlags: Uint8Array;
   /** Hloubka zaplavení. Přidává T49. */
   flood?: Uint8Array;
   /** Trosky (R15). Přidává T50. */
@@ -339,6 +346,9 @@ export function createWorld(
     waterNear: null,
     terrainShares: new Map(),
     disasters: createDisasterState(),
+    fire: new Uint8Array(size * size),
+    fuel: new Uint8Array(size * size),
+    fireFlags: new Uint8Array(size * size),
   };
 }
 
@@ -420,7 +430,9 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.terrainShares.clear();
   // Vrstvy katastrof patří ke staré mřížce. Běžící pohromy taky — jejich
   // souřadnice by v nové mapě ukazovaly někam jinam.
-  if (world.fire) world.fire = new Uint8Array(size * size);
+  world.fire = new Uint8Array(size * size);
+  world.fuel = new Uint8Array(size * size);
+  world.fireFlags = new Uint8Array(size * size);
   if (world.flood) world.flood = new Uint8Array(size * size);
   if (world.rubble) world.rubble = new Uint8Array(size * size);
   world.disasters.active.length = 0;

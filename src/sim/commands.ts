@@ -16,6 +16,7 @@ import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
 import { checkRequirements, presentDefinitions } from './requirements';
 import { needsClearing } from './terrain';
+import { extinguishTile } from './disasters/fire';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
@@ -322,6 +323,11 @@ export function bulldoze(
   if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
 
   const tile = index(x, y, world.size);
+
+  // Buldozer hasí. Je to **hlavní aktivní obrana proti ohni** (§4 fáze 4):
+  // hráč prorazí průsek a oheň se nemá kudy šířit. Hasí se dřív, než se
+  // cokoli zbourá, aby po zbourané budově nezůstal oheň na prázdné parcele.
+  extinguishTile(world, tile);
 
   const buildingId = world.layers.buildingId[tile] ?? 0;
   if (buildingId !== 0) {

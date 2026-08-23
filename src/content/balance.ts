@@ -76,6 +76,25 @@ export interface RiskTermBalance {
   below?: number;
 }
 
+/**
+ * Jak katastrofa hoří (§4 fáze 4).
+ *
+ * Mají to jen dvě: požár a lesní požár. Sdílejí vrstvu i mechaniku, liší se
+ * čísly — lesní hoří prudčeji, šíří se ochotněji a vzniká z jediného ohniska.
+ */
+export interface BurnBalance {
+  /** Lesní varianta: hoří jinak a po vyhoření zbude tráva, ne trosky. */
+  wildfire: boolean;
+  /** Intenzita, se kterou dlaždice chytne. */
+  ignitionIntensity: number;
+  /** O kolik intenzita za ohňový tik povyroste. */
+  intensityGrowth: number;
+  /** Násobitel šance, že oheň přeskočí na souseda. */
+  spreadChance: number;
+  minIgnitions: number;
+  maxIgnitions: number;
+}
+
 export interface DisasterBalance {
   baseMonthlyChance: number;
   maxMonthlyChance: number;
@@ -90,6 +109,33 @@ export interface DisasterBalance {
   /** Bez čeho katastrofa nevznikne — pobřeží u povodně, les u lesního požáru. */
   require: readonly { metric: DisasterMetric; min: number }[];
   risk: readonly RiskTermBalance[];
+  burn?: BurnBalance;
+}
+
+/**
+ * Model ohně — společný požáru i lesnímu požáru (§4 fáze 4).
+ *
+ * Hořlavost a palivo se berou podle **obsahu dlaždice**, ne podle konkrétní
+ * budovy (P5). `byClass` je výjimka pro třídy služeb, které se z kategorie
+ * odvodit nedají: park hoří desetkrát hůř než hasičárna, i když obojí je
+ * služba, a právě proto je z parku použitelná protipožární bariéra.
+ */
+export interface FireBalance {
+  /** Ohňový tik běží nezávisle na plánovači katastrof. */
+  tickInterval: number;
+  /** Kolik intenzity ubyde samo, i bez hasičů. */
+  suppressBase: number;
+  /** Kolik navíc ubyde za každý bod `coverage[fire]`. */
+  suppressPerCoverage: number;
+  /** Znečištění z každé hořící dlaždice za ohňový tik. */
+  pollutionPerTick: number;
+  /** Srážka spokojenosti za každou zničenou budovu. */
+  happinessPerLoss: number;
+  happinessPenaltyTicks: number;
+  /** Klíče: `forest`, `abandoned`, `industrial`, `residential`, `commercial`, `service`, `rubble`. */
+  flammability: Readonly<Record<string, number>>;
+  fuel: Readonly<Record<string, number>>;
+  byClass: Readonly<Record<string, { flammability: number; fuel: number }>>;
 }
 
 export interface Balance {
@@ -288,6 +334,7 @@ export interface Balance {
     /** Strop faktoru typu (R16). Společný všem, jinak by nerozpojoval smyčku. */
     maxRiskMultiplier: number;
     indicators: { uncoveredBelow: number; denseLevel: number; ageTicks: number };
+    fire: FireBalance;
     types: Readonly<Record<string, DisasterBalance>>;
   };
 
@@ -508,6 +555,7 @@ export function validateBalance(raw: unknown): {
           1000000,
         ),
       },
+      fire: validateFire(issues, disasters),
       types: disasterTypes,
     },
     economy: {
@@ -707,6 +755,9 @@ function validateDisasters(
         : { season: validateSeason(issues, asRecord(record['season']), `${where}.season`) }),
       require: validateRequire(issues, record['require'], `${where}.require`),
       risk: validateRisk(issues, record['risk'], `${where}.risk`, natural === true),
+      ...(record['burn'] === undefined
+        ? {}
+        : { burn: validateBurn(issues, asRecord(record['burn']), `${where}.burn`) }),
     };
   }
 
@@ -846,4 +897,147 @@ function validateRisk(
         : { below: num(issues, record, 'below', `${where}[${i}].below`, 0, 1) }),
     };
   });
+}
+
+function validateBurn(
+  issues: ValidationIssue[],
+  raw: Record<string, unknown> | null,
+  where: string,
+): BurnBalance {
+  if (!raw) {
+    issues.push({ field: where, message: 'musí být objekt' });
+    return {
+      wildfire: false,
+      ignitionIntensity: 100,
+      intensityGrowth: 1,
+      spreadChance: 0,
+      minIgnitions: 1,
+      maxIgnitions: 1,
+    };
+  }
+
+  const min = num(issues, raw, 'minIgnitions', `${where}.minIgnitions`, 1, 100);
+  const max = num(issues, raw, 'maxIgnitions', `${where}.maxIgnitions`, 1, 100);
+  if (max < min) issues.push({ field: `${where}.maxIgnitions`, message: 'nesmí být pod min' });
+
+  return {
+    wildfire: raw['wildfire'] === true,
+    ignitionIntensity: num(issues, raw, 'ignitionIntensity', `${where}.ignitionIntensity`, 1, 255),
+    intensityGrowth: num(issues, raw, 'intensityGrowth', `${where}.intensityGrowth`, 0, 255),
+    spreadChance: num(issues, raw, 'spreadChance', `${where}.spreadChance`, 0, 1),
+    minIgnitions: min,
+    maxIgnitions: max,
+  };
+}
+
+/**
+ * Model ohně.
+ *
+ * Hořlavost je pravděpodobnost, tedy 0–1. Palivo je počet ohňových tiků do
+ * zničení — celé číslo, protože se odečítá po jedné. Kdyby některé chybělo,
+ * příslušný obsah dlaždice by tiše nehořel vůbec; proto se kontroluje, že
+ * jsou obě tabulky úplné.
+ */
+function validateFire(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): FireBalance {
+  const raw = disasters ? asRecord(disasters['fire']) : null;
+  const empty: FireBalance = {
+    tickInterval: 2,
+    suppressBase: 0,
+    suppressPerCoverage: 0,
+    pollutionPerTick: 0,
+    happinessPerLoss: 0,
+    happinessPenaltyTicks: 0,
+    flammability: {},
+    fuel: {},
+    byClass: {},
+  };
+  if (!raw) {
+    if (disasters) issues.push({ field: 'disasters.fire', message: 'chybí, nebo není objekt' });
+    return empty;
+  }
+
+  const flammability: Record<string, number> = {};
+  const fuel: Record<string, number> = {};
+  const rawFlammability = asRecord(raw['flammability']);
+  const rawFuel = asRecord(raw['fuel']);
+
+  if (!rawFlammability) {
+    issues.push({ field: 'disasters.fire.flammability', message: 'chybí, nebo není objekt' });
+  } else {
+    for (const key of Object.keys(rawFlammability).sort()) {
+      flammability[key] = num(
+        issues,
+        rawFlammability,
+        key,
+        `disasters.fire.flammability.${key}`,
+        0,
+        1,
+      );
+    }
+  }
+
+  if (!rawFuel) {
+    issues.push({ field: 'disasters.fire.fuel', message: 'chybí, nebo není objekt' });
+  } else {
+    for (const key of Object.keys(rawFuel).sort()) {
+      fuel[key] = num(issues, rawFuel, key, `disasters.fire.fuel.${key}`, 1, 1000);
+    }
+  }
+
+  // Obsah, který má hořlavost, ale ne palivo, by hořel donekonečna.
+  for (const key of Object.keys(flammability)) {
+    if (fuel[key] === undefined) {
+      issues.push({ field: `disasters.fire.fuel.${key}`, message: 'chybí ke stejné hořlavosti' });
+    }
+  }
+
+  const byClass: Record<string, { flammability: number; fuel: number }> = {};
+  const rawByClass = asRecord(raw['byClass']) ?? {};
+  for (const key of Object.keys(rawByClass).sort()) {
+    const entry = asRecord(rawByClass[key]);
+    if (!entry) {
+      issues.push({ field: `disasters.fire.byClass.${key}`, message: 'musí být objekt' });
+      continue;
+    }
+    byClass[key] = {
+      flammability: num(
+        issues,
+        entry,
+        'flammability',
+        `disasters.fire.byClass.${key}.flammability`,
+        0,
+        1,
+      ),
+      fuel: num(issues, entry, 'fuel', `disasters.fire.byClass.${key}.fuel`, 1, 1000),
+    };
+  }
+
+  return {
+    tickInterval: num(issues, raw, 'tickInterval', 'disasters.fire.tickInterval', 1, 100),
+    suppressBase: num(issues, raw, 'suppressBase', 'disasters.fire.suppressBase', 0, 255),
+    suppressPerCoverage: num(
+      issues,
+      raw,
+      'suppressPerCoverage',
+      'disasters.fire.suppressPerCoverage',
+      0,
+      10,
+    ),
+    pollutionPerTick: num(issues, raw, 'pollutionPerTick', 'disasters.fire.pollutionPerTick', 0, 255),
+    happinessPerLoss: num(issues, raw, 'happinessPerLoss', 'disasters.fire.happinessPerLoss', 0, 255),
+    happinessPenaltyTicks: num(
+      issues,
+      raw,
+      'happinessPenaltyTicks',
+      'disasters.fire.happinessPenaltyTicks',
+      0,
+      100000,
+    ),
+    flammability,
+    fuel,
+    byClass,
+  };
 }

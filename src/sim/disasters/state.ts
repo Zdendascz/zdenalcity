@@ -82,6 +82,15 @@ export interface DisasterState {
    * měsíční bilance záporná, riziko se dál nezvyšuje: platí tenhle strop.
    */
   riskCeiling: Map<string, number>;
+
+  /**
+   * Kolik dlaždic právě hoří, zvlášť běžným a zvlášť lesním požárem.
+   *
+   * **Odvozené** — po načtení savu se dopočítá z vrstvy `fire`. Drží se tu
+   * proto, že se na to ptá každý tik každá běžící pohroma, a projít kvůli
+   * tomu 262 144 dlaždic velké mapy by bylo dražší než celý zbytek plánovače.
+   */
+  burning: { normal: number; wildfire: number };
 }
 
 export function createDisasterState(enabled = true): DisasterState {
@@ -92,5 +101,6 @@ export function createDisasterState(enabled = true): DisasterState {
     modifiers: [],
     nextId: 1,
     riskCeiling: new Map(),
+    burning: { normal: 0, wildfire: 0 },
   };
 }

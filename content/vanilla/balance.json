@@ -137,8 +137,45 @@
   "disasters": {
     "maxRiskMultiplier": 3,
     "indicators": { "uncoveredBelow": 60, "denseLevel": 4, "ageTicks": 3600 },
+    "fire": {
+      "tickInterval": 2,
+      "suppressBase": 4,
+      "suppressPerCoverage": 0.1,
+      "pollutionPerTick": 8,
+      "happinessPerLoss": 2,
+      "happinessPenaltyTicks": 120,
+      "flammability": {
+        "forest": 0.55,
+        "abandoned": 0.45,
+        "industrial": 0.4,
+        "residential": 0.3,
+        "commercial": 0.22,
+        "service": 0.18,
+        "rubble": 0.1
+      },
+      "fuel": {
+        "forest": 6,
+        "abandoned": 6,
+        "industrial": 12,
+        "residential": 8,
+        "commercial": 10,
+        "service": 14,
+        "rubble": 4
+      },
+      "byClass": {
+        "parks": { "flammability": 0.05, "fuel": 4 }
+      }
+    },
     "types": {
       "fire": {
+        "burn": {
+          "wildfire": false,
+          "ignitionIntensity": 100,
+          "intensityGrowth": 6,
+          "spreadChance": 0.5,
+          "minIgnitions": 1,
+          "maxIgnitions": 3
+        },
         "baseMonthlyChance": 0.02,
         "maxMonthlyChance": 0.2,
         "cooldownTicks": 10,
@@ -290,6 +327,14 @@
       },
 
       "wildfire": {
+        "burn": {
+          "wildfire": true,
+          "ignitionIntensity": 130,
+          "intensityGrowth": 9,
+          "spreadChance": 0.7,
+          "minIgnitions": 1,
+          "maxIgnitions": 1
+        },
         "baseMonthlyChance": 0.015,
         "maxMonthlyChance": 0.08,
         "cooldownTicks": 90,

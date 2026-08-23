@@ -167,7 +167,7 @@
   "ui.newGame.disasters": "Katastrofy",
   "ui.disaster.title": "Katastrofy",
   "ui.disaster.armed": "{name}: klikni na mapu, kde má udeřit.",
-  "ui.disaster.started": "{name} začala.",
+  "ui.disaster.started": "Spuštěno: {name}.",
   "ui.disaster.fire": "Požár",
   "ui.disaster.flood": "Povodeň",
   "ui.disaster.tornado": "Tornádo",

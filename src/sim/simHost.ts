@@ -51,6 +51,11 @@ export interface ReadonlyWorldView {
   readonly waterSupply: Readonly<Uint8Array>;
   /** Spokojenost na hrubé mřížce — hlavní číslo HUDu a vlastní overlay (§9). */
   readonly happiness: Readonly<Uint8Array>;
+  /**
+   * Intenzita ohně (§4 fáze 4). Není to diagnostická vrstva, kterou si hráč
+   * zapíná — renderer ji kreslí vždycky, protože je to věc na okamžitou reakci.
+   */
+  readonly fire: Readonly<Uint8Array>;
 }
 
 /**

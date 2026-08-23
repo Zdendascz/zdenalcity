@@ -15,6 +15,7 @@ import { createHealthSystem } from './health';
 import { createTrafficSystem } from './traffic';
 import { createLevelSystem } from './levels';
 import { createDisasterSystem } from '../disasters/scheduler';
+import { createFireSystem } from '../disasters/fire';
 import { DisasterRegistry } from '../disasters/registry';
 
 export interface System {
@@ -50,6 +51,10 @@ export function createDefaultSystems(
     // než na to zareaguje elektřina, voda a všechno ostatní. Plánovač zároveň
     // nechává vypršet dočasné postihy, které si ostatní systémy vzápětí čtou.
     createDisasterSystem(catalogue, balance, disasters),
+    // Oheň má **vlastní tik** (§4 fáze 4) a s plánovačem nesouvisí: hoří dál,
+    // i když se zrovna nelosuje. Hned za plánovačem, ať to, co v tomhle tiku
+    // vzniklo, začne hořet ještě v něm.
+    createFireSystem(catalogue, balance),
     createPowerSystem(catalogue),
     // Voda hned za elektřinou: růst i chátrání z ní čtou ve stejném tiku.
     createWaterSystem(catalogue, balance),

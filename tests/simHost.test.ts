@@ -115,6 +115,9 @@ describe('fázování systémů', () => {
       // Katastrofy první: co udeřilo, se má propsat dřív, než na to zareaguje
       // zbytek města. Hází se ale jen jednou za měsíc, uvnitř systému.
       ['disasters', 1, 0],
+      // Oheň má vlastní tik a s plánovačem nesouvisí — hoří dál, i když se
+      // zrovna nelosuje (§4 fáze 4).
+      ['fire', 2, 1],
       ['power', 1, 0],
       // Voda hned za elektřinou, offset 1 kvůli jinému tiku flood fillu.
       ['water', 1, 1],

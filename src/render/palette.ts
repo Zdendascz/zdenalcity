@@ -143,6 +143,15 @@ export const UNDERGROUND_ZONE_ALPHA = 0.18;
  * a na obrazovce to vypadá úplně stejně jako fungující síť. Hlásil to autor.
  */
 export const PIPE_COLOR = 0x67b6e8;
+/**
+ * Oheň. Škála od doutnání k plamenům — hráč musí na první pohled poznat, kde
+ * hoří nejvíc, protože právě tam se rozhoduje, jestli dům shoří.
+ */
+export const FIRE_COLORS = [0xd94f2a, 0xe8732b, 0xf2a03a, 0xffd257] as const;
+/** Nejnižší průhlednost plamene, aby bylo pořád vidět, co hoří. */
+export const FIRE_MIN_ALPHA = 0.45;
+export const FIRE_MAX_ALPHA = 0.9;
+
 export const PIPE_DRY_COLOR = 0x7b7f86;
 /** Šířka trubky jako podíl dlaždice. Užší než vozovka — je to trubka. */
 export const PIPE_WIDTH = 0.24;

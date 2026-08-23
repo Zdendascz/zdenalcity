@@ -73,7 +73,7 @@ function advanceActive(
       continue;
     }
     disaster.tick(contextFor(world, catalogue, balance, entry.x, entry.y), entry);
-    if (disaster.isFinished(entry)) entry.finished = true;
+    if (disaster.isFinished(world, entry)) entry.finished = true;
   }
 
   let write = 0;
@@ -189,7 +189,7 @@ export function startDisaster(
   if (!disaster.cooldownFromEnd) world.disasters.lastOccurrence.set(kind, world.tick);
 
   disaster.start(contextFor(world, catalogue, balance, x, y), entry);
-  if (disaster.isFinished(entry)) entry.finished = true;
+  if (disaster.isFinished(world, entry)) entry.finished = true;
   return entry;
 }
 
