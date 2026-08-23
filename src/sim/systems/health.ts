@@ -47,7 +47,8 @@ export function createHealthSystem(catalogue: BuildingCatalogue, balance: Balanc
         if (capacity === 0) continue;
 
         const covered =
-          (coverage?.[coarseIndex(building.x, building.y)] ?? 0) >= balance.health.coverageThreshold;
+          (coverage?.[coarseIndex(building.x, building.y, world.size)] ?? 0) >=
+          balance.health.coverageThreshold;
         const floor = Math.ceil(capacity * balance.health.unservedRatio);
 
         const next = covered

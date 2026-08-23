@@ -1,5 +1,3 @@
-import { MAP_SIZE } from './layers';
-
 /**
  * Hrubá mřížka pro difuzní vrstvy (fáze 2, §2 zadání).
  *
@@ -12,16 +10,37 @@ import { MAP_SIZE } from './layers';
  */
 
 export const COARSE_FACTOR = 4;
-export const COARSE_SIZE = MAP_SIZE / COARSE_FACTOR; // 32
-export const COARSE_CELLS = COARSE_SIZE * COARSE_SIZE;
 
-/** Buňka hrubé mřížky pro dlaždici v plném rozlišení. */
-export function coarseIndex(x: number, y: number): number {
-  return ((y / COARSE_FACTOR) | 0) * COARSE_SIZE + ((x / COARSE_FACTOR) | 0);
+/**
+ * Hrana hrubé mřížky pro mapu o hraně `size`.
+ *
+ * Faktor zůstává 4 i u velkých map (§2 fáze 4), takže mřížka roste s nimi:
+ * 128 → 32 buněk, 512 → 128. Difuze tím zůstává stejně jemná bez ohledu na
+ * velikost města.
+ */
+export function coarseSizeOf(size: number): number {
+  return Math.ceil(size / COARSE_FACTOR);
 }
 
-export function coarseInBounds(cellX: number, cellY: number): boolean {
-  return cellX >= 0 && cellY >= 0 && cellX < COARSE_SIZE && cellY < COARSE_SIZE;
+export function coarseCellsOf(size: number): number {
+  const side = coarseSizeOf(size);
+  return side * side;
+}
+
+/** Buňka hrubé mřížky pro dlaždici v plném rozlišení. `size` je hrana mapy. */
+export function coarseIndex(x: number, y: number, size: number): number {
+  return (
+    ((y / COARSE_FACTOR) | 0) * coarseSizeOf(size) + ((x / COARSE_FACTOR) | 0)
+  );
+}
+
+/** `coarseSize` je hrana **hrubé** mřížky, ne mapy. */
+export function coarseInBounds(
+  cellX: number,
+  cellY: number,
+  coarseSize: number,
+): boolean {
+  return cellX >= 0 && cellY >= 0 && cellX < coarseSize && cellY < coarseSize;
 }
 
 /**
@@ -43,11 +62,12 @@ export const COARSE_LAYER_ORDER = [
 
 export type ReadonlyCoarseLayers = { readonly [K in keyof CoarseLayers]: Readonly<CoarseLayers[K]> };
 
-export function createCoarseLayers(): CoarseLayers {
+export function createCoarseLayers(size: number): CoarseLayers {
+  const cells = coarseCellsOf(size);
   return {
-    pollution: new Uint8Array(COARSE_CELLS),
-    landValue: new Uint8Array(COARSE_CELLS),
-    crime: new Uint8Array(COARSE_CELLS),
+    pollution: new Uint8Array(cells),
+    landValue: new Uint8Array(cells),
+    crime: new Uint8Array(cells),
   };
 }
 

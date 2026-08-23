@@ -36,7 +36,8 @@ function street(content: ContentRegistry, world: WorldState): void {
 /** Celková zátěž na ulici po ustálení. */
 function roadLoad(world: WorldState): number {
   let total = 0;
-  for (let x = 10; x <= 30; x++) total += world.trafficLoad[index(x, 10)] ?? 0;
+  for (let x = 10; x <= 30; x++)
+    total += world.trafficLoad[index(x, 10, world.size)] ?? 0;
   return total;
 }
 

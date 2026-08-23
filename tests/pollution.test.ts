@@ -5,19 +5,17 @@ import type { Definition } from '@/content/schema';
 import { placeBuilding } from '@/sim/buildings';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import {
-  COARSE_CELLS,
   COARSE_FACTOR,
-  COARSE_SIZE,
   coarseIndex,
   createCoarseLayers,
   hashCoarseLayers,
 } from '@/sim/coarse';
 import { diffuse } from '@/sim/diffusion';
-import { MAP_SIZE } from '@/sim/layers';
 import { createPollutionSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE, COARSE_SIZE, COARSE_CELLS } from './support/grid';
 
 const FACTORY: Definition = {
   id: 'test:factory',
@@ -59,7 +57,7 @@ function runPollution(world: WorldState, catalogue: BuildingCatalogue, runs: num
 }
 
 function cell(world: WorldState, x: number, y: number): number {
-  return world.coarse.pollution[coarseIndex(x, y)] ?? 0;
+  return world.coarse.pollution[coarseIndex(x, y, MAP_SIZE)] ?? 0;
 }
 
 describe('hrubá mřížka', () => {
@@ -70,17 +68,17 @@ describe('hrubá mřížka', () => {
   });
 
   it('všechny dlaždice jednoho bloku 4×4 padnou do stejné buňky', () => {
-    const target = coarseIndex(8, 12);
+    const target = coarseIndex(8, 12, MAP_SIZE);
     for (let dy = 0; dy < COARSE_FACTOR; dy++) {
       for (let dx = 0; dx < COARSE_FACTOR; dx++) {
-        expect(coarseIndex(8 + dx, 12 + dy)).toBe(target);
+        expect(coarseIndex(8 + dx, 12 + dy, MAP_SIZE)).toBe(target);
       }
     }
-    expect(coarseIndex(12, 12)).not.toBe(target);
+    expect(coarseIndex(12, 12, MAP_SIZE)).not.toBe(target);
   });
 
   it('hash reaguje na změnu jediné buňky', () => {
-    const layers = createCoarseLayers();
+    const layers = createCoarseLayers(MAP_SIZE);
     const before = hashCoarseLayers(layers);
     layers.pollution[500] = 3;
     expect(hashCoarseLayers(layers)).not.toBe(before);
@@ -190,7 +188,9 @@ describe('znečištění ve světě', () => {
 
     runPollution(world, catalogueOf(big), 1);
 
-    expect(coarseIndex(62, 62)).not.toBe(coarseIndex(65, 65));
+    expect(coarseIndex(62, 62, MAP_SIZE)).not.toBe(
+      coarseIndex(65, 65, MAP_SIZE),
+    );
     // Buňka počátku něco dostane difuzí, ale zdroj sedí v té s předním rohem.
     expect(cell(world, 65, 65)).toBeGreaterThan(cell(world, 62, 62));
   });
@@ -256,8 +256,8 @@ describe('vanilla obsah', () => {
     const system = createPollutionSystem(content, balance);
     for (let tick = 0; tick < 2000; tick++) tickWorld(world, [system]);
 
-    const dirty = world.coarse.pollution[coarseIndex(12, 12)] ?? 0;
-    const clean = world.coarse.pollution[coarseIndex(104, 104)] ?? 0;
+    const dirty = world.coarse.pollution[coarseIndex(12, 12, MAP_SIZE)] ?? 0;
+    const clean = world.coarse.pollution[coarseIndex(104, 104, MAP_SIZE)] ?? 0;
 
     expect(dirty).toBeGreaterThan(50); // areál musí být vidět
     expect(clean).toBeLessThan(dirty / 4); // a čtvrť daleko od něj musí být jinak

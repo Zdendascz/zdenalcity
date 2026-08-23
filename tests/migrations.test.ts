@@ -12,11 +12,11 @@ import {
 } from '@/save/deserialize';
 import { CURRENT_FORMAT_VERSION } from '@/save/format';
 import { migrate, MIGRATIONS } from '@/save/migrations';
-import { COARSE_SIZE } from '@/sim/coarse';
 import { countViolations } from '@/sim/heights';
-import { hashLayers, MAP_SIZE, ROAD, TERRAIN } from '@/sim/layers';
+import { hashLayers, ROAD, TERRAIN } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld, totalPopulation } from '@/sim/world';
+import { MAP_SIZE, COARSE_SIZE } from './support/grid';
 
 /**
  * Fixtury savů (P7).
@@ -139,7 +139,7 @@ describe('fixtury savů', () => {
     expect(after.meta.formatVersion).toBe(4);
     // Rovná mapa: dopočítat patra ze seedu by šlo jen u map z generátoru a
     // i tam by se rozešla s tím, co hráč mezitím postavil.
-    expect(after.heights.byteLength).toBe(expectedHeightsByteLength());
+    expect(after.heights.byteLength).toBe(expectedHeightsByteLength(MAP_SIZE));
     expect([...after.heights].every((value) => value === 0)).toBe(true);
 
     // `layers.bin` se zkrátil přesně o jednu jednobajtovou vrstvu.
@@ -177,7 +177,7 @@ describe('fixtury savů', () => {
 
     expect(after.meta.formatVersion).toBe(5);
     expect(after.layers.byteLength - before.layers.byteLength).toBe(cells);
-    expect(after.layers.byteLength).toBe(expectedLayersByteLength());
+    expect(after.layers.byteLength).toBe(expectedLayersByteLength(MAP_SIZE));
 
     // Stávající vrstvy zůstaly bajt po bajtu tam, kde byly…
     expect([...after.layers.subarray(0, before.layers.byteLength)]).toEqual([...before.layers]);
@@ -309,8 +309,11 @@ describe('fixtury savů', () => {
 
       // Kontejner si od verze 2 nese rozměry mřížek — bez nich by se `layers.bin`
       // četl podle toho, jak je zrovna velká mapa v kódu.
-      expect(save.meta.grid).toEqual({ size: MAP_SIZE, coarseSize: COARSE_SIZE });
-      expect(save.coarse.byteLength).toBe(expectedCoarseByteLength());
+      expect(save.meta.grid).toEqual({
+        size: MAP_SIZE,
+        coarseSize: COARSE_SIZE,
+      });
+      expect(save.coarse.byteLength).toBe(expectedCoarseByteLength(MAP_SIZE));
       for (const building of save.entities.buildings) {
         expect(typeof building.abandoned).toBe('boolean');
         expect(Number.isInteger(building.levelChangedAtTick)).toBe(true);

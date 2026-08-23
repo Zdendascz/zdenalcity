@@ -1,9 +1,9 @@
 import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from '../buildings';
 import type { BuildingCatalogue } from '../catalogue';
-import { COARSE_CELLS, coarseIndex } from '../coarse';
+import { coarseCellsOf, coarseIndex } from '../coarse';
 import { isFlatTile } from '../heights';
-import { index, MAP_SIZE, ROAD, ZONE } from '../layers';
+import { index, ROAD, ZONE } from '../layers';
 import { seedDefinitions } from '../levels';
 import { categoryForZone, RCI_CATEGORIES } from '../rci';
 import { checkRequirements, presentDefinitions } from '../requirements';
@@ -151,9 +151,9 @@ function collectCandidates(
     const roadFactor = balance.growth.roadFactors[distance] ?? 0;
     if (roadFactor === 0) continue; // mimo dosah silnice se nestaví vůbec
 
-    const x = tile % MAP_SIZE;
-    const y = (tile - x) / MAP_SIZE;
-    const cell = coarseIndex(x, y);
+    const x = tile % world.size;
+    const y = (tile - x) / world.size;
+    const cell = coarseIndex(x, y, world.size);
     const landValue = world.coarse.landValue[cell] ?? 0;
     // Na svahu se staví dráž, takže se tam staví méně ochotně. Není to zákaz:
     // zóna na kopci roste pomaleji, ne vůbec — stejná logika jako u dostupnosti
@@ -207,13 +207,13 @@ export function roadReach(world: WorldState, maxDistance: number): Uint8Array {
   for (let step = 1; step <= maxDistance && frontier.length > 0; step++) {
     const next: number[] = [];
     for (const tile of frontier) {
-      const x = tile % MAP_SIZE;
-      const y = (tile - x) / MAP_SIZE;
+      const x = tile % world.size;
+      const y = (tile - x) / world.size;
       for (const [dx, dy] of NEIGHBOURS) {
         const nx = x + dx;
         const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
-        const at = index(nx, ny);
+        if (nx < 0 || ny < 0 || nx >= world.size || ny >= world.size) continue;
+        const at = index(nx, ny, world.size);
         if (distance[at] !== 255) continue;
         distance[at] = step;
         next.push(at);
@@ -291,7 +291,8 @@ function jobAccessByCell(
   catalogue: BuildingCatalogue,
   minFactor: number,
 ): Float32Array {
-  const factors = new Float32Array(COARSE_CELLS).fill(1);
+  const cells = coarseCellsOf(world.size);
+  const factors = new Float32Array(cells).fill(1);
 
   let totalJobs = 0;
   for (const building of world.buildings.values()) {
@@ -299,14 +300,14 @@ function jobAccessByCell(
   }
   if (totalJobs === 0) return factors;
 
-  const sums = new Float32Array(COARSE_CELLS);
-  const counts = new Float32Array(COARSE_CELLS);
+  const sums = new Float32Array(cells);
+  const counts = new Float32Array(cells);
 
   for (const building of world.buildings.values()) {
     if (building.abandoned || building.population === 0) continue;
     if (catalogue.get(building.definitionId)?.category !== 'residential') continue;
 
-    const cell = coarseIndex(building.x, building.y);
+    const cell = coarseIndex(building.x, building.y, world.size);
     sums[cell] = (sums[cell] ?? 0) + (world.jobAccess.get(building.id) ?? 0);
     counts[cell] = (counts[cell] ?? 0) + 1;
   }

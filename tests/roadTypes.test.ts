@@ -11,6 +11,7 @@ import { computeBudget } from '@/sim/systems/economy';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { createWorld } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE } from './support/grid';
 
 const EMPTY: BuildingCatalogue = { get: () => undefined, byCategory: () => [] };
 
@@ -49,7 +50,7 @@ describe('stavba silnic', () => {
 
     expect(buildRoad(w, 10, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
     expect(w.economy.funds).toBe(before - (STREET?.cost ?? 0));
-    expect(w.layers.road[index(10, 10)]).toBe(ROAD.street);
+    expect(w.layers.road[index(10, 10, MAP_SIZE)]).toBe(ROAD.street);
   });
 
   it('vylepšení na místě přepíše typ a účtuje plnou cenu nového (§4)', () => {
@@ -59,7 +60,7 @@ describe('stavba silnic', () => {
 
     expect(buildRoad(w, 10, 10, ROAD.avenue, VANILLA_BALANCE).ok).toBe(true);
 
-    expect(w.layers.road[index(10, 10)]).toBe(ROAD.avenue);
+    expect(w.layers.road[index(10, 10, MAP_SIZE)]).toBe(ROAD.avenue);
     expect(w.economy.funds).toBe(afterStreet - (AVENUE?.cost ?? 0));
   });
 
@@ -81,11 +82,13 @@ describe('stavba silnic', () => {
 
     const downgrade = buildRoad(w, 10, 10, ROAD.street, VANILLA_BALANCE);
     expect(downgrade.ok).toBe(false);
-    expect(downgrade.ok === false && downgrade.reason).toBe('error.roadDowngrade');
-    expect(w.layers.road[index(10, 10)]).toBe(ROAD.highway);
+    expect(downgrade.ok === false && downgrade.reason).toBe(
+      'error.roadDowngrade',
+    );
+    expect(w.layers.road[index(10, 10, MAP_SIZE)]).toBe(ROAD.highway);
 
     expect(bulldoze(w, 10, 10, VANILLA_BALANCE).ok).toBe(true);
-    expect(w.layers.road[index(10, 10)]).toBe(ROAD.none);
+    expect(w.layers.road[index(10, 10, MAP_SIZE)]).toBe(ROAD.none);
     expect(buildRoad(w, 10, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
   });
 
@@ -97,13 +100,13 @@ describe('stavba silnic', () => {
 
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toBe('error.notEnoughFunds');
-    expect(w.layers.road[index(10, 10)]).toBe(ROAD.none);
+    expect(w.layers.road[index(10, 10, MAP_SIZE)]).toBe(ROAD.none);
   });
 
   it('na vodu ani do lesa se silnice neklade', () => {
     const w = world();
-    w.layers.terrain[index(10, 10)] = TERRAIN.water;
-    w.layers.terrain[index(11, 10)] = TERRAIN.forest;
+    w.layers.terrain[index(10, 10, MAP_SIZE)] = TERRAIN.water;
+    w.layers.terrain[index(11, 10, MAP_SIZE)] = TERRAIN.forest;
 
     expect(buildRoad(w, 10, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(false);
     expect(buildRoad(w, 11, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(false);
@@ -139,7 +142,7 @@ describe('vykreslení', () => {
 
     // Bitmask se počítá z „je tam jakákoli silnice", ne ze shody typů.
     const isRoad = (x: number, y: number): boolean =>
-      (w.layers.road[index(x, y)] ?? ROAD.none) !== ROAD.none;
+      (w.layers.road[index(x, y, MAP_SIZE)] ?? ROAD.none) !== ROAD.none;
 
     expect(roadMask(isRoad, 10, 10)).toBe(2); // ROAD_E
     expect(roadMask(isRoad, 11, 10)).toBe(8); // ROAD_W

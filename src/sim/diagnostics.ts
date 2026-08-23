@@ -1,6 +1,6 @@
 import type { Balance } from '@/content/balance';
-import { COARSE_CELLS, coarseIndex } from './coarse';
-import { index, MAP_SIZE, ROAD, TERRAIN, ZONE } from './layers';
+import { coarseCellsOf, coarseIndex } from './coarse';
+import { index, ROAD, TERRAIN, ZONE } from './layers';
 import { coarseTerrainShare } from './terrain';
 import { categoryForZone } from './rci';
 import type { RciCategory } from './rci';
@@ -53,21 +53,27 @@ export function landValueContext(world: WorldState, balance: Balance): LandValue
  * jedna ucpaná ulice uprostřed pole není „šestnáctina problému", ale problém.
  * Buňka bez silnice má nulu.
  */
-export function coarseCongestion(world: WorldState, balance: Balance): Float32Array {
-  const total = new Float32Array(COARSE_CELLS);
-  const counts = new Float32Array(COARSE_CELLS);
+export function coarseCongestion(
+  world: WorldState,
+  balance: Balance,
+): Float32Array {
+  const cells = coarseCellsOf(world.size);
+  const total = new Float32Array(cells);
+  const counts = new Float32Array(cells);
 
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      const tile = index(x, y);
+  for (let y = 0; y < world.size; y++) {
+    for (let x = 0; x < world.size; x++) {
+      const tile = index(x, y, world.size);
       const roadType = world.layers.road[tile] ?? ROAD.none;
       if (roadType === ROAD.none) continue;
 
       const capacity = balance.traffic.roadTypes[roadType - 1]?.capacity ?? 0;
       if (capacity <= 0) continue;
 
-      const cell = coarseIndex(x, y);
-      total[cell] = (total[cell] ?? 0) + Math.min(2, (world.trafficLoad[tile] ?? 0) / capacity);
+      const cell = coarseIndex(x, y, world.size);
+      total[cell] =
+        (total[cell] ?? 0) +
+        Math.min(2, (world.trafficLoad[tile] ?? 0) / capacity);
       counts[cell] = (counts[cell] ?? 0) + 1;
     }
   }
@@ -226,7 +232,7 @@ export function growthBlocker(
   x: number,
   y: number,
 ): string | null {
-  const tile = index(x, y);
+  const tile = index(x, y, world.size);
   if (world.layers.buildingId[tile] !== 0) return null; // stojí tu budova
   if ((world.layers.road[tile] ?? 0) !== 0) return null; // vozovka, ne parcela
 
@@ -312,8 +318,8 @@ export function explainParcel(
   x: number,
   y: number,
 ): ParcelExplanation {
-  const tile = index(x, y);
-  const cell = coarseIndex(x, y);
+  const tile = index(x, y, world.size);
+  const cell = coarseIndex(x, y, world.size);
   const zone = world.layers.zone[tile] ?? ZONE.none;
   const category = categoryForZone(zone);
 

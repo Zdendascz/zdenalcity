@@ -50,7 +50,7 @@ export function checkRequirements(
   const requirements = definition.requirements;
   if (!requirements) return OK;
 
-  const cell = coarseIndex(x, y);
+  const cell = coarseIndex(x, y, world.size);
   for (const serviceClass of Object.keys(requirements.services).sort()) {
     const needed = requirements.services[serviceClass] ?? 0;
     const actual = coverageOf(world, serviceClass)?.[cell] ?? 0;

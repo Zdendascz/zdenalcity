@@ -1,14 +1,18 @@
 import { strFromU8, unzipSync } from 'fflate';
 import type { BuildingCatalogue } from '@/sim/catalogue';
-import { COARSE_CELLS } from '@/sim/coarse';
-import { CORNER_CELLS } from '@/sim/heights';
+import { coarseCellsOf } from '@/sim/coarse';
+import { cornerCellsOf } from '@/sim/heights';
 import type { CoarseLayers } from '@/sim/coarse';
-import { MAP_SIZE } from '@/sim/layers';
 import type { Layers } from '@/sim/layers';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
-import { NEUTRAL_HAPPINESS } from '@/sim/world';
-import type { Building, DemandState, EconomyState, WorldState } from '@/sim/world';
+import { NEUTRAL_HAPPINESS, resizeWorld } from '@/sim/world';
+import type {
+  Building,
+  DemandState,
+  EconomyState,
+  WorldState,
+} from '@/sim/world';
 import {
   SAVE_COARSE_LAYER_ORDER,
   SAVE_FILES,
@@ -194,55 +198,88 @@ function parseState(raw: Record<string, unknown>): SaveState {
   };
 }
 
-/** Očekávaná délka `coarse.bin`: tři jednobajtové vrstvy na hrubé mřížce. */
-export function expectedCoarseByteLength(): number {
-  return COARSE_CELLS * SAVE_COARSE_LAYER_ORDER.length;
+/**
+ * Hrana mapy, na kterou je save uložený.
+ *
+ * `meta.grid` je v typu volitelné, protože verze 1 ho neměla — jenže tam se
+ * dostane až po migraci, která ho vždycky doplní. Kdyby chybělo tady, je to
+ * chyba migrací, ne vada savu, a mlčky dosadit 128 by znamenalo číst cizí mapu
+ * jako by byla naše.
+ */
+export function saveMapSize(meta: SaveMeta): number {
+  const size = meta.grid?.size;
+  if (size === undefined)
+    fail('v savu chybí meta.grid.size — save neprošel migrací');
+  return size;
 }
 
-export function unpackCoarseInto(bytes: Uint8Array, coarse: CoarseLayers): void {
-  if (bytes.byteLength !== expectedCoarseByteLength()) {
+/**
+ * Očekávaná délka `coarse.bin`: tři jednobajtové vrstvy na hrubé mřížce.
+ *
+ * `size` je hrana **mapy**, ne hrubé mřížky — od T42 ji nese `meta.grid.size`
+ * a save z mapy 512 × 512 je jinak dlouhý než ze 128 × 128.
+ */
+export function expectedCoarseByteLength(size: number): number {
+  return coarseCellsOf(size) * SAVE_COARSE_LAYER_ORDER.length;
+}
+
+export function unpackCoarseInto(
+  bytes: Uint8Array,
+  coarse: CoarseLayers,
+  size: number,
+): void {
+  const cells = coarseCellsOf(size);
+  if (bytes.byteLength !== expectedCoarseByteLength(size)) {
     fail(
-      `coarse.bin má ${bytes.byteLength} B, čekalo se ${expectedCoarseByteLength()} B — jiná velikost hrubé mřížky nebo jiná sada vrstev`,
+      `coarse.bin má ${bytes.byteLength} B, čekalo se ${expectedCoarseByteLength(size)} B — jiná velikost hrubé mřížky nebo jiná sada vrstev`,
     );
   }
 
   let offset = 0;
   for (const name of SAVE_COARSE_LAYER_ORDER) {
-    coarse[name].set(bytes.subarray(offset, offset + COARSE_CELLS));
-    offset += COARSE_CELLS;
+    coarse[name].set(bytes.subarray(offset, offset + cells));
+    offset += cells;
   }
 }
 
 /** Očekávaná délka `heights.bin`: jeden bajt na roh mřížky. */
-export function expectedHeightsByteLength(): number {
-  return CORNER_CELLS;
+export function expectedHeightsByteLength(size: number): number {
+  return cornerCellsOf(size);
 }
 
-export function unpackHeightsInto(bytes: Uint8Array, heights: Uint8Array): void {
-  if (bytes.byteLength !== expectedHeightsByteLength()) {
+export function unpackHeightsInto(
+  bytes: Uint8Array,
+  heights: Uint8Array,
+  size: number,
+): void {
+  if (bytes.byteLength !== expectedHeightsByteLength(size)) {
     fail(
-      `heights.bin má ${bytes.byteLength} B, čekalo se ${expectedHeightsByteLength()} B — jiná velikost mapy`,
+      `heights.bin má ${bytes.byteLength} B, čekalo se ${expectedHeightsByteLength(size)} B — jiná velikost mapy`,
     );
   }
   heights.set(bytes);
 }
 
-/** Očekávaná délka `layers.bin` pro aktuální formát. */
-export function expectedLayersByteLength(): number {
-  const cells = MAP_SIZE * MAP_SIZE;
+/** Očekávaná délka `layers.bin` pro aktuální formát a mapu o hraně `size`. */
+export function expectedLayersByteLength(size: number): number {
+  const cells = size * size;
   // Jen `buildingId` je dvoubajtová; kdyby se to změnilo, je to nová verze formátu.
   return cells * (SAVE_LAYER_ORDER.length + 1);
 }
 
-export function unpackLayersInto(bytes: Uint8Array, layers: Layers): void {
-  if (bytes.byteLength !== expectedLayersByteLength()) {
+export function unpackLayersInto(
+  bytes: Uint8Array,
+  layers: Layers,
+  size: number,
+): void {
+  if (bytes.byteLength !== expectedLayersByteLength(size)) {
     fail(
-      `layers.bin má ${bytes.byteLength} B, čekalo se ${expectedLayersByteLength()} B — jiná velikost mapy nebo jiná sada vrstev`,
+      `layers.bin má ${bytes.byteLength} B, čekalo se ${expectedLayersByteLength(size)} B — jiná velikost mapy nebo jiná sada vrstev`,
     );
   }
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const cells = MAP_SIZE * MAP_SIZE;
+  const cells = size * size;
   let offset = 0;
 
   for (const name of SAVE_LAYER_ORDER) {
@@ -341,7 +378,7 @@ export function collectLoadWarnings(
 
   // Vrstva potrubí je v `layers.bin` poslední, takže stačí sáhnout na její
   // konec — rozbalovat celý save kvůli jednomu „je tam vůbec něco?“ ne.
-  const cells = MAP_SIZE * MAP_SIZE;
+  const cells = saveMapSize(save.meta) ** 2;
   const pipes = save.layers.subarray(save.layers.byteLength - cells);
   const hasPipes = pipes.some((value) => value !== 0);
   const waterlessBuildings = hasPipes
@@ -360,7 +397,12 @@ export function collectLoadWarnings(
  * pohled (T2), takže výměna objektu by jim nechala zastaralou referenci.
  */
 export function applySaveToWorld(world: WorldState, save: SaveData): void {
-  unpackLayersInto(save.layers, world.layers);
+  // Velikost mapy nese save (T42). Přestavba musí být **první**: všechno pod
+  // ní zapisuje do vrstev, které tím teprve vzniknou ve správné délce.
+  const size = saveMapSize(save.meta);
+  resizeWorld(world, size);
+
+  unpackLayersInto(save.layers, world.layers, size);
 
   // `seed` je readonly, aby ho nikdo nepřepsal omylem. Load je ta jediná
   // legitimní výjimka — ze světa se stává jiné město.
@@ -382,9 +424,9 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
 
   // Hrubé vrstvy nese formát verze 2. Starší save jimi projde s vynulovaným
   // `coarse.bin`, který mu doplnila migrace.
-  unpackCoarseInto(save.coarse, world.coarse);
+  unpackCoarseInto(save.coarse, world.coarse, size);
   // Patra nese verze 4; starším je migrace doplnila jako rovinu.
-  unpackHeightsInto(save.heights, world.cornerHeight);
+  unpackHeightsInto(save.heights, world.cornerHeight, size);
 
   // Odvozený a runtime stav předchozího města nesmí přetéct do načteného.
   // Pokrytí se **musí** označit za špinavé: bez toho by ho `serviceSystem`
@@ -404,7 +446,7 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   // v tomhle městě nikdy nebyla. Kurzor je jediné, co se přenáší ze savu.
   world.trafficLoad.fill(0);
   world.jobAccess.clear();
-  world.jobAccessCells = new Float32Array(COARSE_CELLS).fill(1);
+  world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
   world.cityJobAccess = 1;
   world.trafficCursor = save.state.trafficCursor;
 

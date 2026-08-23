@@ -1,5 +1,3 @@
-import { COARSE_SIZE } from './coarse';
-
 /**
  * Difuze na hrubé mřížce (§3 zadání fáze 2).
  *
@@ -24,7 +22,9 @@ export function diffuse(
   decay: number,
   passes: number,
 ): void {
-  const size = COARSE_SIZE;
+  // Hrana mřížky se bere z délky pole, ne z konstanty: difuze se od T42 pouští
+  // nad mřížkami různých velikostí a parametr navíc by šel jen zapomenout.
+  const size = Math.round(Math.sqrt(current.length));
   let previous = Float32Array.from(current);
   let next = new Float32Array(current.length);
 

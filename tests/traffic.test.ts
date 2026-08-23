@@ -252,7 +252,7 @@ describe('ruiny a prázdné domy', () => {
     expect(world.jobAccess.has(house.id)).toBe(true);
 
     world.buildings.delete(house.id);
-    world.layers.buildingId[index(10, 11)] = 0;
+    world.layers.buildingId[index(10, 11, world.size)] = 0;
     world.jobAccess.delete(house.id);
 
     expect(world.jobAccess.has(house.id)).toBe(false);

@@ -1,8 +1,23 @@
-import { COARSE_CELLS, COARSE_SIZE } from '@/sim/coarse';
-import { CORNER_CELLS } from '@/sim/heights';
-import { MAP_SIZE } from '@/sim/layers';
-import { CURRENT_FORMAT_VERSION, SAVE_COARSE_LAYER_ORDER, SaveMigrationError } from '../format';
+import {
+  CURRENT_FORMAT_VERSION,
+  SAVE_COARSE_LAYER_ORDER,
+  SaveMigrationError,
+} from '../format';
 import type { SaveData } from '../format';
+
+/**
+ * Hrana mapy, kterou znaly verze 1–5.
+ *
+ * Do T42 byla velikost pevná a každý starý save je přesně takhle velký. Číslo
+ * je tu natvrdo ze stejného důvodu jako pořadí vrstev v `dropElevationLayer`:
+ * **migrace popisuje minulost, ne současnost.** Kdyby četla dnešní
+ * `DEFAULT_MAP_SIZE`, změnila by se, jakmile se výchozí velikost pohne — a
+ * dvacet let staré savy by se přestaly dát načíst.
+ */
+const LEGACY_MAP_SIZE = 128;
+const LEGACY_COARSE_SIZE = LEGACY_MAP_SIZE / 4;
+const LEGACY_COARSE_CELLS = LEGACY_COARSE_SIZE * LEGACY_COARSE_SIZE;
+const LEGACY_CORNER_CELLS = (LEGACY_MAP_SIZE + 1) * (LEGACY_MAP_SIZE + 1);
 
 /**
  * Migrace savů.
@@ -33,9 +48,9 @@ const migrateV1ToV2: Migration = (save) => ({
   meta: {
     ...save.meta,
     formatVersion: 2,
-    grid: { size: MAP_SIZE, coarseSize: COARSE_SIZE },
+    grid: { size: LEGACY_MAP_SIZE, coarseSize: LEGACY_COARSE_SIZE },
   },
-  coarse: new Uint8Array(COARSE_CELLS * SAVE_COARSE_LAYER_ORDER.length),
+  coarse: new Uint8Array(LEGACY_COARSE_CELLS * SAVE_COARSE_LAYER_ORDER.length),
   entities: {
     ...save.entities,
     buildings: save.entities.buildings.map((building) => ({
@@ -92,7 +107,7 @@ const migrateV3ToV4: Migration = (save) => ({
   ...save,
   meta: { ...save.meta, formatVersion: 4 },
   layers: dropElevationLayer(save.layers),
-  heights: new Uint8Array(CORNER_CELLS),
+  heights: new Uint8Array(LEGACY_CORNER_CELLS),
 });
 
 /**
@@ -105,7 +120,7 @@ const migrateV3ToV4: Migration = (save) => ({
  * současnost.**
  */
 function dropElevationLayer(layers: Uint8Array): Uint8Array {
-  const cells = MAP_SIZE * MAP_SIZE;
+  const cells = LEGACY_MAP_SIZE * LEGACY_MAP_SIZE;
   const expected = cells * 7; // 6 vrstev, z toho jedna dvoubajtová
   if (layers.byteLength !== expected) return layers; // cizí velikost mapy neřešíme
 
@@ -142,7 +157,7 @@ const migrateV4ToV5: Migration = (save) => ({
  * `SAVE_LAYER_ORDER`, začala by se chovat jinak, jakmile přibude verze 6.
  */
 function appendEmptyLayer(layers: Uint8Array): Uint8Array {
-  const cells = MAP_SIZE * MAP_SIZE;
+  const cells = LEGACY_MAP_SIZE * LEGACY_MAP_SIZE;
   const expected = cells * 6; // 5 vrstev, z toho `buildingId` dvoubajtová
   if (layers.byteLength !== expected) return layers; // cizí velikost mapy neřešíme
 

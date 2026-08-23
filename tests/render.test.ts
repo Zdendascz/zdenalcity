@@ -24,9 +24,22 @@ import {
   TILE_H,
   TILE_W,
 } from '@/render/projection';
-import { HAPPINESS_CLEAN_AT, shade, TERRAIN_COLORS, unhappinessValue } from '@/render/palette';
-import { roadMask, roadPolygons, ROAD_E, ROAD_N, ROAD_S, ROAD_W } from '@/render/roads';
-import { MAP_SIZE, TERRAIN } from '@/sim/layers';
+import {
+  HAPPINESS_CLEAN_AT,
+  shade,
+  TERRAIN_COLORS,
+  unhappinessValue,
+} from '@/render/palette';
+import {
+  roadMask,
+  roadPolygons,
+  ROAD_E,
+  ROAD_N,
+  ROAD_S,
+  ROAD_W,
+} from '@/render/roads';
+import { TERRAIN } from '@/sim/layers';
+import { MAP_SIZE, CORNER_SIZE } from './support/grid';
 
 /** Rovná dlaždice v počátku — nejčastější vstup do testů vozovky. */
 const FLAT_TILE = tileQuad(0, 0, [0, 0, 0, 0]);
@@ -45,7 +58,7 @@ function flatInverse(screenX: number, screenY: number): { x: number; y: number }
 }
 
 /** Placka: mřížka rohů samých nul, tedy terén fáze 1. */
-const FLAT_HEIGHTS = createCornerHeights();
+const FLAT_HEIGHTS = createCornerHeights(MAP_SIZE);
 
 const VIEW_W = 1280;
 const VIEW_H = 720;
@@ -316,9 +329,10 @@ describe('picking', () => {
 describe('picking s převýšením (§7 fáze 3)', () => {
   /** Mřížka rohů, kde celá plocha od `x0,y0` do konce mapy stojí ve výšce `h`. */
   function plateau(x0: number, y0: number, h: number): Uint8Array {
-    const heights = createCornerHeights();
+    const heights = createCornerHeights(MAP_SIZE);
     for (let y = y0; y < MAP_SIZE + 1; y++) {
-      for (let x = x0; x < MAP_SIZE + 1; x++) heights[cornerIndex(x, y)] = h;
+      for (let x = x0; x < MAP_SIZE + 1; x++)
+        heights[cornerIndex(x, y, CORNER_SIZE)] = h;
     }
     return heights;
   }
@@ -347,14 +361,14 @@ describe('picking s převýšením (§7 fáze 3)', () => {
   it('vyhrává dlaždice blíž k pozorovateli, ne ta za ní', () => {
     // Vysoká dlaždice vpředu zakrývá kus té za sebou. Klik do překryvu patří
     // té přední — to je smysl průchodu od předu dozadu.
-    const heights = createCornerHeights();
+    const heights = createCornerHeights(MAP_SIZE);
     for (const [x, y] of [
       [40, 40],
       [41, 40],
       [40, 41],
       [41, 41],
     ] as const) {
-      heights[cornerIndex(x, y)] = MAX_HEIGHT;
+      heights[cornerIndex(x, y, CORNER_SIZE)] = MAX_HEIGHT;
     }
 
     // Střed vysoké dlaždice (40,40) leží nad dlaždicemi, které jsou dál.
@@ -370,9 +384,9 @@ describe('picking s převýšením (§7 fáze 3)', () => {
   it('trefí i zkroucenou dlaždici (sedlo)', () => {
     // Sedlo se promítne jako nekonvexní čtyřúhelník. Test na konvexní tvar by
     // ho odmítl, ray casting ne.
-    const heights = createCornerHeights();
-    heights[cornerIndex(30, 30)] = 1;
-    heights[cornerIndex(31, 31)] = 1;
+    const heights = createCornerHeights(MAP_SIZE);
+    heights[cornerIndex(30, 30, CORNER_SIZE)] = 1;
+    heights[cornerIndex(31, 31, CORNER_SIZE)] = 1;
 
     const center = { x: gridToScreen(30, 30).x, y: gridToScreen(30, 30).y + TILE_H / 2 - LEVEL_H / 2 };
     const camera = createCamera(center.x, center.y, 1);
@@ -387,20 +401,23 @@ describe('picking s převýšením (§7 fáze 3)', () => {
     // Vypadá to jako chyba, ale je to správně: terén stoupající k pozorovateli
     // znamená, že přední dlaždice je nakreslená výš a zadní zakryje. Přesně
     // tenhle případ vyplaval při zkoušce na vygenerované mapě (4 z 625 vzorků).
-    const heights = createCornerHeights();
+    const heights = createCornerHeights(MAP_SIZE);
     for (let y = 0; y < MAP_SIZE + 1; y++) {
       for (let x = 0; x < MAP_SIZE + 1; x++) {
         // Terén stoupá na jihovýchod o patro na dlaždici.
-        heights[cornerIndex(x, y)] = Math.min(MAX_HEIGHT, Math.max(0, x + y - 100));
+        heights[cornerIndex(x, y, CORNER_SIZE)] = Math.min(
+          MAX_HEIGHT,
+          Math.max(0, x + y - 100),
+        );
       }
     }
 
     const back = { x: 52, y: 52 };
     const corners = [
-      heights[cornerIndex(back.x, back.y)] ?? 0,
-      heights[cornerIndex(back.x + 1, back.y)] ?? 0,
-      heights[cornerIndex(back.x, back.y + 1)] ?? 0,
-      heights[cornerIndex(back.x + 1, back.y + 1)] ?? 0,
+      heights[cornerIndex(back.x, back.y, CORNER_SIZE)] ?? 0,
+      heights[cornerIndex(back.x + 1, back.y, CORNER_SIZE)] ?? 0,
+      heights[cornerIndex(back.x, back.y + 1, CORNER_SIZE)] ?? 0,
+      heights[cornerIndex(back.x + 1, back.y + 1, CORNER_SIZE)] ?? 0,
     ];
     const quad = tileQuad(back.x, back.y, corners as [number, number, number, number]);
     const center = {
@@ -414,10 +431,10 @@ describe('picking s převýšením (§7 fáze 3)', () => {
     expect(hit).not.toBeNull();
     // Ať už vyjde kterákoli, musí to být dlaždice, která ten bod opravdu kryje.
     const hitCorners = [
-      heights[cornerIndex(hit!.x, hit!.y)] ?? 0,
-      heights[cornerIndex(hit!.x + 1, hit!.y)] ?? 0,
-      heights[cornerIndex(hit!.x, hit!.y + 1)] ?? 0,
-      heights[cornerIndex(hit!.x + 1, hit!.y + 1)] ?? 0,
+      heights[cornerIndex(hit!.x, hit!.y, CORNER_SIZE)] ?? 0,
+      heights[cornerIndex(hit!.x + 1, hit!.y, CORNER_SIZE)] ?? 0,
+      heights[cornerIndex(hit!.x, hit!.y + 1, CORNER_SIZE)] ?? 0,
+      heights[cornerIndex(hit!.x + 1, hit!.y + 1, CORNER_SIZE)] ?? 0,
     ] as [number, number, number, number];
     expect(containsPoint(tileQuad(hit!.x, hit!.y, hitCorners), center.x, center.y)).toBe(true);
     // A nesmí být dál než ta, na kterou se mířilo.

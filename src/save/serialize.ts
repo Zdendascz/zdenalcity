@@ -1,7 +1,6 @@
 import { strToU8, zipSync } from 'fflate';
-import { COARSE_CELLS, COARSE_SIZE } from '@/sim/coarse';
+import { coarseSizeOf } from '@/sim/coarse';
 import type { CoarseLayers } from '@/sim/coarse';
-import { MAP_SIZE } from '@/sim/layers';
 import type { Layers } from '@/sim/layers';
 import { totalPopulation } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
@@ -31,10 +30,11 @@ export interface SaveOptions {
  * převzal endianitu stroje a save z ARMu by se na jiné mašině načetl jako šum.
  */
 export function packLayers(layers: Layers): Uint8Array {
-  const cells = MAP_SIZE * MAP_SIZE;
+  // Počet dlaždic se bere z vrstvy, ne z konstanty: od T42 má každý svět svou
+  // velikost a save je musí unést všechny.
   let byteLength = 0;
   for (const name of SAVE_LAYER_ORDER) {
-    byteLength += cells * layers[name].BYTES_PER_ELEMENT;
+    byteLength += layers[name].length * layers[name].BYTES_PER_ELEMENT;
   }
 
   const buffer = new ArrayBuffer(byteLength);
@@ -64,11 +64,12 @@ export function packLayers(layers: Layers): Uint8Array {
  * nehraje roli — kdyby některá přestala být, je to nová verze formátu.
  */
 export function packCoarseLayers(coarse: CoarseLayers): Uint8Array {
-  const buffer = new Uint8Array(COARSE_CELLS * SAVE_COARSE_LAYER_ORDER.length);
+  const cells = coarse.pollution.length;
+  const buffer = new Uint8Array(cells * SAVE_COARSE_LAYER_ORDER.length);
   let offset = 0;
   for (const name of SAVE_COARSE_LAYER_ORDER) {
     buffer.set(coarse[name], offset);
-    offset += COARSE_CELLS;
+    offset += cells;
   }
   return buffer;
 }
@@ -87,7 +88,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
       content: {
         sources: options.sources.map(({ id, version }) => ({ id, version })),
       },
-      grid: { size: MAP_SIZE, coarseSize: COARSE_SIZE },
+      grid: { size: world.size, coarseSize: coarseSizeOf(world.size) },
       map: { ...world.map },
       preview: {
         population: totalPopulation(world.buildings),

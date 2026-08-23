@@ -130,7 +130,8 @@ function planWiden(
   present: ReadonlySet<string>,
 ): Upgrade | null {
   const [width, depth] = definition.footprint;
-  const zone = world.layers.zone[index(building.x, building.y)] ?? 0;
+  const zone =
+    world.layers.zone[index(building.x, building.y, world.size)] ?? 0;
 
   for (const [dx, dy] of DIRECTIONS) {
     const newWidth = width + Math.abs(dx);
@@ -178,8 +179,8 @@ function claimable(
 
   for (let ty = y; ty < y + depth; ty++) {
     for (let tx = x; tx < x + width; tx++) {
-      if (!inBounds(tx, ty)) return null;
-      const tile = index(tx, ty);
+      if (!inBounds(tx, ty, world.size)) return null;
+      const tile = index(tx, ty, world.size);
 
       if (world.layers.zone[tile] !== zone) return null;
       if (world.layers.road[tile] !== 0) return null;
@@ -336,7 +337,9 @@ function apply(
   const [width, depth] = definition.footprint;
   for (let dy = 0; dy < depth; dy++) {
     for (let dx = 0; dx < width; dx++) {
-      world.layers.buildingId[index(upgrade.x + dx, upgrade.y + dy)] = building.id;
+      world.layers.buildingId[
+        index(upgrade.x + dx, upgrade.y + dy, world.size)
+      ] = building.id;
       markTileDirty(world, upgrade.x + dx, upgrade.y + dy);
     }
   }
@@ -350,7 +353,7 @@ function clearFootprint(world: WorldState, definition: Definition, x: number, y:
   const [width, depth] = definition.footprint;
   for (let dy = 0; dy < depth; dy++) {
     for (let dx = 0; dx < width; dx++) {
-      world.layers.buildingId[index(x + dx, y + dy)] = 0;
+      world.layers.buildingId[index(x + dx, y + dy, world.size)] = 0;
       markTileDirty(world, x + dx, y + dy);
     }
   }

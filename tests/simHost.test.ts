@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { createSimHost, MAX_TICKS_PER_FRAME, SPEEDS, TICK_MS } from '@/sim/simHost';
+import {
+  createSimHost,
+  MAX_TICKS_PER_FRAME,
+  SPEEDS,
+  TICK_MS,
+} from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
 import type { System } from '@/sim/systems';
 import { createWorld, markTileDirty, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { index } from '@/sim/layers';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE } from './support/grid';
 
 /** Prázdný katalog — tyhle testy se obsahu netýkají. */
 const NO_CONTENT = { get: () => undefined, byCategory: () => [] };
@@ -151,7 +157,7 @@ describe('dirty tracking', () => {
     host.consumeDirty();
 
     host.step(TICK_MS);
-    expect([...host.consumeDirty().tiles]).toEqual([index(3, 4)]);
+    expect([...host.consumeDirty().tiles]).toEqual([index(3, 4, MAP_SIZE)]);
     expect(host.consumeDirty().tiles.size).toBe(0);
   });
 });

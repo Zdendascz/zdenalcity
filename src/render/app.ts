@@ -1,7 +1,12 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
-import { applySaveToWorld, collectLoadWarnings, readSaveMeta, unpackSave } from '@/save/deserialize';
+import {
+  applySaveToWorld,
+  collectLoadWarnings,
+  readSaveMeta,
+  unpackSave,
+} from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
 import { estimatePlacement } from '@/sim/commands';
 import { explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
@@ -9,14 +14,14 @@ import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
 import { cornerIndex, tileCorners } from '@/sim/heights';
-import { index, MAP_SIZE, ZONE } from '@/sim/layers';
+import { DEFAULT_MAP_SIZE, index, ZONE } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
 import { computeBudget } from '@/sim/systems/economy';
-import { COARSE_CELLS } from '@/sim/coarse';
+import { coarseCellsOf } from '@/sim/coarse';
 import { createWorld, NEUTRAL_HAPPINESS } from '@/sim/world';
 import { BudgetPanel } from '@/ui/budgetPanel';
 import { BuildingInfo } from '@/ui/buildingInfo';
@@ -28,7 +33,12 @@ import { Hud } from '@/ui/hud';
 import type { OverlayOption } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
-import { clearAutosave, hasAutosave, loadAutosave, storeAutosave } from '@/ui/autosave';
+import {
+  clearAutosave,
+  hasAutosave,
+  loadAutosave,
+  storeAutosave,
+} from '@/ui/autosave';
 import { downloadBytes, readFileBytes } from '@/ui/saveFile';
 import { showNewGameDialog } from '@/ui/newGameDialog';
 import { Toolbar } from '@/ui/toolbar';
@@ -328,7 +338,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
-  const simWorld = createWorld(newGame.seed, content.getBalance().economy);
+  const simWorld = createWorld(
+    newGame.seed,
+    content.getBalance().economy,
+    DEFAULT_MAP_SIZE,
+  );
 
   // Obnovení rozehraného města. Nečitelný autosave se **zahodí a hra začne
   // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,
@@ -347,7 +361,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   if (!restored) {
-    applyGeneratedMap(simWorld, generateTerrain(newGame.seed, content.getBalance()));
+    applyGeneratedMap(
+      simWorld,
+      generateTerrain(newGame.seed, content.getBalance(), simWorld.size),
+    );
     // Ze seedu jde tenhle terén kdykoli vygenerovat znovu, tak ať to save ví.
     simWorld.map = { seed: newGame.seed, generated: true };
   }
@@ -376,7 +393,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * nejsilněji by svítily čtvrti, se kterými není co dělat, a ta jediná, kde
    * se něco děje, by zůstala prázdná.
    */
-  const unhappiness = new Uint8Array(COARSE_CELLS);
+  const unhappiness = new Uint8Array(coarseCellsOf(world.size));
   const unhappinessLayer = (): Uint8Array => {
     for (let cell = 0; cell < unhappiness.length; cell++) {
       const value = world.happiness[cell] ?? NEUTRAL_HAPPINESS;
@@ -646,9 +663,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * Vejde se sem to, co hráč drží? Ptá se stejné funkce jako příkaz, takže
    * rámeček nemůže tvrdit něco jiného, než co se pak stane.
    */
-  function placementFits(tile: { x: number; y: number }, width: number, depth: number): boolean {
+  function placementFits(
+    tile: { x: number; y: number },
+    width: number,
+    depth: number,
+  ): boolean {
     if (activeTool.action.kind !== 'place') return true;
-    if (tile.x + width > MAP_SIZE || tile.y + depth > MAP_SIZE) return false;
+    if (tile.x + width > world.size || tile.y + depth > world.size)
+      return false;
 
     const definition = content.get(activeTool.action.definitionId);
     // Svah **není** překážka: parcela se srovná při stavbě, jen to něco stojí.
@@ -662,9 +684,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * zůstává na nástroji.
    */
   function showBuildingAt(tile: { x: number; y: number }): void {
-    const buildingId = simWorld.layers.buildingId[index(tile.x, tile.y)] ?? 0;
-    const building = buildingId === 0 ? undefined : simWorld.buildings.get(buildingId);
-    const parcel = explainParcel(simWorld, content.getBalance(), tile.x, tile.y);
+    const buildingId =
+      simWorld.layers.buildingId[index(tile.x, tile.y, world.size)] ?? 0;
+    const building =
+      buildingId === 0 ? undefined : simWorld.buildings.get(buildingId);
+    const parcel = explainParcel(
+      simWorld,
+      content.getBalance(),
+      tile.x,
+      tile.y,
+    );
 
     buildingInfo.show(
       simWorld,
@@ -761,7 +790,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       event.offsetY,
       app.screen.width,
       app.screen.height,
-      MAP_SIZE,
+      world.size,
       world.cornerHeight,
     );
   }
@@ -792,7 +821,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     ] as const) {
       const cx = tile.x + dx;
       const cy = tile.y + dy;
-      const at = gridToScreen(cx, cy, heights[cornerIndex(cx, cy)] ?? 0);
+      const at = gridToScreen(
+        cx,
+        cy,
+        heights[cornerIndex(cx, cy, world.size + 1)] ?? 0,
+      );
       const distance = (at.x - point.x) ** 2 + (at.y - point.y) ** 2;
       if (distance < bestDistance) {
         bestDistance = distance;
@@ -838,8 +871,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       if (buildingId[tile] !== 0) continue;
       free++;
 
-      const x = tile % MAP_SIZE;
-      const reason = growthBlocker(simWorld, content, balance, x, (tile - x) / MAP_SIZE);
+      const x = tile % world.size;
+      const reason = growthBlocker(
+        simWorld,
+        content,
+        balance,
+        x,
+        (tile - x) / world.size,
+      );
       // Jediná volná parcela, na které se stavět dá, znamená, že město běží.
       if (reason === null) return;
       reasons.push(reason);
@@ -969,7 +1008,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
 
     paintButton = event.button;
-    lastPaintedTile = tile.y * MAP_SIZE + tile.x;
+    lastPaintedTile = tile.y * world.size + tile.x;
 
     // Nástroje s náhledem se použijí až při puštění; ostatní hned.
     if (dragKind() !== null) {
@@ -994,7 +1033,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Malování tažením: dokud je tlačítko dole, každá nová dlaždice dostane
     // stejný nástroj. Bez toho by se zóna vyznačovala klikáním po jedné.
     if (paintButton !== null && hoveredTile && dragAnchor === null) {
-      const tile = hoveredTile.y * MAP_SIZE + hoveredTile.x;
+      const tile = hoveredTile.y * world.size + hoveredTile.x;
       if (tile !== lastPaintedTile) {
         lastPaintedTile = tile;
         applyTool(hoveredTile, event.offsetX, event.offsetY);
@@ -1226,7 +1265,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       // Hráč musí vidět, kam až sahá, dřív než pustí tlačítko.
       const tiles = dragTiles();
       for (const tile of tiles) {
-        if (tile.x >= MAP_SIZE || tile.y >= MAP_SIZE) continue;
+        if (tile.x >= world.size || tile.y >= world.size) continue;
         hover
           .poly(tileQuad(tile.x, tile.y, tileCorners(world.cornerHeight, tile.x, tile.y)))
           .fill({ color: HOVER_COLOR, alpha: HOVER_FILL_ALPHA })
@@ -1246,7 +1285,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       // čtverce by ukazoval čtyři rohy naráz a hráč by netušil, který z nich
       // se pohne — proto se místo něj rozsvítí ten jeden.
       const corner = nearestCorner(hoveredTile, pointerX, pointerY);
-      const at = gridToScreen(corner.x, corner.y, world.cornerHeight[cornerIndex(corner.x, corner.y)] ?? 0);
+      const at = gridToScreen(
+        corner.x,
+        corner.y,
+        world.cornerHeight[cornerIndex(corner.x, corner.y, world.size + 1)] ??
+          0,
+      );
       // Velikost v obrazovkových bodech, ne ve světových: značka má být stejně
       // čitelná při plném přiblížení i oddálení.
       const radius = CORNER_MARK_SIZE / camera.zoom;
@@ -1275,7 +1319,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         for (let dx = 0; dx < width; dx++) {
           const x = hoveredTile.x + dx;
           const y = hoveredTile.y + dy;
-          if (x >= MAP_SIZE || y >= MAP_SIZE) continue;
+          if (x >= world.size || y >= world.size) continue;
           hover
             .poly(tileQuad(x, y, tileCorners(world.cornerHeight, x, y)))
             .fill({ color, alpha: HOVER_FILL_ALPHA })

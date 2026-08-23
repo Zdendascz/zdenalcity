@@ -39,14 +39,14 @@ function runLandValue(world: WorldState, runs: number, withPollution = false): v
 }
 
 function value(world: WorldState, x: number, y: number): number {
-  return world.coarse.landValue[coarseIndex(x, y)] ?? 0;
+  return world.coarse.landValue[coarseIndex(x, y, world.size)] ?? 0;
 }
 
 /** Kaluž vody o rozměru jedné hrubé buňky. */
 function addWater(world: WorldState, x: number, y: number): void {
   for (let dy = 0; dy < COARSE_FACTOR; dy++) {
     for (let dx = 0; dx < COARSE_FACTOR; dx++) {
-      world.layers.terrain[index(x + dx, y + dy)] = TERRAIN.water;
+      world.layers.terrain[index(x + dx, y + dy, world.size)] = TERRAIN.water;
     }
   }
 }

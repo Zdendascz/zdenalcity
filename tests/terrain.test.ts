@@ -21,7 +21,8 @@ async function vanilla(): Promise<ContentRegistry> {
 /** Vyplní čtverec 4×4 dlaždic, tedy přesně jednu buňku hrubé mřížky. */
 function fillCell(world: WorldState, x: number, y: number, terrain: number): void {
   for (let dy = 0; dy < 4; dy++) {
-    for (let dx = 0; dx < 4; dx++) world.layers.terrain[index(x + dx, y + dy)] = terrain;
+    for (let dx = 0; dx < 4; dx++)
+      world.layers.terrain[index(x + dx, y + dy, world.size)] = terrain;
   }
 }
 
@@ -30,13 +31,15 @@ describe('podíl terénu v buňce', () => {
     const world = createWorld(1);
     fillCell(world, 20, 20, TERRAIN.forest);
     for (let dx = 0; dx < 2; dx++) {
-      for (let dy = 0; dy < 4; dy++) world.layers.terrain[index(24 + dx, 20 + dy)] = TERRAIN.forest;
+      for (let dy = 0; dy < 4; dy++)
+        world.layers.terrain[index(24 + dx, 20 + dy, world.size)] =
+          TERRAIN.forest;
     }
 
     const share = coarseTerrainShare(world, TERRAIN.forest);
-    expect(share[coarseIndex(20, 20)]).toBeCloseTo(1);
-    expect(share[coarseIndex(24, 20)]).toBeCloseTo(0.5);
-    expect(share[coarseIndex(60, 60)]).toBe(0);
+    expect(share[coarseIndex(20, 20, world.size)]).toBeCloseTo(1);
+    expect(share[coarseIndex(24, 20, world.size)]).toBeCloseTo(0.5);
+    expect(share[coarseIndex(60, 60, world.size)]).toBe(0);
   });
 
   it('zná terény, které se musí nejdřív upravit', () => {
@@ -52,7 +55,7 @@ describe('les v ceně půdy', () => {
   it('zvedá ji, dokud stojí, a po vykácení bonus zmizí (§13 krok 4)', () => {
     const world = createWorld(1);
     fillCell(world, 20, 20, TERRAIN.forest);
-    const cell = coarseIndex(20, 20);
+    const cell = coarseIndex(20, 20, world.size);
 
     const withForest = explainLandValue(world, VANILLA_BALANCE, cell, landValueContext(world, VANILLA_BALANCE));
     const forestTerm = withForest.terms.find((term) => term.source === 'forest');
@@ -72,7 +75,12 @@ describe('les v ceně půdy', () => {
     const world = createWorld(1);
     fillCell(world, 20, 20, TERRAIN.sand);
 
-    const explained = explainLandValue(world, VANILLA_BALANCE, coarseIndex(20, 20), landValueContext(world, VANILLA_BALANCE));
+    const explained = explainLandValue(
+      world,
+      VANILLA_BALANCE,
+      coarseIndex(20, 20, world.size),
+      landValueContext(world, VANILLA_BALANCE),
+    );
     const sand = explained.terms.find((term) => term.source === 'sand');
 
     expect(sand?.amount).toBeLessThan(0);
@@ -94,7 +102,7 @@ describe('les pohlcuje znečištění', () => {
 
       const system = createPollutionSystem(content, balance);
       for (let tick = 0; tick < 400; tick++) tickWorld(world, [system]);
-      return world.coarse.pollution[coarseIndex(21, 21)] ?? 0;
+      return world.coarse.pollution[coarseIndex(21, 21, world.size)] ?? 0;
     };
 
     const bare = measure(false);
@@ -108,39 +116,43 @@ describe('les pohlcuje znečištění', () => {
 describe('kácení lesa', () => {
   it('stojí peníze a uvolní místo', () => {
     const world = createWorld(1, VANILLA_BALANCE.economy);
-    world.layers.terrain[index(30, 30)] = TERRAIN.forest;
+    world.layers.terrain[index(30, 30, world.size)] = TERRAIN.forest;
     const before = world.economy.funds;
 
     expect(bulldoze(world, 30, 30, VANILLA_BALANCE).ok).toBe(true);
 
-    expect(world.layers.terrain[index(30, 30)]).toBe(TERRAIN.grass);
-    expect(world.economy.funds).toBe(before - VANILLA_BALANCE.map.clearForestCost);
+    expect(world.layers.terrain[index(30, 30, world.size)]).toBe(TERRAIN.grass);
+    expect(world.economy.funds).toBe(
+      before - VANILLA_BALANCE.map.clearForestCost,
+    );
   });
 
   it('bez peněz se nekácí', () => {
     const world = createWorld(1, VANILLA_BALANCE.economy);
-    world.layers.terrain[index(30, 30)] = TERRAIN.forest;
+    world.layers.terrain[index(30, 30, world.size)] = TERRAIN.forest;
     world.economy.funds = 0;
 
     const result = bulldoze(world, 30, 30, VANILLA_BALANCE);
 
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toBe('error.notEnoughFunds');
-    expect(world.layers.terrain[index(30, 30)]).toBe(TERRAIN.forest);
+    expect(world.layers.terrain[index(30, 30, world.size)]).toBe(
+      TERRAIN.forest,
+    );
   });
 
   it('mokřad se zaveze a skála odtěží — od 3b už to jde (§7)', () => {
     // Do fáze 3a to byly terény, se kterými hráč nemohl dělat vůbec nic.
     const world = createWorld(1, VANILLA_BALANCE.economy);
-    world.layers.terrain[index(30, 30)] = TERRAIN.marsh;
-    world.layers.terrain[index(31, 30)] = TERRAIN.rock;
+    world.layers.terrain[index(30, 30, world.size)] = TERRAIN.marsh;
+    world.layers.terrain[index(31, 30, world.size)] = TERRAIN.rock;
     const funds = world.economy.funds;
 
     expect(bulldoze(world, 30, 30, VANILLA_BALANCE).ok).toBe(true);
     expect(bulldoze(world, 31, 30, VANILLA_BALANCE).ok).toBe(true);
 
-    expect(world.layers.terrain[index(30, 30)]).toBe(TERRAIN.grass);
-    expect(world.layers.terrain[index(31, 30)]).toBe(TERRAIN.grass);
+    expect(world.layers.terrain[index(30, 30, world.size)]).toBe(TERRAIN.grass);
+    expect(world.layers.terrain[index(31, 30, world.size)]).toBe(TERRAIN.grass);
     // Skála stojí víc než mokřad — je to těžba, ne navážka.
     expect(funds - world.economy.funds).toBe(
       VANILLA_BALANCE.map.fillMarshCost + VANILLA_BALANCE.map.clearRockCost,

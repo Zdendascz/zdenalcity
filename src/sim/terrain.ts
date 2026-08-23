@@ -1,5 +1,5 @@
-import { COARSE_CELLS, COARSE_FACTOR, COARSE_SIZE } from './coarse';
-import { index, MAP_SIZE, TERRAIN } from './layers';
+import { coarseCellsOf, COARSE_FACTOR, coarseSizeOf } from './coarse';
+import { index, TERRAIN } from './layers';
 import type { WorldState } from './world';
 
 /**
@@ -12,15 +12,20 @@ import type { WorldState } from './world';
  * počítala sama, byl by z toho průchod 16 384 dlaždicemi pro každou z 1024
  * buněk.
  */
-export function coarseTerrainShare(world: WorldState, terrain: number): Float32Array {
-  const share = new Float32Array(COARSE_CELLS);
+export function coarseTerrainShare(
+  world: WorldState,
+  terrain: number,
+): Float32Array {
+  const size = world.size;
+  const coarseSize = coarseSizeOf(size);
+  const share = new Float32Array(coarseCellsOf(size));
   const perCell = COARSE_FACTOR * COARSE_FACTOR;
 
-  for (let y = 0; y < MAP_SIZE; y++) {
+  for (let y = 0; y < size; y++) {
     const cellY = (y / COARSE_FACTOR) | 0;
-    for (let x = 0; x < MAP_SIZE; x++) {
-      if (world.layers.terrain[index(x, y)] !== terrain) continue;
-      const cell = cellY * COARSE_SIZE + ((x / COARSE_FACTOR) | 0);
+    for (let x = 0; x < size; x++) {
+      if (world.layers.terrain[index(x, y, size)] !== terrain) continue;
+      const cell = cellY * coarseSize + ((x / COARSE_FACTOR) | 0);
       share[cell] = (share[cell] ?? 0) + 1 / perCell;
     }
   }

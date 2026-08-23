@@ -6,7 +6,7 @@ import type { Definition } from '@/content/schema';
 import { placeBuilding } from '@/sim/buildings';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, placeDefinition, zoneArea } from '@/sim/commands';
-import { COARSE_CELLS, coarseIndex } from '@/sim/coarse';
+import { coarseIndex } from '@/sim/coarse';
 import { ZONE } from '@/sim/layers';
 import { tryUpgrade } from '@/sim/levels';
 import { checkRequirements, presentDefinitions } from '@/sim/requirements';
@@ -14,8 +14,12 @@ import { createGrowthSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { COARSE_CELLS } from './support/grid';
 
-function definition(id: string, overrides: Partial<Definition> = {}): Definition {
+function definition(
+  id: string,
+  overrides: Partial<Definition> = {},
+): Definition {
   return {
     id: `test:${id}`,
     type: 'building',
@@ -149,7 +153,7 @@ describe('vyhodnocení podmínek', () => {
     const world = zonedWorld();
     placeBuilding(world, school, 6, 9);
     const coverage = new Uint8Array(COARSE_CELLS);
-    coverage[coarseIndex(6, 6)] = 40;
+    coverage[coarseIndex(6, 6, world.size)] = 40;
     world.coverage.set('education', coverage);
 
     expect(checkRequirements(world, catalogue, gated, 6, 6, presentDefinitions(world)).ok).toBe(true);

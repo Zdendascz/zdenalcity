@@ -1,12 +1,18 @@
 import type { Balance } from '@/content/balance';
 import {
-  CORNER_SIZE,
   cornerIndex,
+  cornerSizeOf,
   createCornerHeights,
   relaxHeights,
   tileBaseHeight,
 } from '../heights';
-import { index, inBounds, MAP_SIZE, TERRAIN } from '../layers';
+import {
+  DEFAULT_MAP_SIZE,
+  index,
+  inBounds,
+  sizeOfLayer,
+  TERRAIN,
+} from '../layers';
 import type { Layers } from '../layers';
 import { Rng } from '../rng';
 import { createNoiseField, fbm } from './noise';
@@ -44,20 +50,31 @@ export interface GeneratedMap {
   cornerHeight: Uint8Array;
 }
 
-export function generateTerrain(seed: number, balance: Balance): GeneratedMap {
+export function generateTerrain(
+  seed: number,
+  balance: Balance,
+  size: number = DEFAULT_MAP_SIZE,
+): GeneratedMap {
   const rng = new Rng(seed);
   const { rockLevel, beachWidth, forestDensity, marshThreshold, octaves, roughness } = balance.map;
 
   const heightField = createNoiseField(rng, FIELD_SIZE);
   const forestField = createNoiseField(rng, FIELD_SIZE);
 
-  const cells = MAP_SIZE * MAP_SIZE;
+  const cells = size * size;
   const height = new Float32Array(cells);
   const terrain = new Uint8Array(cells);
 
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      height[index(x, y)] = fbm(heightField, x, y, octaves, roughness, HEIGHT_SCALE);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      height[index(x, y, size)] = fbm(
+        heightField,
+        x,
+        y,
+        octaves,
+        roughness,
+        HEIGHT_SCALE,
+      );
     }
   }
 
@@ -84,9 +101,9 @@ export function generateTerrain(seed: number, balance: Balance): GeneratedMap {
   // při normalizovaném fBm vycházelo na šest procent.
   const grassTiles: number[] = [];
   const forestNoise = new Float32Array(cells);
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      const tile = index(x, y);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const tile = index(x, y, size);
       if (terrain[tile] !== TERRAIN.grass) continue;
       forestNoise[tile] = fbm(forestField, x, y, octaves, roughness, FOREST_SCALE);
       grassTiles.push(tile);
@@ -136,7 +153,9 @@ function buildCornerHeights(
   balance: Balance,
 ): Uint8Array {
   const { maxHeight, heightCurve, octaves, roughness } = balance.map;
-  const heights = createCornerHeights();
+  const size = sizeOfLayer(terrain);
+  const side = cornerSizeOf(size);
+  const heights = createCornerHeights(size);
   if (maxHeight <= 0) return heights;
 
   // Vrchol bereme jako kvantil, ne maximum: jediná špička šumu by jinak
@@ -144,18 +163,21 @@ function buildCornerHeights(
   const peak = quantileOf(sorted, 0.995);
   const span = Math.max(1e-6, peak - seaHeight);
 
-  for (let y = 0; y < CORNER_SIZE; y++) {
-    for (let x = 0; x < CORNER_SIZE; x++) {
+  for (let y = 0; y < side; y++) {
+    for (let x = 0; x < side; x++) {
       const value = fbm(heightField, x, y, octaves, roughness, HEIGHT_SCALE);
       const above = Math.max(0, Math.min(1, (value - seaHeight) / span));
-      heights[cornerIndex(x, y)] = Math.round(Math.pow(above, heightCurve) * maxHeight);
+      heights[cornerIndex(x, y, side)] = Math.round(
+        Math.pow(above, heightCurve) * maxHeight,
+      );
     }
   }
 
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      if (terrain[index(x, y)] !== TERRAIN.water) continue;
-      for (const [dx, dy] of TILE_CORNERS) heights[cornerIndex(x + dx, y + dy)] = 0;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (terrain[index(x, y, size)] !== TERRAIN.water) continue;
+      for (const [dx, dy] of TILE_CORNERS)
+        heights[cornerIndex(x + dx, y + dy, side)] = 0;
     }
   }
 
@@ -179,10 +201,11 @@ function carveRivers(rng: Rng, terrain: Uint8Array, heights: Uint8Array, balance
   const { rivers, riverSourceHeight } = balance.map;
   if (rivers <= 0) return;
 
+  const size = sizeOfLayer(terrain);
   const sources: number[] = [];
-  for (let y = 1; y < MAP_SIZE - 1; y++) {
-    for (let x = 1; x < MAP_SIZE - 1; x++) {
-      const tile = index(x, y);
+  for (let y = 1; y < size - 1; y++) {
+    for (let x = 1; x < size - 1; x++) {
+      const tile = index(x, y, size);
       if (terrain[tile] === TERRAIN.water) continue;
       if (tileBaseHeight(heights, x, y) >= riverSourceHeight) sources.push(tile);
     }
@@ -210,6 +233,8 @@ function carveRivers(rng: Rng, terrain: Uint8Array, heights: Uint8Array, balance
  * Odříznutá trojice dlaždic uprostřed vody most nikdy neuvidí.
  */
 function drownScraps(terrain: Uint8Array, heights: Uint8Array): void {
+  const size = sizeOfLayer(terrain);
+  const side = cornerSizeOf(size);
   const { componentOf, sizes } = landComponents(terrain);
   for (let tile = 0; tile < terrain.length; tile++) {
     const id = componentOf[tile];
@@ -219,10 +244,10 @@ function drownScraps(terrain: Uint8Array, heights: Uint8Array): void {
     terrain[tile] = TERRAIN.water;
     // Zaplavená dlaždice musí klesnout na hladinu, jinak by voda zůstala
     // ležet na kopci.
-    const x = tile % MAP_SIZE;
-    const y = (tile - x) / MAP_SIZE;
+    const x = tile % size;
+    const y = (tile - x) / size;
     for (const [dx, dy] of TILE_CORNERS) {
-      heights[cornerIndex(x + dx, y + dy)] = 0;
+      heights[cornerIndex(x + dx, y + dy, side)] = 0;
     }
   }
 }
@@ -233,19 +258,21 @@ const SCRAP_TILES = 24;
 /** Jedna řeka od pramene dolů. Vrací délku koryta v dlaždicích. */
 function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: number): number {
   const path: number[] = [];
+  const size = sizeOfLayer(terrain);
+  const side = cornerSizeOf(size);
   const visited = new Set<number>();
   let tile = start;
 
   // Strop kroků je obvod mapy: delší koryto než okolo dokola být nemůže.
-  for (let step = 0; step < MAP_SIZE * 4; step++) {
+  for (let step = 0; step < size * 4; step++) {
     if (visited.has(tile)) break;
     visited.add(tile);
     path.push(tile);
 
     if (terrain[tile] === TERRAIN.water) break; // dotekli jsme moře, hotovo
 
-    const x = tile % MAP_SIZE;
-    const y = (tile - x) / MAP_SIZE;
+    const x = tile % size;
+    const y = (tile - x) / size;
     const here = tileBaseHeight(heights, x, y);
 
     let next = -1;
@@ -253,8 +280,8 @@ function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: num
     for (const [dx, dy] of NEIGHBOURS) {
       const nx = x + dx;
       const ny = y + dy;
-      if (!inBounds(nx, ny)) continue;
-      const at = index(nx, ny);
+      if (!inBounds(nx, ny, size)) continue;
+      const at = index(nx, ny, size);
       if (visited.has(at)) continue;
 
       const level = terrain[at] === TERRAIN.water ? -1 : tileBaseHeight(heights, nx, ny);
@@ -267,7 +294,7 @@ function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: num
 
     if (next < 0) {
       // Prolákliny: pokračuj k nejbližšímu okraji mapy, ať řeka někde skončí.
-      next = stepTowardsEdge(x, y, visited);
+      next = stepTowardsEdge(size, x, y, visited);
       if (next < 0) break;
     }
 
@@ -285,10 +312,10 @@ function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: num
   // údolí.
   for (const at of path) {
     terrain[at] = TERRAIN.water;
-    const x = at % MAP_SIZE;
-    const y = (at - x) / MAP_SIZE;
+    const x = at % size;
+    const y = (at - x) / size;
     for (const [dx, dy] of TILE_CORNERS) {
-      heights[cornerIndex(x + dx, y + dy)] = 0;
+      heights[cornerIndex(x + dx, y + dy, side)] = 0;
     }
   }
 
@@ -296,11 +323,16 @@ function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: num
 }
 
 /** Krok k nejbližšímu okraji mapy. Slouží jen k dokopání řeky z prolákliny. */
-function stepTowardsEdge(x: number, y: number, visited: ReadonlySet<number>): number {
+function stepTowardsEdge(
+  size: number,
+  x: number,
+  y: number,
+  visited: ReadonlySet<number>,
+): number {
   const toEdge = [
     [0, -1, y],
-    [1, 0, MAP_SIZE - 1 - x],
-    [0, 1, MAP_SIZE - 1 - y],
+    [1, 0, size - 1 - x],
+    [0, 1, size - 1 - y],
     [-1, 0, x],
   ] as const;
 
@@ -309,8 +341,8 @@ function stepTowardsEdge(x: number, y: number, visited: ReadonlySet<number>): nu
   for (const [dx, dy, distance] of toEdge) {
     const nx = x + dx;
     const ny = y + dy;
-    if (!inBounds(nx, ny)) continue;
-    const at = index(nx, ny);
+    if (!inBounds(nx, ny, size)) continue;
+    const at = index(nx, ny, size);
     if (visited.has(at) || distance >= bestDistance) continue;
     best = at;
     bestDistance = distance;
@@ -408,7 +440,11 @@ function shapeCoastline(
 }
 
 /** Očísluje souvislé plochy souše. Vrací pole indexů komponent a jejich velikosti. */
-function landComponents(terrain: Uint8Array): { componentOf: Int32Array; sizes: number[] } {
+function landComponents(terrain: Uint8Array): {
+  componentOf: Int32Array;
+  sizes: number[];
+} {
+  const mapSize = sizeOfLayer(terrain);
   const componentOf = new Int32Array(terrain.length).fill(-1);
   const sizes: number[] = [];
 
@@ -425,13 +461,13 @@ function landComponents(terrain: Uint8Array): { componentOf: Int32Array; sizes: 
       if (tile === undefined) break;
       size++;
 
-      const x = tile % MAP_SIZE;
-      const y = (tile - x) / MAP_SIZE;
+      const x = tile % mapSize;
+      const y = (tile - x) / mapSize;
       for (const [dx, dy] of NEIGHBOURS) {
         const nx = x + dx;
         const ny = y + dy;
-        if (!inBounds(nx, ny)) continue;
-        const next = index(nx, ny);
+        if (!inBounds(nx, ny, mapSize)) continue;
+        const next = index(nx, ny, mapSize);
         if (!isLand(terrain, next) || componentOf[next] !== -1) continue;
         componentOf[next] = id;
         stack.push(next);
@@ -447,6 +483,7 @@ function landComponents(terrain: Uint8Array): { componentOf: Int32Array; sizes: 
 function paintBeaches(terrain: Uint8Array, beachWidth: number): void {
   if (beachWidth <= 0) return;
 
+  const size = sizeOfLayer(terrain);
   const distance = new Uint8Array(terrain.length).fill(255);
   let frontier: number[] = [];
   for (let tile = 0; tile < terrain.length; tile++) {
@@ -459,13 +496,13 @@ function paintBeaches(terrain: Uint8Array, beachWidth: number): void {
   for (let step = 1; step <= beachWidth && frontier.length > 0; step++) {
     const next: number[] = [];
     for (const tile of frontier) {
-      const x = tile % MAP_SIZE;
-      const y = (tile - x) / MAP_SIZE;
+      const x = tile % size;
+      const y = (tile - x) / size;
       for (const [dx, dy] of NEIGHBOURS) {
         const nx = x + dx;
         const ny = y + dy;
-        if (!inBounds(nx, ny)) continue;
-        const at = index(nx, ny);
+        if (!inBounds(nx, ny, size)) continue;
+        const at = index(nx, ny, size);
         if (distance[at] !== 255 || terrain[at] !== TERRAIN.grass) continue;
         distance[at] = step;
         terrain[at] = TERRAIN.sand;
@@ -487,11 +524,12 @@ function paintMarshes(
   seaLevel: number,
   marshThreshold: number,
 ): void {
+  const size = sizeOfLayer(terrain);
   const limit = seaLevel + marshThreshold;
 
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      const tile = index(x, y);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const tile = index(x, y, size);
       if (terrain[tile] !== TERRAIN.grass) continue;
       if ((height[tile] ?? 0) > limit) continue;
 
@@ -499,8 +537,8 @@ function paintMarshes(
       for (const [dx, dy] of NEIGHBOURS) {
         const nx = x + dx;
         const ny = y + dy;
-        if (!inBounds(nx, ny)) continue;
-        const at = index(nx, ny);
+        if (!inBounds(nx, ny, size)) continue;
+        const at = index(nx, ny, size);
         if (terrain[at] === TERRAIN.water || terrain[at] === TERRAIN.sand) {
           nearWater = true;
           break;

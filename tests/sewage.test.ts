@@ -80,7 +80,8 @@ describe('kanalizace jako kapacita', () => {
     pollutionOf(world, content);
 
     // Roh mapy je od nejbližšího domu přes sto dlaždic daleko.
-    const daleko = world.coarse.pollution[coarseIndex(120, 120)] ?? 0;
+    const daleko =
+      world.coarse.pollution[coarseIndex(120, 120, world.size)] ?? 0;
     expect(daleko).toBeGreaterThan(0);
   });
 

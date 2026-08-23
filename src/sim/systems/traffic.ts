@@ -1,7 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
-import { index, MAP_SIZE, ROAD } from '../layers';
+import { index, ROAD } from '../layers';
 import type { WorldState } from '../world';
 import type { Building } from '../world';
 import type { System } from './index';
@@ -117,9 +117,9 @@ function forEachRoadAround(
 
       const tx = x + dx;
       const ty = y + dy;
-      if (tx < 0 || ty < 0 || tx >= MAP_SIZE || ty >= MAP_SIZE) continue;
+      if (tx < 0 || ty < 0 || tx >= world.size || ty >= world.size) continue;
 
-      const tile = index(tx, ty);
+      const tile = index(tx, ty, world.size);
       if ((world.layers.road[tile] ?? ROAD.none) !== ROAD.none) visit(tile);
     }
   }
@@ -211,7 +211,10 @@ function transitFactor(world: WorldState, balance: Balance, building: Building):
   const reduction = balance.traffic.transitReduction;
   if (reduction <= 0) return 1;
 
-  const coverage = (world.coverage.get('transit')?.[coarseIndex(building.x, building.y)] ?? 0) / 255;
+  const coverage =
+    (world.coverage.get('transit')?.[
+      coarseIndex(building.x, building.y, world.size)
+    ] ?? 0) / 255;
   return 1 - Math.max(0, Math.min(1, coverage)) * reduction;
 }
 
@@ -239,8 +242,8 @@ function startTiles(
     for (let dx = 0; dx < footprint[0]; dx++) {
       const tx = building.x + dx;
       const ty = building.y + dy;
-      if (tx < 0 || ty < 0 || tx >= MAP_SIZE || ty >= MAP_SIZE) continue;
-      const tile = index(tx, ty);
+      if (tx < 0 || ty < 0 || tx >= world.size || ty >= world.size) continue;
+      const tile = index(tx, ty, world.size);
       seen.add(tile);
       frontier.push(tile);
     }
@@ -251,13 +254,13 @@ function startTiles(
     const next: number[] = [];
 
     for (const tile of frontier) {
-      const x = tile % MAP_SIZE;
-      const y = (tile - x) / MAP_SIZE;
+      const x = tile % world.size;
+      const y = (tile - x) / world.size;
       for (const [dx, dy] of NEIGHBOURS) {
         const nx = x + dx;
         const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
-        const at = index(nx, ny);
+        if (nx < 0 || ny < 0 || nx >= world.size || ny >= world.size) continue;
+        const at = index(nx, ny, world.size);
         if (seen.has(at)) continue;
         seen.add(at);
 
@@ -275,17 +278,21 @@ function startTiles(
 }
 
 /** Silniční sousedé dlaždice kromě té, ze které jsme přišli. */
-function neighbourRoads(world: WorldState, tile: number, from: number): number[] {
-  const x = tile % MAP_SIZE;
-  const y = (tile - x) / MAP_SIZE;
+function neighbourRoads(
+  world: WorldState,
+  tile: number,
+  from: number,
+): number[] {
+  const x = tile % world.size;
+  const y = (tile - x) / world.size;
   const roads: number[] = [];
 
   for (const [dx, dy] of NEIGHBOURS) {
     const nx = x + dx;
     const ny = y + dy;
-    if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+    if (nx < 0 || ny < 0 || nx >= world.size || ny >= world.size) continue;
 
-    const at = index(nx, ny);
+    const at = index(nx, ny, world.size);
     if (at === from) continue;
     if ((world.layers.road[at] ?? ROAD.none) !== ROAD.none) roads.push(at);
   }

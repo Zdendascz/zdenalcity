@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Definition } from '@/content/schema';
 import { placeBuilding } from '@/sim/buildings';
 import type { BuildingCatalogue } from '@/sim/catalogue';
-import { COARSE_CELLS, coarseIndex, COARSE_FACTOR } from '@/sim/coarse';
+import { coarseIndex, COARSE_FACTOR } from '@/sim/coarse';
 import { explainParcel } from '@/sim/diagnostics';
 import {
   createCrimeSystem,
@@ -18,6 +18,7 @@ import {
 import { createWorld, NEUTRAL_HAPPINESS, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { COARSE_CELLS } from './support/grid';
 
 /**
  * Spokojenost (§9 fáze 3).
@@ -84,7 +85,7 @@ function runAlone(world: WorldState, runs: number): void {
 }
 
 function happiness(world: WorldState, x: number, y: number): number {
-  return world.happiness[coarseIndex(x, y)] ?? 0;
+  return world.happiness[coarseIndex(x, y, world.size)] ?? 0;
 }
 
 describe('spokojenost', () => {
@@ -114,7 +115,7 @@ describe('spokojenost', () => {
 
   it('kriminalita ji srazí', () => {
     const world = createWorld(1);
-    world.coarse.crime[coarseIndex(64, 64)] = 200;
+    world.coarse.crime[coarseIndex(64, 64, world.size)] = 200;
     runAlone(world, 40);
 
     expect(happiness(world, 64, 64)).toBeLessThan(happiness(world, 4, 100));
@@ -122,7 +123,7 @@ describe('spokojenost', () => {
 
   it('znečištění ji srazí', () => {
     const world = createWorld(1);
-    world.coarse.pollution[coarseIndex(64, 64)] = 200;
+    world.coarse.pollution[coarseIndex(64, 64, world.size)] = 200;
     runAlone(world, 40);
 
     expect(happiness(world, 64, 64)).toBeLessThan(happiness(world, 4, 100));
@@ -130,7 +131,7 @@ describe('spokojenost', () => {
 
   it('cena půdy ji zvedá', () => {
     const world = createWorld(1);
-    world.coarse.landValue[coarseIndex(64, 64)] = 200;
+    world.coarse.landValue[coarseIndex(64, 64, world.size)] = 200;
     runAlone(world, 40);
 
     expect(happiness(world, 64, 64)).toBeGreaterThan(happiness(world, 4, 100));
@@ -139,7 +140,7 @@ describe('spokojenost', () => {
   it('pokrytí službami ji zvedá přímo, ne jen přes cenu půdy', () => {
     const world = createWorld(1);
     const parks = new Uint8Array(COARSE_CELLS);
-    parks[coarseIndex(64, 64)] = 255;
+    parks[coarseIndex(64, 64, world.size)] = 255;
     world.coverage.set('parks', parks);
     runAlone(world, 40);
 
@@ -162,7 +163,7 @@ describe('spokojenost', () => {
   it('vyhlazení brání skokům', () => {
     const measure = (runs: number): number => {
       const world = createWorld(1);
-      world.coarse.crime[coarseIndex(64, 64)] = 255;
+      world.coarse.crime[coarseIndex(64, 64, world.size)] = 255;
       runAlone(world, runs);
       return happiness(world, 64, 64);
     };
@@ -205,7 +206,7 @@ describe('průměrná spokojenost', () => {
     // Park lidi nemá; jeho čtvrť do průměru nepatří, i když tam budova stojí.
     placeBuilding(world, PARK, 4, 100);
     world.happiness.fill(0);
-    world.happiness[coarseIndex(64, 64)] = 200;
+    world.happiness[coarseIndex(64, 64, world.size)] = 200;
 
     // Prázdných buněk je 1023 z 1024; kdyby se počítaly, průměr by byl skoro nula.
     expect(averageHappiness(world)).toBe(200);
@@ -268,7 +269,7 @@ describe('vazba na poptávku', () => {
 describe('čitelnost', () => {
   it('panel parcely spokojenost ukazuje', () => {
     const world = createWorld(1);
-    world.happiness[coarseIndex(64, 64)] = 42;
+    world.happiness[coarseIndex(64, 64, world.size)] = 42;
     expect(explainParcel(world, VANILLA_BALANCE, 64, 64).happiness).toBe(42);
   });
 });

@@ -1,5 +1,3 @@
-import { MAP_SIZE } from './layers';
-
 /**
  * Výškový model terénu (§7 zadání fáze 3).
  *
@@ -20,22 +18,59 @@ import { MAP_SIZE } from './layers';
  */
 
 /** Mřížka rohů je o jedna větší než mřížka dlaždic. */
-export const CORNER_SIZE = MAP_SIZE + 1;
-export const CORNER_CELLS = CORNER_SIZE * CORNER_SIZE;
+/**
+ * Mřížka rohů je o jedna větší než mřížka dlaždic (R8 fáze 3) — výška patří
+ * rohu, ne dlaždici. `size` je hrana **mapy**.
+ */
+export function cornerSizeOf(size: number): number {
+  return size + 1;
+}
+
+export function cornerCellsOf(size: number): number {
+  const side = cornerSizeOf(size);
+  return side * side;
+}
 
 /** Rozsah výšek 0–15 (R8). Víc by se do půlbajtu nevešlo, kdyby došlo na packing. */
 export const MAX_HEIGHT = 15;
 
-export function cornerIndex(x: number, y: number): number {
-  return y * CORNER_SIZE + x;
+/**
+ * Hrana mřížky rohů odvozená z **délky pole**.
+ *
+ * Pole tu mřížku definuje, takže hrana se z něj dá spočítat — a nemůže se s ní
+ * rozejít, jak by se stalo, kdyby si ji každý volající nosil zvlášť. Ušetří to
+ * navíc parametr v patnácti funkcích a stovkách volání.
+ *
+ * Odmocnina se pamatuje podle délky: v jednom běhu mají skoro vždy všechna
+ * pole stejnou velikost. Je to čistá keš klíčovaná délkou, žádný skrytý stav —
+ * determinismus (P2) tím netrpí.
+ */
+let cachedLength = -1;
+let cachedSide = 0;
+
+export function cornerSideOf(heights: Readonly<Uint8Array>): number {
+  if (heights.length !== cachedLength) {
+    cachedLength = heights.length;
+    cachedSide = Math.round(Math.sqrt(heights.length));
+  }
+  return cachedSide;
 }
 
-export function cornerInBounds(x: number, y: number): boolean {
-  return x >= 0 && y >= 0 && x < CORNER_SIZE && y < CORNER_SIZE;
+/** Velikost mapy, ke které mřížka rohů patří. */
+export function mapSizeOf(heights: Readonly<Uint8Array>): number {
+  return cornerSideOf(heights) - 1;
 }
 
-export function createCornerHeights(): Uint8Array {
-  return new Uint8Array(CORNER_CELLS);
+export function cornerIndex(x: number, y: number, side: number): number {
+  return y * side + x;
+}
+
+export function cornerInBounds(x: number, y: number, side: number): boolean {
+  return x >= 0 && y >= 0 && x < side && y < side;
+}
+
+export function createCornerHeights(size: number): Uint8Array {
+  return new Uint8Array(cornerCellsOf(size));
 }
 
 const NEIGHBOURS = [
@@ -51,11 +86,12 @@ export function tileCorners(
   x: number,
   y: number,
 ): [number, number, number, number] {
+  const side = cornerSideOf(heights);
   return [
-    heights[cornerIndex(x, y)] ?? 0,
-    heights[cornerIndex(x + 1, y)] ?? 0,
-    heights[cornerIndex(x, y + 1)] ?? 0,
-    heights[cornerIndex(x + 1, y + 1)] ?? 0,
+    heights[cornerIndex(x, y, side)] ?? 0,
+    heights[cornerIndex(x + 1, y, side)] ?? 0,
+    heights[cornerIndex(x, y + 1, side)] ?? 0,
+    heights[cornerIndex(x + 1, y + 1, side)] ?? 0,
   ];
 }
 
@@ -95,13 +131,14 @@ export function areaHeightRange(
   w: number,
   h: number,
 ): { min: number; max: number } {
+  const side = cornerSideOf(heights);
   let min = MAX_HEIGHT;
   let max = 0;
 
   for (let cy = y; cy <= y + h; cy++) {
     for (let cx = x; cx <= x + w; cx++) {
-      if (!cornerInBounds(cx, cy)) continue;
-      const value = heights[cornerIndex(cx, cy)] ?? 0;
+      if (!cornerInBounds(cx, cy, side)) continue;
+      const value = heights[cornerIndex(cx, cy, side)] ?? 0;
       if (value < min) min = value;
       if (value > max) max = value;
     }
@@ -117,15 +154,22 @@ export function areaHeightRange(
  * dvojice" a „šest tisíc dvojic" ta nejcennější informace.
  */
 export function countViolations(heights: Readonly<Uint8Array>): number {
+  const side = cornerSideOf(heights);
   let violations = 0;
-  for (let y = 0; y < CORNER_SIZE; y++) {
-    for (let x = 0; x < CORNER_SIZE; x++) {
-      const here = heights[cornerIndex(x, y)] ?? 0;
+  for (let y = 0; y < side; y++) {
+    for (let x = 0; x < side; x++) {
+      const here = heights[cornerIndex(x, y, side)] ?? 0;
       // Stačí doprava a dolů, jinak by se každá dvojice počítala dvakrát.
-      if (x + 1 < CORNER_SIZE && Math.abs(here - (heights[cornerIndex(x + 1, y)] ?? 0)) > 1) {
+      if (
+        x + 1 < side &&
+        Math.abs(here - (heights[cornerIndex(x + 1, y, side)] ?? 0)) > 1
+      ) {
         violations++;
       }
-      if (y + 1 < CORNER_SIZE && Math.abs(here - (heights[cornerIndex(x, y + 1)] ?? 0)) > 1) {
+      if (
+        y + 1 < side &&
+        Math.abs(here - (heights[cornerIndex(x, y + 1, side)] ?? 0)) > 1
+      ) {
         violations++;
       }
     }
@@ -151,11 +195,12 @@ export function planCornerHeight(
   y: number,
   target: number,
 ): Map<number, number> {
+  const side = cornerSideOf(heights);
   const changes = new Map<number, number>();
-  if (!cornerInBounds(x, y)) return changes;
+  if (!cornerInBounds(x, y, side)) return changes;
 
   const clamped = Math.max(0, Math.min(MAX_HEIGHT, Math.round(target)));
-  const start = cornerIndex(x, y);
+  const start = cornerIndex(x, y, side);
   if ((heights[start] ?? 0) === clamped) return changes;
 
   const heightAt = (corner: number): number => changes.get(corner) ?? heights[corner] ?? 0;
@@ -168,15 +213,15 @@ export function planCornerHeight(
     if (corner === undefined) break;
 
     const here = heightAt(corner);
-    const cx = corner % CORNER_SIZE;
-    const cy = (corner - cx) / CORNER_SIZE;
+    const cx = corner % side;
+    const cy = (corner - cx) / side;
 
     for (const [dx, dy] of NEIGHBOURS) {
       const nx = cx + dx;
       const ny = cy + dy;
-      if (!cornerInBounds(nx, ny)) continue;
+      if (!cornerInBounds(nx, ny, side)) continue;
 
-      const neighbour = cornerIndex(nx, ny);
+      const neighbour = cornerIndex(nx, ny, side);
       const value = heightAt(neighbour);
       // Soused smí zůstat, jen když je v mezích jednoho patra.
       const wanted = value < here - 1 ? here - 1 : value > here + 1 ? here + 1 : value;
@@ -209,10 +254,11 @@ export function planLevelArea(
   depth: number,
   target?: number,
 ): Map<number, number> {
+  const side = cornerSideOf(heights);
   const corners: number[] = [];
   for (let cy = y; cy <= y + depth; cy++) {
     for (let cx = x; cx <= x + width; cx++) {
-      if (cornerInBounds(cx, cy)) corners.push(cornerIndex(cx, cy));
+      if (cornerInBounds(cx, cy, side)) corners.push(cornerIndex(cx, cy, side));
     }
   }
 
@@ -228,8 +274,8 @@ export function planLevelArea(
 
   const working = Uint8Array.from(heights);
   for (const corner of corners) {
-    const cx = corner % CORNER_SIZE;
-    const cy = (corner - cx) / CORNER_SIZE;
+    const cx = corner % side;
+    const cy = (corner - cx) / side;
     const step = planCornerHeight(working, cx, cy, level);
     applyCornerChanges(working, step);
     for (const [at, value] of step) changes.set(at, value);
@@ -259,20 +305,21 @@ export function applyCornerChanges(heights: Uint8Array, changes: ReadonlyMap<num
  * Vrací počet průchodů, což je jediné, co při ladění generátoru zajímá.
  */
 export function relaxHeights(heights: Uint8Array, maxPasses = 64): number {
+  const side = cornerSideOf(heights);
   for (let pass = 1; pass <= maxPasses; pass++) {
     let changed = false;
 
-    for (let y = 0; y < CORNER_SIZE; y++) {
-      for (let x = 0; x < CORNER_SIZE; x++) {
-        const corner = cornerIndex(x, y);
+    for (let y = 0; y < side; y++) {
+      for (let x = 0; x < side; x++) {
+        const corner = cornerIndex(x, y, side);
         const here = heights[corner] ?? 0;
 
         let lowest = MAX_HEIGHT;
         for (const [dx, dy] of NEIGHBOURS) {
           const nx = x + dx;
           const ny = y + dy;
-          if (!cornerInBounds(nx, ny)) continue;
-          lowest = Math.min(lowest, heights[cornerIndex(nx, ny)] ?? 0);
+          if (!cornerInBounds(nx, ny, side)) continue;
+          lowest = Math.min(lowest, heights[cornerIndex(nx, ny, side)] ?? 0);
         }
 
         if (here > lowest + 1) {

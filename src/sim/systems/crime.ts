@@ -1,5 +1,5 @@
 import type { Balance } from '@/content/balance';
-import { COARSE_SIZE, coarseIndex } from '../coarse';
+import { coarseCellsOf, coarseIndex } from '../coarse';
 import { coverageOf } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -32,15 +32,16 @@ export function createCrimeSystem(balance: Balance): System {
     interval: 16,
     offset: 11,
     run(world: WorldState) {
-      const density = new Float32Array(COARSE_SIZE * COARSE_SIZE);
-      const ruins = new Float32Array(COARSE_SIZE * COARSE_SIZE);
+      const cells = coarseCellsOf(world.size);
+      const density = new Float32Array(cells);
+      const ruins = new Float32Array(cells);
       let population = 0;
       let jobs = 0;
 
       // Hustota populace se počítá při stejném průchodu — vlastní vrstva
       // pro ni nevzniká.
       for (const building of world.buildings.values()) {
-        const at = coarseIndex(building.x, building.y);
+        const at = coarseIndex(building.x, building.y, world.size);
         if (building.abandoned) {
           ruins[at] = (ruins[at] ?? 0) + 1;
           continue;

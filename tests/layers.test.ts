@@ -1,22 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { createLayers, hashLayers, inBounds, index, LAYER_ORDER, MAP_SIZE } from '@/sim/layers';
+import {
+  createLayers,
+  hashLayers,
+  inBounds,
+  index,
+  LAYER_ORDER,
+} from '@/sim/layers';
+import { MAP_SIZE } from './support/grid';
 
 describe('index / inBounds', () => {
   it('počítá index po řádcích', () => {
-    expect(index(0, 0)).toBe(0);
-    expect(index(1, 0)).toBe(1);
-    expect(index(0, 1)).toBe(MAP_SIZE);
-    expect(index(3, 2)).toBe(2 * MAP_SIZE + 3);
-    expect(index(MAP_SIZE - 1, MAP_SIZE - 1)).toBe(MAP_SIZE * MAP_SIZE - 1);
+    expect(index(0, 0, MAP_SIZE)).toBe(0);
+    expect(index(1, 0, MAP_SIZE)).toBe(1);
+    expect(index(0, 1, MAP_SIZE)).toBe(MAP_SIZE);
+    expect(index(3, 2, MAP_SIZE)).toBe(2 * MAP_SIZE + 3);
+    expect(index(MAP_SIZE - 1, MAP_SIZE - 1, MAP_SIZE)).toBe(
+      MAP_SIZE * MAP_SIZE - 1,
+    );
   });
 
   it('hlídá okraje mapy', () => {
-    expect(inBounds(0, 0)).toBe(true);
-    expect(inBounds(MAP_SIZE - 1, MAP_SIZE - 1)).toBe(true);
-    expect(inBounds(-1, 0)).toBe(false);
-    expect(inBounds(0, -1)).toBe(false);
-    expect(inBounds(MAP_SIZE, 0)).toBe(false);
-    expect(inBounds(0, MAP_SIZE)).toBe(false);
+    expect(inBounds(0, 0, MAP_SIZE)).toBe(true);
+    expect(inBounds(MAP_SIZE - 1, MAP_SIZE - 1, MAP_SIZE)).toBe(true);
+    expect(inBounds(-1, 0, MAP_SIZE)).toBe(false);
+    expect(inBounds(0, -1, MAP_SIZE)).toBe(false);
+    expect(inBounds(MAP_SIZE, 0, MAP_SIZE)).toBe(false);
+    expect(inBounds(0, MAP_SIZE, MAP_SIZE)).toBe(false);
   });
 });
 
@@ -53,7 +62,7 @@ describe('hashLayers', () => {
   it('reaguje na změnu jediné dlaždice', () => {
     const layers = createLayers(MAP_SIZE);
     const before = hashLayers(layers);
-    layers.terrain[index(64, 64)] = 1;
+    layers.terrain[index(64, 64, MAP_SIZE)] = 1;
     expect(hashLayers(layers)).not.toBe(before);
   });
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { hashLayers, index, MAP_SIZE } from '@/sim/layers';
+import { hashLayers, index } from '@/sim/layers';
 import { createSimHost } from '@/sim/simHost';
 import { createWorld } from '@/sim/world';
+import { MAP_SIZE } from '../support/grid';
 
 /**
  * Golden test silniční sítě.
@@ -48,7 +49,7 @@ describe('golden: silniční síť', () => {
     }
     // 21 vodorovných + 31 svislých − 1 průsečík − 6 zbouraných
     expect(roadTiles).toBe(45);
-    expect(snapshot.layers.road[index(30, 64)]).toBe(1);
+    expect(snapshot.layers.road[index(30, 64, MAP_SIZE)]).toBe(1);
 
     expect(hashLayers(snapshot.layers)).toMatchSnapshot();
   });

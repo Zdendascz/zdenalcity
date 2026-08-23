@@ -2,12 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { checkFootprint, placeBuilding } from '@/sim/buildings';
-import { buildPipe, buildRoad, bulldoze, placeDefinition, removePipe } from '@/sim/commands';
+import {
+  buildPipe,
+  buildRoad,
+  bulldoze,
+  placeDefinition,
+  removePipe,
+} from '@/sim/commands';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { createWaterDecaySystem, createWaterSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE } from './support/grid';
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -24,7 +31,8 @@ function world(funds = 200000): WorldState {
 /** Jezero na levém okraji, ať má vodárna z čeho brát. */
 function lake(w: WorldState): void {
   for (let y = 0; y < w.size; y++) {
-    for (let x = 0; x < 4; x++) w.layers.terrain[index(x, y)] = TERRAIN.water;
+    for (let x = 0; x < 4; x++)
+      w.layers.terrain[index(x, y, MAP_SIZE)] = TERRAIN.water;
   }
 }
 
@@ -57,10 +65,10 @@ describe('vodovod (§8 fáze 3)', () => {
     pipes(w, 7, 20, 20);
     run(w, content, 4);
 
-    expect(w.waterSupply[index(7, 20)]).toBe(1);
-    expect(w.waterSupply[index(20, 20)]).toBe(1);
+    expect(w.waterSupply[index(7, 20, MAP_SIZE)]).toBe(1);
+    expect(w.waterSupply[index(20, 20, MAP_SIZE)]).toBe(1);
     // Vedle potrubí už voda není — netvoří kaluž, drží se v trubkách.
-    expect(w.waterSupply[index(20, 21)]).toBe(0);
+    expect(w.waterSupply[index(20, 21, MAP_SIZE)]).toBe(0);
   });
 
   it('budovy vodu nevedou, potrubí musí být pod nimi (§8)', async () => {
@@ -107,8 +115,8 @@ describe('vodovod (§8 fáze 3)', () => {
     run(w, content, 4);
 
     // Poslední dlaždice v dosahu ještě má vodu, ta za koncem už ne.
-    expect(w.waterSupply[index(7 + range - 3, 20)]).toBe(1);
-    expect(w.waterSupply[index(7 + range + 6, 20)]).toBe(0);
+    expect(w.waterSupply[index(7 + range - 3, 20, MAP_SIZE)]).toBe(1);
+    expect(w.waterSupply[index(7 + range + 6, 20, MAP_SIZE)]).toBe(0);
   });
 
   it('čerpací stanice dosah prodlouží, ale sama vodu nezaloží', async () => {
@@ -138,8 +146,8 @@ describe('vodovod (§8 fáze 3)', () => {
     run(s, content, 4);
 
     const konec = 7 + range + 8;
-    expect(bez.waterSupply[index(konec, 20)]).toBe(0);
-    expect(s.waterSupply[index(konec, 20)]).toBe(1);
+    expect(bez.waterSupply[index(konec, 20, MAP_SIZE)]).toBe(0);
+    expect(s.waterSupply[index(konec, 20, MAP_SIZE)]).toBe(1);
   });
 
   it('odpojená čerpací stanice vodu nikam nedá', async () => {
@@ -156,9 +164,9 @@ describe('vodovod (§8 fáze 3)', () => {
     expect(placeDefinition(w, content, 'vanilla:pump_station', 65, 60, VANILLA_BALANCE).ok).toBe(true);
     run(w, content, 4);
 
-    expect(w.waterSupply[index(20, 20)]).toBe(1); // připojená síť teče
-    expect(w.waterSupply[index(65, 60)]).toBe(0); // odpojený ostrůvek ne
-    expect(w.waterSupply[index(70, 60)]).toBe(0);
+    expect(w.waterSupply[index(20, 20, MAP_SIZE)]).toBe(1); // připojená síť teče
+    expect(w.waterSupply[index(65, 60, MAP_SIZE)]).toBe(0); // odpojený ostrůvek ne
+    expect(w.waterSupply[index(70, 60, MAP_SIZE)]).toBe(0);
   });
 
   it('vodárna musí stát u vody', async () => {
@@ -180,18 +188,18 @@ describe('vodovod (§8 fáze 3)', () => {
     waterworks(w, content, 4, 20);
     pipes(w, 7, 20, 20);
     run(w, content, 4);
-    expect(w.waterSupply[index(20, 20)]).toBe(1);
+    expect(w.waterSupply[index(20, 20, MAP_SIZE)]).toBe(1);
 
     expect(bulldoze(w, 14, 20, VANILLA_BALANCE).ok).toBe(true);
     run(w, content, 4);
 
-    expect(w.waterSupply[index(12, 20)]).toBe(1); // před přetrženým místem
-    expect(w.waterSupply[index(20, 20)]).toBe(0); // za ním už ne
+    expect(w.waterSupply[index(12, 20, MAP_SIZE)]).toBe(1); // před přetrženým místem
+    expect(w.waterSupply[index(20, 20, MAP_SIZE)]).toBe(0); // za ním už ne
   });
 
   it('potrubí nejde položit na vodu ani dvakrát', () => {
     const w = world();
-    w.layers.terrain[index(10, 10)] = TERRAIN.water;
+    w.layers.terrain[index(10, 10, MAP_SIZE)] = TERRAIN.water;
 
     expect(buildPipe(w, 10, 10, VANILLA_BALANCE).ok === false).toBe(true);
     expect(buildPipe(w, 11, 10, VANILLA_BALANCE).ok).toBe(true);
@@ -208,7 +216,7 @@ describe('vodovod (§8 fáze 3)', () => {
 
     placeBuilding(w, house, 30, 30);
     expect(buildPipe(w, 30, 30, VANILLA_BALANCE).ok).toBe(true);
-    expect(w.layers.pipe[index(30, 30)]).toBe(1);
+    expect(w.layers.pipe[index(30, 30, MAP_SIZE)]).toBe(1);
   });
 });
 
@@ -217,13 +225,13 @@ describe('podzemní pohled a kladení potrubí (T36)', () => {
     // Obyčejný `bulldoze` bourá to nejvrchnější, takže by v podzemním pohledu
     // sundal budovu nad potrubím. Hráč, který kouká pod zem, míří na trubku.
     const w = world();
-    w.layers.road[index(20, 20)] = ROAD.street;
+    w.layers.road[index(20, 20, MAP_SIZE)] = ROAD.street;
     buildPipe(w, 20, 20, VANILLA_BALANCE);
 
     expect(removePipe(w, 20, 20).ok).toBe(true);
 
-    expect(w.layers.pipe[index(20, 20)]).toBe(0);
-    expect(w.layers.road[index(20, 20)]).toBe(ROAD.street); // silnice zůstala
+    expect(w.layers.pipe[index(20, 20, MAP_SIZE)]).toBe(0);
+    expect(w.layers.road[index(20, 20, MAP_SIZE)]).toBe(ROAD.street); // silnice zůstala
   });
 
   it('kde trubka není, nemá buldozer co sundat', () => {
@@ -246,7 +254,7 @@ describe('podzemní pohled a kladení potrubí (T36)', () => {
     run(w, content, 4);
 
     expect(w.dirty.tiles.size).toBeGreaterThan(10);
-    expect(w.dirty.tiles.has(index(20, 20))).toBe(true);
+    expect(w.dirty.tiles.has(index(20, 20, MAP_SIZE))).toBe(true);
   });
 
   it('označí se jen to, co se opravdu změnilo', async () => {

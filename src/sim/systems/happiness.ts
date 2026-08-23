@@ -1,5 +1,5 @@
 import type { Balance } from '@/content/balance';
-import { COARSE_FACTOR, COARSE_SIZE } from '../coarse';
+import { COARSE_FACTOR } from '../coarse';
 import { coarseCongestion } from '../diagnostics';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -96,13 +96,16 @@ export interface HappinessView {
  * základní hodnoty bez ohledu na to, jak se v něm žije.
  */
 export function averageHappiness(world: HappinessView): number {
+  // Hrana hrubé mřížky z délky vrstvy — pohled na svět velikost mapy nenese
+  // a odvodit ji jde jedním kořenem.
+  const coarseSize = Math.round(Math.sqrt(world.happiness.length));
   const populated = new Set<number>();
 
   for (const building of world.buildings.values()) {
     if (building.abandoned || building.population === 0) continue;
     const cellX = Math.floor(building.x / COARSE_FACTOR);
     const cellY = Math.floor(building.y / COARSE_FACTOR);
-    populated.add(cellY * COARSE_SIZE + cellX);
+    populated.add(cellY * coarseSize + cellX);
   }
 
   if (populated.size === 0) return 0;

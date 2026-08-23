@@ -6,6 +6,7 @@ import { coarseIndex } from '@/sim/coarse';
 import { createLandValueSystem, createServiceSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { MAP_SIZE } from './support/grid';
 
 /**
  * Kultura a sounáležitost (§9 fáze 3, R12).
@@ -52,9 +53,9 @@ describe('nové třídy služeb', () => {
     run(world, content, 2);
 
     const culture = world.coverage.get('culture');
-    expect(culture?.[coarseIndex(64, 64)] ?? 0).toBeGreaterThan(0);
+    expect(culture?.[coarseIndex(64, 64, MAP_SIZE)] ?? 0).toBeGreaterThan(0);
     // A za dosahem nic — je to táž mechanika, ne globální bonus.
-    expect(culture?.[coarseIndex(120, 120)] ?? 0).toBe(0);
+    expect(culture?.[coarseIndex(120, 120, MAP_SIZE)] ?? 0).toBe(0);
   });
 
   it('kultura i sounáležitost zvedají cenu půdy', async () => {
@@ -66,7 +67,7 @@ describe('nové třídy služeb', () => {
         if (definition) placeBuilding(world, definition, 64, 64);
       }
       run(world, content, 40);
-      return world.coarse.landValue[coarseIndex(64, 64)] ?? 0;
+      return world.coarse.landValue[coarseIndex(64, 64, MAP_SIZE)] ?? 0;
     };
 
     const prazdno = await value(null);
@@ -99,8 +100,10 @@ describe('nové třídy služeb', () => {
     půl.serviceFunding.set('culture', 0.5);
     run(půl, content, 2);
 
-    expect(půl.coverage.get('culture')?.[coarseIndex(64, 64)] ?? 0).toBeLessThan(
-      plné.coverage.get('culture')?.[coarseIndex(64, 64)] ?? 0,
+    expect(
+      půl.coverage.get('culture')?.[coarseIndex(64, 64, MAP_SIZE)] ?? 0,
+    ).toBeLessThan(
+      plné.coverage.get('culture')?.[coarseIndex(64, 64, MAP_SIZE)] ?? 0,
     );
   });
 });

@@ -1,6 +1,6 @@
 import type { Definition } from '@/content/schema';
 import { isFlatTile } from './heights';
-import { inBounds, index, TERRAIN } from './layers';
+import { inBounds, index, sizeOfLayer, TERRAIN } from './layers';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
@@ -55,12 +55,15 @@ export function checkFootprint(
     for (let dx = 0; dx < width; dx++) {
       const tileX = x + dx;
       const tileY = y + dy;
-      if (!inBounds(tileX, tileY)) {
+      if (!inBounds(tileX, tileY, world.size)) {
         return reject('error.outOfBounds');
       }
 
-      const tile = index(tileX, tileY);
-      if (options.requireZone !== undefined && world.layers.zone[tile] !== options.requireZone) {
+      const tile = index(tileX, tileY, world.size);
+      if (
+        options.requireZone !== undefined &&
+        world.layers.zone[tile] !== options.requireZone
+      ) {
         return reject('error.wrongZone');
       }
       if (world.layers.road[tile] !== 0) {
@@ -115,8 +118,9 @@ export function hasWater(world: WorldState, definition: Definition, x: number, y
   const [width, depth] = definition.footprint;
   for (let dy = 0; dy < depth; dy++) {
     for (let dx = 0; dx < width; dx++) {
-      if (!inBounds(x + dx, y + dy)) continue;
-      if (world.waterSupply[index(x + dx, y + dy)] === 1) return true;
+      if (!inBounds(x + dx, y + dy, world.size)) continue;
+      if (world.waterSupply[index(x + dx, y + dy, world.size)] === 1)
+        return true;
     }
   }
   return false;
@@ -136,8 +140,9 @@ export function touchesWater(
       if (!onEdge) continue;
       const tx = x + dx;
       const ty = y + dy;
-      if (!inBounds(tx, ty)) continue;
-      if (world.layers.terrain[index(tx, ty)] === TERRAIN.water) return true;
+      if (!inBounds(tx, ty, world.size)) continue;
+      if (world.layers.terrain[index(tx, ty, world.size)] === TERRAIN.water)
+        return true;
     }
   }
   return false;
@@ -201,7 +206,8 @@ function touchesLayerValue(
  * hraní.
  */
 function isSet(layer: Uint8Array, x: number, y: number): boolean {
-  return inBounds(x, y) && (layer[index(x, y)] ?? 0) !== 0;
+  const size = sizeOfLayer(layer);
+  return inBounds(x, y, size) && (layer[index(x, y, size)] ?? 0) !== 0;
 }
 
 export function placeBuilding(
@@ -229,7 +235,7 @@ export function placeBuilding(
   const [width, depth] = definition.footprint;
   for (let dy = 0; dy < depth; dy++) {
     for (let dx = 0; dx < width; dx++) {
-      world.layers.buildingId[index(x + dx, y + dy)] = building.id;
+      world.layers.buildingId[index(x + dx, y + dy, world.size)] = building.id;
       markTileDirty(world, x + dx, y + dy);
     }
   }

@@ -3,7 +3,25 @@
  * Souřadnice jsou výhradně gridové (P3) — izometrie patří do `src/render/`.
  */
 
-export const MAP_SIZE = 128;
+/**
+ * Výchozí velikost mapy. **Skutečnou velikost nese `world.size`** (§2 fáze 4) —
+ * tahle konstanta slouží jen jako výchozí volba v dialogu nové hry a v testech,
+ * které na velikosti nezáleží.
+ *
+ * Do T42 to byla konstanta, se kterou počítal `index()`, `inBounds()` i alokace
+ * každé vrstvy. Čím dřív se z ní stal běhový údaj, tím levněji: katastrofy
+ * i linky MHD se opírají o souřadnice a přepisovat je podruhé by bylo dražší
+ * než refaktor sám.
+ */
+export const DEFAULT_MAP_SIZE = 128;
+
+/**
+ * Velikosti, které hra nabízí. Pořadí je pořadí v dialogu.
+ *
+ * `COARSE_FACTOR` zůstává 4, takže hrubá mřížka roste s mapou (512 → 128×128).
+ */
+export const MAP_SIZES = [128, 192, 256, 512] as const;
+export type MapSize = (typeof MAP_SIZES)[number];
 
 /**
  * Hodnoty vrstvy `terrain`.
@@ -35,12 +53,31 @@ export type RoadType = (typeof ROAD)[keyof typeof ROAD];
 export const ZONE = { none: 0, residential: 1, commercial: 2, industrial: 3 } as const;
 export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
 
-export function index(x: number, y: number): number {
-  return y * MAP_SIZE + x;
+/**
+ * Index dlaždice ve vrstvě. `size` je hrana mapy — bere se z `world.size`.
+ *
+ * Parametr je **povinný schválně**: s výchozí hodnotou by se dalo zapomenout
+ * ho předat a mapa 512×512 by potichu četla po 128 dlaždicích. Takhle na každé
+ * zapomenuté místo ukáže překladač.
+ */
+export function index(x: number, y: number, size: number): number {
+  return y * size + x;
 }
 
-export function inBounds(x: number, y: number): boolean {
-  return x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE;
+export function inBounds(x: number, y: number, size: number): boolean {
+  return x >= 0 && y >= 0 && x < size && y < size;
+}
+
+/**
+ * Hrana mapy odvozená z **délky vrstvy**.
+ *
+ * Vrstva je čtverec `size × size`, takže se velikost dá spočítat z ní — a
+ * nemůže se s daty rozejít. Používá to kód, který dostane jen pole a ne celý
+ * svět: generátor mapy, difuze, načítání savu. Stejný trik jako
+ * `cornerSideOf()` u mřížky rohů.
+ */
+export function sizeOfLayer(layer: { readonly length: number }): number {
+  return Math.round(Math.sqrt(layer.length));
 }
 
 export interface Layers {

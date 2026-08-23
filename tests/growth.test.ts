@@ -87,7 +87,9 @@ describe('růst budov', () => {
     const building = [...world.buildings.values()][0];
     expect(building).toBeDefined();
     if (!building) return;
-    expect(world.layers.buildingId[index(building.x, building.y)]).toBe(building.id);
+    expect(
+      world.layers.buildingId[index(building.x, building.y, world.size)],
+    ).toBe(building.id);
   });
 
   it('bez silnice nevyroste nic — žádná parcela není v dosahu', () => {
@@ -114,7 +116,7 @@ describe('růst budov', () => {
   it('nestaví na terén, který definice nedovoluje', () => {
     const world = cityWithZone();
     for (let x = 5; x <= 15; x++) {
-      world.layers.terrain[index(x, 11)] = TERRAIN.rock;
+      world.layers.terrain[index(x, 11, world.size)] = TERRAIN.rock;
     }
 
     run(world, catalogueOf(HOUSE), 20);
@@ -147,9 +149,11 @@ describe('růst budov', () => {
       [0, 1],
       [1, 1],
     ]) {
-      expect(world.layers.buildingId[index(building.x + (dx ?? 0), building.y + (dy ?? 0))]).toBe(
-        building.id,
-      );
+      expect(
+        world.layers.buildingId[
+          index(building.x + (dx ?? 0), building.y + (dy ?? 0), world.size)
+        ],
+      ).toBe(building.id);
     }
     expect(totalJobs(world.buildings)).toBe(12 * world.buildings.size);
   });
@@ -237,7 +241,9 @@ describe('skóre parcely (§9)', () => {
     expect(tryUpgrade(world, catalogueOf(seed, deep), building)).toBe(true);
     expect(building.definitionId).toBe(deep.id);
     // Druhá dlaždice leží čtyři pole od silnice, tedy za dosahem růstu.
-    expect(world.layers.buildingId[index(building.x, 14)]).toBe(building.id);
+    expect(world.layers.buildingId[index(building.x, 14, world.size)]).toBe(
+      building.id,
+    );
   });
 
   it('drahá půda se zastaví dřív než levná', () => {
@@ -251,7 +257,7 @@ describe('skóre parcely (§9)', () => {
       world.coarse.landValue[cell] = 20;
     }
     for (let x = 40; x <= 59; x++) {
-      world.coarse.landValue[coarseIndex(x, 11)] = 200;
+      world.coarse.landValue[coarseIndex(x, 11, world.size)] = 200;
     }
 
     run(world, catalogueOf(HOUSE), 3);
@@ -344,35 +350,39 @@ describe('zónování', () => {
     const world = createWorld(1);
     zoneArea(world, 3, 4, 2, 3, ZONE.commercial);
 
-    expect(world.layers.zone[index(3, 4)]).toBe(ZONE.commercial);
-    expect(world.layers.zone[index(4, 6)]).toBe(ZONE.commercial);
-    expect(world.layers.zone[index(5, 4)]).toBe(ZONE.none);
+    expect(world.layers.zone[index(3, 4, world.size)]).toBe(ZONE.commercial);
+    expect(world.layers.zone[index(4, 6, world.size)]).toBe(ZONE.commercial);
+    expect(world.layers.zone[index(5, 4, world.size)]).toBe(ZONE.none);
   });
 
   it('přeskočí vodu, silnici i obsazenou dlaždici', () => {
     const world = createWorld(1);
-    world.layers.terrain[index(3, 4)] = TERRAIN.water;
+    world.layers.terrain[index(3, 4, world.size)] = TERRAIN.water;
     buildRoad(world, 4, 4);
-    world.layers.buildingId[index(5, 4)] = 7;
+    world.layers.buildingId[index(5, 4, world.size)] = 7;
 
     zoneArea(world, 3, 4, 3, 1, ZONE.residential);
 
-    expect(world.layers.zone[index(3, 4)]).toBe(ZONE.none);
-    expect(world.layers.zone[index(4, 4)]).toBe(ZONE.none);
-    expect(world.layers.zone[index(5, 4)]).toBe(ZONE.none);
+    expect(world.layers.zone[index(3, 4, world.size)]).toBe(ZONE.none);
+    expect(world.layers.zone[index(4, 4, world.size)]).toBe(ZONE.none);
+    expect(world.layers.zone[index(5, 4, world.size)]).toBe(ZONE.none);
   });
 
   it('ZONE.none zónu ruší', () => {
     const world = createWorld(1);
     zoneArea(world, 3, 4, 2, 2, ZONE.residential);
     zoneArea(world, 3, 4, 2, 2, ZONE.none);
-    expect(world.layers.zone[index(3, 4)]).toBe(ZONE.none);
+    expect(world.layers.zone[index(3, 4, world.size)]).toBe(ZONE.none);
   });
 
   it('ořízne se o okraj mapy místo pádu', () => {
     const world = createWorld(1);
-    expect(() => zoneArea(world, 126, 126, 8, 8, ZONE.residential)).not.toThrow();
-    expect(world.layers.zone[index(127, 127)]).toBe(ZONE.residential);
+    expect(() =>
+      zoneArea(world, 126, 126, 8, 8, ZONE.residential),
+    ).not.toThrow();
+    expect(world.layers.zone[index(127, 127, world.size)]).toBe(
+      ZONE.residential,
+    );
   });
 });
 
@@ -389,8 +399,12 @@ describe('bourání', () => {
     bulldoze(world, building.x, building.y);
 
     expect(world.buildings.has(building.id)).toBe(false);
-    expect(world.layers.buildingId[index(building.x, building.y)]).toBe(0);
-    expect(world.layers.zone[index(building.x, building.y)]).toBe(ZONE.residential);
+    expect(
+      world.layers.buildingId[index(building.x, building.y, world.size)],
+    ).toBe(0);
+    expect(world.layers.zone[index(building.x, building.y, world.size)]).toBe(
+      ZONE.residential,
+    );
     // Obyvatelé zmizeli s domem, ne s celým městem.
     expect(totalPopulation(world.buildings)).toBe(populationBefore - building.population);
   });
@@ -401,10 +415,10 @@ describe('bourání', () => {
     zoneArea(world, 6, 5, 1, 1, ZONE.residential);
 
     bulldoze(world, 5, 5);
-    expect(world.layers.road[index(5, 5)]).toBe(0);
+    expect(world.layers.road[index(5, 5, world.size)]).toBe(0);
 
     bulldoze(world, 6, 5);
-    expect(world.layers.zone[index(6, 5)]).toBe(ZONE.none);
+    expect(world.layers.zone[index(6, 5, world.size)]).toBe(ZONE.none);
   });
 });
 

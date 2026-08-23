@@ -6,14 +6,25 @@ import type { Definition } from '@/content/schema';
 import { placeBuilding } from '@/sim/buildings';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, bulldoze, zoneArea } from '@/sim/commands';
-import { COARSE_CELLS, coarseIndex } from '@/sim/coarse';
+import { coarseIndex } from '@/sim/coarse';
 import { index, ZONE } from '@/sim/layers';
-import { definitionsFor, pickDefinition, seedDefinitions, tryUpgrade } from '@/sim/levels';
-import { createCrimeSystem, createGrowthSystem, createHealthSystem, createLevelSystem } from '@/sim/systems';
+import {
+  definitionsFor,
+  pickDefinition,
+  seedDefinitions,
+  tryUpgrade,
+} from '@/sim/levels';
+import {
+  createCrimeSystem,
+  createGrowthSystem,
+  createHealthSystem,
+  createLevelSystem,
+} from '@/sim/systems';
 import { computeBudget } from '@/sim/systems/economy';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { Building, WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE, COARSE_CELLS } from './support/grid';
 
 /**
  * Žebříček definic pro testy. Kód nesmí znát žádnou konkrétní budovu (P5),
@@ -69,12 +80,17 @@ function zonedWorld(): WorldState {
 }
 
 /** Cena půdy na hrubé mřížce v okolí dlaždice. */
-function setLandValue(world: WorldState, x: number, y: number, value: number): void {
-  world.coarse.landValue[coarseIndex(x, y)] = value;
+function setLandValue(
+  world: WorldState,
+  x: number,
+  y: number,
+  value: number,
+): void {
+  world.coarse.landValue[coarseIndex(x, y, MAP_SIZE)] = value;
 }
 
 function at(world: WorldState, x: number, y: number): Building | undefined {
-  const id = world.layers.buildingId[index(x, y)] ?? 0;
+  const id = world.layers.buildingId[index(x, y, MAP_SIZE)] ?? 0;
   return world.buildings.get(id);
 }
 
@@ -470,7 +486,7 @@ describe('snížení a opuštění', () => {
     expect(at(world, 7, 6)?.id).toBe(building.id);
     // Uvolněné dlaždice zůstanou prázdné, ale pořád zónované.
     expect(at(world, 6, 7)).toBeUndefined();
-    expect(world.layers.zone[index(6, 7)]).toBe(ZONE.residential);
+    expect(world.layers.zone[index(6, 7, MAP_SIZE)]).toBe(ZONE.residential);
   });
 
   it('pod úrovní 1 budova zůstane stát jako ruina', () => {
@@ -595,8 +611,10 @@ describe('důsledky opuštění', () => {
       tickWorld(dirty, [crime]);
     }
 
-    const cell = coarseIndex(6, 6);
-    expect(dirty.coarse.crime[cell] ?? 0).toBeGreaterThan(clean.coarse.crime[cell] ?? 0);
+    const cell = coarseIndex(6, 6, MAP_SIZE);
+    expect(dirty.coarse.crime[cell] ?? 0).toBeGreaterThan(
+      clean.coarse.crime[cell] ?? 0,
+    );
   });
 
   it('do ruiny se nikdo nenastěhuje zpátky', () => {

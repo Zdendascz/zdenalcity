@@ -22,8 +22,11 @@ import { migrate } from '@/save/migrations';
 import type { Migration } from '@/save/migrations';
 import { packLayers, serializeSave, toSaveData } from '@/save/serialize';
 import type { SaveOptions } from '@/save/serialize';
-import { COARSE_CELLS } from '@/sim/coarse';
-import { applyCornerChanges, countViolations, planCornerHeight } from '@/sim/heights';
+import {
+  applyCornerChanges,
+  countViolations,
+  planCornerHeight,
+} from '@/sim/heights';
 import {
   buildPipe,
   buildRoad,
@@ -32,11 +35,12 @@ import {
   setTaxRate,
   zoneArea,
 } from '@/sim/commands';
-import { hashLayers, index, LAYER_ORDER, MAP_SIZE, ZONE } from '@/sim/layers';
+import { hashLayers, index, LAYER_ORDER, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { assumeWatered } from './support/water';
+import { MAP_SIZE, COARSE_CELLS } from './support/grid';
 
 const OPTIONS: SaveOptions = {
   cityName: 'Nový Brod',
@@ -110,10 +114,12 @@ describe('formát savu', () => {
 
   it('layers.bin má očekávanou délku', async () => {
     const { world } = await builtCity();
-    expect(packLayers(world.layers).byteLength).toBe(expectedLayersByteLength());
+    expect(packLayers(world.layers).byteLength).toBe(
+      expectedLayersByteLength(MAP_SIZE),
+    );
     // 6 vrstev, z toho jedna dvoubajtová. `elevation` zmizela ve verzi 4
     // (výšku nese `heights.bin`), `pipe` přibyla ve verzi 5.
-    expect(expectedLayersByteLength()).toBe(MAP_SIZE * MAP_SIZE * 7);
+    expect(expectedLayersByteLength(MAP_SIZE)).toBe(MAP_SIZE * MAP_SIZE * 7);
   });
 
   it('meta.json je v ZIPu nekomprimovaná, aby se dala číst samostatně', async () => {
@@ -291,7 +297,7 @@ describe('round-trip', () => {
     const bytes = serializeSave(world, OPTIONS);
 
     const restored = createWorld(1);
-    restored.trafficLoad[index(5, 5)] = 999;
+    restored.trafficLoad[index(5, 5, world.size)] = 999;
     restored.jobAccess.set(1234, 0.9);
     restored.jobAccessCells.fill(0.15);
     restored.cityJobAccess = 0.15;
@@ -373,12 +379,12 @@ describe('round-trip', () => {
 
   it('přežije hodnotu buildingId nad 255 (endianita)', () => {
     const world = createWorld(1);
-    world.layers.buildingId[index(10, 10)] = 4242;
+    world.layers.buildingId[index(10, 10, world.size)] = 4242;
 
     const restored = createWorld(1);
     applySaveToWorld(restored, unpackSave(serializeSave(world, OPTIONS)));
 
-    expect(restored.layers.buildingId[index(10, 10)]).toBe(4242);
+    expect(restored.layers.buildingId[index(10, 10, world.size)]).toBe(4242);
   });
 
   it('po loadu se překresluje všechno a síť se přepočítá', async () => {

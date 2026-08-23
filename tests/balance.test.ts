@@ -9,6 +9,7 @@ import { index, TERRAIN } from '@/sim/layers';
 import { createLandValueSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE } from './support/grid';
 
 const MANIFEST = {
   id: 'testmod',
@@ -128,7 +129,7 @@ describe('balanc opravdu řídí simulaci', () => {
     const world = createWorld(1);
     for (let dy = 0; dy < 4; dy++) {
       for (let dx = 0; dx < 4; dx++) {
-        world.layers.terrain[index(40 + dx, 40 + dy)] = TERRAIN.water;
+        world.layers.terrain[index(40 + dx, 40 + dy, MAP_SIZE)] = TERRAIN.water;
       }
     }
 
@@ -136,8 +137,8 @@ describe('balanc opravdu řídí simulaci', () => {
     for (let tick = 0; tick < 60 * 16 + 5; tick++) tickWorld(world, [system]);
 
     return {
-      uVody: world.coarse.landValue[coarseIndex(40, 40)] ?? 0,
-      vnitrozemi: world.coarse.landValue[coarseIndex(100, 100)] ?? 0,
+      uVody: world.coarse.landValue[coarseIndex(40, 40, MAP_SIZE)] ?? 0,
+      vnitrozemi: world.coarse.landValue[coarseIndex(100, 100, MAP_SIZE)] ?? 0,
     };
   }
 

@@ -1,5 +1,5 @@
 import type { Balance } from '@/content/balance';
-import { COARSE_FACTOR, COARSE_SIZE, coarseInBounds } from '../coarse';
+import { COARSE_FACTOR, coarseInBounds, coarseSizeOf } from '../coarse';
 import { explainLandValue, landValueContext } from '../diagnostics';
 import { index, TERRAIN } from '../layers';
 import type { WorldState } from '../world';
@@ -66,39 +66,45 @@ export function createLandValueSystem(balance: Balance): System {
  * homogenní ještě než se cokoli postaví.
  */
 export function waterProximity(world: WorldState): Uint8Array {
-  const size = COARSE_SIZE;
-  const hasWater = new Uint8Array(size * size);
+  const size = world.size;
+  const coarse = coarseSizeOf(size);
+  const hasWater = new Uint8Array(coarse * coarse);
 
-  for (let cellY = 0; cellY < size; cellY++) {
-    for (let cellX = 0; cellX < size; cellX++) {
+  for (let cellY = 0; cellY < coarse; cellY++) {
+    for (let cellX = 0; cellX < coarse; cellX++) {
       let found = false;
       for (let dy = 0; dy < COARSE_FACTOR && !found; dy++) {
         for (let dx = 0; dx < COARSE_FACTOR; dx++) {
-          const tile = index(cellX * COARSE_FACTOR + dx, cellY * COARSE_FACTOR + dy);
-          if (world.layers.terrain[tile] === TERRAIN.water) {
+          const tileX = cellX * COARSE_FACTOR + dx;
+          const tileY = cellY * COARSE_FACTOR + dy;
+          // U mapy, jejíž hrana není násobkem čtyř, kraj poslední buňky přesahuje.
+          if (tileX >= size || tileY >= size) continue;
+          if (
+            world.layers.terrain[index(tileX, tileY, size)] === TERRAIN.water
+          ) {
             found = true;
             break;
           }
         }
       }
-      if (found) hasWater[cellY * size + cellX] = 1;
+      if (found) hasWater[cellY * coarse + cellX] = 1;
     }
   }
 
-  const nearWater = new Uint8Array(size * size);
-  for (let cellY = 0; cellY < size; cellY++) {
-    for (let cellX = 0; cellX < size; cellX++) {
+  const nearWater = new Uint8Array(coarse * coarse);
+  for (let cellY = 0; cellY < coarse; cellY++) {
+    for (let cellX = 0; cellX < coarse; cellX++) {
       let near = false;
       for (let dy = -1; dy <= 1 && !near; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
-          if (!coarseInBounds(cellX + dx, cellY + dy)) continue;
-          if (hasWater[(cellY + dy) * size + (cellX + dx)] === 1) {
+          if (!coarseInBounds(cellX + dx, cellY + dy, coarse)) continue;
+          if (hasWater[(cellY + dy) * coarse + (cellX + dx)] === 1) {
             near = true;
             break;
           }
         }
       }
-      if (near) nearWater[cellY * size + cellX] = 1;
+      if (near) nearWater[cellY * coarse + cellX] = 1;
     }
   }
 

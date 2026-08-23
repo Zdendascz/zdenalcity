@@ -1,7 +1,7 @@
-import { COARSE_CELLS, createCoarseLayers } from './coarse';
+import { coarseCellsOf, createCoarseLayers } from './coarse';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
-import { createLayers, inBounds, index, MAP_SIZE } from './layers';
+import { createLayers, DEFAULT_MAP_SIZE, inBounds, index } from './layers';
 import type { Layers } from './layers';
 import type { RciCategory } from './rci';
 import { Rng } from './rng';
@@ -14,7 +14,7 @@ import type { System } from './systems';
  */
 export interface Building {
   id: number;
-  definitionId: string; // "vanilla:residential_small" — P6
+  definitionId: string; // 'vanilla:residential_small' — P6
   x: number; // levý horní roh footprintu
   y: number;
   /** Úroveň 1–5. Jaký půdorys a kapacitu k ní patří, říká definice (§8 fáze 2). */
@@ -219,19 +219,29 @@ export interface WorldState {
   happiness: Uint8Array;
 }
 
+/**
+ * Nový svět o hraně `size`.
+ *
+ * Velikost je parametr, ne konstanta (T42): mapy 128–512 se liší jen tímhle
+ * číslem a všechno ostatní — vrstvy, hrubá mřížka, rohy terénu — se z něj
+ * odvodí. Výchozí hodnota je tu kvůli testům, hra ji vždycky předává z dialogu
+ * nové hry.
+ */
 export function createWorld(
   seed: number,
   economy: WorldEconomyDefaults = {
     startingFunds: STARTING_FUNDS,
     defaultTaxRate: DEFAULT_TAX_RATE,
   },
+  size: number = DEFAULT_MAP_SIZE,
 ): WorldState {
+  const coarseCells = coarseCellsOf(size);
   return {
-    size: MAP_SIZE,
+    size,
     seed: seed >>> 0,
     tick: 0,
-    layers: createLayers(MAP_SIZE),
-    coarse: createCoarseLayers(),
+    layers: createLayers(size),
+    coarse: createCoarseLayers(size),
     buildings: new Map(),
     nextBuildingId: 1, // 0 ve vrstvě `buildingId` znamená prázdno
     economy: {
@@ -251,21 +261,50 @@ export function createWorld(
     coverage: new Map(),
     serviceFunding: new Map(),
     coverageDirty: false,
-    trafficLoad: new Float32Array(MAP_SIZE * MAP_SIZE),
-    cornerHeight: createCornerHeights(),
+    trafficLoad: new Float32Array(size * size),
+    cornerHeight: createCornerHeights(size),
     jobAccess: new Map(),
-    jobAccessCells: new Float32Array(COARSE_CELLS).fill(1),
+    jobAccessCells: new Float32Array(coarseCells).fill(1),
     cityJobAccess: 1,
     trafficCursor: 0,
     map: { seed: seed >>> 0, generated: false },
     downgradeStreak: new Map(),
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
-    waterSupply: new Uint8Array(MAP_SIZE * MAP_SIZE),
+    waterSupply: new Uint8Array(size * size),
     watered: new Set(),
     waterlessStreak: new Map(),
     waterNetworkDirty: false,
-    happiness: new Uint8Array(COARSE_CELLS).fill(NEUTRAL_HAPPINESS),
+    happiness: new Uint8Array(coarseCells).fill(NEUTRAL_HAPPINESS),
   };
+}
+
+/**
+ * Přestaví svět na jinou velikost mapy.
+ *
+ * Používá to načítání savu: renderer i UI drží `getSnapshot()` jako živý pohled
+ * (T2), takže se objekt světa nesmí vyměnit — musí se přealokovat vrstvy uvnitř
+ * něj. Obsah se zahazuje, protože ho volající vzápětí přepíše ze savu; kdyby se
+ * kus starého města přenesl, mísila by se dvě různá města.
+ *
+ * Když velikost sedí, nedělá nic: přealokovat 512 × 512 zbytečně by při každém
+ * loadu stálo desítky megabajtů.
+ */
+export function resizeWorld(world: WorldState, size: number): void {
+  if (world.size === size) return;
+
+  // `size` je readonly, aby ho nikdo nepřepsal omylem. Load je stejná
+  // legitimní výjimka jako u `seed` — ze světa se stává jiné město.
+  (world as { size: number }).size = size;
+
+  world.layers = createLayers(size);
+  world.coarse = createCoarseLayers(size);
+  world.cornerHeight = createCornerHeights(size);
+  world.trafficLoad = new Float32Array(size * size);
+  world.waterSupply = new Uint8Array(size * size);
+  world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
+  world.happiness = new Uint8Array(coarseCellsOf(size)).fill(NEUTRAL_HAPPINESS);
+  world.dirty.fullRedraw = true;
+  world.dirty.coarseChanged = true;
 }
 
 /** Potrubí nebo vodárna se změnily — vodovod se musí přepočítat. */
@@ -312,9 +351,9 @@ export function applyHeightChanges(
     ] as const) {
       const x = cx + dx;
       const y = cy + dy;
-      if (!inBounds(x, y)) continue;
+      if (!inBounds(x, y, world.size)) continue;
 
-      const tile = index(x, y);
+      const tile = index(x, y, world.size);
       world.dirty.tiles.add(tile);
 
       const buildingId = world.layers.buildingId[tile] ?? 0;
@@ -333,8 +372,8 @@ export function coverageOf(world: WorldState, serviceClass: string): Uint8Array 
 }
 
 export function markTileDirty(world: WorldState, x: number, y: number): void {
-  if (inBounds(x, y)) {
-    world.dirty.tiles.add(index(x, y));
+  if (inBounds(x, y, world.size)) {
+    world.dirty.tiles.add(index(x, y, world.size));
   }
 }
 

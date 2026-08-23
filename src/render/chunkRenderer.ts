@@ -157,7 +157,7 @@ export class ChunkRenderer {
   private drawTile(graphics: Graphics, x: number, y: number): void {
     if (x >= this.world.size || y >= this.world.size) return;
 
-    const tileIndex = index(x, y);
+    const tileIndex = index(x, y, this.world.size);
     const terrain = this.world.layers.terrain[tileIndex] ?? 0;
     const corners = tileCorners(this.world.cornerHeight, x, y);
     const underground = this.overlay === 'underground';
@@ -265,8 +265,9 @@ export class ChunkRenderer {
 
   /** Mimo mapu potrubí není — okraj se chová jako slepý konec, stejně jako u silnic. */
   private isPipe(x: number, y: number): boolean {
-    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return false;
-    return this.world.layers.pipe[index(x, y)] === 1;
+    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size)
+      return false;
+    return this.world.layers.pipe[index(x, y, this.world.size)] === 1;
   }
 
   /**
@@ -285,8 +286,12 @@ export class ChunkRenderer {
 
   /** Mimo mapu silnice nikdy není — okraj mapy se tak chová jako slepý konec. */
   private isRoad(x: number, y: number): boolean {
-    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return false;
-    return (this.world.layers.road[index(x, y)] ?? ROAD.none) !== ROAD.none;
+    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size)
+      return false;
+    return (
+      (this.world.layers.road[index(x, y, this.world.size)] ?? ROAD.none) !==
+      ROAD.none
+    );
   }
 
   destroy(): void {

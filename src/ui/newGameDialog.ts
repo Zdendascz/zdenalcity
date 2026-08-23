@@ -1,5 +1,5 @@
 import type { Balance } from '@/content/balance';
-import { MAP_SIZE, TERRAIN } from '@/sim/layers';
+import { DEFAULT_MAP_SIZE, TERRAIN } from '@/sim/layers';
 import { generateTerrain } from '@/sim/mapgen';
 import { button, el } from './dom';
 import type { I18n } from './i18n';
@@ -89,8 +89,8 @@ export function showNewGameDialog(
   dialog.appendChild(form);
 
   const canvas = el('canvas', 'dialog__preview');
-  canvas.width = MAP_SIZE * PREVIEW_SCALE;
-  canvas.height = MAP_SIZE * PREVIEW_SCALE;
+  canvas.width = DEFAULT_MAP_SIZE * PREVIEW_SCALE;
+  canvas.height = DEFAULT_MAP_SIZE * PREVIEW_SCALE;
   dialog.appendChild(canvas);
 
   const note = el('p', 'dialog__note');
@@ -109,10 +109,17 @@ export function showNewGameDialog(
 
     // Kreslí se po dlaždicích; 16 384 obdélníků je pod milisekundu a odpadá
     // tím práce s ImageData a jejím pořadím kanálů.
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        context.fillStyle = PREVIEW_COLORS[terrain[y * MAP_SIZE + x] ?? TERRAIN.grass] ?? '#000';
-        context.fillRect(x * PREVIEW_SCALE, y * PREVIEW_SCALE, PREVIEW_SCALE, PREVIEW_SCALE);
+    for (let y = 0; y < DEFAULT_MAP_SIZE; y++) {
+      for (let x = 0; x < DEFAULT_MAP_SIZE; x++) {
+        context.fillStyle =
+          PREVIEW_COLORS[terrain[y * DEFAULT_MAP_SIZE + x] ?? TERRAIN.grass] ??
+          '#000';
+        context.fillRect(
+          x * PREVIEW_SCALE,
+          y * PREVIEW_SCALE,
+          PREVIEW_SCALE,
+          PREVIEW_SCALE,
+        );
       }
     }
 

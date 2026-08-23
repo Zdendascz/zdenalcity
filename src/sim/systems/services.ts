@@ -1,6 +1,5 @@
 import type { BuildingCatalogue } from '../catalogue';
-import { COARSE_CELLS, COARSE_SIZE, coarseIndex } from '../coarse';
-import { MAP_SIZE } from '../layers';
+import { coarseCellsOf, coarseIndex, coarseSizeOf } from '../coarse';
 import { serviceFunding } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -55,11 +54,18 @@ export function createServiceSystem(catalogue: BuildingCatalogue): System {
 
           let field = accumulated.get(source.class);
           if (!field) {
-            field = new Float32Array(COARSE_CELLS);
+            field = new Float32Array(coarseCellsOf(world.size));
             accumulated.set(source.class, field);
           }
 
-          addCoverage(field, building, definition.footprint, radius, strength);
+          addCoverage(
+            field,
+            world.size,
+            building,
+            definition.footprint,
+            radius,
+            strength,
+          );
         }
       }
 
@@ -72,29 +78,36 @@ export function createServiceSystem(catalogue: BuildingCatalogue): System {
 
 function addCoverage(
   field: Float32Array,
+  size: number,
   building: { x: number; y: number },
   footprint: readonly [number, number],
   radius: number,
   strength: number,
 ): void {
+  const coarseSize = coarseSizeOf(size);
   const [width, depth] = footprint;
-  const centerTileX = Math.min(building.x + (width - 1) / 2, MAP_SIZE - 1);
-  const centerTileY = Math.min(building.y + (depth - 1) / 2, MAP_SIZE - 1);
-  const origin = coarseIndex(Math.floor(centerTileX), Math.floor(centerTileY));
-  const originX = origin % COARSE_SIZE;
-  const originY = (origin - originX) / COARSE_SIZE;
+  const centerTileX = Math.min(building.x + (width - 1) / 2, size - 1);
+  const centerTileY = Math.min(building.y + (depth - 1) / 2, size - 1);
+  const origin = coarseIndex(
+    Math.floor(centerTileX),
+    Math.floor(centerTileY),
+    size,
+  );
+  const originX = origin % coarseSize;
+  const originY = (origin - originX) / coarseSize;
 
   const reach = Math.ceil(radius);
   for (let dy = -reach; dy <= reach; dy++) {
     for (let dx = -reach; dx <= reach; dx++) {
       const cellX = originX + dx;
       const cellY = originY + dy;
-      if (cellX < 0 || cellY < 0 || cellX >= COARSE_SIZE || cellY >= COARSE_SIZE) continue;
+      if (cellX < 0 || cellY < 0 || cellX >= coarseSize || cellY >= coarseSize)
+        continue;
 
       const distance = Math.sqrt(dx * dx + dy * dy);
       if (distance > radius) continue;
 
-      const at = cellY * COARSE_SIZE + cellX;
+      const at = cellY * coarseSize + cellX;
       field[at] = (field[at] ?? 0) + strength * (1 - distance / radius);
     }
   }
@@ -108,7 +121,7 @@ function writeCoverage(world: WorldState, accumulated: Map<string, Float32Array>
   for (const [serviceClass, field] of accumulated) {
     let target = world.coverage.get(serviceClass);
     if (!target) {
-      target = new Uint8Array(COARSE_CELLS);
+      target = new Uint8Array(coarseCellsOf(world.size));
       world.coverage.set(serviceClass, target);
     }
     for (let cell = 0; cell < target.length; cell++) {

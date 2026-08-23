@@ -49,8 +49,9 @@ export function createLevelSystem(catalogue: BuildingCatalogue, balance: Balance
         if (!definition || !isRciCategory(definition.category)) continue;
         if (world.tick - building.levelChangedAtTick < balance.levels.cooldown) continue;
 
-        const cell = coarseIndex(building.x, building.y);
-        const landValue = (world.coarse.landValue[cell] ?? 0) - neglect(building, cell);
+        const cell = coarseIndex(building.x, building.y, world.size);
+        const landValue =
+          (world.coarse.landValue[cell] ?? 0) - neglect(building, cell);
 
         // Čím větší tlak, tím ochotněji se čtvrť zahustí. Bez téhle úlevy
         // povyšovalo město s poptávkou 100 stejně jako město s poptávkou 1.

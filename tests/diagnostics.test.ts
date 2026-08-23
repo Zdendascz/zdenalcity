@@ -3,14 +3,21 @@ import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { placeBuilding } from '@/sim/buildings';
 import { buildRoad, zoneArea } from '@/sim/commands';
-import { COARSE_CELLS, coarseIndex } from '@/sim/coarse';
-import { explainLandValue, explainParcel, growthBlocker, landValueContext, worstBlocker } from '@/sim/diagnostics';
+import { coarseIndex } from '@/sim/coarse';
+import {
+  explainLandValue,
+  explainParcel,
+  growthBlocker,
+  landValueContext,
+  worstBlocker,
+} from '@/sim/diagnostics';
 import { applyCornerChanges, planCornerHeight } from '@/sim/heights';
 import { ZONE } from '@/sim/layers';
 import { createDefaultSystems, createLandValueSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { assumeWatered } from './support/water';
+import { COARSE_CELLS } from './support/grid';
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -80,7 +87,7 @@ describe('rozpis ceny půdy', () => {
 
   it('pojmenuje, co cenu půdy sráží a co ji zvedá', async () => {
     const { world, content } = await city();
-    const cell = coarseIndex(22, 31); // u parku
+    const cell = coarseIndex(22, 31, world.size); // u parku
     const balance = content.getBalance();
     const explained = explainLandValue(world, balance, cell, landValueContext(world, balance));
     const by = new Map(explained.terms.map((term) => [term.source, term]));

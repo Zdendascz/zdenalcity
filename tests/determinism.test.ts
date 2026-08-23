@@ -6,12 +6,13 @@ import { hashCoarseLayers } from '@/sim/coarse';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import { createDefaultSystems } from '@/sim/systems';
 import { assumeWatered } from './support/water';
-import { hashLayers, index, MAP_SIZE, ROAD, TERRAIN, ZONE } from '@/sim/layers';
+import { hashLayers, index, ROAD, TERRAIN, ZONE } from '@/sim/layers';
 import { createWorld, markTileDirty, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import type { System } from '@/sim/systems';
 import { createSimHost } from '@/sim/simHost';
 import type { Command } from '@/sim/commands';
+import { MAP_SIZE } from './support/grid';
 
 /**
  * Determinismus (P2): stejný seed + stejná posloupnost vstupů = bit-identický výsledek.
@@ -28,8 +29,8 @@ const chaosSystem: System = {
   run(world: WorldState) {
     const x = world.rng.int(world.size);
     const y = world.rng.int(world.size);
-    world.layers.terrain[index(x, y)] = world.rng.int(4);
-    world.layers.road[index(x, y)] = world.rng.int(2);
+    world.layers.terrain[index(x, y, world.size)] = world.rng.int(4);
+    world.layers.road[index(x, y, world.size)] = world.rng.int(2);
     markTileDirty(world, x, y);
   },
 };
@@ -125,7 +126,9 @@ describe('determinismus celé sestavy (kritérium fáze 3)', () => {
         let score = 0;
         for (let dy = 0; dy < 10; dy++) {
           for (let dx = 0; dx < 20; dx++) {
-            const terrain = world.layers.terrain[index(x + dx, y + dy)] ?? TERRAIN.water;
+            const terrain =
+              world.layers.terrain[index(x + dx, y + dy, world.size)] ??
+              TERRAIN.water;
             if (terrain === TERRAIN.grass || terrain === TERRAIN.sand) score++;
           }
         }

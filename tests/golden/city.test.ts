@@ -3,12 +3,18 @@ import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { buildRoad, placeDefinition, zoneArea } from '@/sim/commands';
 import { hashCoarseLayers } from '@/sim/coarse';
-import { hashLayers, index, MAP_SIZE, ROAD, TERRAIN, ZONE } from '@/sim/layers';
+import { hashLayers, index, ROAD, TERRAIN, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
-import { createWorld, tickWorld, totalJobs, totalPopulation } from '@/sim/world';
+import {
+  createWorld,
+  tickWorld,
+  totalJobs,
+  totalPopulation,
+} from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { assumeWatered } from '../support/water';
+import { MAP_SIZE } from '../support/grid';
 
 /**
  * Golden test **celého města**, ne jen silnic (architektura §12).
@@ -75,7 +81,9 @@ function findSite(world: WorldState): { x: number; y: number } {
       let score = 0;
       for (let dy = 0; dy < SITE_H; dy++) {
         for (let dx = 0; dx < SITE_W; dx++) {
-          const terrain = world.layers.terrain[index(x + dx, y + dy)] ?? TERRAIN.water;
+          const terrain =
+            world.layers.terrain[index(x + dx, y + dy, world.size)] ??
+            TERRAIN.water;
           if (terrain === TERRAIN.grass || terrain === TERRAIN.sand) score++;
         }
       }

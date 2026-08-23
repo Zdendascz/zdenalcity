@@ -5,6 +5,7 @@ import {
   areaHeightRange,
   cornerInBounds,
   cornerIndex,
+  cornerSideOf,
   isTwistedTile,
   MAX_HEIGHT,
   planCornerHeight,
@@ -61,8 +62,12 @@ function touchesRoad(world: WorldState, x: number, y: number): boolean {
     [0, 1],
     [-1, 0],
   ] as const) {
-    if (!inBounds(x + dx, y + dy)) continue;
-    if ((world.layers.road[index(x + dx, y + dy)] ?? ROAD.none) !== ROAD.none) return true;
+    if (!inBounds(x + dx, y + dy, world.size)) continue;
+    if (
+      (world.layers.road[index(x + dx, y + dy, world.size)] ?? ROAD.none) !==
+      ROAD.none
+    )
+      return true;
   }
   return false;
 }
@@ -90,9 +95,9 @@ export function buildRoad(
   type: number = ROAD.street,
   balance?: Balance,
 ): CommandResult {
-  if (!inBounds(x, y)) return reject('error.outOfBounds');
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
 
-  const tile = index(x, y);
+  const tile = index(x, y, world.size);
   if (world.layers.buildingId[tile] !== 0) return reject('error.occupied');
 
   // Vozovka na vodě je **most** (§7 fáze 3). Staví se jen z břehu dál, aby
@@ -192,11 +197,15 @@ function planLevelling(
   const averaged = planLevelArea(world.cornerHeight, x, y, width, depth);
   if (checkTerraform(world, averaged).ok) return averaged;
 
+  const side = cornerSideOf(world.cornerHeight);
   let lowest = MAX_HEIGHT;
   for (let cy = y; cy <= y + depth; cy++) {
     for (let cx = x; cx <= x + width; cx++) {
-      if (!cornerInBounds(cx, cy)) continue;
-      lowest = Math.min(lowest, world.cornerHeight[cornerIndex(cx, cy)] ?? 0);
+      if (!cornerInBounds(cx, cy, side)) continue;
+      lowest = Math.min(
+        lowest,
+        world.cornerHeight[cornerIndex(cx, cy, side)] ?? 0,
+      );
     }
   }
 
@@ -266,12 +275,12 @@ export function zoneArea(
     for (let dx = 0; dx < w; dx++) {
       const tileX = x + dx;
       const tileY = y + dy;
-      if (!inBounds(tileX, tileY)) {
+      if (!inBounds(tileX, tileY, world.size)) {
         lastReason = 'error.outOfBounds';
         continue;
       }
 
-      const tile = index(tileX, tileY);
+      const tile = index(tileX, tileY, world.size);
       if (world.layers.terrain[tile] === TERRAIN.water) {
         lastReason = 'error.water';
         continue;
@@ -307,9 +316,9 @@ export function bulldoze(
   y: number,
   balance?: Balance,
 ): CommandResult {
-  if (!inBounds(x, y)) return reject('error.outOfBounds');
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
 
-  const tile = index(x, y);
+  const tile = index(x, y, world.size);
 
   const buildingId = world.layers.buildingId[tile] ?? 0;
   if (buildingId !== 0) {
@@ -411,10 +420,11 @@ export function buildPipe(
   y: number,
   balance?: Balance,
 ): CommandResult {
-  if (!inBounds(x, y)) return reject('error.outOfBounds');
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
 
-  const tile = index(x, y);
-  if (world.layers.terrain[tile] === TERRAIN.water) return reject('error.pipeOnWater');
+  const tile = index(x, y, world.size);
+  if (world.layers.terrain[tile] === TERRAIN.water)
+    return reject('error.pipeOnWater');
   if (world.layers.pipe[tile] === 1) return reject('error.pipeExists');
 
   const cost = balance?.water.pipeCost ?? 0;
@@ -435,10 +445,14 @@ export function buildPipe(
  * Buldozer bourá to nejvrchnější, takže by v podzemním pohledu sundal budovu
  * nebo silnici nad trubkou. Hráč, který kouká pod zem, ale míří na trubku.
  */
-export function removePipe(world: WorldState, x: number, y: number): CommandResult {
-  if (!inBounds(x, y)) return reject('error.outOfBounds');
+export function removePipe(
+  world: WorldState,
+  x: number,
+  y: number,
+): CommandResult {
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
 
-  const tile = index(x, y);
+  const tile = index(x, y, world.size);
   if (world.layers.pipe[tile] !== 1) return reject('error.noPipe');
 
   world.layers.pipe[tile] = 0;
@@ -478,7 +492,7 @@ function tilesAroundCorner(world: WorldState, corner: number): number[] {
   ] as const) {
     const x = cx + dx;
     const y = cy + dy;
-    if (inBounds(x, y)) tiles.push(index(x, y));
+    if (inBounds(x, y, world.size)) tiles.push(index(x, y, world.size));
   }
   return tiles;
 }
@@ -521,7 +535,7 @@ export function estimateCornerHeight(
   delta: number,
   balance?: Balance,
 ): TerraformEstimate {
-  const corner = cornerIndex(x, y);
+  const corner = cornerIndex(x, y, cornerSideOf(world.cornerHeight));
   const current = world.cornerHeight[corner] ?? 0;
   return estimate(planCornerHeight(world.cornerHeight, x, y, current + delta), balance);
 }
@@ -584,7 +598,8 @@ export function terraformCorner(
   delta: number,
   balance?: Balance,
 ): CommandResult {
-  if (!cornerInBounds(x, y)) return reject('error.outOfBounds');
+  if (!cornerInBounds(x, y, cornerSideOf(world.cornerHeight)))
+    return reject('error.outOfBounds');
   return commit(world, estimateCornerHeight(world, x, y, delta, balance));
 }
 
@@ -598,6 +613,6 @@ export function levelArea(
   balance?: Balance,
   mode: LevelMode = 'average',
 ): CommandResult {
-  if (!inBounds(x, y)) return reject('error.outOfBounds');
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
   return commit(world, estimateLevelArea(world, x, y, w, h, balance, mode));
 }

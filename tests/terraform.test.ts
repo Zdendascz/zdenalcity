@@ -5,11 +5,18 @@ import {
   levelArea,
   terraformCorner,
 } from '@/sim/commands';
-import { countViolations, cornerIndex, isFlatTile, planCornerHeight, tileCorners } from '@/sim/heights';
+import {
+  countViolations,
+  cornerIndex,
+  isFlatTile,
+  planCornerHeight,
+  tileCorners,
+} from '@/sim/heights';
 import { index, TERRAIN } from '@/sim/layers';
 import { createWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE, CORNER_SIZE } from './support/grid';
 
 const COST = VANILLA_BALANCE.map.terraformCost;
 
@@ -38,7 +45,7 @@ describe('terraforming — cena a kaskáda (§7 fáze 3)', () => {
 
     expect(terraformCorner(w, 40, 40, 5, VANILLA_BALANCE).ok).toBe(true);
     expect(before - w.economy.funds).toBe(plan.cost);
-    expect(w.cornerHeight[cornerIndex(40, 40)]).toBe(5);
+    expect(w.cornerHeight[cornerIndex(40, 40, CORNER_SIZE)]).toBe(5);
     expect(countViolations(w.cornerHeight)).toBe(0);
   });
 
@@ -66,7 +73,7 @@ describe('terraforming — cena a kaskáda (§7 fáze 3)', () => {
       terraformCorner(w, 50, 50, 1, VANILLA_BALANCE);
     }
 
-    expect(w.cornerHeight[cornerIndex(50, 50)]).toBe(4);
+    expect(w.cornerHeight[cornerIndex(50, 50, CORNER_SIZE)]).toBe(4);
     expect(naraz).toBeLessThan(poPatrech);
   });
 
@@ -101,7 +108,7 @@ describe('terraforming — cena a kaskáda (§7 fáze 3)', () => {
 describe('terraforming — co se nesmí', () => {
   it('dno moře se nezvedá', () => {
     const w = world();
-    w.layers.terrain[index(10, 10)] = TERRAIN.water;
+    w.layers.terrain[index(10, 10, MAP_SIZE)] = TERRAIN.water;
 
     const result = terraformCorner(w, 10, 10, 2, VANILLA_BALANCE);
 
@@ -115,7 +122,7 @@ describe('terraforming — co se nesmí', () => {
     // srovnat ani břeh.
     const w = world();
     hill(w, 10, 10, 4);
-    w.layers.terrain[index(14, 14)] = TERRAIN.water;
+    w.layers.terrain[index(14, 14, MAP_SIZE)] = TERRAIN.water;
 
     expect(terraformCorner(w, 10, 10, -2, VANILLA_BALANCE).ok).toBe(true);
   });
@@ -125,7 +132,7 @@ describe('terraforming — co se nesmí', () => {
     const w = world();
     // Terén ve třetím patře, ať má snížení kam jít — snižovat nulu není změna.
     w.cornerHeight.fill(3);
-    w.layers.buildingId[index(25, 25)] = 42;
+    w.layers.buildingId[index(25, 25, MAP_SIZE)] = 42;
 
     for (const delta of [1, -1]) {
       const result = terraformCorner(w, 25, 25, delta, VANILLA_BALANCE);
@@ -138,7 +145,7 @@ describe('terraforming — co se nesmí', () => {
     // Klik je daleko od budovy, ale vlna se k ní dokutálí. Musí spadnout celá
     // operace — polovina kaskády by porušila invariant.
     const w = world();
-    w.layers.buildingId[index(43, 40)] = 7;
+    w.layers.buildingId[index(43, 40, MAP_SIZE)] = 7;
     const before = Uint8Array.from(w.cornerHeight);
 
     const result = terraformCorner(w, 40, 40, 5, VANILLA_BALANCE);
@@ -151,7 +158,7 @@ describe('terraforming — co se nesmí', () => {
   it('silnice se hýbat smí', () => {
     // Zadání to výslovně dovoluje: invariant drží svah v mezích sám.
     const w = world();
-    w.layers.road[index(60, 60)] = 1;
+    w.layers.road[index(60, 60, MAP_SIZE)] = 1;
 
     expect(terraformCorner(w, 60, 60, 2, VANILLA_BALANCE).ok).toBe(true);
   });

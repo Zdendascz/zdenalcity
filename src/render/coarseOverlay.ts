@@ -1,6 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
-import { COARSE_FACTOR, COARSE_SIZE } from '@/sim/coarse';
-import { cornerIndex } from '@/sim/heights';
+import { COARSE_FACTOR, coarseSizeOf } from '@/sim/coarse';
+import { cornerIndex, cornerSideOf } from '@/sim/heights';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { areaQuad } from './projection';
 
@@ -67,9 +67,10 @@ export class CoarseOverlay {
     const values = layer?.values();
     if (!layer || !values) return;
 
-    for (let cellY = 0; cellY < COARSE_SIZE; cellY++) {
-      for (let cellX = 0; cellX < COARSE_SIZE; cellX++) {
-        const value = values[cellY * COARSE_SIZE + cellX] ?? 0;
+    const coarseSize = coarseSizeOf(this.world.size);
+    for (let cellY = 0; cellY < coarseSize; cellY++) {
+      for (let cellX = 0; cellX < coarseSize; cellX++) {
+        const value = values[cellY * coarseSize + cellX] ?? 0;
         if (value === 0) continue;
 
         // Blok se naklopí podle **svých čtyř rohů**, ne podle každé dlaždice
@@ -89,12 +90,13 @@ export class CoarseOverlay {
   /** Výšky čtyř rohů bloku 4×4 v pořadí SZ, SV, JZ, JV. */
   private blockCorners(x: number, y: number): [number, number, number, number] {
     const heights = this.world.cornerHeight;
+    const side = cornerSideOf(heights);
     const far = COARSE_FACTOR;
     return [
-      heights[cornerIndex(x, y)] ?? 0,
-      heights[cornerIndex(x + far, y)] ?? 0,
-      heights[cornerIndex(x, y + far)] ?? 0,
-      heights[cornerIndex(x + far, y + far)] ?? 0,
+      heights[cornerIndex(x, y, side)] ?? 0,
+      heights[cornerIndex(x + far, y, side)] ?? 0,
+      heights[cornerIndex(x, y + far, side)] ?? 0,
+      heights[cornerIndex(x + far, y + far, side)] ?? 0,
     ];
   }
 

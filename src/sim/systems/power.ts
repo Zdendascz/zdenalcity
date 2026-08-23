@@ -49,7 +49,7 @@ function recompute(world: WorldState, catalogue: BuildingCatalogue): void {
     const [width, depth] = definition.footprint;
     for (let dy = 0; dy < depth; dy++) {
       for (let dx = 0; dx < width; dx++) {
-        const tile = index(building.x + dx, building.y + dy);
+        const tile = index(building.x + dx, building.y + dy, world.size);
         if (reached[tile] === 0) {
           reached[tile] = 1;
           queue.push(tile);
@@ -69,7 +69,7 @@ function floodFill(world: WorldState, reached: Uint8Array, queue: number[]): voi
 
   const visit = (x: number, y: number): void => {
     if (x < 0 || y < 0 || x >= size || y >= size) return;
-    const tile = index(x, y);
+    const tile = index(x, y, size);
     if (reached[tile] !== 0) return;
     // Vodičem je silnice nebo budova. Prázdná dlaždice proud nevede.
     if (road[tile] === 0 && buildingId[tile] === 0) return;
@@ -149,7 +149,8 @@ function isConnected(
       const tileX = x + dx;
       const tileY = y + dy;
       if (tileX >= world.size || tileY >= world.size) continue;
-      if (world.layers.power[index(tileX, tileY)] === 1) return true;
+      if (world.layers.power[index(tileX, tileY, world.size)] === 1)
+        return true;
     }
   }
 

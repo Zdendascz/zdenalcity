@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
-import { index, MAP_SIZE, ROAD } from '@/sim/layers';
+import { index, ROAD } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { TRAFFIC_COLORS, TRAFFIC_MAX_ALPHA } from './palette';
 import { tileCorners } from '@/sim/heights';
@@ -50,9 +50,10 @@ export class TrafficOverlay {
   private redraw(): void {
     this.graphics.clear();
 
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        const tile = index(x, y);
+    const size = this.world.size;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const tile = index(x, y, size);
         const roadType = this.world.layers.road[tile] ?? ROAD.none;
         if (roadType === ROAD.none) continue;
 

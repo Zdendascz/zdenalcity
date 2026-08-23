@@ -4,14 +4,23 @@ import { placeBuilding } from '@/sim/buildings';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, zoneArea } from '@/sim/commands';
 import { coarseIndex } from '@/sim/coarse';
-import { coarseCongestion, explainLandValue, landValueContext } from '@/sim/diagnostics';
+import {
+  coarseCongestion,
+  explainLandValue,
+  landValueContext,
+} from '@/sim/diagnostics';
 import { index, ROAD, ZONE } from '@/sim/layers';
 import { createGrowthSystem, createTrafficSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE } from './support/grid';
 
-function definition(id: string, category: string, capacity: number): Definition {
+function definition(
+  id: string,
+  category: string,
+  capacity: number,
+): Definition {
   return {
     id: `test:${id}`,
     type: 'building',
@@ -47,11 +56,12 @@ describe('kolony', () => {
     const w = world();
     // Buňka hrubé mřížky pokrývá dlaždice 8–11; ulice ji projde celou.
     street(w, 8, 11, 8);
-    w.trafficLoad[index(8, 8)] = VANILLA_BALANCE.traffic.roadTypes[0]?.capacity ?? 0;
+    w.trafficLoad[index(8, 8, MAP_SIZE)] =
+      VANILLA_BALANCE.traffic.roadTypes[0]?.capacity ?? 0;
 
     const congestion = coarseCongestion(w, VANILLA_BALANCE);
     // Čtyři silniční dlaždice, jedna z nich je plná — průměr je čtvrtina.
-    expect(congestion[coarseIndex(8, 8)]).toBeCloseTo(0.25, 5);
+    expect(congestion[coarseIndex(8, 8, MAP_SIZE)]).toBeCloseTo(0.25, 5);
   });
 
   it('širší silnice snese stejnou zátěž s menším vytížením', () => {
@@ -59,13 +69,15 @@ describe('kolony', () => {
 
     const narrow = world();
     street(narrow, 8, 11, 8);
-    for (let x = 8; x <= 11; x++) narrow.trafficLoad[index(x, 8)] = load;
+    for (let x = 8; x <= 11; x++)
+      narrow.trafficLoad[index(x, 8, MAP_SIZE)] = load;
 
     const wide = world();
     street(wide, 8, 11, 8, ROAD.avenue);
-    for (let x = 8; x <= 11; x++) wide.trafficLoad[index(x, 8)] = load;
+    for (let x = 8; x <= 11; x++)
+      wide.trafficLoad[index(x, 8, MAP_SIZE)] = load;
 
-    const cell = coarseIndex(8, 8);
+    const cell = coarseIndex(8, 8, MAP_SIZE);
     expect(coarseCongestion(wide, VANILLA_BALANCE)[cell] ?? 0).toBeLessThan(
       coarseCongestion(narrow, VANILLA_BALANCE)[cell] ?? 0,
     );
@@ -79,10 +91,15 @@ describe('kolony', () => {
   it('srážejí cenu půdy jako záporný člen', () => {
     const w = world();
     street(w, 8, 11, 8);
-    for (let x = 8; x <= 11; x++) w.trafficLoad[index(x, 8)] = 200;
+    for (let x = 8; x <= 11; x++) w.trafficLoad[index(x, 8, MAP_SIZE)] = 200;
 
-    const cell = coarseIndex(8, 8);
-    const explained = explainLandValue(w, VANILLA_BALANCE, cell, landValueContext(w, VANILLA_BALANCE));
+    const cell = coarseIndex(8, 8, MAP_SIZE);
+    const explained = explainLandValue(
+      w,
+      VANILLA_BALANCE,
+      cell,
+      landValueContext(w, VANILLA_BALANCE),
+    );
     const term = explained.terms.find((t) => t.source === 'congestion');
 
     expect(term).toBeDefined();

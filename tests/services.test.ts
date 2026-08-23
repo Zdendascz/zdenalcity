@@ -5,10 +5,15 @@ import type { Definition } from '@/content/schema';
 import { placeBuilding } from '@/sim/buildings';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { COARSE_FACTOR, coarseIndex, hashCoarseLayers } from '@/sim/coarse';
-import { createCrimeSystem, createLandValueSystem, createServiceSystem } from '@/sim/systems';
+import {
+  createCrimeSystem,
+  createLandValueSystem,
+  createServiceSystem,
+} from '@/sim/systems';
 import { createWorld, removeBuilding, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
+import { MAP_SIZE } from './support/grid';
 
 const STATION: Definition = {
   id: 'test:station',
@@ -51,11 +56,11 @@ function recomputeCoverage(world: WorldState, catalogue: BuildingCatalogue): voi
 }
 
 function coverage(world: WorldState, x: number, y: number): number {
-  return world.coverage.get('police')?.[coarseIndex(x, y)] ?? 0;
+  return world.coverage.get('police')?.[coarseIndex(x, y, MAP_SIZE)] ?? 0;
 }
 
 function crime(world: WorldState, x: number, y: number): number {
-  return world.coarse.crime[coarseIndex(x, y)] ?? 0;
+  return world.coarse.crime[coarseIndex(x, y, MAP_SIZE)] ?? 0;
 }
 
 describe('pokrytí službami', () => {
@@ -201,8 +206,8 @@ describe('vazba na cenu půdy', () => {
     placeBuilding(seStanicí, STATION, 64, 64);
     runAll(seStanicí, catalogueOf(STATION), 40);
 
-    const doma = seStanicí.coarse.landValue[coarseIndex(64, 64)] ?? 0;
-    const bez = bezStanice.coarse.landValue[coarseIndex(64, 64)] ?? 0;
+    const doma = seStanicí.coarse.landValue[coarseIndex(64, 64, MAP_SIZE)] ?? 0;
+    const bez = bezStanice.coarse.landValue[coarseIndex(64, 64, MAP_SIZE)] ?? 0;
 
     expect(doma).toBeGreaterThan(bez);
   });
@@ -213,8 +218,9 @@ describe('vazba na cenu půdy', () => {
 
     runAll(world, catalogueOf(HOUSE), 40);
 
-    const uKriminality = world.coarse.landValue[coarseIndex(64, 64)] ?? 0;
-    const klid = world.coarse.landValue[coarseIndex(4, 100)] ?? 0;
+    const uKriminality =
+      world.coarse.landValue[coarseIndex(64, 64, MAP_SIZE)] ?? 0;
+    const klid = world.coarse.landValue[coarseIndex(4, 100, MAP_SIZE)] ?? 0;
 
     expect(crime(world, 64, 64)).toBeGreaterThan(0);
     expect(uKriminality).toBeLessThan(klid);

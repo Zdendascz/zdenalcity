@@ -1,8 +1,8 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
-import { COARSE_CELLS, coarseIndex } from '../coarse';
+import { coarseCellsOf, coarseIndex } from '../coarse';
 import { diffuse } from '../diffusion';
-import { MAP_SIZE, TERRAIN } from '../layers';
+import { TERRAIN } from '../layers';
 import { coarseTerrainShare } from '../terrain';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -28,7 +28,7 @@ export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Bal
     run(world: WorldState) {
       // Buffer se alokuje uvnitř: systém tak nedrží stav mezi světy a dva
       // souběžné světy si nemůžou přepsat zdroje.
-      const sources = new Float32Array(COARSE_CELLS);
+      const sources = new Float32Array(coarseCellsOf(world.size));
       let population = 0;
       let wasteCapacity = 0;
       let sewageCapacity = 0;
@@ -49,9 +49,9 @@ export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Bal
         if (emitted <= 0) continue;
 
         const [width, depth] = definition.footprint;
-        const cornerX = Math.min(building.x + width - 1, MAP_SIZE - 1);
-        const cornerY = Math.min(building.y + depth - 1, MAP_SIZE - 1);
-        const at = coarseIndex(cornerX, cornerY);
+        const cornerX = Math.min(building.x + width - 1, world.size - 1);
+        const cornerY = Math.min(building.y + depth - 1, world.size - 1);
+        const at = coarseIndex(cornerX, cornerY, world.size);
         sources[at] = (sources[at] ?? 0) + emitted;
       }
 

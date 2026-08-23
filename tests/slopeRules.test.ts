@@ -2,14 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { checkFootprint } from '@/sim/buildings';
-import { buildRoad, bulldoze, estimatePlacement, placeDefinition } from '@/sim/commands';
-import { applyCornerChanges, cornerIndex, isFlatTile, planCornerHeight } from '@/sim/heights';
+import {
+  buildRoad,
+  bulldoze,
+  estimatePlacement,
+  placeDefinition,
+} from '@/sim/commands';
+import {
+  applyCornerChanges,
+  cornerIndex,
+  isFlatTile,
+  planCornerHeight,
+} from '@/sim/heights';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { createTrafficSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { assumeWatered } from './support/water';
+import { MAP_SIZE, CORNER_SIZE } from './support/grid';
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -96,11 +107,11 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
     const w = world();
     raise(w, 70, 70, 4);
     // Voda hned vedle parcely, takže sdílí rohy.
-    w.layers.terrain[index(71, 71)] = TERRAIN.water;
-    w.cornerHeight[cornerIndex(71, 71)] = 0;
-    w.cornerHeight[cornerIndex(72, 71)] = 0;
-    w.cornerHeight[cornerIndex(71, 72)] = 0;
-    w.cornerHeight[cornerIndex(72, 72)] = 0;
+    w.layers.terrain[index(71, 71, MAP_SIZE)] = TERRAIN.water;
+    w.cornerHeight[cornerIndex(71, 71, CORNER_SIZE)] = 0;
+    w.cornerHeight[cornerIndex(72, 71, CORNER_SIZE)] = 0;
+    w.cornerHeight[cornerIndex(71, 72, CORNER_SIZE)] = 0;
+    w.cornerHeight[cornerIndex(72, 72, CORNER_SIZE)] = 0;
 
     const result = placeDefinition(w, content, 'vanilla:park_small', 70, 70, VANILLA_BALANCE);
 
@@ -113,7 +124,10 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
       [71, 72],
       [72, 72],
     ] as const) {
-      expect(w.cornerHeight[cornerIndex(cx, cy)], `${cx},${cy}`).toBe(0);
+      expect(
+        w.cornerHeight[cornerIndex(cx, cy, CORNER_SIZE)],
+        `${cx},${cy}`,
+      ).toBe(0);
     }
   });
 
@@ -122,7 +136,7 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
     const content = await vanilla();
     const w = world();
     raise(w, 60, 60, 5);
-    w.layers.buildingId[index(61, 60)] = 3;
+    w.layers.buildingId[index(61, 60, MAP_SIZE)] = 3;
 
     const result = placeDefinition(w, content, 'vanilla:park_small', 60, 60, VANILLA_BALANCE);
 
@@ -135,8 +149,8 @@ describe('silnice na svahu', () => {
   it('rovnoměrný svah vozovka snese', () => {
     const w = world();
     // Svah stoupající na východ: obě východní rohy o patro výš.
-    w.cornerHeight[cornerIndex(11, 10)] = 1;
-    w.cornerHeight[cornerIndex(11, 11)] = 1;
+    w.cornerHeight[cornerIndex(11, 10, CORNER_SIZE)] = 1;
+    w.cornerHeight[cornerIndex(11, 11, CORNER_SIZE)] = 1;
 
     expect(buildRoad(w, 10, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
   });
@@ -144,8 +158,8 @@ describe('silnice na svahu', () => {
   it('zkroucená dlaždice ji nepobere', () => {
     // Sedlo: protilehlé rohy nahoře. Po takové dlaždici se nedá jet po rovině.
     const w = world();
-    w.cornerHeight[cornerIndex(20, 20)] = 1;
-    w.cornerHeight[cornerIndex(21, 21)] = 1;
+    w.cornerHeight[cornerIndex(20, 20, CORNER_SIZE)] = 1;
+    w.cornerHeight[cornerIndex(21, 21, CORNER_SIZE)] = 1;
 
     const result = buildRoad(w, 20, 20, ROAD.street, VANILLA_BALANCE);
 
@@ -157,9 +171,12 @@ describe('silnice na svahu', () => {
 describe('mosty (§7 fáze 3)', () => {
   /** Řeka svisle přes mapu a silnice na obou březích. */
   function riverbanks(w: WorldState): void {
-    for (let y = 0; y < w.size; y++) w.layers.terrain[index(30, y)] = TERRAIN.water;
-    for (let x = 25; x <= 29; x++) buildRoad(w, x, 40, ROAD.street, VANILLA_BALANCE);
-    for (let x = 31; x <= 35; x++) buildRoad(w, x, 40, ROAD.street, VANILLA_BALANCE);
+    for (let y = 0; y < w.size; y++)
+      w.layers.terrain[index(30, y, MAP_SIZE)] = TERRAIN.water;
+    for (let x = 25; x <= 29; x++)
+      buildRoad(w, x, 40, ROAD.street, VANILLA_BALANCE);
+    for (let x = 31; x <= 35; x++)
+      buildRoad(w, x, 40, ROAD.street, VANILLA_BALANCE);
   }
 
   it('most se staví z břehu a stojí vlastní cenu', () => {
@@ -169,8 +186,8 @@ describe('mosty (§7 fáze 3)', () => {
 
     expect(buildRoad(w, 30, 40, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
 
-    expect(w.layers.road[index(30, 40)]).toBe(ROAD.street);
-    expect(w.layers.terrain[index(30, 40)]).toBe(TERRAIN.water); // pořád voda pod ním
+    expect(w.layers.road[index(30, 40, MAP_SIZE)]).toBe(ROAD.street);
+    expect(w.layers.terrain[index(30, 40, MAP_SIZE)]).toBe(TERRAIN.water); // pořád voda pod ním
     expect(before - w.economy.funds).toBe(VANILLA_BALANCE.traffic.bridgeCost);
     expect(VANILLA_BALANCE.traffic.bridgeCost).toBeGreaterThan(
       VANILLA_BALANCE.traffic.roadTypes[0]?.cost ?? 0,
@@ -179,7 +196,8 @@ describe('mosty (§7 fáze 3)', () => {
 
   it('uprostřed vody most nezačne', () => {
     const w = world();
-    for (let y = 0; y < w.size; y++) w.layers.terrain[index(30, y)] = TERRAIN.water;
+    for (let y = 0; y < w.size; y++)
+      w.layers.terrain[index(30, y, MAP_SIZE)] = TERRAIN.water;
 
     const result = buildRoad(w, 30, 40, ROAD.street, VANILLA_BALANCE);
 
@@ -194,8 +212,8 @@ describe('mosty (§7 fáze 3)', () => {
 
     expect(bulldoze(w, 30, 40, VANILLA_BALANCE).ok).toBe(true);
 
-    expect(w.layers.road[index(30, 40)]).toBe(ROAD.none);
-    expect(w.layers.terrain[index(30, 40)]).toBe(TERRAIN.water);
+    expect(w.layers.road[index(30, 40, MAP_SIZE)]).toBe(ROAD.none);
+    expect(w.layers.terrain[index(30, 40, MAP_SIZE)]).toBe(TERRAIN.water);
   });
 
   it('doprava po mostě projde (§12 kritérium 15)', async () => {

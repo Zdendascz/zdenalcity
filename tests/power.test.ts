@@ -75,9 +75,9 @@ describe('flood fill elektřiny', () => {
 
     tickPower(world, catalogue);
 
-    expect(world.layers.power[index(5, 11)]).toBe(1); // vlastní dlaždice
-    expect(world.layers.power[index(5, 10)]).toBe(1); // připojená silnice
-    expect(world.layers.power[index(25, 10)]).toBe(1); // druhý konec silnice
+    expect(world.layers.power[index(5, 11, world.size)]).toBe(1); // vlastní dlaždice
+    expect(world.layers.power[index(5, 10, world.size)]).toBe(1); // připojená silnice
+    expect(world.layers.power[index(25, 10, world.size)]).toBe(1); // druhý konec silnice
   });
 
   it('prázdná dlaždice proud nevede', () => {
@@ -87,8 +87,8 @@ describe('flood fill elektřiny', () => {
 
     tickPower(world, catalogue);
 
-    expect(world.layers.power[index(15, 20)]).toBe(0);
-    expect(world.layers.power[index(15, 11)]).toBe(0);
+    expect(world.layers.power[index(15, 20, world.size)]).toBe(0);
+    expect(world.layers.power[index(15, 11, world.size)]).toBe(0);
   });
 
   it('odpojená větev silnice zůstane bez proudu', () => {
@@ -101,8 +101,8 @@ describe('flood fill elektřiny', () => {
 
     tickPower(world, catalogue);
 
-    expect(world.layers.power[index(40, 40)]).toBe(0);
-    expect(world.layers.power[index(41, 40)]).toBe(0);
+    expect(world.layers.power[index(40, 40, world.size)]).toBe(0);
+    expect(world.layers.power[index(41, 40, world.size)]).toBe(0);
   });
 
   it('přerušení silnice odřízne zbytek sítě', () => {
@@ -110,13 +110,13 @@ describe('flood fill elektřiny', () => {
     const world = withRoad();
     placeDefinition(world, catalogue, 'test:plant', 5, 11);
     tickPower(world, catalogue);
-    expect(world.layers.power[index(25, 10)]).toBe(1);
+    expect(world.layers.power[index(25, 10, world.size)]).toBe(1);
 
     bulldoze(world, 15, 10);
     tickPower(world, catalogue);
 
-    expect(world.layers.power[index(14, 10)]).toBe(1);
-    expect(world.layers.power[index(25, 10)]).toBe(0);
+    expect(world.layers.power[index(14, 10, world.size)]).toBe(1);
+    expect(world.layers.power[index(25, 10, world.size)]).toBe(0);
   });
 
   it('bez elektrárny není proud nikde', () => {
@@ -125,7 +125,7 @@ describe('flood fill elektřiny', () => {
 
     tickPower(world, catalogue);
 
-    expect(world.layers.power[index(5, 10)]).toBe(0);
+    expect(world.layers.power[index(5, 10, world.size)]).toBe(0);
   });
 });
 

@@ -1,6 +1,6 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
-import { index, MAP_SIZE } from '../layers';
+import { index } from '../layers';
 import { markBuildingDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -77,7 +77,12 @@ function recompute(world: WorldState, catalogue: BuildingCatalogue, balance: Bal
 
     production += produced;
     sources.push({
-      tiles: footprintTiles(building.x, building.y, definition.footprint),
+      tiles: footprintTiles(
+        world.size,
+        building.x,
+        building.y,
+        definition.footprint,
+      ),
       range,
       produces: produced > 0,
     });
@@ -99,13 +104,19 @@ function markChangedTiles(world: WorldState, before: Uint8Array, after: Uint8Arr
   }
 }
 
-function footprintTiles(x: number, y: number, footprint: readonly [number, number]): number[] {
+function footprintTiles(
+  size: number,
+  x: number,
+  y: number,
+  footprint: readonly [number, number],
+): number[] {
   const tiles: number[] = [];
   for (let dy = 0; dy < footprint[1]; dy++) {
     for (let dx = 0; dx < footprint[0]; dx++) {
       const tx = x + dx;
       const ty = y + dy;
-      if (tx >= 0 && ty >= 0 && tx < MAP_SIZE && ty < MAP_SIZE) tiles.push(index(tx, ty));
+      if (tx >= 0 && ty >= 0 && tx < size && ty < size)
+        tiles.push(index(tx, ty, size));
     }
   }
   return tiles;
@@ -158,7 +169,7 @@ function floodFill(world: WorldState, sources: readonly Source[], supply: Uint8A
         const ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
 
-        const at = index(nx, ny);
+        const at = index(nx, ny, size);
         if (pipe[at] !== 1) continue;
         if (budget - 1 <= (remaining[at] ?? -1)) continue;
 
@@ -255,9 +266,12 @@ function markWateredBuildings(
     if (!building) continue;
 
     const footprint = catalogue.get(building.definitionId)?.footprint ?? [1, 1];
-    const watered = footprintTiles(building.x, building.y, footprint).some(
-      (tile) => world.waterSupply[tile] === 1,
-    );
+    const watered = footprintTiles(
+      world.size,
+      building.x,
+      building.y,
+      footprint,
+    ).some((tile) => world.waterSupply[tile] === 1);
 
     const had = world.watered.has(id);
     if (watered === had) continue;

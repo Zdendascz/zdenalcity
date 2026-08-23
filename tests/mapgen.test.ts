@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { countViolations, MAX_HEIGHT, tileBaseHeight, tileCorners } from '@/sim/heights';
 import { generateTerrain } from '@/sim/mapgen';
-import { index, inBounds, MAP_SIZE, TERRAIN } from '@/sim/layers';
+import { index, inBounds, TERRAIN } from '@/sim/layers';
+import { MAP_SIZE } from './support/grid';
 import { VANILLA_BALANCE } from './support/balance';
 
 /** FNV-1a přes vrstvu terénu — golden hash mapy. */
@@ -56,13 +57,13 @@ function landIsConnected(terrain: Uint8Array, bridgeSpan = 3): boolean {
       let ny = y + dy;
       // Přeskoč souvislý pruh vody, pokud se do mostu vejde.
       let span = 0;
-      while (inBounds(nx, ny) && terrain[index(nx, ny)] === TERRAIN.water && span < bridgeSpan) {
+      while (inBounds(nx, ny, MAP_SIZE) && terrain[index(nx, ny, MAP_SIZE)] === TERRAIN.water && span < bridgeSpan) {
         nx += dx;
         ny += dy;
         span++;
       }
-      if (!inBounds(nx, ny)) continue;
-      const next = index(nx, ny);
+      if (!inBounds(nx, ny, MAP_SIZE)) continue;
+      const next = index(nx, ny, MAP_SIZE);
       if (seen[next] === 1 || terrain[next] === TERRAIN.water) continue;
       seen[next] = 1;
       stack.push(next);
@@ -164,14 +165,14 @@ describe('generátor mapy', () => {
 
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
-        if (terrain[index(x, y)] !== TERRAIN.sand) continue;
+        if (terrain[index(x, y, MAP_SIZE)] !== TERRAIN.sand) continue;
 
         // Písek vzniká pásem od vody, takže někde v okolí voda být musí.
         let waterNear = false;
         for (let dy = -VANILLA_BALANCE.map.beachWidth; dy <= VANILLA_BALANCE.map.beachWidth; dy++) {
           for (let dx = -VANILLA_BALANCE.map.beachWidth; dx <= VANILLA_BALANCE.map.beachWidth; dx++) {
-            if (!inBounds(x + dx, y + dy)) continue;
-            if (terrain[index(x + dx, y + dy)] === TERRAIN.water) waterNear = true;
+            if (!inBounds(x + dx, y + dy, MAP_SIZE)) continue;
+            if (terrain[index(x + dx, y + dy, MAP_SIZE)] === TERRAIN.water) waterNear = true;
           }
         }
         expect(waterNear, `písek na ${x},${y} bez vody v okolí`).toBe(true);
@@ -208,7 +209,7 @@ describe('patra terénu (§7 fáze 3)', () => {
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         const base = tileBaseHeight(cornerHeight, x, y);
-        if (terrain[index(x, y)] === TERRAIN.water) {
+        if (terrain[index(x, y, MAP_SIZE)] === TERRAIN.water) {
           // Moře na kopci by byl vodopád visící ve vzduchu. Kontroluje se
           // **nejvyšší** roh, ne nejnižší: kdyby stačil jeden roh dole, mohla
           // by být hladina nakloněná a nikdo by si toho nevšiml.
@@ -255,7 +256,7 @@ describe('řeky (R7)', () => {
       // řeka viditelně tekla po hřebeni.
       for (let y = 1; y < MAP_SIZE - 1; y++) {
         for (let x = 1; x < MAP_SIZE - 1; x++) {
-          if (terrain[index(x, y)] !== TERRAIN.water) continue;
+          if (terrain[index(x, y, MAP_SIZE)] !== TERRAIN.water) continue;
           const base = tileBaseHeight(cornerHeight, x, y);
           for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
             const neighbour = tileBaseHeight(cornerHeight, x + dx, y + dy);
@@ -293,8 +294,8 @@ describe('řeky (R7)', () => {
         if (bare[tile] === TERRAIN.water) reachesSea = true;
 
         for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
-          if (!inBounds(x + dx, y + dy)) continue;
-          const at = index(x + dx, y + dy);
+          if (!inBounds(x + dx, y + dy, MAP_SIZE)) continue;
+          const at = index(x + dx, y + dy, MAP_SIZE);
           if (seen.has(at) || wet[at] !== TERRAIN.water) continue;
           seen.add(at);
           stack.push(at);
