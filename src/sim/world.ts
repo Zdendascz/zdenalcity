@@ -217,6 +217,44 @@ export interface WorldState {
    * se skutečností.
    */
   happiness: Uint8Array;
+
+  /**
+   * Dlaždice, na kterých stojí silnice (R20 fáze 4).
+   *
+   * Do T45 si každý systém, který silnice potřeboval, prošel celou mapu.
+   * Na 128 × 128 to bylo 16 384 porovnání a nikdo si toho nevšiml; na
+   * 512 × 512 je jich 262 144 a spokojenost sama zabrala 8,9 ms na jeden běh —
+   * půlku rozpočtu šedesáti snímků. Seznam se místo toho **udržuje** při zápisu
+   * do vrstvy.
+   *
+   * **Neukládá se** — dá se kdykoli obnovit průchodem vrstvy (`rebuildTileIndex`)
+   * a uložený by se s ní mohl rozejít. Přesně to dělá načtení savu.
+   */
+  roadTiles: Set<number>;
+
+  /**
+   * Dlaždice s nějakou zónou. Nefiltruje se tu, jestli je na nich volno —
+   * to se pozná až při růstu a měnilo by se to každý tik.
+   */
+  zonedTiles: Set<number>;
+
+  /**
+   * Buňky hrubé mřížky, které mají vodu v sobě nebo vedle sebe.
+   *
+   * Počítá se z terénu, a ten se skoro nemění — přepočítávat to každých
+   * šestnáct tiků průchodem 262 144 dlaždic je marnost. `null` znamená
+   * „přepočítej", nastavuje ho `markTerrainChanged()`.
+   */
+  waterNear: Uint8Array | null;
+
+  /**
+   * Podíly terénu v buňkách hrubé mřížky, podle druhu terénu.
+   *
+   * Stejný důvod jako u `waterNear`: cena půdy si to počítala dvakrát za běh
+   * (les a písek), pokaždé průchodem celé mapy. Prázdná mapa znamená
+   * „přepočítej"; vyprazdňuje ji `markTerrainChanged()`.
+   */
+  terrainShares: Map<number, Float32Array>;
 }
 
 /**
@@ -275,7 +313,57 @@ export function createWorld(
     waterlessStreak: new Map(),
     waterNetworkDirty: false,
     happiness: new Uint8Array(coarseCells).fill(NEUTRAL_HAPPINESS),
+    roadTiles: new Set(),
+    zonedTiles: new Set(),
+    waterNear: null,
+    terrainShares: new Map(),
   };
+}
+
+/**
+ * Zapíše silnici a udrží seznam. **Jediná cesta, jak do vrstvy `road` psát.**
+ *
+ * Kdyby někdo zapsal do vrstvy přímo, seznam by se rozešel s mapou a růst by
+ * si vymýšlel silnice, které nikdo nepostavil. Hlídá to test, který po dlouhém
+ * běhu seznam přepočítá a porovná.
+ */
+export function setRoadTile(world: WorldState, tile: number, type: number): void {
+  world.layers.road[tile] = type;
+  if (type === 0) world.roadTiles.delete(tile);
+  else world.roadTiles.add(tile);
+}
+
+/** Zapíše zónu a udrží seznam. Stejný důvod jako u `setRoadTile`. */
+export function setZoneTile(world: WorldState, tile: number, zone: number): void {
+  world.layers.zone[tile] = zone;
+  if (zone === 0) world.zonedTiles.delete(tile);
+  else world.zonedTiles.add(tile);
+}
+
+/** Terén se změnil — co se z něj počítá, se musí zahodit. */
+export function markTerrainChanged(world: WorldState): void {
+  world.waterNear = null;
+  world.terrainShares.clear();
+}
+
+/**
+ * Postaví seznamy znovu průchodem vrstev.
+ *
+ * Používá to načtení savu — seznamy se neukládají (R10), protože odvozený stav
+ * v savu se dřív nebo později rozejde se skutečností. A používají to testy jako
+ * orákulum: co vyjde odsud, musí sedět s tím, co se udržovalo cestou.
+ */
+export function rebuildTileIndex(world: WorldState): void {
+  world.roadTiles.clear();
+  world.zonedTiles.clear();
+  world.waterNear = null;
+  world.terrainShares.clear();
+
+  const { road, zone } = world.layers;
+  for (let tile = 0; tile < road.length; tile++) {
+    if ((road[tile] ?? 0) !== 0) world.roadTiles.add(tile);
+    if ((zone[tile] ?? 0) !== 0) world.zonedTiles.add(tile);
+  }
 }
 
 /**
@@ -303,6 +391,11 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.waterSupply = new Uint8Array(size * size);
   world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
   world.happiness = new Uint8Array(coarseCellsOf(size)).fill(NEUTRAL_HAPPINESS);
+  // Seznamy patří ke starým vrstvám; nové jsou prázdné.
+  world.roadTiles.clear();
+  world.zonedTiles.clear();
+  world.waterNear = null;
+  world.terrainShares.clear();
   world.dirty.fullRedraw = true;
   world.dirty.coarseChanged = true;
 }

@@ -6,7 +6,7 @@ import type { CoarseLayers } from '@/sim/coarse';
 import type { Layers } from '@/sim/layers';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
-import { NEUTRAL_HAPPINESS, resizeWorld } from '@/sim/world';
+import { NEUTRAL_HAPPINESS, rebuildTileIndex, resizeWorld } from '@/sim/world';
 import type {
   Building,
   DemandState,
@@ -403,6 +403,8 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   resizeWorld(world, size);
 
   unpackLayersInto(save.layers, world.layers, size);
+  // Seznamy silnic a zón se neukládají (R10) — postaví se z načtených vrstev.
+  rebuildTileIndex(world);
 
   // `seed` je readonly, aby ho nikdo nepřepsal omylem. Load je ta jediná
   // legitimní výjimka — ze světa se stává jiné město.

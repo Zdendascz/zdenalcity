@@ -25,8 +25,11 @@ import {
   MIN_TAX_RATE,
   markCoverageDirty,
   markPowerNetworkDirty,
+  markTerrainChanged,
   markTileDirty,
   removeBuilding,
+  setRoadTile,
+  setZoneTile,
 } from './world';
 import type { WorldState } from './world';
 
@@ -129,7 +132,7 @@ export function buildRoad(
   }
   world.economy.funds -= cost;
 
-  world.layers.road[tile] = type;
+  setRoadTile(world, tile, type);
   markRoadNeighbourhoodDirty(world, x, y);
   markPowerNetworkDirty(world); // silnice je vodič
   return OK;
@@ -295,7 +298,7 @@ export function zoneArea(
       }
       if (world.layers.zone[tile] === zone) continue;
 
-      world.layers.zone[tile] = zone;
+      setZoneTile(world, tile, zone);
       markTileDirty(world, tileX, tileY);
       changed++;
     }
@@ -327,14 +330,14 @@ export function bulldoze(
   }
 
   if ((world.layers.road[tile] ?? ROAD.none) !== ROAD.none) {
-    world.layers.road[tile] = ROAD.none;
+    setRoadTile(world, tile, ROAD.none);
     markRoadNeighbourhoodDirty(world, x, y);
     markPowerNetworkDirty(world);
     return OK;
   }
 
   if (world.layers.zone[tile] !== ZONE.none) {
-    world.layers.zone[tile] = ZONE.none;
+    setZoneTile(world, tile, ZONE.none);
     markTileDirty(world, x, y);
     return OK;
   }
@@ -355,6 +358,7 @@ export function bulldoze(
     }
     world.economy.funds -= cost;
     world.layers.terrain[tile] = TERRAIN.grass;
+    markTerrainChanged(world);
     markTileDirty(world, x, y);
     return OK;
   }
@@ -372,6 +376,7 @@ export function bulldoze(
     }
     world.economy.funds -= cost;
     world.layers.terrain[tile] = TERRAIN.grass;
+    markTerrainChanged(world);
     markTileDirty(world, x, y);
     return OK;
   }

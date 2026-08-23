@@ -8,6 +8,7 @@ import { createDefaultSystems } from '@/sim/systems';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import {
   createWorld,
+  rebuildTileIndex,
   tickWorld,
   totalJobs,
   totalPopulation,
@@ -113,6 +114,32 @@ describe('golden: město po 1000 tikách', () => {
       jobs: totalJobs(world.buildings),
       funds: world.economy.funds,
     }).toMatchSnapshot();
+  });
+
+  it('udržované seznamy sedí s vrstvami i po tisíci tikách', async () => {
+    // Seznamy silnic a zón se od T45 udržují při zápisu. Jediné místo, kde se
+    // do vrstvy zapíše mimo `setRoadTile` / `setZoneTile`, je rozejde — a
+    // nepoznalo by se to: růst by prostě přestal vidět kus města.
+    //
+    // Tenhle test je proto nezávislé orákulum: po celém běhu se seznamy
+    // postaví znovu průchodem vrstev a porovnají s tím, co se udržovalo.
+    const content = await vanilla();
+    const world = buildCity(content);
+    const systems = createDefaultSystems(content, content.getBalance());
+
+    for (let tick = 0; tick < TICKS; tick++) {
+      tickWorld(world, systems);
+      assumeWatered(world);
+    }
+
+    const maintainedRoads = [...world.roadTiles].sort((a, b) => a - b);
+    const maintainedZones = [...world.zonedTiles].sort((a, b) => a - b);
+    expect(maintainedRoads.length).toBeGreaterThan(0);
+    expect(maintainedZones.length).toBeGreaterThan(0);
+
+    rebuildTileIndex(world);
+    expect([...world.roadTiles].sort((a, b) => a - b)).toEqual(maintainedRoads);
+    expect([...world.zonedTiles].sort((a, b) => a - b)).toEqual(maintainedZones);
   });
 
   it('dva běhy téhož seedu dají identické město', async () => {

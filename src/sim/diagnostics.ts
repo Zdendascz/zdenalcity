@@ -35,14 +35,31 @@ export interface LandValueContext {
   sand: Float32Array;
   /** Průměrné vytížení silnic v buňce, 0 = volno, 1 = na kapacitě (§5 fáze 3). */
   congestion: Float32Array;
+  /**
+   * Třídy služeb, které do ceny půdy mluví: jméno, mapa pokrytí a váha.
+   * Setříděné, aby rozpis v panelu neposkakoval podle pořadí v mapě.
+   */
+  services: [string, Readonly<Uint8Array>, number][];
 }
 
 export function landValueContext(world: WorldState, balance: Balance): LandValueContext {
+  // Pevné pořadí tříd, ať rozpis neposkakuje podle historie vkládání do mapy.
+  // Počítá se **jednou za běh**, ne pro každou buňku: kopírovat a třídit klíče
+  // šestnáctkrát tisíckrát bylo znát víc než celý zbytek vzorce.
+  const services: [string, Readonly<Uint8Array>, number][] = [];
+  for (const serviceClass of [...world.coverage.keys()].sort()) {
+    const weight = balance.landValue.weights[serviceClass];
+    const coverage = world.coverage.get(serviceClass);
+    if (weight === undefined || !coverage) continue;
+    services.push([serviceClass, coverage, weight]);
+  }
+
   return {
     water: waterProximity(world),
     forest: coarseTerrainShare(world, TERRAIN.forest),
     sand: coarseTerrainShare(world, TERRAIN.sand),
     congestion: coarseCongestion(world, balance),
+    services,
   };
 }
 
@@ -61,21 +78,21 @@ export function coarseCongestion(
   const total = new Float32Array(cells);
   const counts = new Float32Array(cells);
 
-  for (let y = 0; y < world.size; y++) {
-    for (let x = 0; x < world.size; x++) {
-      const tile = index(x, y, world.size);
-      const roadType = world.layers.road[tile] ?? ROAD.none;
-      if (roadType === ROAD.none) continue;
+  // Kolony jsou vlastnost silnic, tak se prochází seznam silnic (R20 fáze 4).
+  // Průchod celou mapou tady byl nejdražší kus spokojenosti: ta se počítá
+  // z kolon a na 512 × 512 stála 8,9 ms na jeden běh.
+  for (const tile of world.roadTiles) {
+    const roadType = world.layers.road[tile] ?? ROAD.none;
+    if (roadType === ROAD.none) continue;
 
-      const capacity = balance.traffic.roadTypes[roadType - 1]?.capacity ?? 0;
-      if (capacity <= 0) continue;
+    const capacity = balance.traffic.roadTypes[roadType - 1]?.capacity ?? 0;
+    if (capacity <= 0) continue;
 
-      const cell = coarseIndex(x, y, world.size);
-      total[cell] =
-        (total[cell] ?? 0) +
-        Math.min(2, (world.trafficLoad[tile] ?? 0) / capacity);
-      counts[cell] = (counts[cell] ?? 0) + 1;
-    }
+    const x = tile % world.size;
+    const y = (tile - x) / world.size;
+    const cell = coarseIndex(x, y, world.size);
+    total[cell] = (total[cell] ?? 0) + Math.min(2, (world.trafficLoad[tile] ?? 0) / capacity);
+    counts[cell] = (counts[cell] ?? 0) + 1;
   }
 
   for (let cell = 0; cell < total.length; cell++) {
@@ -117,11 +134,41 @@ export function explainLandValue(
   cell: number,
   context: LandValueContext,
 ): LandValueExplanation {
+  const terms: LandValueTerm[] = [];
+  return {
+    terms,
+    raw: landValueRaw(world, balance, cell, context, terms),
+    current: world.coarse.landValue[cell] ?? 0,
+  };
+}
+
+/**
+ * Surová cena půdy v jedné buňce. **Jediný vzorec v celé hře.**
+ *
+ * `collect` je volitelný sběrač sčítanců pro panel parcely. Když je `null`,
+ * nevznikne ani jeden objekt — a přesně tak to volá `landValueSystem`, který
+ * tenhle výpočet dělá pro každou buňku hrubé mřížky. Dokud se sčítance
+ * alokovaly vždycky, stálo šestnáct tisíc buněk velké mapy víc než všechno
+ * ostatní dohromady.
+ *
+ * Rozdělit to na „rychlou" a „vysvětlující" verzi by znamenalo dva vzorce a
+ * dřív nebo později dvě různá čísla — jedno pro hru, druhé pro hráče.
+ */
+export function landValueRaw(
+  world: WorldState,
+  balance: Balance,
+  cell: number,
+  context: LandValueContext,
+  collect: LandValueTerm[] | null,
+): number {
   const { base, waterBonus, weights } = balance.landValue;
-  const terms: LandValueTerm[] = [{ source: 'base', input: 1, weight: base, amount: base }];
+
+  let raw = base;
+  collect?.push({ source: 'base', input: 1, weight: base, amount: base });
 
   if (context.water[cell] === 1) {
-    terms.push({ source: 'water', input: 1, weight: waterBonus, amount: waterBonus });
+    raw += waterBonus;
+    collect?.push({ source: 'water', input: 1, weight: waterBonus, amount: waterBonus });
   }
 
   // Kolony cenu půdy srážejí (§5 fáze 3). Vzniká tím záporná zpětná vazba:
@@ -131,7 +178,8 @@ export function explainLandValue(
   if (congestion > 0) {
     const weight = weights['congestion'] ?? 0;
     if (weight !== 0) {
-      terms.push({
+      raw -= congestion * weight;
+      collect?.push({
         source: 'congestion',
         input: congestion,
         weight,
@@ -142,40 +190,56 @@ export function explainLandValue(
 
   // Terén se do ceny půdy počítá podílem buňky, kterou zabírá. Les ji zvedá,
   // dokud stojí — vykácení je tím pádem volba, ne samozřejmost (§2).
-  for (const [source, shares] of [
-    ['forest', context.forest],
-    ['sand', context.sand],
-  ] as const) {
-    const input = shares[cell] ?? 0;
-    const weight = weights[source] ?? 0;
-    if (input === 0 || weight === 0) continue;
-    terms.push({ source, input, weight, amount: input * weight });
-  }
+  //
+  // Rozepsané po jednom, ne smyčkou přes pole dvojic: takové pole by se
+  // alokovalo pro **každou buňku** hrubé mřížky, a to je na velké mapě
+  // šestnáct tisíc zbytečných polí při každém běhu ceny půdy.
+  raw += addShare(collect, 'forest', context.forest[cell] ?? 0, weights['forest'] ?? 0);
+  raw += addShare(collect, 'sand', context.sand[cell] ?? 0, weights['sand'] ?? 0);
 
-  // Pevné pořadí tříd, ať rozpis neposkakuje podle historie vkládání do mapy.
-  for (const serviceClass of [...world.coverage.keys()].sort()) {
-    const weight = weights[serviceClass];
-    if (weight === undefined) continue;
-    const input = world.coverage.get(serviceClass)?.[cell] ?? 0;
+  const services = context.services;
+  for (let i = 0; i < services.length; i++) {
+    const entry = services[i];
+    if (!entry) continue;
+    const input = entry[1][cell] ?? 0;
     if (input === 0) continue;
-    terms.push({ source: serviceClass, input, weight, amount: input * weight });
+    raw += input * entry[2];
+    collect?.push({
+      source: entry[0],
+      input,
+      weight: entry[2],
+      amount: input * entry[2],
+    });
   }
 
-  for (const [source, layer] of [
-    ['pollution', world.coarse.pollution],
-    ['crime', world.coarse.crime],
-  ] as const) {
-    const input = layer[cell] ?? 0;
-    if (input === 0) continue;
-    const weight = weights[source] ?? 0;
-    terms.push({ source, input, weight, amount: -input * weight });
-  }
+  raw -= addPenalty(collect, 'pollution', world.coarse.pollution[cell] ?? 0, weights['pollution'] ?? 0);
+  raw -= addPenalty(collect, 'crime', world.coarse.crime[cell] ?? 0, weights['crime'] ?? 0);
 
-  return {
-    terms,
-    raw: terms.reduce((sum, term) => sum + term.amount, 0),
-    current: world.coarse.landValue[cell] ?? 0,
-  };
+  return raw;
+}
+
+/** Kladný sčítanec. Vrací příspěvek a případně ho zapíše do rozpisu. */
+function addShare(
+  collect: LandValueTerm[] | null,
+  source: string,
+  input: number,
+  weight: number,
+): number {
+  if (input === 0 || weight === 0) return 0;
+  collect?.push({ source, input, weight, amount: input * weight });
+  return input * weight;
+}
+
+/** Záporný sčítanec. Vrací **kladnou** velikost srážky; volající ji odečte. */
+function addPenalty(
+  collect: LandValueTerm[] | null,
+  source: string,
+  input: number,
+  weight: number,
+): number {
+  if (input === 0) return 0;
+  collect?.push({ source, input, weight, amount: -input * weight });
+  return input * weight;
 }
 
 /** Co hráči brání ve stavbě na téhle parcele, nebo co ji naopak žene nahoru. */

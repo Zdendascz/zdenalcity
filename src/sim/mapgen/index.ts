@@ -13,8 +13,9 @@ import {
   sizeOfLayer,
   TERRAIN,
 } from '../layers';
-import type { Layers } from '../layers';
 import { Rng } from '../rng';
+import { markTerrainChanged } from '../world';
+import type { WorldState } from '../world';
 import { createNoiseField, fbm } from './noise';
 
 /**
@@ -123,13 +124,16 @@ export function generateTerrain(
   return { terrain, height, cornerHeight };
 }
 
-/** Zapíše vygenerovaný terén i patra do světa. */
-export function applyGeneratedMap(
-  world: { layers: Layers; cornerHeight: Uint8Array },
-  map: GeneratedMap,
-): void {
+/**
+ * Zapíše vygenerovaný terén i patra do světa.
+ *
+ * Bere celý `WorldState`, protože přepsat terén znamená zahodit i to, co se
+ * z terénu počítá. Dokud byl terén konstantou hry, stačily dvě vrstvy.
+ */
+export function applyGeneratedMap(world: WorldState, map: GeneratedMap): void {
   world.layers.terrain.set(map.terrain);
   world.cornerHeight.set(map.cornerHeight);
+  markTerrainChanged(world);
 }
 
 /**

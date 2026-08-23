@@ -3,7 +3,7 @@ import { checkFootprint, placeBuilding } from '../buildings';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseCellsOf, coarseIndex } from '../coarse';
 import { isFlatTile } from '../heights';
-import { index, ROAD, ZONE } from '../layers';
+import { index, ZONE } from '../layers';
 import { seedDefinitions } from '../levels';
 import { categoryForZone, RCI_CATEGORIES } from '../rci';
 import { checkRequirements, presentDefinitions } from '../requirements';
@@ -143,7 +143,9 @@ function collectCandidates(
   const { zone, buildingId, road } = world.layers;
   const candidates: Candidate[] = [];
 
-  for (let tile = 0; tile < zone.length; tile++) {
+  // Prochází se **zónované dlaždice**, ne celá mapa (R20 fáze 4). Na velké
+  // mapě je zóna zlomek plochy a zbytek nemá růstu co nabídnout.
+  for (const tile of world.zonedTiles) {
     if (buildingId[tile] !== 0 || road[tile] !== 0) continue;
     if (categoryForZone(zone[tile] ?? ZONE.none) !== category) continue;
 
@@ -195,14 +197,15 @@ function pick(candidates: readonly Candidate[], roll: number): Candidate | undef
 export function roadReach(world: WorldState, maxDistance: number): Uint8Array {
   const { road } = world.layers;
   const distance = new Uint8Array(road.length).fill(255);
-  let frontier: number[] = [];
 
-  for (let tile = 0; tile < road.length; tile++) {
-    if ((road[tile] ?? ROAD.none) !== ROAD.none) {
-      distance[tile] = 0;
-      frontier.push(tile);
-    }
+  // Čelo průchodu je rovnou seznam silnic — hledat je průchodem mapy je na
+  // 512 × 512 čtvrt milionu porovnání pro pár tisíc dlaždic (R20 fáze 4).
+  const frontierStart: number[] = [];
+  for (const tile of world.roadTiles) {
+    distance[tile] = 0;
+    frontierStart.push(tile);
   }
+  let frontier: number[] = frontierStart;
 
   for (let step = 1; step <= maxDistance && frontier.length > 0; step++) {
     const next: number[] = [];

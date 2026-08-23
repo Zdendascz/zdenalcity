@@ -13,7 +13,7 @@ import {
   tileCorners,
 } from '@/sim/heights';
 import { index, TERRAIN } from '@/sim/layers';
-import { createWorld } from '@/sim/world';
+import { createWorld, setRoadTile } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { MAP_SIZE, CORNER_SIZE } from './support/grid';
@@ -158,7 +158,7 @@ describe('terraforming — co se nesmí', () => {
   it('silnice se hýbat smí', () => {
     // Zadání to výslovně dovoluje: invariant drží svah v mezích sám.
     const w = world();
-    w.layers.road[index(60, 60, MAP_SIZE)] = 1;
+    setRoadTile(w, index(60, 60, MAP_SIZE), 1);
 
     expect(terraformCorner(w, 60, 60, 2, VANILLA_BALANCE).ok).toBe(true);
   });

@@ -1,6 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { COARSE_FACTOR, coarseInBounds, coarseSizeOf } from '../coarse';
-import { explainLandValue, landValueContext } from '../diagnostics';
+import { landValueContext, landValueRaw } from '../diagnostics';
 import { index, TERRAIN } from '../layers';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -39,8 +39,10 @@ export function createLandValueSystem(balance: Balance): System {
 
       for (let cell = 0; cell < landValue.length; cell++) {
         // Vzorec je jeden a sdílí ho diagnostika parcely (§12) — jinak by hráči
-        // ukazovala rozpis, podle kterého se ve skutečnosti nehraje.
-        const { raw, current } = explainLandValue(world, balance, cell, context);
+        // ukazovala rozpis, podle kterého se ve skutečnosti nehraje. `null`
+        // znamená „sčítance nesbírej"; panel si o ně řekne, systém ne.
+        const raw = landValueRaw(world, balance, cell, context, null);
+        const current = landValue[cell] ?? 0;
         const delta = raw - current;
         const next = current + delta * smoothing;
 
@@ -66,6 +68,15 @@ export function createLandValueSystem(balance: Balance): System {
  * homogenní ještě než se cokoli postaví.
  */
 export function waterProximity(world: WorldState): Uint8Array {
+  // Terén se skoro nemění, výsledek proto přežije mezi běhy. Bez keše to byl
+  // průchod 262 144 dlaždicemi každých šestnáct tiků — 5 ms na velké mapě jen
+  // za to, aby se zjistilo, že řeka teče tam co minule (R20 fáze 4).
+  //
+  // Keš sedí **na světě**, ne v modulu: dva světy vedle sebe (a testy jich
+  // dělají spoustu) by si ji jinak přepsaly. Zahazuje ji `markTerrainChanged`.
+  const cached = world.waterNear;
+  if (cached) return cached;
+
   const size = world.size;
   const coarse = coarseSizeOf(size);
   const hasWater = new Uint8Array(coarse * coarse);
@@ -108,5 +119,6 @@ export function waterProximity(world: WorldState): Uint8Array {
     }
   }
 
+  world.waterNear = nearWater;
   return nearWater;
 }

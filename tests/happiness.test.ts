@@ -15,7 +15,7 @@ import {
   averageHappiness,
   happinessDemandFactor,
 } from '@/sim/systems/happiness';
-import { createWorld, NEUTRAL_HAPPINESS, tickWorld } from '@/sim/world';
+import { createWorld, NEUTRAL_HAPPINESS, setRoadTile, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { COARSE_CELLS } from './support/grid';
@@ -188,7 +188,7 @@ describe('spokojenost', () => {
     // jen vazbu kolony → spokojenost.
     for (let x = 64; x < 64 + COARSE_FACTOR; x++) {
       for (let y = 64; y < 64 + COARSE_FACTOR; y++) {
-        ucpané.layers.road[y * ucpané.size + x] = 1;
+        setRoadTile(ucpané, y * ucpané.size + x, 1);
         ucpané.trafficLoad[y * ucpané.size + x] = 10000;
       }
     }

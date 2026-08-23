@@ -179,8 +179,13 @@ export function computeBudget(
 
   // Silnice se neúčtují po dlaždicích, ale jedním řádkem — hráč jich má tisíce
   // a zajímá ho součet, ne kolik stojí každá zvlášť.
+  // Prochází se seznam silnic, ne celá mapa (R20 fáze 4). Rozpočet se počítá
+  // jednou za herní měsíc, ale i tak: na 512 × 512 to byla čtvrt milionu
+  // porovnání pro pár tisíc dlaždic, a rozpočet si o něj řekne i panel
+  // pokaždé, když ho hráč otevře.
   const roads: RoadBudget = { count: 0, upkeep: 0 };
-  for (const value of world.layers.road) {
+  for (const tile of world.roadTiles) {
+    const value = world.layers.road[tile] ?? ROAD.none;
     if (value === ROAD.none) continue;
     roads.count++;
     roads.upkeep += balance.traffic.roadTypes[value - 1]?.upkeep ?? 0;

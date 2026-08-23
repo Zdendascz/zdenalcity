@@ -11,7 +11,7 @@ import {
 } from '@/sim/commands';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { createWaterDecaySystem, createWaterSystem } from '@/sim/systems';
-import { createWorld, tickWorld } from '@/sim/world';
+import { createWorld, setRoadTile, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { MAP_SIZE } from './support/grid';
@@ -225,7 +225,7 @@ describe('podzemní pohled a kladení potrubí (T36)', () => {
     // Obyčejný `bulldoze` bourá to nejvrchnější, takže by v podzemním pohledu
     // sundal budovu nad potrubím. Hráč, který kouká pod zem, míří na trubku.
     const w = world();
-    w.layers.road[index(20, 20, MAP_SIZE)] = ROAD.street;
+    setRoadTile(w, index(20, 20, MAP_SIZE), ROAD.street);
     buildPipe(w, 20, 20, VANILLA_BALANCE);
 
     expect(removePipe(w, 20, 20).ok).toBe(true);

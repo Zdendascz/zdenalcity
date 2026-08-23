@@ -16,6 +16,12 @@ export function coarseTerrainShare(
   world: WorldState,
   terrain: number,
 ): Float32Array {
+  // Výsledek závisí jen na terénu, a ten se skoro nemění. Bez keše to byl
+  // průchod celou mapou pro každý druh terénu při každém běhu ceny půdy —
+  // na 512 × 512 dvakrát 262 144 dlaždic každých šestnáct tiků (R20 fáze 4).
+  const cached = world.terrainShares.get(terrain);
+  if (cached) return cached;
+
   const size = world.size;
   const coarseSize = coarseSizeOf(size);
   const share = new Float32Array(coarseCellsOf(size));
@@ -30,6 +36,7 @@ export function coarseTerrainShare(
     }
   }
 
+  world.terrainShares.set(terrain, share);
   return share;
 }
 

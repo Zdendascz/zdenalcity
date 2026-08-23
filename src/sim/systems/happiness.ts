@@ -53,11 +53,26 @@ export function createHappinessSystem(balance: Balance): System {
         world.economy.taxRates.residential * happiness.tax +
         unemployment * happiness.unemployment;
 
+      // Váhy i mapy pokrytí se rozbalí **jednou**, ne pro každou buňku, a to
+      // do dvou souběžných polí. `Object.entries` uvnitř smyčky alokoval pole
+      // pro každou ze 16 384 buněk velké mapy; procházet místo toho dvojice
+      // přes `for…of` bylo o málo lepší, protože rozbalení dvojice je taky
+      // alokace. Indexovaná smyčka nealokuje nic.
+      const covers: Readonly<Uint8Array>[] = [];
+      const coverWeights: number[] = [];
+      for (const [serviceClass, weight] of Object.entries(happiness.weights)) {
+        const coverage = world.coverage.get(serviceClass);
+        // Třída, kterou město nemá, přispívá nulou — a nemusí se na ni ptát.
+        if (!coverage || weight === 0) continue;
+        covers.push(coverage);
+        coverWeights.push(weight);
+      }
+
       for (let cell = 0; cell < world.happiness.length; cell++) {
         let raw = happiness.base - cityWide;
 
-        for (const [serviceClass, weight] of Object.entries(happiness.weights)) {
-          raw += (world.coverage.get(serviceClass)?.[cell] ?? 0) * weight;
+        for (let i = 0; i < covers.length; i++) {
+          raw += (covers[i]?.[cell] ?? 0) * (coverWeights[i] ?? 0);
         }
 
         raw += (world.coarse.landValue[cell] ?? 0) * happiness.landValue;
