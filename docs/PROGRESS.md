@@ -1850,17 +1850,196 @@ Ověřeno v běžící hře: tažení zóny přes 6×3 vyznačilo 15 polí (zbyt
 nepustil) a během tažení nezměnilo ani jedno; silnice a potrubí totéž;
 průhlednost přepíná krytí 1 ↔ 0,35; `contextmenu` nad HUDem je zrušené.
 
+- [x] T42 — velikost mapy jako běhový údaj
+
+`MAP_SIZE` byla zadrátovaná konstanta v `index()`, `inBounds()` a v alokaci
+každé vrstvy. Teď ji nese `world.size` a předává se do `index(x, y, size)`.
+Parametr je **povinný schválně**: s výchozí hodnotou by šlo zapomenout ho
+předat a mapa 512×512 by potichu četla po 128 dlaždicích.
+
+Kde velikost předat nejde, odvozuje se z délky pole — `sizeOfLayer()`,
+`cornerSideOf()`, difuze. Pole tu mřížku definuje, takže se s ní nemůže
+rozejít, a ušetří to parametr ve stovkách volání.
+
+Save si velikost nese v `meta.grid.size` (pole tam je od verze 2, jen se dosud
+ignorovalo). Načtení jinak velkého města přestaví svět **zevnitř** přes
+`resizeWorld()` — objekt se vyměnit nesmí, renderer i UI na něj drží živý
+pohled. Migrace verzí 1–5 mají 128 natvrdo: popisují minulost, ne současnost.
+
+Ověřeno: `tests/mapSize.test.ts`, 20 případů na hranách 64, 128 a 192 —
+alokace, generátor, růst města u vzdáleného rohu, kolečko uložit → načíst.
+Mutační test 10 z 10.
+
+- [x] T43 — výběr velikosti mapy v dialogu nové hry
+
+Čtyři pevné volby (128, 192, 256, 512), u největší varování. Náhled přešel
+z `fillRect` na `ImageData`: u 16 384 dlaždic byl rozdíl jedno, u 262 144 by
+to byla čtvrt milionu volání při každém přepnutí. Náhled 512×512 se vygeneruje
+za 377 ms, což na kliknutí stačí bez odkládání do pozadí.
+
+Dialog se netestuje — je to DOM a jsdom není závislost. Testuje se, co za
+tlačítky stojí: všechny čtyři velikosti a hratelný poměr souše a vody.
+
+- [x] T44 — uvolňování chunků
+
+Do teď se pekly všechny chunky naráz. Naměřeno na 512×512: 1024 chunků, první
+snímek 1,6 s, halda 573 MB, nejhorší snímek 179 ms.
+
+`update()` teď jen **značí** a nekreslí. Peče se v `cull()`, který dostane
+obdélník obrazovky a upeče, co do něj zasahuje, plus prstenec jednoho chunku
+za okrajem. Co je za obzorem, zahodí geometrii; uzel `Graphics` zůstává,
+protože na něm stojí pořadí kreslení přes `zIndex`.
+
+Obálka chunku počítá s **nejvyšším možným terénem**, ne se skutečným — kopec
+se dá kdykoli vztyčit a přepočítávat obálky při každém hrábnutí do terénu by
+stálo víc než ten kus obrazovky navíc. Chyba tím padá na správnou stranu.
+
+Prstenec má rozpočet dvou chunků na snímek; viditelné chunky rozpočtu
+nepodléhají, odložit je znamená díru v mapě.
+
+Naměřeno po úpravě (512×512, plynulé posouvání): zoom 1,0 medián 0,7 ms /
+p95 6,0 ms / 28 chunků; zoom 0,25 medián 1,1 ms / p95 5,5 ms / 112 chunků.
+První snímek 84 ms, halda 116 MB.
+
+První verze testů brala meze od testovaného kódu — z jedenácti zanesených
+chyb jich devět přežilo. Po přepsání (viditelnost se počítá z promítnutých
+dlaždic) 13 z 13. V běžící hře 2550 kontrol napříč mapou, nula děr.
+
+- [x] T45 — celoplošné průchody nahrazeny udržovanými seznamy
+
+Naměřeno na 512×512, jeden běh systému: spokojenost 8,89 ms, cena půdy
+5,04 ms, rozpočet 4,30 ms, růst 1,65 ms.
+
+Svět nese `roadTiles` a `zonedTiles`, které se udržují při zápisu. Do vrstev
+`road` a `zone` se smí psát **jen** přes `setRoadTile` / `setZoneTile` — kdo
+zapíše přímo, rozejde seznam s mapou a nic nespadne, jen město přestane růst
+tam, o čem hra neví. Seznamy se neukládají (R10) a po načtení savu se postaví
+znovu z vrstev.
+
+Ukázalo se, že větší část času nebyly průchody, ale **alokace na každou buňku
+hrubé mřížky**: `Object.entries` ve smyčce spokojenosti, `[...keys()].sort()`
+v ceně půdy (16 384 setřídění na běh) a pole dvojic uvnitř vzorce. Podíly lesa
+a písku se navíc počítaly dvěma průchody mapou při každém běhu; teď se kešují
+u světa a zahazuje je `markTerrainChanged()`.
+
+Vzorec ceny půdy zůstal **jediný**. `landValueRaw` bere volitelný sběrač
+sčítanců: panel parcely si o rozpis řekne, systém ne a nealokuje nic.
+
+Po úpravě: spokojenost 0,30 ms (30×), cena půdy 0,60 ms (8×), růst 0,10 ms
+(16×), rozpočet pod prahem měření. Znečištění zůstalo na 2,00 ms — je to
+difuze na hrubé mřížce, kterou zadání povoluje. Celý tik: medián 0 ms,
+p95 0,1 ms. Golden snapshot beze změny.
+
+Mutační test 15 z 15. Čtyři existující testy braly silnice zápisem do vrstvy —
+přesně ta chyba, kterou nový invariant hlídá.
+
+**T46 (Web Worker) se nedělá.** Zadání ho podmiňuje měřením a to říká, že
+simulace není úzké hrdlo: 0,49 ms na tik na největší mapě.
+
+- [x] T47 — kostra katastrof: model rizika, plánovač, `effects.ts`, menu
+
+Patnáct katastrof má patnáct různých mechanik, ale kdy udeří, počítá jeden
+vzorec: `min(základ × měřítko × sezóna × faktorTypu, strop typu)`. Prostý
+součin schválně — když hráč hlásí, že mu hoří pořád, dá se to rozebrat na
+čtyři čísla a jedno z nich opravit.
+
+Všech patnáct je v `balance.json` jako **data** (P5). Formule z katalogu se
+zapisují jednotně: měřítko jako `clamp(offset + tvar(metrika/dělitel))`,
+podmínky vzniku jako seznam `{metrika, min}`. Validace odmítne neznámou
+veličinu — překlep v `buildigns` by jinak tiše znamenal katastrofu, která
+nikdy nepřijde.
+
+`src/sim/disasters/`: `shapes.ts` (bod, kruh, pás, globální vzorkování),
+`effects.ts` (třináct společných operací z R13), `indicators.ts` (dvacet
+ukazatelů, všechny 0–1), `risk.ts`, `scheduler.ts`, `registry.ts`.
+
+Dočasné postihy se **neuplatňují v effects.ts**. Zapíšou se do světa a přečte
+si je systém, který tu veličinu vlastní — kdyby je katastrofa psala rovnou do
+vrstvy, první běh systému by je přepsal. Postihy se neskládají: dvě stávky
+nepotlačí hasiče na čtvrtinu, platí ta horší.
+
+Mutační test 28 z 29; poslední přeživší odhalil mrtvý kód (`tiles.sort()` ve
+tvarech — každá větev generuje vzestupně už sama) a šel pryč.
+
+- [x] T48 — oheň: vrstvy, šíření, hašení, průseky, lesní varianta
+
+Jediná katastrofa s plnohodnotným šířením, a proto ta, na které stojí polovina
+zbytku katalogu. Vrstvy `fire`, `fuel`, `fireFlags`; ohňový tik každé dva tiky,
+nezávisle na plánovači.
+
+Každá hořící dlaždice je **závod**: palivo ubývá o jedna, intenzita roste o
+přírůstek a klesá o `základ + coverage[fire] × podíl`. Buď hasiči stihnou
+intenzitu srazit dřív, než dojde palivo, nebo dům shoří. Ověřeno: plné pokrytí
+dům zachrání, pokrytí 40 ne — přidá čtyři body hašení proti šesti přírůstku.
+
+Hořlavost a palivo se berou podle **obsahu dlaždice**, ne podle konkrétní
+budovy (P5). `byClass` je výjimka pro třídy služeb: park hoří desetkrát hůř
+než hasičárna, i když obojí je služba — a právě proto je z parku bariéra.
+
+Silnice, voda, potrubí ani prázdná dlaždice nehoří, takže **průsek funguje**.
+Buldozer navíc hasí. Je to hráčova jediná aktivní obrana.
+
+Lesní varianta: 130/+9/×0,7, jedno ohnisko, vzniká v souvislém lese bez ohledu
+na hasiče, po vyhoření zbude **tráva**. Hájí se od uhašení, ne od vzniku.
+
+Mutační test 26 z 26; první běh chytil jen 18. Vážený los ohniska se ověřoval
+jen tím, že požár vznikne na něčem hořlavém — což platí i při rovnoměrném
+losu. Teď dvě stě losů porovnává krytou a nekrytou půlku ulice.
+
+- [x] T50 — trosky: vrstva, blokování stavby, efekty, úklid
+
+**Vrstva, ne stav budovy** (R15) — trosky zůstanou i tam, kde žádná budova
+nestála. Blokují stavbu budovy, silnice i potrubí; z toho plyne jediná věc,
+kterou po katastrofě hráč musí zaplatit, a tím i rozhodnutí, kterou čtvrť
+obnovit dřív.
+
+Srážejí cenu půdy **vlastním sčítancem**, ne jen oklikou přes kriminalitu:
+hráč to musí vidět v rozpisu parcely. Panel je hlásí dřív než vzdálenost od
+silnice — rada „je to daleko od silnice" by ho poslala stavět cestu tam, kde
+stejně nic nevyroste.
+
+Mutační test 14 z 14; z prvních deseti chycených vyplynulo, že dva testy
+měřily vedle (cena půdy se ověřovala přes celé město, kde ji srazí i
+kriminalita) a dva kusy kódu byly mrtvé.
+
+
 ## Rozpracované
-_(Zbývá T41 — vyhodnocení fáze 3. Je to rozhodovací bod pro autora,
-ne technický úkol.)_
+
+**Fáze 4.** Hotová je celá 4a (T42–T45; T46 odpadl podle měření) a z 4b
+kostra katastrof, oheň a trosky.
+
+Zbývá:
+
+| Úkol | Obsah |
+|---|---|
+| T49 | Záplava — vrstvy, šíření podle výšky, postupné poškození, opadání |
+| T51 | Ničivé: tornádo, zemětřesení, výbuch, průmyslová havárie |
+| T52 | Sociální: stávka, nepokoje, válka gangů, hromadná nehoda |
+| T53 | Síťové a zdravotní: blackout, epidemie, chemická havárie |
+| T54 | Sesuv půdy |
+| T55–T56 | Linky MHD |
+| T57 | Půjčky, dotace, úvěrový rating |
+| T58 | Dluhopisy |
+| T59 | Save verze 6 |
+| T60 | Vyhodnocení fáze 4 |
+
+_(T41 — vyhodnocení fáze 3 — zůstává otevřené. Je to rozhodovací bod pro
+autora, ne technický úkol.)_
 
 ## Backlog
-- [ ] T5 — zóny, růst budov, populace
-- [ ] T6 — elektřina
-- [ ] T7 — RCI poptávka, daně, rozpočet
-- [ ] T8 — save/load, migrace, fixtury
-- [ ] T9 — HUD, toolbar, i18n
-- [ ] T10 — vyhodnocení zábavnosti smyčky (rozhodovací bod, ne technický úkol)
+
+_(Seznam zbývajících úkolů je v sekci **Rozpracované** výš. Tahle sekce byla
+z doby fáze 1 a nesla úkoly T5–T10, které jsou dávno hotové — nechávat je tu
+znamenalo tvrdit, že elektřina ani save neexistují.)_
+
+Mimo zadání fází, otevřené k rozhodnutí:
+
+- **`src/platform/`** — abstrakce nad úložištěm a soubory. Architektura §9 ji
+  předepisuje, žádný úkol ji nezadává. Dokud neexistuje, sahá `ui/` na
+  `localStorage` a `File` přímo.
+- **Kopec před budovou ji nezakryje** — viz Známé problémy.
+- **Z bankrotu není cesta zpátky** — patří k T41, ale T57 (půjčky) by to
+  mohl vyřešit sám.
 
 ## Rozhodnutí učiněná během vývoje
 
@@ -1964,6 +2143,27 @@ ne technický úkol.)_
 | 2026-08-14 | `systems/zoning.ts` nevznikl | Strom v architektuře §11 ho zmiňuje, ale v tabulce systémů §5 nemá řádek — zónování je příkaz, ne tikající systém. Vznikne v T5, pokud se ukáže, že ho potřebuje. |
 
 ## Známé problémy / technický dluh
+
+- **Katalog katastrof si u blackoutu odporuje.** Vzorec `max(0; 0,25 −
+  rezerva) × 24` říká, že blackout je na stropu rizika už při rezervě pod
+  ~21 %. Próza vedle něj tvrdí mírnější náběh („15 % → 1,24"), což odpovídá
+  koeficientu ~2,4; žádný koeficient nedá zároveň obě čísla z prózy. Kód se
+  řídí **vzorcem**, protože ten je normativní. Rozhodnutí patří autorovi — je
+  to jedno číslo v `balance.json`.
+- **Katastrofy se neukládají.** `world.disasters`, vrstvy `fire`, `fuel`,
+  `fireFlags` a `rubble` jsou runtime stav; formát savu je pořád verze 5.
+  Patří to do T59 (save v6) a do té doby se rozehraná pohroma načtením savu
+  ztratí.
+- **Vrstva `flood` neexistuje.** `floodArea()` v `effects.ts` je proto prázdná
+  operace, která vrací nulu. Přidává ji T49; ostatní katastrofy na ni už
+  odkazují, aby volání existovalo a nemuselo se čekat s prázdným `TODO`.
+- **Past na jméno souboru `locale.py`.** Pomocný skript v adresáři, ze kterého
+  se pouští Python, může zastínit modul ze standardní knihovny — Python dává
+  adresář skriptu na začátek cesty k modulům. Konkrétně `locale.py` se
+  importuje z `subprocess` a při každém spuštění jakéhokoli skriptu odtud se
+  spustil a přepsal `content/vanilla/locale/*.json`. Projevilo se to jako
+  „záhadně přeformátované locale soubory" a chvíli se to hledalo. Pomocné
+  skripty nepojmenovávat jako moduly stdlib.
 
 - **Z bankrotu není cesta zpátky.** Daně platí jen obyvatelé a pracovní místa
   v zónách; služby a infrastruktura nevydělávají nic. Město, které utratí vše
