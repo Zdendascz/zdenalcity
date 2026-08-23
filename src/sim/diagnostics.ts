@@ -2,6 +2,7 @@ import type { Balance } from '@/content/balance';
 import { coarseCellsOf, coarseIndex } from './coarse';
 import { index, ROAD, TERRAIN, ZONE } from './layers';
 import { coarseTerrainShare } from './terrain';
+import { floodPerCell } from './disasters/flood';
 import { hasRubble, rubblePerCell } from './disasters/rubble';
 import { categoryForZone } from './rci';
 import type { RciCategory } from './rci';
@@ -43,6 +44,8 @@ export interface LandValueContext {
   services: [string, Readonly<Uint8Array>, number][];
   /** Kolik dlaždic trosek leží v buňce (R15). */
   rubble: Float32Array;
+  /** Podíl buňky pod vodou, 0–1 (§5 fáze 4). */
+  flood: Float32Array;
 }
 
 export function landValueContext(world: WorldState, balance: Balance): LandValueContext {
@@ -64,6 +67,7 @@ export function landValueContext(world: WorldState, balance: Balance): LandValue
     congestion: coarseCongestion(world, balance),
     services,
     rubble: rubblePerCell(world),
+    flood: floodPerCell(world),
   };
 }
 
@@ -225,6 +229,21 @@ export function landValueRaw(
     const amount = Math.min(balance.disasters.rubble.landValuePenalty, rubble * perTile);
     raw -= amount;
     collect?.push({ source: 'rubble', input: rubble, weight: perTile, amount: -amount });
+  }
+
+  // Zaplavená čtvrť je neprodejná, dokud voda neopadne. Sčítanec je dočasný:
+  // jakmile voda zmizí, cena se sama vrátí — na rozdíl od trosek, které musí
+  // hráč uklidit.
+  const flooded = context.flood[cell] ?? 0;
+  if (flooded > 0) {
+    const amount = flooded * balance.disasters.flood.landValuePenalty;
+    raw -= amount;
+    collect?.push({
+      source: 'flood',
+      input: flooded,
+      weight: balance.disasters.flood.landValuePenalty,
+      amount: -amount,
+    });
   }
 
   raw -= addPenalty(collect, 'pollution', world.coarse.pollution[cell] ?? 0, weights['pollution'] ?? 0);

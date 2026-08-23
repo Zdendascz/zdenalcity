@@ -144,6 +144,17 @@ export const UNDERGROUND_ZONE_ALPHA = 0.18;
  */
 export const PIPE_COLOR = 0x67b6e8;
 /**
+ * Zaplavená dlaždice. Modrý závoj, jehož sytost roste s hloubkou — hráč musí
+ * poznat, kde je po kotníky a kde po pás, protože podle toho se rozhoduje,
+ * kterou čtvrť odepsat.
+ */
+export const FLOOD_COLOR = 0x2f6f9e;
+export const FLOOD_MIN_ALPHA = 0.35;
+export const FLOOD_MAX_ALPHA = 0.75;
+/** Nad tuhle hloubku už se závoj nesytí — pár pater by jinak vyšlo neprůhledně. */
+export const FLOOD_FULL_DEPTH = 3;
+
+/**
  * Trosky. Šedivá suť, která musí být poznat od prázdné dlaždice — je to
  * překážka, ne kosmetika, a hráč na ni musí poslat buldozer.
  */

@@ -2,6 +2,7 @@ import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
 import { index, ROAD } from '../layers';
+import { isFlooded } from '../disasters/flood';
 import type { WorldState } from '../world';
 import type { Building } from '../world';
 import type { System } from './index';
@@ -120,6 +121,10 @@ function forEachRoadAround(
       if (tx < 0 || ty < 0 || tx >= world.size || ty >= world.size) continue;
 
       const tile = index(tx, ty, world.size);
+      // Zaplavení se tu **nekontroluje**, a je to schválně. Tahle funkce jen
+      // označuje cíle cest; vozidlo se na zaplavenou dlaždici stejně nikdy
+      // nedostane, protože ji odmítne jak `startTiles`, tak `neighbourRoads`.
+      // Kontrola navíc by byla řádek, který nejde porušit — a tedy ani ověřit.
       if ((world.layers.road[tile] ?? ROAD.none) !== ROAD.none) visit(tile);
     }
   }
@@ -264,7 +269,9 @@ function startTiles(
         if (seen.has(at)) continue;
         seen.add(at);
 
-        if ((world.layers.road[at] ?? ROAD.none) !== ROAD.none) roads.push(at);
+        if ((world.layers.road[at] ?? ROAD.none) !== ROAD.none && !isFlooded(world, at)) {
+          roads.push(at);
+        }
         else next.push(at);
       }
     }
@@ -294,7 +301,9 @@ function neighbourRoads(
 
     const at = index(nx, ny, world.size);
     if (at === from) continue;
-    if ((world.layers.road[at] ?? ROAD.none) !== ROAD.none) roads.push(at);
+    if ((world.layers.road[at] ?? ROAD.none) !== ROAD.none && !isFlooded(world, at)) {
+      roads.push(at);
+    }
   }
 
   return roads;

@@ -9,6 +9,10 @@ import {
   FIRE_COLORS,
   FIRE_MAX_ALPHA,
   FIRE_MIN_ALPHA,
+  FLOOD_COLOR,
+  FLOOD_FULL_DEPTH,
+  FLOOD_MAX_ALPHA,
+  FLOOD_MIN_ALPHA,
   PIPE_COLOR,
   PIPE_DRY_COLOR,
   PIPE_WIDTH,
@@ -330,6 +334,16 @@ export class ChunkRenderer {
     // na hrubé mřížce kreslí `CoarseOverlay` — ty do chunků nepatří.
     if (this.overlay === 'power') {
       this.drawPowerOverlay(graphics, points, tileIndex);
+    }
+
+    // Voda pod trosky i oheň: zaplavená suť je pořád suť pod vodou.
+    const depth = this.world.floodDepth[tileIndex] ?? 0;
+    if ((this.world.flood[tileIndex] ?? 0) > 0 && depth > 0) {
+      const share = Math.min(1, depth / FLOOD_FULL_DEPTH);
+      graphics.poly(points).fill({
+        color: FLOOD_COLOR,
+        alpha: FLOOD_MIN_ALPHA + (FLOOD_MAX_ALPHA - FLOOD_MIN_ALPHA) * share,
+      });
     }
 
     // Trosky pod oheň: hořící suť má být vidět jako oheň, ne jako suť.

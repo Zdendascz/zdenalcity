@@ -58,6 +58,9 @@ export interface ReadonlyWorldView {
   readonly fire: Readonly<Uint8Array>;
   /** Trosky (R15). Renderer je kreslí vždycky — je to překážka, ne diagnostika. */
   readonly rubble: Readonly<Uint8Array>;
+  /** Zbývající doba zaplavení a hloubka (§5 fáze 4). */
+  readonly flood: Readonly<Uint8Array>;
+  readonly floodDepth: Readonly<Uint8Array>;
 }
 
 /**

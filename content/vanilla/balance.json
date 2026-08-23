@@ -142,6 +142,21 @@
       "crimeWeight": 1.5,
       "landValuePenalty": 30
     },
+    "flood": {
+      "waterRise": 1,
+      "bayWeight": 4,
+      "reachMin": 2,
+      "reachMax": 5,
+      "advanceTicksMin": 3,
+      "advanceTicksMax": 6,
+      "durationMin": 10,
+      "durationMax": 25,
+      "drainPerCoverage": 0.04,
+      "damagePerDepth": 20,
+      "pollutionPerTick": 5,
+      "landValuePenalty": 15,
+      "happinessPerLoss": 3
+    },
     "fire": {
       "tickInterval": 2,
       "suppressBase": 4,

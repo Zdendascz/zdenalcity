@@ -152,6 +152,19 @@ describe('katalog katastrof v balancu', () => {
     expect(result.issues.some((i) => i.field === 'disasters.fire.fuel.forest')).toBe(true);
   });
 
+  it('validace odmítne přehozené meze u povodně', () => {
+    // `min` nad `max` znamená prázdný rozsah a `rng.int()` na záporné šířce
+    // vrátí nulu — vlna by se nikdy nepohnula a nic by to nehlásilo.
+    const raw = rawBalance();
+    const disasters = raw['disasters'] as Record<string, unknown>;
+    const flood = disasters['flood'] as Record<string, unknown>;
+    flood['reachMax'] = 1;
+    flood['reachMin'] = 5;
+
+    const result = validateBalance(raw);
+    expect(result.issues.some((i) => i.field === 'disasters.flood.reachMax')).toBe(true);
+  });
+
   it('validace odmítne strop pod základem', () => {
     const raw = rawBalance();
     const fire = disasterType(raw, 'fire');

@@ -1,5 +1,6 @@
 import type { BuildingCatalogue } from '../catalogue';
 import { index } from '../layers';
+import { isFlooded } from '../disasters/flood';
 import { markBuildingDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -73,6 +74,9 @@ function floodFill(world: WorldState, reached: Uint8Array, queue: number[]): voi
     if (reached[tile] !== 0) return;
     // Vodičem je silnice nebo budova. Prázdná dlaždice proud nevede.
     if (road[tile] === 0 && buildingId[tile] === 0) return;
+    // Ani zaplavená (§5 fáze 4). Přerušené sítě bolí víc než pár zbořených
+    // domů — právě proto je povodeň nebezpečná i tam, kde nic nespadne.
+    if (isFlooded(world, tile)) return;
     reached[tile] = 1;
     queue.push(tile);
   };

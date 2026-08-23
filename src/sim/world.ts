@@ -279,8 +279,30 @@ export interface WorldState {
   fuel: Uint8Array;
   /** 1 = lesní požár. Šíří se jinak a po vyhoření zbude tráva, ne trosky. */
   fireFlags: Uint8Array;
-  /** Hloubka zaplavení. Přidává T49. */
-  flood?: Uint8Array;
+  /**
+   * Zbývající doba zaplavení v ticích (§5 fáze 4).
+   *
+   * Ne hloubka — ta je ve `floodDepth`. Voda opadá po tiku a hasiči opadání
+   * zrychlují, takže odpočet musí být **per dlaždici**: čtvrť u hasičárny
+   * vyschne dřív než ta na druhém konci.
+   */
+  flood: Uint8Array;
+  /**
+   * O kolik pater je dlaždice pod hladinou.
+   *
+   * Vlastní vrstva, i když zadání jmenuje jen `flood` a `floodDamage`.
+   * Poškození se počítá z hloubky **každý tik**, takže ji nestačí spočítat při
+   * zaplavení a zapomenout. Odvodit ji zpětně z jedné hladiny by přestalo
+   * platit v okamžiku, kdy zemětřesení spustí druhou záplavu jinde (T51).
+   */
+  floodDepth: Uint8Array;
+  /**
+   * Nasbírané poškození, 0–255. Při 255 je po budově.
+   *
+   * Škoda se **hromadí**, nepůsobí naráz — právě proto rychlé opadnutí
+   * opravdu zachraňuje a hasiči do povodně mluví.
+   */
+  floodDamage: Uint8Array;
   /**
    * Trosky, 0/1 na dlaždici (R15).
    *
@@ -357,6 +379,9 @@ export function createWorld(
     fuel: new Uint8Array(size * size),
     fireFlags: new Uint8Array(size * size),
     rubble: new Uint8Array(size * size),
+    flood: new Uint8Array(size * size),
+    floodDepth: new Uint8Array(size * size),
+    floodDamage: new Uint8Array(size * size),
   };
 }
 
@@ -441,7 +466,9 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.fire = new Uint8Array(size * size);
   world.fuel = new Uint8Array(size * size);
   world.fireFlags = new Uint8Array(size * size);
-  if (world.flood) world.flood = new Uint8Array(size * size);
+  world.flood = new Uint8Array(size * size);
+  world.floodDepth = new Uint8Array(size * size);
+  world.floodDamage = new Uint8Array(size * size);
   world.rubble = new Uint8Array(size * size);
   world.disasters.active.length = 0;
   world.disasters.modifiers.length = 0;

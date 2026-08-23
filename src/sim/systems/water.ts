@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { index } from '../layers';
+import { isFlooded } from '../disasters/flood';
 import { markBuildingDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -171,6 +172,8 @@ function floodFill(world: WorldState, sources: readonly Source[], supply: Uint8A
 
         const at = index(nx, ny, size);
         if (pipe[at] !== 1) continue;
+        // Zaplavené potrubí nevede vodu (§5 fáze 4).
+        if (isFlooded(world, at)) continue;
         if (budget - 1 <= (remaining[at] ?? -1)) continue;
 
         remaining[at] = budget - 1;

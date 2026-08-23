@@ -95,6 +95,49 @@ export interface BurnBalance {
   maxIgnitions: number;
 }
 
+/**
+ * Povodeň (§5 fáze 4).
+ *
+ * Tři fáze: vlna postoupí, chvíli stojí a pak opadá. Škoda se **hromadí**, ne
+ * působí naráz — právě proto rychlé opadnutí opravdu zachraňuje a hasiči,
+ * kteří ho zrychlují, mají do povodně co mluvit.
+ */
+export interface FloodBalance {
+  /**
+   * O kolik pater nad terén u břehu voda stoupne.
+   *
+   * Jednička je tu schválně: hráz o **jednu úroveň** pak vlnu zastaví úplně,
+   * což zadání označuje za platné trvalé řešení. Vyšší číslo by z terraformingu
+   * udělalo sázku, ne obranu.
+   */
+  waterRise: number;
+  /**
+   * Oč je sevřenější břeh pravděpodobnějším ohniskem.
+   *
+   * Váha dlaždice je `1 + počet vodních sousedů × bayWeight`. Rovný břeh má
+   * jednoho vodního souseda, ústí zálivu tři — rozdíl je tím pádem dvojnásobek,
+   * ne pár procent. Podíl vody v okolí, který se nabízel jako první, se mezi
+   * zálivem a rovným břehem liší sotva o desetinu a hráč by to nikdy nepoznal.
+   */
+  bayWeight: number;
+  /** Jak daleko od břehu vlna dosáhne, v dlaždicích. */
+  reachMin: number;
+  reachMax: number;
+  /** Kolik tiků vlna postupuje, než se zastaví. */
+  advanceTicksMin: number;
+  advanceTicksMax: number;
+  /** Jak dlouho voda stojí, než opadne. */
+  durationMin: number;
+  durationMax: number;
+  /** O kolik rychleji opadá voda za každý bod `coverage[fire]`. */
+  drainPerCoverage: number;
+  /** Přírůstek poškození 0–255 za tik a za jedno patro hloubky. */
+  damagePerDepth: number;
+  pollutionPerTick: number;
+  landValuePenalty: number;
+  happinessPerLoss: number;
+}
+
 export interface DisasterBalance {
   baseMonthlyChance: number;
   maxMonthlyChance: number;
@@ -340,6 +383,7 @@ export interface Balance {
      */
     rubble: { clearCost: number; crimeWeight: number; landValuePenalty: number };
     fire: FireBalance;
+    flood: FloodBalance;
     types: Readonly<Record<string, DisasterBalance>>;
   };
 
@@ -587,6 +631,7 @@ export function validateBalance(raw: unknown): {
         ),
       },
       fire: validateFire(issues, disasters),
+      flood: validateFlood(issues, disasters),
       types: disasterTypes,
     },
     economy: {
@@ -1070,5 +1115,94 @@ function validateFire(
     flammability,
     fuel,
     byClass,
+  };
+}
+
+/**
+ * Povodeň z balancu.
+ *
+ * Kontroluje se **tvar a pořadí mezí**: `min` nad `max` by znamenalo prázdný
+ * rozsah a `rng.int()` na záporné šířce vrátí nulu — vlna by se nikdy
+ * nepohnula a nic by to nehlásilo.
+ */
+function validateFlood(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): FloodBalance {
+  const raw = disasters ? asRecord(disasters['flood']) : null;
+  if (!raw) {
+    if (disasters) issues.push({ field: 'disasters.flood', message: 'chybí, nebo není objekt' });
+    return {
+      waterRise: 1,
+      bayWeight: 0,
+      reachMin: 1,
+      reachMax: 1,
+      advanceTicksMin: 1,
+      advanceTicksMax: 1,
+      durationMin: 1,
+      durationMax: 1,
+      drainPerCoverage: 0,
+      damagePerDepth: 0,
+      pollutionPerTick: 0,
+      landValuePenalty: 0,
+      happinessPerLoss: 0,
+    };
+  }
+
+  const range = (minKey: string, maxKey: string, lo: number, hi: number): [number, number] => {
+    const min = num(issues, raw, minKey, `disasters.flood.${minKey}`, lo, hi);
+    const max = num(issues, raw, maxKey, `disasters.flood.${maxKey}`, lo, hi);
+    if (max < min) {
+      issues.push({ field: `disasters.flood.${maxKey}`, message: 'nesmí být pod min' });
+    }
+    return [min, max];
+  };
+
+  const [reachMin, reachMax] = range('reachMin', 'reachMax', 1, 100);
+  const [advanceMin, advanceMax] = range('advanceTicksMin', 'advanceTicksMax', 1, 1000);
+  const [durationMin, durationMax] = range('durationMin', 'durationMax', 1, 1000);
+
+  return {
+    waterRise: num(issues, raw, 'waterRise', 'disasters.flood.waterRise', 1, 15),
+    bayWeight: num(issues, raw, 'bayWeight', 'disasters.flood.bayWeight', 0, 100),
+    reachMin,
+    reachMax,
+    advanceTicksMin: advanceMin,
+    advanceTicksMax: advanceMax,
+    durationMin,
+    durationMax,
+    drainPerCoverage: num(
+      issues,
+      raw,
+      'drainPerCoverage',
+      'disasters.flood.drainPerCoverage',
+      0,
+      10,
+    ),
+    damagePerDepth: num(issues, raw, 'damagePerDepth', 'disasters.flood.damagePerDepth', 0, 255),
+    pollutionPerTick: num(
+      issues,
+      raw,
+      'pollutionPerTick',
+      'disasters.flood.pollutionPerTick',
+      0,
+      255,
+    ),
+    landValuePenalty: num(
+      issues,
+      raw,
+      'landValuePenalty',
+      'disasters.flood.landValuePenalty',
+      0,
+      255,
+    ),
+    happinessPerLoss: num(
+      issues,
+      raw,
+      'happinessPerLoss',
+      'disasters.flood.happinessPerLoss',
+      0,
+      255,
+    ),
   };
 }

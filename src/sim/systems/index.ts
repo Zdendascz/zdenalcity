@@ -16,6 +16,7 @@ import { createTrafficSystem } from './traffic';
 import { createLevelSystem } from './levels';
 import { createDisasterSystem } from '../disasters/scheduler';
 import { createFireSystem } from '../disasters/fire';
+import { createFloodSystem } from '../disasters/flood';
 import { DisasterRegistry } from '../disasters/registry';
 
 export interface System {
@@ -55,6 +56,9 @@ export function createDefaultSystems(
     // i když se zrovna nelosuje. Hned za plánovačem, ať to, co v tomhle tiku
     // vzniklo, začne hořet ještě v něm.
     createFireSystem(catalogue, balance),
+    // Záplava před elektřinou a vodou: zaplavená dlaždice je nevede, takže se
+    // to musí propsat dřív, než obě sítě proběhnou.
+    createFloodSystem(catalogue, balance),
     createPowerSystem(catalogue),
     // Voda hned za elektřinou: růst i chátrání z ní čtou ve stejném tiku.
     createWaterSystem(catalogue, balance),

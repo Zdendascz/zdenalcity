@@ -23,6 +23,7 @@ import { createDefaultSystems } from '@/sim/systems';
 import { DisasterRegistry } from '@/sim/disasters/registry';
 import { startDisaster } from '@/sim/disasters/scheduler';
 import { createFireDisaster, createWildfireDisaster } from '@/sim/disasters/fire';
+import { createFloodDisaster } from '@/sim/disasters/flood';
 import { computeBudget } from '@/sim/systems/economy';
 import { coarseCellsOf } from '@/sim/coarse';
 import { createWorld, NEUTRAL_HAPPINESS } from '@/sim/world';
@@ -356,6 +357,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const disasterRegistry = new DisasterRegistry();
   disasterRegistry.register(createFireDisaster());
   disasterRegistry.register(createWildfireDisaster());
+  disasterRegistry.register(createFloodDisaster());
 
   // Obnovení rozehraného města. Nečitelný autosave se **zahodí a hra začne
   // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,

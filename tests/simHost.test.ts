@@ -118,6 +118,8 @@ describe('fázování systémů', () => {
       // Oheň má vlastní tik a s plánovačem nesouvisí — hoří dál, i když se
       // zrovna nelosuje (§4 fáze 4).
       ['fire', 2, 1],
+      // Záplava před elektřinou a vodou: zaplavená dlaždice je nevede.
+      ['flood', 1, 0],
       ['power', 1, 0],
       // Voda hned za elektřinou, offset 1 kvůli jinému tiku flood fillu.
       ['water', 1, 1],
