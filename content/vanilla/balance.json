@@ -137,6 +137,11 @@
   "disasters": {
     "maxRiskMultiplier": 3,
     "indicators": { "uncoveredBelow": 60, "denseLevel": 4, "ageTicks": 3600 },
+    "rubble": {
+      "clearCost": 25,
+      "crimeWeight": 1.5,
+      "landValuePenalty": 30
+    },
     "fire": {
       "tickInterval": 2,
       "suppressBase": 4,
@@ -151,6 +156,7 @@
         "residential": 0.3,
         "commercial": 0.22,
         "service": 0.18,
+        "utility": 0.18,
         "rubble": 0.1
       },
       "fuel": {
@@ -160,6 +166,7 @@
         "residential": 8,
         "commercial": 10,
         "service": 14,
+        "utility": 14,
         "rubble": 4
       },
       "byClass": {

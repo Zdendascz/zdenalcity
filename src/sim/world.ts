@@ -281,8 +281,15 @@ export interface WorldState {
   fireFlags: Uint8Array;
   /** Hloubka zaplavení. Přidává T49. */
   flood?: Uint8Array;
-  /** Trosky (R15). Přidává T50. */
-  rubble?: Uint8Array;
+  /**
+   * Trosky, 0/1 na dlaždici (R15).
+   *
+   * **Vrstva, ne stav budovy** — schválně: trosky zůstanou i tam, kde žádná
+   * budova nestála, po zničené silnici nebo potrubí. Blokují stavbu, dokud je
+   * hráč nezbourá, a mezitím se chovají jako ruiny z fáze 2: srážejí cenu
+   * půdy a živí kriminalitu.
+   */
+  rubble: Uint8Array;
 }
 
 /**
@@ -349,6 +356,7 @@ export function createWorld(
     fire: new Uint8Array(size * size),
     fuel: new Uint8Array(size * size),
     fireFlags: new Uint8Array(size * size),
+    rubble: new Uint8Array(size * size),
   };
 }
 
@@ -434,7 +442,7 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.fuel = new Uint8Array(size * size);
   world.fireFlags = new Uint8Array(size * size);
   if (world.flood) world.flood = new Uint8Array(size * size);
-  if (world.rubble) world.rubble = new Uint8Array(size * size);
+  world.rubble = new Uint8Array(size * size);
   world.disasters.active.length = 0;
   world.disasters.modifiers.length = 0;
   world.dirty.fullRedraw = true;

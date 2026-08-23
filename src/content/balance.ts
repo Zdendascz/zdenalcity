@@ -334,6 +334,11 @@ export interface Balance {
     /** Strop faktoru typu (R16). Společný všem, jinak by nerozpojoval smyčku. */
     maxRiskMultiplier: number;
     indicators: { uncoveredBelow: number; denseLevel: number; ageTicks: number };
+    /**
+     * Trosky (R15). Chovají se jako opuštěné budovy z fáze 2 — sráží cenu půdy
+     * a živí kriminalitu — a stojí peníze, než je hráč uklidí.
+     */
+    rubble: { clearCost: number; crimeWeight: number; landValuePenalty: number };
     fire: FireBalance;
     types: Readonly<Record<string, DisasterBalance>>;
   };
@@ -553,6 +558,32 @@ export function validateBalance(raw: unknown): {
           'disasters.indicators.ageTicks',
           0,
           1000000,
+        ),
+      },
+      rubble: {
+        clearCost: num(
+          issues,
+          disasters ? asRecord(disasters['rubble']) : null,
+          'clearCost',
+          'disasters.rubble.clearCost',
+          0,
+          100000,
+        ),
+        crimeWeight: num(
+          issues,
+          disasters ? asRecord(disasters['rubble']) : null,
+          'crimeWeight',
+          'disasters.rubble.crimeWeight',
+          0,
+          100,
+        ),
+        landValuePenalty: num(
+          issues,
+          disasters ? asRecord(disasters['rubble']) : null,
+          'landValuePenalty',
+          'disasters.rubble.landValuePenalty',
+          0,
+          255,
         ),
       },
       fire: validateFire(issues, disasters),

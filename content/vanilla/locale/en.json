@@ -271,6 +271,7 @@
   "error.roadDowngrade": "A road cannot be downgraded. Bulldoze it and build again.",
   "error.roadExists": "There is already a road here.",
   "error.roadInTheWay": "A road is in the way.",
+  "error.rubbleInTheWay": "Rubble is in the way — clear it with the bulldozer first.",
   "error.occupied": "The tile is occupied.",
   "error.occupiedFootprint": "It does not fit here. This building needs {width} × {depth} free tiles.",
   "error.nothingToBulldoze": "Nothing to bulldoze here.",

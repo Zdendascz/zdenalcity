@@ -17,6 +17,8 @@ import {
   POWER_OVERLAY_ALPHA,
   ROAD_COLOR,
   ROAD_COLORS,
+  RUBBLE_ALPHA,
+  RUBBLE_COLOR,
   ROAD_WIDTHS,
   shade,
   TERRAIN_COLORS,
@@ -328,6 +330,11 @@ export class ChunkRenderer {
     // na hrubé mřížce kreslí `CoarseOverlay` — ty do chunků nepatří.
     if (this.overlay === 'power') {
       this.drawPowerOverlay(graphics, points, tileIndex);
+    }
+
+    // Trosky pod oheň: hořící suť má být vidět jako oheň, ne jako suť.
+    if ((this.world.rubble[tileIndex] ?? 0) !== 0) {
+      graphics.poly(points).fill({ color: RUBBLE_COLOR, alpha: RUBBLE_ALPHA });
     }
 
     // Oheň úplně nahoru, přes silnici i překryvy. Není to diagnostická vrstva,

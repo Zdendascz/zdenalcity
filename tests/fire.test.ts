@@ -172,6 +172,26 @@ describe('hořlavost dlaždice', () => {
     expect(park.fuel).toBeLessThan(station.fuel);
   });
 
+  it('každá kategorie z obsahu má hořlavost', async () => {
+    // Kategorie, která v tabulce chybí, **tiše nehoří**. Přesně to se stalo
+    // u `utility`: elektrárna ani vodárna nešly zapálit a nic to nehlásilo,
+    // protože `entry()` vrátí nulu, když klíč nenajde. Tenhle test je jediné
+    // místo, kde se taková díra pozná dřív než hraním.
+    const content = await vanilla();
+    const fire = content.getBalance().disasters.fire;
+
+    const categories = new Set<string>();
+    for (const definition of content.getAll('building')) {
+      categories.add(definition.category);
+    }
+    expect(categories.size).toBeGreaterThan(3);
+
+    for (const category of [...categories].sort()) {
+      expect(fire.flammability[category], `hořlavost pro ${category}`).toBeGreaterThan(0);
+      expect(fire.fuel[category], `palivo pro ${category}`).toBeGreaterThan(0);
+    }
+  });
+
   it('každá hořlavost má palivo', () => {
     // Obsah s hořlavostí bez paliva by hořel donekonečna.
     const fire = VANILLA_BALANCE.disasters.fire;

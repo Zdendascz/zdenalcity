@@ -144,6 +144,13 @@ export const UNDERGROUND_ZONE_ALPHA = 0.18;
  */
 export const PIPE_COLOR = 0x67b6e8;
 /**
+ * Trosky. Šedivá suť, která musí být poznat od prázdné dlaždice — je to
+ * překážka, ne kosmetika, a hráč na ni musí poslat buldozer.
+ */
+export const RUBBLE_COLOR = 0x6b6560;
+export const RUBBLE_ALPHA = 0.85;
+
+/**
  * Oheň. Škála od doutnání k plamenům — hráč musí na první pohled poznat, kde
  * hoří nejvíc, protože právě tam se rozhoduje, jestli dům shoří.
  */

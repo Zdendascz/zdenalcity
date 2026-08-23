@@ -41,6 +41,17 @@ export function createCrimeSystem(balance: Balance): System {
 
       // Hustota populace se počítá při stejném průchodu — vlastní vrstva
       // pro ni nevzniká.
+      // Trosky se počítají jako ruina (R15). Není v tom rozdíl: vypálený dům
+      // i hromada suti dělají se čtvrtí totéž, a hráč to má poznat na stejném
+      // ukazateli, ne na dvou.
+      const rubbleWeight = balance.disasters.rubble.crimeWeight;
+      for (let tile = 0; tile < world.rubble.length; tile++) {
+        if ((world.rubble[tile] ?? 0) === 0) continue;
+        const x = tile % world.size;
+        const at = coarseIndex(x, (tile - x) / world.size, world.size);
+        ruins[at] = (ruins[at] ?? 0) + rubbleWeight;
+      }
+
       for (const building of world.buildings.values()) {
         const at = coarseIndex(building.x, building.y, world.size);
         if (building.abandoned) {

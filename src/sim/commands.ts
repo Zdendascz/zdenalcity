@@ -17,6 +17,7 @@ import { categoryForZone } from './rci';
 import { checkRequirements, presentDefinitions } from './requirements';
 import { needsClearing } from './terrain';
 import { extinguishTile } from './disasters/fire';
+import { clearRubble } from './disasters/rubble';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
@@ -103,6 +104,9 @@ export function buildRoad(
 
   const tile = index(x, y, world.size);
   if (world.layers.buildingId[tile] !== 0) return reject('error.occupied');
+  // Trosky blokují i silnici (R15) — právě proto rozbitá čtvrť po tornádu
+  // není jen kulisa, ale opravdová překážka v dopravě.
+  if ((world.rubble[tile] ?? 0) !== 0) return reject('error.rubbleInTheWay');
 
   // Vozovka na vodě je **most** (§7 fáze 3). Staví se jen z břehu dál, aby
   // hráč nemohl položit kus vozovky doprostřed moře.
@@ -342,6 +346,23 @@ export function bulldoze(
     return OK;
   }
 
+  // Trosky leží **na** parcele, zóna je jen značka pod nimi. Kdyby se mazala
+  // zóna dřív, hráč by musel na hromadu suti kliknout dvakrát a poprvé by
+  // navíc nepozorovaně přišel o zónu — nahlásilo se to při hraní.
+  if ((world.rubble[tile] ?? 0) !== 0) {
+    // Úklid trosek stojí peníze. Je to jediné, co po katastrofě hráč **musí**
+    // zaplatit, aby mohl znovu stavět — a proto se to počítá do rozhodnutí,
+    // kterou čtvrť obnovit dřív.
+    const cost = balance?.disasters.rubble.clearCost ?? 0;
+    if (world.economy.funds < cost) {
+      return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+    }
+    world.economy.funds -= cost;
+    clearRubble(world, tile);
+    markTileDirty(world, x, y);
+    return OK;
+  }
+
   if (world.layers.zone[tile] !== ZONE.none) {
     setZoneTile(world, tile, ZONE.none);
     markTileDirty(world, x, y);
@@ -437,6 +458,7 @@ export function buildPipe(
   if (world.layers.terrain[tile] === TERRAIN.water)
     return reject('error.pipeOnWater');
   if (world.layers.pipe[tile] === 1) return reject('error.pipeExists');
+  if ((world.rubble[tile] ?? 0) !== 0) return reject('error.rubbleInTheWay');
 
   const cost = balance?.water.pipeCost ?? 0;
   if (world.economy.funds < cost) {

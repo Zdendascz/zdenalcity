@@ -271,6 +271,7 @@
   "error.roadDowngrade": "Silnici nejde snížit. Zbourej ji a postav znovu.",
   "error.roadExists": "Silnice už tady je.",
   "error.roadInTheWay": "Překáží silnice.",
+  "error.rubbleInTheWay": "Překážejí trosky — nejdřív je ukliď buldozerem.",
   "error.occupied": "Dlaždice je obsazená.",
   "error.occupiedFootprint": "Nevejde se sem. Tahle budova potřebuje volných {width} × {depth} dlaždic.",
   "error.nothingToBulldoze": "Není tu co bourat.",

@@ -6,6 +6,7 @@ import type { System } from '../systems/index';
 import { markTerrainChanged, markTileDirty, removeBuilding } from '../world';
 import type { WorldState } from '../world';
 import type { Disaster, DisasterContext } from './registry';
+import { spawnRubble } from './rubble';
 import { tilesOf } from './shapes';
 import type { ActiveDisaster } from './state';
 
@@ -96,7 +97,7 @@ export function flammableAt(
     }
   }
 
-  if ((world.rubble?.[tile] ?? 0) !== 0) return entry(fire, 'rubble');
+  if ((world.rubble[tile] ?? 0) !== 0) return entry(fire, 'rubble');
   if (terrain === TERRAIN.forest) return entry(fire, 'forest');
 
   // Tráva, písek, skála i mokřad: není co zapálit.
@@ -259,7 +260,6 @@ function burnDown(
   let lost = 0;
 
   for (const tile of tiles) {
-    const wildfire = (world.fireFlags[tile] ?? 0) === 1;
     const buildingId = world.layers.buildingId[tile] ?? 0;
     if (buildingId !== 0) {
       doomed.add(buildingId);
@@ -277,7 +277,9 @@ function burnDown(
       continue;
     }
 
-    if (!wildfire) spawnRubble(world, tile);
+    // Dlaždice bez budovy, která není les, je hořící suť — a ta už trosky
+    // nese. Nic dalšího tu vzniknout nemá: silnice ani potrubí nehoří, takže
+    // trosky po nich nechávají až ničivé katastrofy z T51.
   }
 
   for (const id of [...doomed].sort((a, b) => a - b)) {
@@ -311,21 +313,6 @@ function burnDown(
       source: 0,
     });
   }
-}
-
-/**
- * Trosky na dlaždici.
- *
- * Vrstvu zakládá až T50 i s tím, co trosky dělají — blokují stavbu, srážejí
- * cenu půdy a živí kriminalitu. Do té doby je tohle prázdná operace: zapsat
- * se nemá kam. Oheň s troskami počítá už teď, protože hořlavost trosek je
- * součástí tabulky v katalogu.
- */
-function spawnRubble(world: WorldState, tile: number): void {
-  const rubble = world.rubble;
-  if (!rubble) return;
-  rubble[tile] = 1;
-  markTileAt(world, tile);
 }
 
 function burnSettings(balance: Balance, wildfire: boolean): BurnBalance {

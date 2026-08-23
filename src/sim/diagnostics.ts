@@ -2,6 +2,7 @@ import type { Balance } from '@/content/balance';
 import { coarseCellsOf, coarseIndex } from './coarse';
 import { index, ROAD, TERRAIN, ZONE } from './layers';
 import { coarseTerrainShare } from './terrain';
+import { hasRubble, rubblePerCell } from './disasters/rubble';
 import { categoryForZone } from './rci';
 import type { RciCategory } from './rci';
 import { checkFootprint } from './buildings';
@@ -40,6 +41,8 @@ export interface LandValueContext {
    * Setříděné, aby rozpis v panelu neposkakoval podle pořadí v mapě.
    */
   services: [string, Readonly<Uint8Array>, number][];
+  /** Kolik dlaždic trosek leží v buňce (R15). */
+  rubble: Float32Array;
 }
 
 export function landValueContext(world: WorldState, balance: Balance): LandValueContext {
@@ -60,6 +63,7 @@ export function landValueContext(world: WorldState, balance: Balance): LandValue
     sand: coarseTerrainShare(world, TERRAIN.sand),
     congestion: coarseCongestion(world, balance),
     services,
+    rubble: rubblePerCell(world),
   };
 }
 
@@ -212,6 +216,17 @@ export function landValueRaw(
     });
   }
 
+  // Trosky srážejí cenu půdy stejně jako ruiny (R15). Sčítanec je vlastní, ne
+  // schovaný v kriminalitě: hráč musí v rozpisu vidět, že mu čtvrť táhne dolů
+  // neuklizená suť, jinak by nevěděl, co s tím.
+  const rubble = context.rubble[cell] ?? 0;
+  if (rubble > 0) {
+    const perTile = balance.disasters.rubble.landValuePenalty / 16;
+    const amount = Math.min(balance.disasters.rubble.landValuePenalty, rubble * perTile);
+    raw -= amount;
+    collect?.push({ source: 'rubble', input: rubble, weight: perTile, amount: -amount });
+  }
+
   raw -= addPenalty(collect, 'pollution', world.coarse.pollution[cell] ?? 0, weights['pollution'] ?? 0);
   raw -= addPenalty(collect, 'crime', world.coarse.crime[cell] ?? 0, weights['crime'] ?? 0);
 
@@ -304,6 +319,11 @@ export function growthBlocker(
   const category = categoryForZone(zone);
   if (category === null) return 'ui.parcel.blocked.noZone';
 
+  // Trosky se hlásí hned za zónou, dřív než dosah silnice: hromada suti je
+  // konkrétní věc, se kterou hráč umí něco udělat, kdežto rada „je to daleko
+  // od silnice" by ho poslala stavět tam, kde stejně nic nevyroste.
+  if (hasRubble(world, tile)) return 'error.rubbleInTheWay';
+
   // Bankrot zastaví růst v celém městě (§9 fáze 2).
   if (world.economy.funds < 0) return 'ui.parcel.blocked.bankrupt';
   if (world.demand[category] <= 0) return 'ui.parcel.blocked.noDemand';
@@ -348,6 +368,7 @@ const BLOCKER_DEPTH: Readonly<Record<string, number>> = {
   'ui.parcel.blocked.noZone': 1,
   'ui.parcel.blocked.noDemand': 2,
   'ui.parcel.blocked.tooFarFromRoad': 3,
+  'error.rubbleInTheWay': 4,
   'error.wrongZone': 4,
   'error.terrainNotAllowed': 5,
   'error.notFlat': 6,

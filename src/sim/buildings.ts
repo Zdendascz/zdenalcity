@@ -69,6 +69,12 @@ export function checkFootprint(
       if (world.layers.road[tile] !== 0) {
         return reject('error.roadInTheWay');
       }
+      // Trosky blokují stavbu, dokud je hráč neuklidí (R15). Je to jediný
+      // důvod, proč po katastrofě není město hned zase stavitelné — a zároveň
+      // to, co dělá z úklidu rozhodnutí, kam dát peníze dřív.
+      if ((world.rubble[tile] ?? 0) !== 0) {
+        return reject('error.rubbleInTheWay');
+      }
       if (world.layers.buildingId[tile] !== 0) {
         // Vlastní klíč, ne `error.occupied`: u víceldlaždicové budovy je
         // podstatné, kolik místa potřebuje, a text s parametry by u jednoduché

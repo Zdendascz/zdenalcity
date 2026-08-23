@@ -56,6 +56,8 @@ export interface ReadonlyWorldView {
    * zapíná — renderer ji kreslí vždycky, protože je to věc na okamžitou reakci.
    */
   readonly fire: Readonly<Uint8Array>;
+  /** Trosky (R15). Renderer je kreslí vždycky — je to překážka, ne diagnostika. */
+  readonly rubble: Readonly<Uint8Array>;
 }
 
 /**
