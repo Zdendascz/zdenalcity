@@ -46,7 +46,7 @@ import type { ToolOption } from '@/ui/tools';
 import { BuildingRenderer } from './buildingRenderer';
 import type { AppearanceLookup } from './buildingRenderer';
 import { createCamera, pan, viewportToWorld, zoomAt } from './camera';
-import { ChunkRenderer } from './chunkRenderer';
+import { ChunkRenderer, viewportFor } from './chunkRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
 import { TrafficOverlay } from './trafficOverlay';
@@ -1229,6 +1229,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     const dirty = host.consumeDirty();
     chunkRenderer.update(dirty);
+    // Peče se až tady a jen to, na co je vidět (R20). Musí to být po
+    // `update()`, aby se změna z tohohle tiku promítla ještě v tomhle snímku.
+    chunkRenderer.cull(
+      viewportFor(camera.x, camera.y, camera.zoom, app.screen.width, app.screen.height),
+    );
     buildingRenderer.update(dirty);
     coarseOverlay.update(dirty.coarseChanged);
     trafficOverlay.update();

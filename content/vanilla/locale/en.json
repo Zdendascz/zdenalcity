@@ -79,7 +79,6 @@
   "building.landfill.desc": "Cheap waste disposal at the cost of heavy local pollution.",
   "building.incinerator.name": "Incinerator",
   "building.incinerator.desc": "Expensive, but handles three times the waste and pollutes less.",
-
   "building.residential_terraces.name": "Terraced housing",
   "building.residential_terraces.desc": "A continuous terrace — more housing on the same footprint.",
   "building.residential_quarter.name": "Residential quarter",
@@ -130,7 +129,6 @@
   "building.park_large.desc": "Lifts land value over a wide area and costs almost nothing.",
   "building.prison.name": "Prison",
   "building.prison.desc": "Cuts crime across the city — and land value everywhere in sight of it.",
-
   "ui.tool.road": "Road",
   "ui.tool.road.street": "Street",
   "ui.tool.road.avenue": "Avenue",
@@ -144,7 +142,6 @@
   "ui.tool.zone.residential": "Residential zone",
   "ui.tool.zone.commercial": "Commercial zone",
   "ui.tool.zone.industrial": "Industrial zone",
-
   "ui.menu.road": "Roads",
   "ui.menu.terrain": "Terrain",
   "ui.menu.zone": "Zones",
@@ -161,7 +158,6 @@
   "ui.menu.transit": "Transit",
   "ui.menu.utility": "Utilities",
   "ui.menu.service": "Services",
-
   "ui.newGame.title": "New city",
   "ui.newGame.cityName": "City name",
   "ui.newGame.defaultCityName": "Newbridge",
@@ -172,7 +168,6 @@
   "ui.newGame.start": "Found the city",
   "ui.newGame.resume": "Continue",
   "ui.newGame.stats": "Land {land} %, generated in {ms} ms.",
-
   "ui.hud.funds": "Funds",
   "ui.hud.population": "Population",
   "ui.hud.happiness": "Happiness",
@@ -184,15 +179,12 @@
   "ui.hud.powered": "Powered",
   "ui.hud.power": "Power",
   "ui.notice.powerShortage": "Not enough power: you produce {produced}, the city needs {needed}. Build another plant.",
-
   "ui.demand.residential": "R",
   "ui.demand.commercial": "C",
   "ui.demand.industrial": "I",
-
   "ui.speed.label": "Speed",
   "ui.speed.pause": "Pause",
   "ui.speed.value": "{speed}×",
-
   "ui.funding.title": "Service funding",
   "ui.service.police": "Police",
   "ui.service.fire": "Fire",
@@ -200,13 +192,11 @@
   "ui.service.education": "Education",
   "ui.service.parks": "Parks",
   "ui.service.transit": "Transit",
-
   "ui.service.culture": "Culture",
   "ui.service.social": "Community",
   "ui.tax.title": "Tax rates",
   "ui.tax.decrease": "Lower the tax rate",
   "ui.tax.increase": "Raise the tax rate",
-
   "ui.save.title": "Save",
   "ui.save.quicksave": "Quick save",
   "ui.save.quickload": "Quick load",
@@ -219,10 +209,8 @@
   "ui.save.noWaterNetwork": "The loaded city has no water network: {count} buildings will decay without water. Build a water works and pipes.",
   "ui.notice.bankrupt": "The treasury is in the red — nothing new will be built until it is back at zero. Demolish what you do not need, or raise taxes.",
   "ui.save.missingContent": "Missing content: {list}",
-
   "ui.cost.spent": "−{amount}",
   "ui.price.withLevelling": "{total} ({levelling} of it for levelling)",
-
   "ui.budget.toggle": "Economy",
   "ui.budget.title": "Economy overview",
   "ui.budget.building": "Building",
@@ -240,7 +228,6 @@
   "ui.budget.formula.tax": "tax: {base} {unit} × {value} × {rate} % = {income}",
   "ui.budget.formula.upkeep": "upkeep: {count} × {each} = {total}",
   "ui.budget.formula.idle": "{count} idle (no power)",
-
   "ui.info.position": "Position",
   "ui.info.footprint": "Footprint",
   "ui.info.level": "Level",
@@ -260,7 +247,6 @@
   "ui.info.abandonedWarning": "This building is abandoned. It earns nothing, costs nothing and drags the area down — it will not go away on its own, you have to bulldoze it.",
   "ui.info.noPowerWarning": "Without power the building is idle: it earns nothing and costs nothing.",
   "ui.info.dryRelayWarning": "Water never reaches this pump station, so it extends nothing. A station is not a source — it must stand on a pipe the water already reached.",
-
   "error.outOfBounds": "Outside the map.",
   "error.water": "You cannot build on water.",
   "error.roadDowngrade": "A road cannot be downgraded. Bulldoze it and build again.",
@@ -293,7 +279,6 @@
   "error.invalidFunding": "Invalid funding level.",
   "error.unknownSpeed": "Unknown speed {speed}.",
   "error.crash": "Runtime error: {message}",
-
   "ui.parcel.title": "Parcel breakdown",
   "ui.parcel.road": "Road",
   "ui.parcel.water": "Water",

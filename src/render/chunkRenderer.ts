@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
-import { tileCorners } from '@/sim/heights';
+import { MAX_HEIGHT, tileCorners } from '@/sim/heights';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
@@ -29,11 +29,38 @@ import {
   ZONE_COLOR_BY_VALUE,
   ZONE_OVERLAY_ALPHA,
 } from './palette';
-import { slopeLight, tileQuad } from './projection';
+import { LEVEL_H, slopeLight, TILE_H, TILE_W, tileQuad } from './projection';
 import { roadMask, roadPolygons } from './roads';
 
 /** Chunk = 16×16 dlaždic. Změna jedné dlaždice invaliduje jeden chunk, ne mapu. */
 export const CHUNK_SIZE = 16;
+
+/**
+ * Kolik chunků za okrajem obrazovky se ještě drží upečených.
+ *
+ * Nula by znamenala, že se chunk peče přesně v okamžiku, kdy do něj hráč
+ * najede — a to je vidět jako záblesk prázdna. Jeden prstenec navíc stačí:
+ * při běžném posunu se stihne upéct dřív, než se doroluje.
+ */
+export const CHUNK_MARGIN = 1;
+
+/**
+ * Kolik chunků z prstence se smí upéct v jednom snímku.
+ *
+ * Prstenec je zásoba dopředu, ne to, na co hráč kouká — nemá důvod vzniknout
+ * naráz. Bez rozpočtu vyskočil při plynulém posouvání nad 512 × 512 p95 na
+ * 19,5 ms, tedy nad rozpočet šedesáti snímků. Viditelné chunky rozpočtu
+ * **nepodléhají**: odložit je znamená díru v mapě.
+ */
+export const RING_BUDGET = 2;
+
+/** Obdélník v projekčních souřadnicích. */
+export interface Viewport {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
 
 /**
  * Který diagnostický pohled je zapnutý. Vždycky nejvýš jeden — dva překryvy
@@ -45,6 +72,16 @@ interface Chunk {
   readonly x0: number;
   readonly y0: number;
   readonly graphics: Graphics;
+  /**
+   * Meze chunku v projekčních souřadnicích. Počítají se jednou v konstruktoru
+   * — terén se sice hýbe, ale jen v rámci `MAX_HEIGHT`, se kterým se tady
+   * počítá rovnou.
+   */
+  readonly bounds: Viewport;
+  /** Má chunk nakreslenou geometrii? Uvolněný chunk je prázdný `Graphics`. */
+  baked: boolean;
+  /** Změnilo se v něm něco od posledního upečení? */
+  stale: boolean;
 }
 
 /**
@@ -64,6 +101,17 @@ export class ChunkRenderer {
   private readonly chunks: Chunk[] = [];
   private readonly container: Container;
   private overlay: OverlayMode = 'none';
+  /**
+   * Chunky upečené právě teď. Sleduje se to kvůli měření — bez čísla by
+   * nešlo poznat, jestli uvolňování vůbec funguje.
+   */
+  private bakedCount = 0;
+  /**
+   * Kolik pečení proběhlo celkem. Monotónní — na rozdíl od `bakedCount` se
+   * nesnižuje. Bez toho nejde poznat rozdíl mezi „nepřekreslilo se to" a
+   * „překreslilo se to a vyšlo to stejně".
+   */
+  private bakes = 0;
 
   constructor(world: ReadonlyWorldView, parent: Container) {
     this.world = world;
@@ -87,28 +135,87 @@ export class ChunkRenderer {
         const graphics = new Graphics();
         graphics.zIndex = cx + cy;
         this.container.addChild(graphics);
-        this.chunks.push({ x0: cx * CHUNK_SIZE, y0: cy * CHUNK_SIZE, graphics });
+        const x0 = cx * CHUNK_SIZE;
+        const y0 = cy * CHUNK_SIZE;
+        this.chunks.push({
+          x0,
+          y0,
+          graphics,
+          bounds: chunkBounds(x0, y0),
+          // Čerstvý chunk je prázdný a čeká, jestli na něj bude vidět.
+          baked: false,
+          stale: true,
+        });
       }
     }
   }
 
   /**
-   * Přepne overlay. Překreslí všechny chunky, ale je to reakce na stisk
-   * klávesy, ne věc snímku.
+   * Přepne overlay. Zneplatní všechny chunky; upečou se ty, na které je vidět.
    */
   setOverlay(mode: OverlayMode): void {
     if (this.overlay === mode) return;
     this.overlay = mode;
-    this.redrawAll();
+    this.invalidateAll();
   }
 
   getOverlay(): OverlayMode {
     return this.overlay;
   }
 
-  private redrawAll(): void {
-    for (let chunkIndex = 0; chunkIndex < this.chunks.length; chunkIndex++) {
-      this.redraw(chunkIndex);
+  /** Kolik chunků je právě upečených. Slouží měření a testům. */
+  getBakedCount(): number {
+    return this.bakedCount;
+  }
+
+  getChunkCount(): number {
+    return this.chunks.length;
+  }
+
+  /** Kolik chunků se od začátku upeklo. Slouží měření a testům. */
+  getBakeCount(): number {
+    return this.bakes;
+  }
+
+  private invalidateAll(): void {
+    for (const chunk of this.chunks) chunk.stale = true;
+  }
+
+  /**
+   * Upeče, co je vidět, a uvolní, co vidět není (R20 fáze 4).
+   *
+   * Do T44 se pekly všechny chunky naráz. Na mapě 128 × 128 jich bylo 64 a
+   * nikoho to netrápilo; u 512 × 512 je jich 1024, první snímek trval 1,6 s
+   * a halda vyskočila na 573 MB. Naměřeno, ne odhadnuto.
+   *
+   * Uvolněný chunk si drží svůj `Graphics` — zahodí se jen geometrie. Uzel
+   * samotný je pár desítek bajtů a jeho opětovné zakládání by rozbilo pořadí
+   * kreslení, které stojí na `zIndex`.
+   */
+  cull(view: Viewport): void {
+    const ring = expand(view, CHUNK_MARGIN);
+    let budget = RING_BUDGET;
+
+    for (let i = 0; i < this.chunks.length; i++) {
+      const chunk = this.chunks[i];
+      if (!chunk) continue;
+
+      const needsWork = !chunk.baked || chunk.stale;
+
+      if (overlaps(chunk.bounds, view)) {
+        // Na tohle hráč kouká teď. Peče se bez ohledu na rozpočet.
+        if (needsWork) this.redraw(i);
+      } else if (overlaps(chunk.bounds, ring)) {
+        // Zásoba za okrajem. Klidně počká na příští snímek.
+        if (needsWork && budget > 0) {
+          this.redraw(i);
+          budget--;
+        }
+      } else if (chunk.baked) {
+        chunk.graphics.clear();
+        chunk.baked = false;
+        this.bakedCount--;
+      }
     }
   }
 
@@ -117,23 +224,24 @@ export class ChunkRenderer {
     return Math.floor(y / CHUNK_SIZE) * this.chunksPerAxis + Math.floor(x / CHUNK_SIZE);
   }
 
+  /**
+   * Zaznamená, co se změnilo. **Nekreslí** — jen značí.
+   *
+   * Kreslí se až v `cull()`, a to jen to, na co je vidět. Změna v chunku za
+   * okrajem obrazovky se tím neztratí: chunk zůstane označený a upeče se,
+   * jakmile na něj hráč najede.
+   */
   update(dirty: DirtySet): void {
-    const pending = new Set<number>();
-
     if (dirty.fullRedraw) {
-      for (let i = 0; i < this.chunks.length; i++) {
-        pending.add(i);
-      }
-    } else {
-      for (const tileIndex of dirty.tiles) {
-        const x = tileIndex % this.world.size;
-        const y = (tileIndex - x) / this.world.size;
-        pending.add(this.chunkIndexFor(x, y));
-      }
+      this.invalidateAll();
+      return;
     }
 
-    for (const chunkIndex of pending) {
-      this.redraw(chunkIndex);
+    for (const tileIndex of dirty.tiles) {
+      const x = tileIndex % this.world.size;
+      const y = (tileIndex - x) / this.world.size;
+      const chunk = this.chunks[this.chunkIndexFor(x, y)];
+      if (chunk) chunk.stale = true;
     }
   }
 
@@ -143,6 +251,10 @@ export class ChunkRenderer {
 
     const { x0, y0, graphics } = chunk;
     graphics.clear();
+    if (!chunk.baked) this.bakedCount++;
+    this.bakes++;
+    chunk.baked = true;
+    chunk.stale = false;
 
     const last = CHUNK_SIZE - 1;
     // Kreslení vzestupně podle x + y (back-to-front). Na ploché mapě na pořadí
@@ -299,6 +411,74 @@ export class ChunkRenderer {
       chunk.graphics.destroy();
     }
     this.chunks.length = 0;
+    this.bakedCount = 0;
     this.container.destroy();
   }
+}
+
+/**
+ * Obálka chunku v projekčních souřadnicích.
+ *
+ * Počítá se **s nejvyšším možným terénem**, ne se skutečným: kopec se dá
+ * srovnat i vztyčit a přepočítávat obálky při každém hrábnutí do terénu by
+ * bylo dražší než ten kus obrazovky navíc. Obálka je tím pádem konzervativní —
+ * občas se upeče chunk, na který ve skutečnosti vidět není. To je ta správná
+ * strana chyby: opačná by znamenala díru v mapě.
+ */
+function chunkBounds(x0: number, y0: number): Viewport {
+  const n = CHUNK_SIZE;
+  return {
+    // x = (x − y) · TILE_W/2; nejmenší u jihozápadního rohu, největší u severovýchodního
+    minX: (x0 - (y0 + n)) * (TILE_W / 2),
+    maxX: (x0 + n - y0) * (TILE_W / 2),
+    // y = (x + y) · TILE_H/2 − výška · LEVEL_H
+    minY: (x0 + y0) * (TILE_H / 2) - MAX_HEIGHT * LEVEL_H,
+    maxY: (x0 + n + y0 + n) * (TILE_H / 2),
+  };
+}
+
+function overlaps(a: Viewport, b: Viewport): boolean {
+  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+}
+
+/**
+ * Obdélník obrazovky v projekčních souřadnicích.
+ *
+ * Vrací **přesně to, co je vidět** — o prstenec navíc se stará `cull()` sám.
+ * Volitelný `margin` je pro testy a měření; okraj je v chuncích, ne v pixelech,
+ * protože „jeden chunk za hranou" znamená totéž při každém přiblížení, kdežto
+ * „sto pixelů" ne.
+ */
+export function viewportFor(
+  centerX: number,
+  centerY: number,
+  zoom: number,
+  viewWidth: number,
+  viewHeight: number,
+  margin = 0,
+): Viewport {
+  const halfW = viewWidth / 2 / zoom;
+  const halfH = viewHeight / 2 / zoom;
+
+  return expand(
+    {
+      minX: centerX - halfW,
+      maxX: centerX + halfW,
+      minY: centerY - halfH,
+      maxY: centerY + halfH,
+    },
+    margin,
+  );
+}
+
+/** Roztáhne obdélník o `margin` chunků na každou stranu. */
+function expand(view: Viewport, margin: number): Viewport {
+  const padX = margin * CHUNK_SIZE * (TILE_W / 2);
+  const padY = margin * CHUNK_SIZE * (TILE_H / 2);
+  return {
+    minX: view.minX - padX,
+    maxX: view.maxX + padX,
+    minY: view.minY - padY,
+    maxY: view.maxY + padY,
+  };
 }

@@ -79,7 +79,6 @@
   "building.landfill.desc": "Levné zpracování odpadu za cenu silného znečištění okolí.",
   "building.incinerator.name": "Spalovna",
   "building.incinerator.desc": "Drahá, ale zpracuje třikrát víc odpadu a znečišťuje méně.",
-
   "building.residential_terraces.name": "Řadové terasy",
   "building.residential_terraces.desc": "Souvislá řada teras — víc bydlení na stejné ploše.",
   "building.residential_quarter.name": "Obytná čtvrť",
@@ -130,7 +129,6 @@
   "building.park_large.desc": "Zvedá cenu půdy v širokém okolí a nestojí skoro nic.",
   "building.prison.name": "Věznice",
   "building.prison.desc": "Srazí kriminalitu v celém městě — a cenu půdy všude, kam je na ni vidět.",
-
   "ui.tool.road": "Silnice",
   "ui.tool.road.street": "Ulice",
   "ui.tool.road.avenue": "Třída",
@@ -144,7 +142,6 @@
   "ui.tool.zone.residential": "Obytná zóna",
   "ui.tool.zone.commercial": "Komerční zóna",
   "ui.tool.zone.industrial": "Průmyslová zóna",
-
   "ui.menu.road": "Silnice",
   "ui.menu.terrain": "Terén",
   "ui.menu.zone": "Zóny",
@@ -161,7 +158,6 @@
   "ui.menu.transit": "MHD",
   "ui.menu.utility": "Infrastruktura",
   "ui.menu.service": "Služby",
-
   "ui.newGame.title": "Nové město",
   "ui.newGame.cityName": "Jméno města",
   "ui.newGame.defaultCityName": "Nový Brod",
@@ -172,7 +168,6 @@
   "ui.newGame.start": "Založit město",
   "ui.newGame.resume": "Pokračovat",
   "ui.newGame.stats": "Souše {land} %, vygenerováno za {ms} ms.",
-
   "ui.hud.funds": "Kasa",
   "ui.hud.population": "Obyvatel",
   "ui.hud.happiness": "Spokojenost",
@@ -184,15 +179,12 @@
   "ui.hud.powered": "Pod proudem",
   "ui.hud.power": "Proud",
   "ui.notice.powerShortage": "Elektrárny nestačí: vyrábíš {produced}, město potřebuje {needed}. Postav další elektrárnu.",
-
   "ui.demand.residential": "O",
   "ui.demand.commercial": "K",
   "ui.demand.industrial": "P",
-
   "ui.speed.label": "Rychlost",
   "ui.speed.pause": "Pauza",
   "ui.speed.value": "{speed}×",
-
   "ui.funding.title": "Financování služeb",
   "ui.service.police": "Policie",
   "ui.service.fire": "Hasiči",
@@ -200,13 +192,11 @@
   "ui.service.education": "Vzdělání",
   "ui.service.parks": "Parky",
   "ui.service.transit": "MHD",
-
   "ui.service.culture": "Kultura",
   "ui.service.social": "Sounáležitost",
   "ui.tax.title": "Daňové sazby",
   "ui.tax.decrease": "Snížit sazbu",
   "ui.tax.increase": "Zvýšit sazbu",
-
   "ui.save.title": "Uložení",
   "ui.save.quicksave": "Rychlé uložení",
   "ui.save.quickload": "Rychlé načtení",
@@ -219,10 +209,8 @@
   "ui.save.noWaterNetwork": "Načtené město nemá vodovod: {count} budov začne bez vody chátrat. Postav vodárnu a potrubí.",
   "ui.notice.bankrupt": "Kasa je v mínusu — dokud v ní nebude aspoň nula, nic nového nevyroste. Zbourej, co nepotřebuješ, nebo zvyš daně.",
   "ui.save.missingContent": "Chybí obsah: {list}",
-
   "ui.cost.spent": "−{amount}",
   "ui.price.withLevelling": "{total} (z toho {levelling} za srovnání)",
-
   "ui.budget.toggle": "Ekonomika",
   "ui.budget.title": "Ekonomický přehled",
   "ui.budget.building": "Budova",
@@ -240,7 +228,6 @@
   "ui.budget.formula.tax": "daň: {base} {unit} × {value} × {rate} % = {income}",
   "ui.budget.formula.upkeep": "údržba: {count} × {each} = {total}",
   "ui.budget.formula.idle": "{count} mimo provoz (bez proudu)",
-
   "ui.info.position": "Pozice",
   "ui.info.footprint": "Půdorys",
   "ui.info.level": "Úroveň",
@@ -260,7 +247,6 @@
   "ui.info.abandonedWarning": "Budova je opuštěná. Nic nevydělává, nic nestojí a kazí okolí — sama nezmizí, musíš ji zbourat.",
   "ui.info.noPowerWarning": "Bez proudu je budova mimo provoz: nevydělává, ale ani nic nestojí.",
   "ui.info.dryRelayWarning": "K téhle čerpací stanici voda nedoteče, takže síť neprodlužuje. Stanice není zdroj — musí stát na potrubí, kam voda došla.",
-
   "error.outOfBounds": "Mimo mapu.",
   "error.water": "Na vodu se stavět nedá.",
   "error.roadDowngrade": "Silnici nejde snížit. Zbourej ji a postav znovu.",
@@ -293,7 +279,6 @@
   "error.invalidFunding": "Neplatná výše financování.",
   "error.unknownSpeed": "Neznámá rychlost {speed}.",
   "error.crash": "Chyba v běhu hry: {message}",
-
   "ui.parcel.title": "Rozbor parcely",
   "ui.parcel.road": "Silnice",
   "ui.parcel.water": "Voda",
