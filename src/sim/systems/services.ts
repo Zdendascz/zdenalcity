@@ -48,6 +48,18 @@ export function createServiceSystem(catalogue: BuildingCatalogue): System {
         ] as const) {
           if (!source) continue;
 
+          // **Temná služba nepokrývá** (katalog 12, následky blackoutu).
+          //
+          // Obecné pravidlo, ne zvláštnost blackoutu: hasičárna bez proudu
+          // nevyjede, ať je tma z výpadku nebo z toho, že hráč nepostavil dost
+          // elektráren. Bez toho by blackout nedělal vůbec nic — a je to
+          // zároveň důvod, proč během něj skokově roste riziko požáru i války
+          // gangů.
+          //
+          // Obtěžování se to netýká: skládka smrdí i po tmě, a proto se ptáme
+          // jen u `funded`, tedy u služeb.
+          if (funded && !building.powered) continue;
+
           const funding = funded ? serviceFunding(world, source.class) : 1;
           const radius = source.radius * funding;
           const strength = source.strength * funding;

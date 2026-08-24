@@ -18,6 +18,7 @@ import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { assumeWatered } from './support/water';
 import { COARSE_CELLS } from './support/grid';
+import { powerAll } from './support/power';
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -41,7 +42,12 @@ async function city(): Promise<{ world: WorldState; content: ContentRegistry }> 
   }
 
   const systems = createDefaultSystems(content, balance);
-  for (let tick = 0; tick < 400; tick++) tickWorld(world, systems);
+  // Testovací město nemá elektrárnu; temná služba od T53 nepokrývá a rozbor
+  // ceny půdy je o parku, ne o elektřině.
+  for (let tick = 0; tick < 400; tick++) {
+    powerAll(world);
+    tickWorld(world, systems);
+  }
   return { world, content };
 }
 

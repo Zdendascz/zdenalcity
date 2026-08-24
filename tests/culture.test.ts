@@ -7,6 +7,7 @@ import { createLandValueSystem, createServiceSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { MAP_SIZE } from './support/grid';
+import { powerAll } from './support/power';
 
 /**
  * Kultura a sounáležitost (§9 fáze 3, R12).
@@ -22,6 +23,7 @@ async function vanilla(): Promise<ContentRegistry> {
 }
 
 function run(world: WorldState, content: ContentRegistry, runs: number): void {
+  powerAll(world);
   const systems = [createServiceSystem(content), createLandValueSystem(content.getBalance())];
   for (let tick = 0; tick < runs * 16 + 11; tick++) tickWorld(world, systems);
 }

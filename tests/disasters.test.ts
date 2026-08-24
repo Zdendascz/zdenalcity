@@ -37,6 +37,7 @@ import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { MAP_SIZE } from './support/grid';
+import { powerAll } from './support/power';
 
 /**
  * Katastrofy — kostra (T47, §3 fáze 4).
@@ -667,7 +668,11 @@ describe('postihy se propíšou do systémů', () => {
     ).toBe(true);
 
     const systems = createDefaultSystems(content, content.getBalance());
-    for (let tick = 0; tick < 5; tick++) tickWorld(world, systems);
+    // Temná hasičárna nepokrývá (T53) — test je o potlačení, ne o elektřině.
+    for (let tick = 0; tick < 5; tick++) {
+      powerAll(world);
+      tickWorld(world, systems);
+    }
     const cell = coarseCellsOfShape(world, { kind: 'point', x: 20, y: 20 })[0] ?? 0;
     const before = world.coverage.get('fire')?.[cell] ?? 0;
     expect(before).toBeGreaterThan(0);

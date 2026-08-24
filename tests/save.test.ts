@@ -201,6 +201,9 @@ describe('round-trip', () => {
     const world = createWorld(1);
     for (let x = 20; x <= 30; x++) buildRoad(world, x, 40);
     placeDefinition(world, content, 'vanilla:police_small', 22, 41);
+    // Skutečná elektrárna, ne pomocník: temná služba od T53 nepokrývá, a tenhle
+    // test má projít celou cestu uložení → načtení → proud → pokrytí.
+    expect(placeDefinition(world, content, 'vanilla:coal_power_plant', 25, 41).ok).toBe(true);
 
     const systems = createDefaultSystems(content, content.getBalance());
     for (let tick = 0; tick < 40; tick++) tickWorld(world, systems);

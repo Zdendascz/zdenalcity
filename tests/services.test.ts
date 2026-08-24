@@ -14,6 +14,7 @@ import { createWorld, removeBuilding, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { MAP_SIZE } from './support/grid';
+import { powerAll } from './support/power';
 
 const STATION: Definition = {
   id: 'test:station',
@@ -52,6 +53,7 @@ function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
 
 /** Pokrytí se přepočítá jedním tikem, protože systém běží každý tik. */
 function recomputeCoverage(world: WorldState, catalogue: BuildingCatalogue): void {
+  powerAll(world);
   tickWorld(world, [createServiceSystem(catalogue)]);
 }
 
@@ -145,6 +147,7 @@ describe('kriminalita', () => {
   /** Odtiká tolik tiků, aby kriminalita proběhla `runs`krát (interval 16, offset 11). */
   function runCrime(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
     const systems = [createServiceSystem(catalogue), createCrimeSystem(VANILLA_BALANCE)];
+    powerAll(world);
     for (let tick = 0; tick < runs * 16 + 11; tick++) tickWorld(world, systems);
   }
 
@@ -195,6 +198,7 @@ describe('kriminalita', () => {
 describe('vazba na cenu půdy', () => {
   function runAll(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
     const systems = [createServiceSystem(catalogue), createCrimeSystem(VANILLA_BALANCE), createLandValueSystem(VANILLA_BALANCE)];
+    powerAll(world);
     for (let tick = 0; tick < runs * 16 + 11; tick++) tickWorld(world, systems);
   }
 

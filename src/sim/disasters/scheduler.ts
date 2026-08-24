@@ -3,6 +3,8 @@ import type { BuildingCatalogue } from '../catalogue';
 import type { System } from '../systems/index';
 import type { WorldState } from '../world';
 import { clearModifiersOf, expireModifiers } from './effects';
+import { restorePlants } from './blackout';
+import { clearInfection } from './epidemic';
 import { escalatesToRiot } from './riot';
 import { computeIndicators } from './indicators';
 import { DisasterRegistry } from './registry';
@@ -89,6 +91,12 @@ function advanceActive(
       continue;
     }
     clearModifiersOf(world, entry.id);
+    // Blackout a epidemie si drží stav mimo `modifiers` — odpojené elektrárny
+    // a mapu nákazy. Bez tohohle by po nich zbyla elektrárna, která nikdy
+    // nenaběhne, a nákaza, kterou nikdo nešíří ani neléčí.
+    if (entry.kind === 'blackout') restorePlants(world);
+    if (entry.kind === 'epidemic') clearInfection(world);
+
     const disaster = registry.get(entry.kind);
     // Povodeň a lesní požár se hájí od skončení, ne od vzniku.
     if (disaster?.cooldownFromEnd) world.disasters.lastOccurrence.set(entry.kind, world.tick);

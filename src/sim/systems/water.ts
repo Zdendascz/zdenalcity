@@ -1,5 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
+import { coarseIndex } from '../coarse';
+import { strongestModifier } from '../disasters/effects';
 import { index } from '../layers';
 import { isFlooded } from '../disasters/flood';
 import { markBuildingDirty, markTileDirty } from '../world';
@@ -76,6 +78,11 @@ function recompute(world: WorldState, catalogue: BuildingCatalogue, balance: Bal
     const range = water.range ?? balance.water.defaultRange;
     if (produced <= 0 && range <= 0) continue;
 
+    // Zamořená vodárna **nedodává** (katalog 15). Rozvod zůstane, jen do něj
+    // nic neteče — a to je celá druhá polovina chemické havárie: budovy začnou
+    // chátrat dva měsíce po ní, kdy už si na ni nikdo nevzpomene.
+    if (produced > 0 && isContaminated(world, building.x, building.y)) continue;
+
     production += produced;
     sources.push({
       tiles: footprintTiles(
@@ -94,6 +101,13 @@ function recompute(world: WorldState, catalogue: BuildingCatalogue, balance: Bal
 
   markChangedTiles(world, before, supply);
   markWateredBuildings(world, catalogue, ids);
+}
+
+/** Je vodárna v zamořené buňce? */
+function isContaminated(world: WorldState, x: number, y: number): boolean {
+  if (world.disasters.modifiers.length === 0) return false;
+  const cell = coarseIndex(x, y, world.size);
+  return strongestModifier(world, 'contaminateWater', cell, 0, undefined, Math.max) > 0;
 }
 
 /** Označí dlaždice, kterým voda přibyla nebo zmizela. */

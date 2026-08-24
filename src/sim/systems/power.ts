@@ -1,7 +1,7 @@
 import type { BuildingCatalogue } from '../catalogue';
 import { index } from '../layers';
 import { isFlooded } from '../disasters/flood';
-import { markBuildingDirty, markTileDirty } from '../world';
+import { markBuildingDirty, markCoverageDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
@@ -44,6 +44,11 @@ function recompute(world: WorldState, catalogue: BuildingCatalogue): void {
     const definition = catalogue.get(building.definitionId);
     const produced = definition?.power?.production ?? 0;
     if (!definition || produced <= 0) continue;
+    // Odpojená elektrárna nevyrábí **a ani nevede** — blackout je výpadek
+    // zdroje, ne jen chybějící kapacita. Kdyby dál sloužila jako vodič,
+    // vzdálená čtvrť by zůstala „připojená k ničemu" a hráč by na mapě viděl
+    // síť, která nefunguje.
+    if (world.disasters.offlinePlants.has(id)) continue;
 
     production += produced;
 
@@ -136,6 +141,11 @@ function distributeCapacity(
     if (building.powered !== powered) {
       building.powered = powered;
       markBuildingDirty(world, id);
+      // Temná služba nepokrývá (T53), takže změna proudu je změnou pokrytí.
+      // Bez tohohle by blackout zhasnul hasičárnu a mapa pokrytí by o tom
+      // nevěděla až do příští stavby — přesně ten druh tiché chyby, kdy hráč
+      // vidí na mapě dosah, který neexistuje.
+      if (definition?.service) markCoverageDirty(world);
     }
   }
 }

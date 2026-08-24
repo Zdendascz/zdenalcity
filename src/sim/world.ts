@@ -312,6 +312,15 @@ export interface WorldState {
    * půdy a živí kriminalitu.
    */
   rubble: Uint8Array;
+
+  /**
+   * Nakaženost po buňkách hrubé mřížky, 0–1 (T53).
+   *
+   * **Řídká mapa, ne vrstva.** Většina města je vždycky nenakažená; plná vrstva
+   * by bylo pole nul o velikosti mapy, které se každý cyklus prochází celé.
+   * Prázdná mapa znamená „nic se neděje" a stojí to nula.
+   */
+  infection: Map<number, number>;
 }
 
 /**
@@ -379,6 +388,7 @@ export function createWorld(
     fuel: new Uint8Array(size * size),
     fireFlags: new Uint8Array(size * size),
     rubble: new Uint8Array(size * size),
+    infection: new Map(),
     flood: new Uint8Array(size * size),
     floodDepth: new Uint8Array(size * size),
     floodDamage: new Uint8Array(size * size),

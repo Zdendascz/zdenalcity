@@ -2125,18 +2125,83 @@ nastavovala na nulu, takže první tik viděl celou spokojenost čtvrti jako
 všechny budovy uvnitř průchodu všemi budovami — na dvou tisících budov čtyři
 miliony iterací za jediný los. Obojí teď stojí na předpočítaných buňkách.
 
+- [x] T53 — síťové a zdravotní: blackout, epidemie, chemická havárie
+
+Tři katastrofy, které **nerozbijí nic na mapě** a přesto bolí nejvíc.
+
+**Temná služba nepokrývá.** Tohle bylo potřeba udělat dřív než blackout samotný,
+protože bez toho blackout nedělá vůbec nic. Je to obecné pravidlo, ne zvláštnost
+výpadku: hasičárna bez proudu nevyjede, ať je tma z blackoutu nebo z toho, že
+hráč nepostavil dost elektráren. Obtěžování se to netýká — skládka smrdí i po tmě.
+
+Změna má dosah do fází 2 a 3: opravovalo se kvůli ní patnáct testů. Všechny
+stavěly službu ve světě bez elektrárny a měřily něco jiného než elektřinu, takže
+dostaly `powerAll()` z `tests/support/power.ts` nebo skutečnou elektrárnu.
+
+Při tom vyplavala díra, která tam byla už předtím: **změna proudu nepřepočítala
+pokrytí**. Blackout by zhasnul hasičárnu a mapa pokrytí by o tom nevěděla až do
+příští stavby — hráč by na mapě viděl dosah, který neexistuje.
+
+**Blackout** je kaskáda, která se zastaví sama. Odpojí se elektrárna vážená
+kapacitou, každý druhý tik se přepočítá zatížení; nad 1,15 padne další, pod 0,95
+se po třech klidných cyklech začnou vracet. Odpojené elektrárny drží
+`disasters.offlinePlants`, ne příznak na budově — jinak by výpadek přežil konec
+blackoutu a hráč by měl elektrárnu, která nikdy nenaběhne.
+
+**Epidemie** je jediná katastrofa, kterou jde potlačit i po vzniku. Nakaženost je
+**řídká mapa `buňka → 0..1`**, ne vrstva: většina města je vždycky nenakažená.
+Šíří se do sousedství a **skokem po dopravě** — ten skok z ní dělá epidemii,
+protože bez něj by se dala uzavřít pásem parku a hráč by ji řešil geometrií
+místo služeb.
+
+**Chemická havárie** je jediná, kde je nejlepší reakce počkat a pak uklidit.
+Nehoří, jen se rozlévá. Skutečná cena přijde až za rok: mrak srazí cenu půdy
+v celé části města na 360 tiků a spustí snižování úrovní i tam, kde se fyzicky
+nestalo nic. Zamořená vodárna nedodává vodu ještě 60 tiků po úniku.
+
+Validace hlídá dvě věci, které by jinak byly tiché: že prahy blackoutu **nekmitají**
+(zotavení musí být pod přetížením) a že epidemii **zastaví plné zdravotnictví**
+(růst musí být nižší než ústup). Kdyby to někdo v datech obrátil, epidemie by se
+nedala zastavit ničím — a přitom je to jediná, jejíž celý smysl je v tom, že to jde.
+
+Mutační test 31 z 31; první běh chytil 17. Blackout byl testovaný nejhůř —
+vanilla má jedinou elektrárnu s výkonem 24 000, takže ji testovací město nikdy
+nepřetíží a kaskádu nešlo vyzkoušet vůbec. Musely na ni vzniknout vlastní
+definice s malým výkonem; jsou tam kvůli **poměru**, ne kvůli číslům.
+
+Čtyři chyby, které nenašlo čtení kódu:
+
+1. `populace × 0,015` je u malého domu desetina člověka, takže se zaokrouhlovalo
+   na nulu a epidemie v malém městě nezabila nikdy nikoho. Zlomek se teď přenáší
+   mezi cykly i mezi domy. *(našel test)*
+2. `applyEffects` procházel nákazu v pořadí vkládání do `Map`, tedy podle toho,
+   kudy se náhodou šířila. Přenášený zlomek úmrtí se tím řetězil jinak a město by
+   se po loadu chovalo jinak než před uložením. *(našel mutační test)*
+3. Když padly **všechny** elektrárny, výroba byla nula, zatížení nekonečno — a
+   podmínka zotavení už nikdy neplatila. Město s jedinou elektrárnou zůstalo
+   tmavé napořád. Blackout, ze kterého není cesty ven, není katastrofa, ale konec
+   hry. *(našlo hraní)*
+4. Plánovač po skončení havárie uklidil i **propad ceny půdy**, který má doznívat
+   rok. Únik trvá čtyřicet tiků, mrak rok; hráč by uklidil trosky a bylo by po ní.
+   Dozvuk se teď zapisuje bez vlastníka. *(našlo hraní)*
+
+A jedna věc, která se ukázala až při hraní a je to rozhodnutí, ne oprava:
+bez zdravotnictví se nakažený shluk **donekonečna dokrmoval sám** — přenos mezi
+dvěma nakaženými sousedy je řádově silnější než ústup. Po vypršení doby teď
+epidemie jen dohasíná: nešíří se ani neroste. Nemocnice pořád rozhoduje o tom,
+jak zle a jak dlouho, jen už ne o tom, jestli vůbec.
+
 
 ## Rozpracované
 
 **Fáze 4.** Hotová je celá 4a (T42–T45; T46 odpadl podle měření) a z 4b
-kostra katastrof, oheň, trosky, povodeň, všechny čtyři ničivé katastrofy
-a všechny čtyři sociální.
+kostra katastrof a **čtrnáct katastrof z patnácti** — chybí jen sesuv půdy,
+který čeká na 3b.
 
 Zbývá:
 
 | Úkol | Obsah |
 |---|---|
-| T53 | Síťové a zdravotní: blackout, epidemie, chemická havárie |
 | T54 | Sesuv půdy |
 | T55–T56 | Linky MHD |
 | T57 | Půjčky, dotace, úvěrový rating |

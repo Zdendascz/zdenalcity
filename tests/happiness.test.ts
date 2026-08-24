@@ -19,6 +19,7 @@ import { createWorld, NEUTRAL_HAPPINESS, setRoadTile, tickWorld } from '@/sim/wo
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { COARSE_CELLS } from './support/grid';
+import { powerAll } from './support/power';
 
 /**
  * Spokojenost (§9 fáze 3).
@@ -106,6 +107,7 @@ describe('spokojenost', () => {
       const world = createWorld(1);
       for (let i = 0; i < 8; i++) placeBuilding(world, HOUSE, 60 + i, 60);
       if (withPark) placeBuilding(world, PARK, 62, 62);
+      powerAll(world);
       run(world, catalogueOf(HOUSE, PARK), 40);
       return world;
     };

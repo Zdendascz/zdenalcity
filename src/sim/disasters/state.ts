@@ -92,6 +92,16 @@ export interface DisasterState {
    * tomu 262 144 dlaždic velké mapy by bylo dražší než celý zbytek plánovače.
    */
   burning: { normal: number; wildfire: number };
+
+  /**
+   * Elektrárny odpojené blackoutem.
+   *
+   * Sedí v evidenci katastrof, ne na budově: je to **dočasný stav sítě**, ne
+   * vlastnost elektrárny. Kdyby to byl příznak na budově, přežil by konec
+   * blackoutu a hráč by měl elektrárnu, která nikdy nenaběhne, aniž by věděl
+   * proč. Takhle stačí seznam vyprázdnit.
+   */
+  offlinePlants: Set<number>;
 }
 
 export function createDisasterState(enabled = true): DisasterState {
@@ -103,5 +113,6 @@ export function createDisasterState(enabled = true): DisasterState {
     nextId: 1,
     riskCeiling: new Map(),
     burning: { normal: 0, wildfire: 0 },
+    offlinePlants: new Set(),
   };
 }

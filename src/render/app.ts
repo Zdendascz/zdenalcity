@@ -26,6 +26,9 @@ import { createFireDisaster, createWildfireDisaster } from '@/sim/disasters/fire
 import { createFloodDisaster } from '@/sim/disasters/flood';
 import { createTornadoDisaster } from '@/sim/disasters/tornado';
 import { createEarthquakeDisaster } from '@/sim/disasters/earthquake';
+import { createBlackoutDisaster } from '@/sim/disasters/blackout';
+import { createChemicalSpillDisaster } from '@/sim/disasters/chemicalSpill';
+import { createEpidemicDisaster } from '@/sim/disasters/epidemic';
 import { createGangWarDisaster } from '@/sim/disasters/gangWar';
 import { createPileupDisaster } from '@/sim/disasters/pileup';
 import { createRiotDisaster } from '@/sim/disasters/riot';
@@ -376,6 +379,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   disasterRegistry.register(createStrikeDisaster());
   disasterRegistry.register(createRiotDisaster());
   disasterRegistry.register(createGangWarDisaster());
+  disasterRegistry.register(createBlackoutDisaster());
+  disasterRegistry.register(createEpidemicDisaster());
+  disasterRegistry.register(createChemicalSpillDisaster());
 
   // Obnovení rozehraného města. Nečitelný autosave se **zahodí a hra začne
   // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,

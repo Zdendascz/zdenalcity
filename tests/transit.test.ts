@@ -8,6 +8,7 @@ import { presentDefinitions } from '@/sim/requirements';
 import { createServiceSystem, createTrafficSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
+import { powerAll } from './support/power';
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -54,6 +55,7 @@ describe('MHD ubírá dopravu (§6)', () => {
         expect(placeDefinition(world, content, STOP, 12, 11).ok).toBe(true);
       }
       const systems = [createServiceSystem(content), createTrafficSystem(content, balance)];
+      powerAll(world);
       for (let tick = 0; tick < 40; tick++) tickWorld(world, systems);
       return roadLoad(world);
     };

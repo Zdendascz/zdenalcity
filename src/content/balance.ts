@@ -311,6 +311,83 @@ export interface GangWarBalance {
   happinessPerLoss: number;
 }
 
+/**
+ * Blackout (katalog 12). Kaskáda, která se zastaví sama.
+ *
+ * Prahy jsou dva a musí být `recoveryRatio < overloadRatio`, jinak by síť
+ * kmitala mezi odpojováním a připojováním donekonečna.
+ */
+export interface BlackoutBalance {
+  cascadeEvery: number;
+  /** Nad tímhle zatížením padne další elektrárna. */
+  overloadRatio: number;
+  /** Pod tímhle se začne počítat klid. */
+  recoveryRatio: number;
+  calmCycles: number;
+  /** Do tolika tiků si výpadku nikdo nevšimne. */
+  noticeTicks: number;
+  happinessPerTick: number;
+  happinessMax: number;
+  penaltyTicks: number;
+}
+
+/** Epidemie (katalog 13). Jediná katastrofa, kterou jde potlačit i po vzniku. */
+export interface EpidemicBalance {
+  durationMin: number;
+  durationMax: number;
+  /** Jak často se přepočítává šíření. */
+  cycleTicks: number;
+  /** Nakaženost v ohnisku při vypuknutí. */
+  seed: number;
+  waves: number;
+  waveBase: number;
+  spread: number;
+  /** Jak moc pokrytí zdravotnictvím brzdí přenos, 0–1. */
+  coverageBlock: number;
+  jumpChance: number;
+  jumpShare: number;
+  growth: number;
+  decay: number;
+  decayPerCoverage: number;
+  /** Pod touhle hodnotou buňka vyhasne. */
+  extinction: number;
+  mortality: number;
+  /** Přetížení: pokrytí v nakažené buňce účinkuje jen na tolik. */
+  overload: number;
+  happiness: number;
+  happinessCity: number;
+}
+
+/** Chemická havárie (katalog 15). Nejsilnější zdroj znečištění ve hře. */
+export interface ChemicalSpillBalance {
+  durationMin: number;
+  durationMax: number;
+  blastRadius: number;
+  sourceDestroyChance: number;
+  nearDestroyChance: number;
+  pollutionRadius: number;
+  pollution: number;
+  waterRadius: number;
+  /** Jak dlouho po úniku ještě vodárny nedodávají. */
+  waterAfterTicks: number;
+  populationRadius: number;
+  populationLoss: number;
+  landValueRadius: number;
+  landValue: number;
+  /** Cena půdy doznívá roky — proto se měří v tikách, ne v desítkách. */
+  landValueTicks: number;
+  happiness: number;
+  happinessCity: number;
+  happinessPerLoss: number;
+  /** Od téhle úrovně výš je průmysl „těžký". */
+  heavyLevel: number;
+  ageTicks: number;
+  ageWeight: number;
+  /** Vlastní váha skládek a spaloven, aby nebyly proti továrnám neviditelné. */
+  wasteWeight: number;
+  neglectFactor: number;
+}
+
 export interface DisasterBalance {
   baseMonthlyChance: number;
   maxMonthlyChance: number;
@@ -564,6 +641,9 @@ export interface Balance {
     strike: StrikeBalance;
     riot: RiotBalance;
     gangWar: GangWarBalance;
+    blackout: BlackoutBalance;
+    epidemic: EpidemicBalance;
+    chemicalSpill: ChemicalSpillBalance;
     types: Readonly<Record<string, DisasterBalance>>;
   };
 
@@ -819,6 +899,9 @@ export function validateBalance(raw: unknown): {
       strike: validateStrike(issues, disasters),
       riot: validateRiot(issues, disasters),
       gangWar: validateGangWar(issues, disasters),
+      blackout: validateBlackout(issues, disasters),
+      epidemic: validateEpidemic(issues, disasters),
+      chemicalSpill: validateChemicalSpill(issues, disasters),
       types: disasterTypes,
     },
     economy: {
@@ -1700,6 +1783,192 @@ function reactionPays(
     field,
     message: `reakce musí katastrofu zkracovat: ${faster} není víc než ${slower}`,
   });
+}
+
+function validateBlackout(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): BlackoutBalance {
+  const raw = disasterSection(issues, disasters, 'blackout');
+  const value: BlackoutBalance = {
+    cascadeEvery: num(issues, raw, 'cascadeEvery', 'disasters.blackout.cascadeEvery', 1, 100),
+    overloadRatio: num(issues, raw, 'overloadRatio', 'disasters.blackout.overloadRatio', 1, 10),
+    recoveryRatio: num(issues, raw, 'recoveryRatio', 'disasters.blackout.recoveryRatio', 0, 10),
+    calmCycles: num(issues, raw, 'calmCycles', 'disasters.blackout.calmCycles', 1, 100),
+    noticeTicks: num(issues, raw, 'noticeTicks', 'disasters.blackout.noticeTicks', 0, 500),
+    happinessPerTick: num(
+      issues,
+      raw,
+      'happinessPerTick',
+      'disasters.blackout.happinessPerTick',
+      0,
+      255,
+    ),
+    happinessMax: num(issues, raw, 'happinessMax', 'disasters.blackout.happinessMax', 0, 255),
+    penaltyTicks: num(issues, raw, 'penaltyTicks', 'disasters.blackout.penaltyTicks', 1, 2000),
+  };
+
+  // Bez odstupu prahů by síť kmitala: odpojí, hned připojí, hned zas odpojí.
+  if (raw && value.recoveryRatio >= value.overloadRatio) {
+    issues.push({
+      field: 'disasters.blackout',
+      message: `práh zotavení musí být pod prahem přetížení: ${value.recoveryRatio} není míň než ${value.overloadRatio}`,
+    });
+  }
+  return value;
+}
+
+function validateEpidemic(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): EpidemicBalance {
+  const raw = disasterSection(issues, disasters, 'epidemic');
+  const value: EpidemicBalance = {
+    durationMin: num(issues, raw, 'durationMin', 'disasters.epidemic.durationMin', 1, 2000),
+    durationMax: num(issues, raw, 'durationMax', 'disasters.epidemic.durationMax', 1, 2000),
+    cycleTicks: num(issues, raw, 'cycleTicks', 'disasters.epidemic.cycleTicks', 1, 100),
+    seed: num(issues, raw, 'seed', 'disasters.epidemic.seed', 0, 1),
+    waves: num(issues, raw, 'waves', 'disasters.epidemic.waves', 1, 10),
+    waveBase: num(issues, raw, 'waveBase', 'disasters.epidemic.waveBase', 0, 1),
+    spread: num(issues, raw, 'spread', 'disasters.epidemic.spread', 0, 1),
+    coverageBlock: num(issues, raw, 'coverageBlock', 'disasters.epidemic.coverageBlock', 0, 1),
+    jumpChance: num(issues, raw, 'jumpChance', 'disasters.epidemic.jumpChance', 0, 1),
+    jumpShare: num(issues, raw, 'jumpShare', 'disasters.epidemic.jumpShare', 0, 1),
+    growth: num(issues, raw, 'growth', 'disasters.epidemic.growth', 0, 1),
+    decay: num(issues, raw, 'decay', 'disasters.epidemic.decay', 0, 1),
+    decayPerCoverage: num(
+      issues,
+      raw,
+      'decayPerCoverage',
+      'disasters.epidemic.decayPerCoverage',
+      0,
+      1,
+    ),
+    extinction: num(issues, raw, 'extinction', 'disasters.epidemic.extinction', 0, 1),
+    mortality: num(issues, raw, 'mortality', 'disasters.epidemic.mortality', 0, 1),
+    overload: num(issues, raw, 'overload', 'disasters.epidemic.overload', 0, 1),
+    happiness: num(issues, raw, 'happiness', 'disasters.epidemic.happiness', 0, 255),
+    happinessCity: num(issues, raw, 'happinessCity', 'disasters.epidemic.happinessCity', 0, 255),
+  };
+
+  // Musí existovat pokrytí, při kterém nákaza ustupuje. Kdyby růst přebil i
+  // plné zdravotnictví, epidemie by se nedala zastavit ničím — a přitom je to
+  // jediná katastrofa, jejíž celý smysl je v tom, že zastavit jde.
+  if (raw && value.growth >= value.decay + value.decayPerCoverage) {
+    issues.push({
+      field: 'disasters.epidemic',
+      message: `plné zdravotnictví musí nákazu srazit: růst ${value.growth} není míň než ústup ${value.decay + value.decayPerCoverage}`,
+    });
+  }
+  return value;
+}
+
+function validateChemicalSpill(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): ChemicalSpillBalance {
+  const raw = disasterSection(issues, disasters, 'chemicalSpill');
+  return {
+    durationMin: num(issues, raw, 'durationMin', 'disasters.chemicalSpill.durationMin', 1, 500),
+    durationMax: num(issues, raw, 'durationMax', 'disasters.chemicalSpill.durationMax', 1, 500),
+    blastRadius: num(issues, raw, 'blastRadius', 'disasters.chemicalSpill.blastRadius', 0, 64),
+    sourceDestroyChance: num(
+      issues,
+      raw,
+      'sourceDestroyChance',
+      'disasters.chemicalSpill.sourceDestroyChance',
+      0,
+      1,
+    ),
+    nearDestroyChance: num(
+      issues,
+      raw,
+      'nearDestroyChance',
+      'disasters.chemicalSpill.nearDestroyChance',
+      0,
+      1,
+    ),
+    pollutionRadius: num(
+      issues,
+      raw,
+      'pollutionRadius',
+      'disasters.chemicalSpill.pollutionRadius',
+      0,
+      64,
+    ),
+    pollution: num(issues, raw, 'pollution', 'disasters.chemicalSpill.pollution', 0, 255),
+    waterRadius: num(issues, raw, 'waterRadius', 'disasters.chemicalSpill.waterRadius', 0, 64),
+    waterAfterTicks: num(
+      issues,
+      raw,
+      'waterAfterTicks',
+      'disasters.chemicalSpill.waterAfterTicks',
+      0,
+      2000,
+    ),
+    populationRadius: num(
+      issues,
+      raw,
+      'populationRadius',
+      'disasters.chemicalSpill.populationRadius',
+      0,
+      64,
+    ),
+    populationLoss: num(
+      issues,
+      raw,
+      'populationLoss',
+      'disasters.chemicalSpill.populationLoss',
+      0,
+      1,
+    ),
+    landValueRadius: num(
+      issues,
+      raw,
+      'landValueRadius',
+      'disasters.chemicalSpill.landValueRadius',
+      0,
+      64,
+    ),
+    landValue: num(issues, raw, 'landValue', 'disasters.chemicalSpill.landValue', 0, 255),
+    landValueTicks: num(
+      issues,
+      raw,
+      'landValueTicks',
+      'disasters.chemicalSpill.landValueTicks',
+      1,
+      10000,
+    ),
+    happiness: num(issues, raw, 'happiness', 'disasters.chemicalSpill.happiness', 0, 255),
+    happinessCity: num(
+      issues,
+      raw,
+      'happinessCity',
+      'disasters.chemicalSpill.happinessCity',
+      0,
+      255,
+    ),
+    happinessPerLoss: num(
+      issues,
+      raw,
+      'happinessPerLoss',
+      'disasters.chemicalSpill.happinessPerLoss',
+      0,
+      255,
+    ),
+    heavyLevel: num(issues, raw, 'heavyLevel', 'disasters.chemicalSpill.heavyLevel', 1, 5),
+    ageTicks: num(issues, raw, 'ageTicks', 'disasters.chemicalSpill.ageTicks', 1, 100000),
+    ageWeight: num(issues, raw, 'ageWeight', 'disasters.chemicalSpill.ageWeight', 0, 10),
+    wasteWeight: num(issues, raw, 'wasteWeight', 'disasters.chemicalSpill.wasteWeight', 0, 100),
+    neglectFactor: num(
+      issues,
+      raw,
+      'neglectFactor',
+      'disasters.chemicalSpill.neglectFactor',
+      0,
+      10,
+    ),
+  };
 }
 
 function validateBlast(
