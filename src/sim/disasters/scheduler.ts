@@ -3,6 +3,7 @@ import type { BuildingCatalogue } from '../catalogue';
 import type { System } from '../systems/index';
 import type { WorldState } from '../world';
 import { clearModifiersOf, expireModifiers } from './effects';
+import { escalatesToRiot } from './riot';
 import { computeIndicators } from './indicators';
 import { DisasterRegistry } from './registry';
 import type { DisasterContext } from './registry';
@@ -63,6 +64,9 @@ function advanceActive(
   const active = world.disasters.active;
   if (active.length === 0) return;
 
+  /** Stávky, které právě skončily. Eskaluje se až po úklidu seznamu. */
+  const escalating: ActiveDisaster[] = [];
+
   for (const entry of active) {
     if (entry.finished) continue;
     const disaster = registry.get(entry.kind);
@@ -88,8 +92,20 @@ function advanceActive(
     const disaster = registry.get(entry.kind);
     // Povodeň a lesní požár se hájí od skončení, ne od vzniku.
     if (disaster?.cooldownFromEnd) world.disasters.lastOccurrence.set(entry.kind, world.tick);
+
+    // Neřešená stávka může přerůst v nepokoje. Doba hájení se přitom ignoruje:
+    // tohle není nová katastrofa z plánovače, tohle je následek té předchozí,
+    // a je to hlavní cesta, kterou nepokoje vůbec vznikají.
+    if (entry.kind === 'strike' && registry.get('riot')) {
+      escalating.push(entry);
+    }
   }
   active.length = write;
+
+  for (const strike of escalating) {
+    if (!escalatesToRiot(world, balance, strike)) continue;
+    startDisaster(world, catalogue, balance, registry, 'riot', strike.x, strike.y);
+  }
 }
 
 /**

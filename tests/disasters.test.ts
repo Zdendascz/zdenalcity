@@ -245,16 +245,24 @@ describe('vzorec rizika', () => {
   });
 
   it('`below` počítá, o kolik ukazatel chybí pod prahem', () => {
-    // Blackout: nad čtvrtinou rezervy nepřispívá nic, pod ní roste strmě.
-    // Platí vzorec z katalogu `max(0; 0,25 − rezerva) × 24`. Prozaické
-    // příklady vedle něj (15 % → 1,24) mu odporují — s koeficientem 24 vyjde
-    // 3,4, tedy strop. Řídíme se vzorcem; nesoulad je nahlášený autorovi.
+    // Blackout: nad čtvrtinou rezervy nepřispívá nic, pod ní roste lineárně.
+    // Koeficient 8 je zvolený tak, aby člen rezervy sám dosáhl stropu **přesně
+    // při nulové rezervě** — ostatní dva členy ho tam dostanou dřív. Původních
+    // 24 dělalo z blackoutu útes: strop už pod 19 % rezervy, takže hráč buď
+    // držel nad 25 %, nebo byl na maximu, a mezi tím nebylo co odměnit.
     const blackout = typeOf('blackout');
     expect(typeFactor(blackout, fakeIndicators({ powerReserve: 0.3 }), 3)).toBe(1);
     expect(typeFactor(blackout, fakeIndicators({ powerReserve: 0.25 }), 3)).toBe(1);
-    expect(typeFactor(blackout, fakeIndicators({ powerReserve: 0.24 }), 3)).toBeCloseTo(1.24);
-    expect(typeFactor(blackout, fakeIndicators({ powerReserve: 0.2 }), 3)).toBeCloseTo(2.2);
+    expect(typeFactor(blackout, fakeIndicators({ powerReserve: 0.2 }), 3)).toBeCloseTo(1.4);
+    expect(typeFactor(blackout, fakeIndicators({ powerReserve: 0.15 }), 3)).toBeCloseTo(1.8);
+    expect(typeFactor(blackout, fakeIndicators({ powerReserve: 0.05 }), 3)).toBeCloseTo(2.6);
     expect(typeFactor(blackout, fakeIndicators({ powerReserve: 0 }), 3)).toBe(3);
+
+    // Škála musí být spojitá, ne skoková: každý procentní bod rezervy se pozná.
+    const at = (reserve: number): number =>
+      typeFactor(blackout, fakeIndicators({ powerReserve: reserve }), 3);
+    expect(at(0.2)).toBeGreaterThan(at(0.22));
+    expect(at(0.1)).toBeGreaterThan(at(0.12));
   });
 
   it('výsledná šance je součin, oříznutý stropem typu', () => {

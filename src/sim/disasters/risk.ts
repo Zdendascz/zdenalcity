@@ -175,11 +175,38 @@ export function typeFactor(
 
   let sum = 1;
   for (const term of disaster.risk) {
-    const raw = indicators.get(term.indicator);
-    const value = term.below === undefined ? raw : Math.max(0, term.below - raw);
-    sum += value * term.weight;
+    sum += termValue(term, indicators);
   }
   return clamp(sum, 1, maxMultiplier);
+}
+
+/** Příspěvek jednoho členu k faktoru typu. */
+function termValue(term: DisasterBalance['risk'][number], indicators: Indicators): number {
+  const raw = indicators.get(term.indicator);
+  const value = term.below === undefined ? raw : Math.max(0, term.below - raw);
+  return value * term.weight;
+}
+
+/**
+ * Který člen přispěl k riziku nejvíc. Vrací jméno ukazatele, nebo `null`.
+ *
+ * Stávka se hlásí s hlavním důvodem, a ten musí být **týž výpočet**, jaký
+ * riziko opravdu použilo. Kdyby si ho hlášení počítalo po svém, dřív nebo
+ * později by hráči tvrdilo něco jiného, než podle čeho stávka vznikla.
+ */
+export function dominantTerm(disaster: DisasterBalance, indicators: Indicators): string | null {
+  let best: string | null = null;
+  let bestValue = 0;
+
+  for (const term of disaster.risk) {
+    const value = termValue(term, indicators);
+    // Ostrá nerovnost: při shodě vyhrává první v pořadí katalogu, ne poslední.
+    if (value > bestValue) {
+      best = term.indicator;
+      bestValue = value;
+    }
+  }
+  return best;
 }
 
 /** Kolik téhle katastrofy smí běžet naráz. */

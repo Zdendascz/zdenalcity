@@ -21,7 +21,8 @@ export interface Modifier {
     | 'happinessPenalty'
     | 'landValuePenalty'
     | 'contaminateWater'
-    | 'blockTile';
+    | 'blockTile'
+    | 'taxLoss';
   /** Třída služby u `suppressService`, jinak prázdné. */
   readonly serviceClass?: string;
   /**

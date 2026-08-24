@@ -1,7 +1,8 @@
 import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '../catalogue';
-import { ROAD } from '../layers';
+import { cellOfTile, strongestModifier } from '../disasters/effects';
+import { index, ROAD } from '../layers';
 import { isRciCategory } from '../rci';
 import { serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
@@ -114,6 +115,17 @@ export function buildingMonthlyUpkeep(
 }
 
 /**
+ * Kolik daně budově ubírá běžící katastrofa, 0–1.
+ *
+ * Postihy se neskládají — platí ten nejhorší (`Math.max`), stejně jako všude
+ * jinde v `effects.ts`. Dvě stávky přes jednu čtvrť nedaní dvakrát nula.
+ */
+function taxLossAt(world: WorldState, tile: number): number {
+  if (world.disasters.modifiers.length === 0) return 0;
+  return strongestModifier(world, 'taxLoss', cellOfTile(world, tile), 0, undefined, Math.max);
+}
+
+/**
  * Rozpad měsíčního rozpočtu po definicích.
  *
  * Sdílí ho `economySystem` i tabulka v UI, aby daňový vzorec existoval jen
@@ -166,7 +178,12 @@ export function computeBudget(
 
     line.upkeepCount++;
     if (taxedAs !== null) {
-      line.taxBase += taxedAs === 'residential' ? building.population : building.jobs;
+      const taxable = taxedAs === 'residential' ? building.population : building.jobs;
+      // Stávkující čtvrť nedaní, nepokoje a válka gangů seberou část. Odečítá
+      // se od základu, ne od výsledku: sazba se nemění, mění se to, z čeho se
+      // počítá, a rozpis v UI tak pořád odpovídá skutečnosti.
+      const lost = taxLossAt(world, index(building.x, building.y, world.size));
+      line.taxBase += lost === 0 ? taxable : taxable - Math.round(taxable * lost);
     }
 
     const upkeep = buildingMonthlyUpkeep(world, definition, building);

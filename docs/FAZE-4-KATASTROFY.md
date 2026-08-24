@@ -747,13 +747,23 @@ Průsek buldozerem; silnice po obvodu lesa; nestavět těsně k lesu; **preventi
 rezerva = (kapacita - spotřeba) / kapacita
 
 faktorTypu = clamp(1
-    + max(0, 0,25 - rezerva) * 24
+    + max(0, 0,25 - rezerva) * 8
     + podílJednéElektrárny   * 0,8
     + zanedbanost            * 0,3,
   1, 3)
 ```
 
-Koeficient 24 je záměrně strmý: rezerva ≥ 25 % → faktor 1; 15 % → 1,24; 5 % → 2,4; nula → strop.
+Koeficient 8 je zvolený tak, aby člen rezervy sám dosáhl stropu **přesně při
+nulové rezervě**: 25 % → faktor 1; 20 % → 1,4; 15 % → 1,8; 10 % → 2,2; 5 % → 2,6;
+nula → 3. Ostatní dva členy ho tam dostanou dřív — s jednou elektrárnou nesoucí
+většinu zátěže a mírnou zanedbaností je město na stropu už kolem 6 % rezervy.
+
+Dřív tu stálo 24 a vedle toho prozaická řada „15 % → 1,24; 5 % → 2,4". Ani jedno
+nesedělo: z prvního čísla plyne koeficient 2,4, z druhého 7,0, a s koeficientem
+24 je faktor na stropu už pod 19 % rezervy. Blackout by pak byl útes, ne svah —
+hráč buď drží nad 25 %, nebo je na maximu, a mezi tím není co odměnit. Přitom
+tahle katastrofa má být „nejčastější v seznamu, ale jen pro hráče, který si o ni
+říká", což je věta o svahu.
 
 **Nejčastější katastrofa v seznamu — ale jen pro hráče, který si o ni říká.**
 

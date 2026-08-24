@@ -2078,17 +2078,64 @@ vznikající pořád na západě a zapalující všechno, přes co přejede. Kř
 a útlum od osy pásu se přes zásah do města spolehlivě změřit nedají, takže jsou
 teď vystavené a testované přímo; zbytek se ověřuje chováním.
 
+- [x] T52 — sociální: stávka, nepokoje, válka gangů, hromadná nehoda
+
+Žádná z nich neboří město. Berou **peníze a čas** — a všechny čtyři jde zkrátit
+tím, že hráč zareaguje. Odsud plyne celý jejich tvar: ukončení je podmínkové,
+ne odpočet. Kdyby to byl pevný čas, nebylo by co hrát, jen co odčekat.
+
+Přibyla operace `taxLoss`. Stávkující čtvrť nedaní vůbec, nepokoje seberou
+60 %, válka gangů 50 %. Odečítá se od **základu**, ne od výsledku: sazba se
+nemění, mění se to, z čeho se počítá, takže rozpis rozpočtu pořád odpovídá
+skutečnosti a hráč vidí, kam se poděl příjem.
+
+Celoměstský postih má **prázdný seznam buněk**, ne vyjmenované čtyři tisíce.
+`strongestModifier` se ptá `cells.includes(cell)`; vyjmenovaný seznam by
+znamenal lineární prohlídku při každém dotazu každého systému. Kvůli tomu
+vznikl tvar `CITY_WIDE` vedle běžných tvarů z `shapes.ts`.
+
+**Hromadná nehoda** nezničí ani jednu budovu. Celá váha je v blokaci dlaždice —
+nehoda na jediné spojnici odřízne čtvrť od práce, což bolí víc než skok
+v kolonách. Odsud i obrana: okružní síť, ne širší silnice. Zdravotnické pokrytí
+zkrátí trvání z deseti tiků na čtyři a potlačení hasičů z ní dělá násobič všeho
+ostatního.
+
+**Stávka** se hlásí s hlavním důvodem a je to **týž výpočet**, jaký použilo
+riziko — `dominantTerm` čte přímo členy z katalogu. Původně jsem to počítal
+zvlášť; dvě paralelní verze téhož vzorce se dřív nebo později rozejdou a hráči
+by hlášení tvrdilo něco jiného, než podle čeho stávka vznikla.
+
+**Nepokoje** jsou celoměstské, ale síla je lokální podle kriminality. Mapa síly
+se během trvání **nepřepočítává**: nepokoje kriminalitu zvyšují, takže by jinak
+posilovaly samy sebe a nikdy neskončily. Hlavní cesta vzniku není plánovač, ale
+eskalace ze stávky — tím se ze stávky stává varování, ne jen nepříjemnost.
+
+**Válka gangů** je jediná pohroma, které se nedá zbavit penězi. `crimeFloor`
+drží kriminalitu nad hodnotou bez ohledu na to, kolik policie do čtvrti přijde;
+policie zkracuje trvání, nesráží číslo. Bez zásahu přes třináct měsíců,
+s pokrytím a rostoucí spokojeností necelé dva.
+
+Validace navíc hlídá, že se **reakce vyplácí** — že `drainRising` je opravdu
+vyšší než `drainIdle`. Kdyby to někdo v datech obrátil, hráč by katastrofu
+prodlužoval tím, že se snaží, a nikdo by na to nepřišel: obojí je jen číslo.
+
+Dvě věci našly testy, ne čtení kódu. Válka gangů si počáteční spokojenost
+nastavovala na nulu, takže první tik viděl celou spokojenost čtvrti jako
+„hráč zabral" a zkrátil válku pětadvacetkrát. A `localUnemployment` procházel
+všechny budovy uvnitř průchodu všemi budovami — na dvou tisících budov čtyři
+miliony iterací za jediný los. Obojí teď stojí na předpočítaných buňkách.
+
 
 ## Rozpracované
 
 **Fáze 4.** Hotová je celá 4a (T42–T45; T46 odpadl podle měření) a z 4b
-kostra katastrof, oheň, trosky, povodeň a všechny čtyři ničivé katastrofy.
+kostra katastrof, oheň, trosky, povodeň, všechny čtyři ničivé katastrofy
+a všechny čtyři sociální.
 
 Zbývá:
 
 | Úkol | Obsah |
 |---|---|
-| T52 | Sociální: stávka, nepokoje, válka gangů, hromadná nehoda |
 | T53 | Síťové a zdravotní: blackout, epidemie, chemická havárie |
 | T54 | Sesuv půdy |
 | T55–T56 | Linky MHD |

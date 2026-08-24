@@ -217,6 +217,100 @@ export interface BlastBalance {
   industrialAccident: BlastKindBalance;
 }
 
+/**
+ * Hromadná nehoda (katalog 5).
+ *
+ * Nezničí žádnou budovu; celá váha je v blokaci dlaždice a v tom, že po dobu
+ * nehody hůř fungují hasiči — je to násobič ostatních katastrof.
+ */
+export interface PileupBalance {
+  /** Trvání v pokryté čtvrti. Nepokrytá si připočte `durationSpan`. */
+  durationBase: number;
+  durationSpan: number;
+  /** Dosah potlačených služeb a srážky spokojenosti, v dlaždicích. */
+  reach: number;
+  jamRadius: number;
+  jamFactor: number;
+  healthFactor: number;
+  fireFactor: number;
+  happiness: number;
+  /** Podíl obyvatel, o který přijdou okolní domy. Budovy zůstanou stát. */
+  populationLoss: number;
+  /** Pod touhle zátěží se blokace nehlásí — ucpaná slepá ulice není zpráva. */
+  reportLoad: number;
+}
+
+/** Stávka (katalog 6). Nic nezničí, jen sebere peníze a čas. */
+export interface StrikeBalance {
+  durationMin: number;
+  durationMax: number;
+  radiusMin: number;
+  radiusMax: number;
+  /** Úbytek za tik, když se nic nelepší. */
+  drainIdle: number;
+  /** Úbytek za tik, když spokojenost v oblasti roste. */
+  drainRising: number;
+  crime: number;
+  traffic: number;
+  healthFactor: number;
+  happiness: number;
+  happinessCity: number;
+}
+
+/** Občanské nepokoje (katalog 7). Celoměstské, ale síla je lokální. */
+export interface RiotBalance {
+  durationMin: number;
+  durationMax: number;
+  drainIdle: number;
+  drainRising: number;
+  /** Úbytek, když roste spokojenost **a** je pokrytá policie. */
+  drainBoth: number;
+  policeCalm: number;
+  /** Nejnižší možná lokální síla. Nikdy nula — i klidná čtvrť něco odnese. */
+  strengthBase: number;
+  crime: number;
+  traffic: number;
+  healthFactor: number;
+  educationFactor: number;
+  happiness: number;
+  taxLoss: number;
+  igniteEvery: number;
+  igniteMax: number;
+  igniteIntensity: number;
+  /** Kriminalita, nad kterou může stávka přerůst v nepokoje. */
+  escalationCrime: number;
+  escalationChance: number;
+}
+
+/** Válka gangů (katalog 9). Nejdelší v katalogu a nedá se přeplatit. */
+export interface GangWarBalance {
+  durationMin: number;
+  durationMax: number;
+  radiusMin: number;
+  radiusMax: number;
+  /** Strop po rozšiřování. Větší než `radiusMax`, který platí při vzniku. */
+  radiusMax2: number;
+  spreadEvery: number;
+  /** Pokrytí policií, nad kterým se válka přestane rozšiřovat. */
+  spreadStop: number;
+  /** Úbytek za tik bez jakéhokoli zásahu. */
+  drainBase: number;
+  pressurePolice: number;
+  pressureHappiness: number;
+  pressureEmployment: number;
+  pressureScale: number;
+  crimeFloor: number;
+  happiness: number;
+  happinessCity: number;
+  educationFactor: number;
+  healthFactor: number;
+  landValue: number;
+  taxLoss: number;
+  destroyEvery: number;
+  destroyChance: number;
+  happinessPerLoss: number;
+}
+
 export interface DisasterBalance {
   baseMonthlyChance: number;
   maxMonthlyChance: number;
@@ -466,6 +560,10 @@ export interface Balance {
     tornado: TornadoBalance;
     earthquake: EarthquakeBalance;
     blast: BlastBalance;
+    pileup: PileupBalance;
+    strike: StrikeBalance;
+    riot: RiotBalance;
+    gangWar: GangWarBalance;
     types: Readonly<Record<string, DisasterBalance>>;
   };
 
@@ -717,6 +815,10 @@ export function validateBalance(raw: unknown): {
       tornado: validateTornado(issues, disasters),
       earthquake: validateEarthquake(issues, disasters),
       blast: validateBlast(issues, disasters),
+      pileup: validatePileup(issues, disasters),
+      strike: validateStrike(issues, disasters),
+      riot: validateRiot(issues, disasters),
+      gangWar: validateGangWar(issues, disasters),
       types: disasterTypes,
     },
     economy: {
@@ -1435,6 +1537,169 @@ function blastKind(
     pollution: num(issues, raw, 'pollution', `${where}.pollution`, 0, 255),
     happinessPerLoss: num(issues, raw, 'happinessPerLoss', `${where}.happinessPerLoss`, 0, 255),
   };
+}
+
+/**
+ * Sociální katastrofy (T52).
+ *
+ * Všechny čtyři sdílejí jednu myšlenku: hráč je umí zkrátit tím, že zareaguje.
+ * Proto mají `drain*` místo pevného trvání — a proto se tady kontroluje, že
+ * `drainRising` je opravdu vyšší než `drainIdle`. Kdyby nebyl, reakce by
+ * katastrofu prodlužovala a celá mechanika by mlčky přestala dávat smysl.
+ */
+function validatePileup(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): PileupBalance {
+  const raw = disasterSection(issues, disasters, 'pileup');
+  return {
+    durationBase: num(issues, raw, 'durationBase', 'disasters.pileup.durationBase', 1, 200),
+    durationSpan: num(issues, raw, 'durationSpan', 'disasters.pileup.durationSpan', 0, 200),
+    reach: num(issues, raw, 'reach', 'disasters.pileup.reach', 0, 64),
+    jamRadius: num(issues, raw, 'jamRadius', 'disasters.pileup.jamRadius', 0, 64),
+    jamFactor: num(issues, raw, 'jamFactor', 'disasters.pileup.jamFactor', 1, 100),
+    healthFactor: num(issues, raw, 'healthFactor', 'disasters.pileup.healthFactor', 0, 1),
+    fireFactor: num(issues, raw, 'fireFactor', 'disasters.pileup.fireFactor', 0, 1),
+    happiness: num(issues, raw, 'happiness', 'disasters.pileup.happiness', 0, 255),
+    populationLoss: num(issues, raw, 'populationLoss', 'disasters.pileup.populationLoss', 0, 1),
+    reportLoad: num(issues, raw, 'reportLoad', 'disasters.pileup.reportLoad', 0, 1000),
+  };
+}
+
+function validateStrike(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): StrikeBalance {
+  const raw = disasterSection(issues, disasters, 'strike');
+  const value: StrikeBalance = {
+    durationMin: num(issues, raw, 'durationMin', 'disasters.strike.durationMin', 1, 1000),
+    durationMax: num(issues, raw, 'durationMax', 'disasters.strike.durationMax', 1, 1000),
+    radiusMin: num(issues, raw, 'radiusMin', 'disasters.strike.radiusMin', 0, 64),
+    radiusMax: num(issues, raw, 'radiusMax', 'disasters.strike.radiusMax', 0, 64),
+    drainIdle: num(issues, raw, 'drainIdle', 'disasters.strike.drainIdle', 0.01, 100),
+    drainRising: num(issues, raw, 'drainRising', 'disasters.strike.drainRising', 0.01, 100),
+    crime: num(issues, raw, 'crime', 'disasters.strike.crime', 0, 255),
+    traffic: num(issues, raw, 'traffic', 'disasters.strike.traffic', 1, 100),
+    healthFactor: num(issues, raw, 'healthFactor', 'disasters.strike.healthFactor', 0, 1),
+    happiness: num(issues, raw, 'happiness', 'disasters.strike.happiness', 0, 255),
+    happinessCity: num(issues, raw, 'happinessCity', 'disasters.strike.happinessCity', 0, 255),
+  };
+  reactionPays(issues, 'disasters.strike', value.drainIdle, value.drainRising);
+  return value;
+}
+
+function validateRiot(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): RiotBalance {
+  const raw = disasterSection(issues, disasters, 'riot');
+  const value: RiotBalance = {
+    durationMin: num(issues, raw, 'durationMin', 'disasters.riot.durationMin', 1, 1000),
+    durationMax: num(issues, raw, 'durationMax', 'disasters.riot.durationMax', 1, 1000),
+    drainIdle: num(issues, raw, 'drainIdle', 'disasters.riot.drainIdle', 0.01, 100),
+    drainRising: num(issues, raw, 'drainRising', 'disasters.riot.drainRising', 0.01, 100),
+    drainBoth: num(issues, raw, 'drainBoth', 'disasters.riot.drainBoth', 0.01, 100),
+    policeCalm: num(issues, raw, 'policeCalm', 'disasters.riot.policeCalm', 0, 255),
+    strengthBase: num(issues, raw, 'strengthBase', 'disasters.riot.strengthBase', 0, 1),
+    crime: num(issues, raw, 'crime', 'disasters.riot.crime', 0, 255),
+    traffic: num(issues, raw, 'traffic', 'disasters.riot.traffic', 0, 100),
+    healthFactor: num(issues, raw, 'healthFactor', 'disasters.riot.healthFactor', 0, 1),
+    educationFactor: num(issues, raw, 'educationFactor', 'disasters.riot.educationFactor', 0, 1),
+    happiness: num(issues, raw, 'happiness', 'disasters.riot.happiness', 0, 255),
+    taxLoss: num(issues, raw, 'taxLoss', 'disasters.riot.taxLoss', 0, 1),
+    igniteEvery: num(issues, raw, 'igniteEvery', 'disasters.riot.igniteEvery', 1, 100),
+    igniteMax: num(issues, raw, 'igniteMax', 'disasters.riot.igniteMax', 0, 50),
+    igniteIntensity: num(issues, raw, 'igniteIntensity', 'disasters.riot.igniteIntensity', 1, 255),
+    escalationCrime: num(issues, raw, 'escalationCrime', 'disasters.riot.escalationCrime', 0, 255),
+    escalationChance: num(issues, raw, 'escalationChance', 'disasters.riot.escalationChance', 0, 1),
+  };
+  reactionPays(issues, 'disasters.riot', value.drainIdle, value.drainRising);
+  reactionPays(issues, 'disasters.riot', value.drainRising, value.drainBoth);
+  return value;
+}
+
+function validateGangWar(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): GangWarBalance {
+  const raw = disasterSection(issues, disasters, 'gangWar');
+  return {
+    durationMin: num(issues, raw, 'durationMin', 'disasters.gangWar.durationMin', 1, 2000),
+    durationMax: num(issues, raw, 'durationMax', 'disasters.gangWar.durationMax', 1, 2000),
+    radiusMin: num(issues, raw, 'radiusMin', 'disasters.gangWar.radiusMin', 0, 64),
+    radiusMax: num(issues, raw, 'radiusMax', 'disasters.gangWar.radiusMax', 0, 64),
+    radiusMax2: num(issues, raw, 'radiusMax2', 'disasters.gangWar.radiusMax2', 0, 64),
+    spreadEvery: num(issues, raw, 'spreadEvery', 'disasters.gangWar.spreadEvery', 1, 500),
+    spreadStop: num(issues, raw, 'spreadStop', 'disasters.gangWar.spreadStop', 0, 255),
+    drainBase: num(issues, raw, 'drainBase', 'disasters.gangWar.drainBase', 0.01, 100),
+    pressurePolice: num(issues, raw, 'pressurePolice', 'disasters.gangWar.pressurePolice', 0, 10),
+    pressureHappiness: num(
+      issues,
+      raw,
+      'pressureHappiness',
+      'disasters.gangWar.pressureHappiness',
+      0,
+      10,
+    ),
+    pressureEmployment: num(
+      issues,
+      raw,
+      'pressureEmployment',
+      'disasters.gangWar.pressureEmployment',
+      0,
+      10,
+    ),
+    pressureScale: num(issues, raw, 'pressureScale', 'disasters.gangWar.pressureScale', 0, 100),
+    crimeFloor: num(issues, raw, 'crimeFloor', 'disasters.gangWar.crimeFloor', 0, 255),
+    happiness: num(issues, raw, 'happiness', 'disasters.gangWar.happiness', 0, 255),
+    happinessCity: num(issues, raw, 'happinessCity', 'disasters.gangWar.happinessCity', 0, 255),
+    educationFactor: num(issues, raw, 'educationFactor', 'disasters.gangWar.educationFactor', 0, 1),
+    healthFactor: num(issues, raw, 'healthFactor', 'disasters.gangWar.healthFactor', 0, 1),
+    landValue: num(issues, raw, 'landValue', 'disasters.gangWar.landValue', 0, 255),
+    taxLoss: num(issues, raw, 'taxLoss', 'disasters.gangWar.taxLoss', 0, 1),
+    destroyEvery: num(issues, raw, 'destroyEvery', 'disasters.gangWar.destroyEvery', 1, 500),
+    destroyChance: num(issues, raw, 'destroyChance', 'disasters.gangWar.destroyChance', 0, 1),
+    happinessPerLoss: num(
+      issues,
+      raw,
+      'happinessPerLoss',
+      'disasters.gangWar.happinessPerLoss',
+      0,
+      255,
+    ),
+  };
+}
+
+/** Sekce v `disasters`. Chybějící se hlásí jednou, ne u každého klíče zvlášť. */
+function disasterSection(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+  key: string,
+): Record<string, unknown> | null {
+  const raw = disasters ? asRecord(disasters[key]) : null;
+  if (!raw && disasters) {
+    issues.push({ field: `disasters.${key}`, message: 'chybí, nebo není objekt' });
+  }
+  return raw;
+}
+
+/**
+ * Reakce se musí vyplatit. `faster` je úbytek při zásahu, `slower` bez něj.
+ *
+ * Kdyby to bylo obráceně, hráč by katastrofu prodlužoval tím, že se snaží —
+ * a nikdo by na to nepřišel, protože obojí je jen číslo v datech.
+ */
+function reactionPays(
+  issues: ValidationIssue[],
+  field: string,
+  slower: number,
+  faster: number,
+): void {
+  if (faster > slower) return;
+  issues.push({
+    field,
+    message: `reakce musí katastrofu zkracovat: ${faster} není víc než ${slower}`,
+  });
 }
 
 function validateBlast(

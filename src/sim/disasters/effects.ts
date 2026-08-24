@@ -98,7 +98,7 @@ export function floodArea(
 export function suppressService(
   world: WorldState,
   serviceClass: string,
-  shape: Shape,
+  shape: EffectArea,
   factor: number,
   duration: number,
   source = 0,
@@ -117,7 +117,7 @@ export function suppressService(
 /** Zvýší dopravní zátěž na `factor` násobek. Uplatní `trafficSystem`. */
 export function spikeTraffic(
   world: WorldState,
-  shape: Shape,
+  shape: EffectArea,
   factor: number,
   duration: number,
   source = 0,
@@ -134,7 +134,7 @@ export function spikeTraffic(
 /** Přičte ke kriminalitě. Uplatní `crimeSystem` po difuzi. */
 export function spikeCrime(
   world: WorldState,
-  shape: Shape,
+  shape: EffectArea,
   amount: number,
   duration: number,
   source = 0,
@@ -157,7 +157,7 @@ export function spikeCrime(
  */
 export function crimeFloor(
   world: WorldState,
-  shape: Shape,
+  shape: EffectArea,
   minValue: number,
   duration: number,
   source = 0,
@@ -174,7 +174,7 @@ export function crimeFloor(
 /** Srazí spokojenost. Uplatní `happinessSystem`. */
 export function happinessPenalty(
   world: WorldState,
-  shape: Shape,
+  shape: EffectArea,
   amount: number,
   duration: number,
   source = 0,
@@ -191,7 +191,7 @@ export function happinessPenalty(
 /** Srazí cenu půdy. Uplatní `landValueSystem`. */
 export function landValuePenalty(
   world: WorldState,
-  shape: Shape,
+  shape: EffectArea,
   amount: number,
   duration: number,
   source = 0,
@@ -268,6 +268,29 @@ export function populationLoss(
     lost += gone;
   }
   return lost;
+}
+
+/**
+ * Sníží daňový výnos v oblasti na `1 − amount`. Uplatní `computeBudget`.
+ *
+ * Sociální katastrofy neboří domy — berou peníze. Stávkující čtvrť nedaní
+ * vůbec, nepokoje a válka gangů seberou část. Protože rozpočet je jeden sdílený
+ * výpočet, hráč to uvidí rovnou v rozpisu a nemusí hádat, kam se poděl příjem.
+ */
+export function taxLoss(
+  world: WorldState,
+  shape: EffectArea,
+  share: number,
+  duration: number,
+  source = 0,
+): void {
+  pushModifier(world, {
+    kind: 'taxLoss',
+    cells: cellsFor(world, shape),
+    amount: Math.max(0, Math.min(1, share)),
+    until: world.tick + duration,
+    source,
+  });
 }
 
 /** Zablokuje dlaždici — doprava přes ni neprojde. Uplatní `trafficSystem`. */
@@ -355,7 +378,20 @@ function pushModifier(world: WorldState, modifier: Modifier): void {
   world.disasters.modifiers.push(modifier);
 }
 
-function cellsFor(world: WorldState, shape: Shape): number[] {
+/**
+ * Postih na celé město.
+ *
+ * Není to `{ kind: 'global' }` s vzorkováním: `strongestModifier` se ptá
+ * `cells.includes(cell)`, takže vyjmenovaných čtyři tisíce buněk by znamenalo
+ * lineární hledání při každém dotazu každého systému. Prázdný seznam znamená
+ * „všude" a odpoví se na něj rovnou.
+ */
+export const CITY_WIDE = { kind: 'cityWide' } as const;
+
+export type EffectArea = Shape | typeof CITY_WIDE;
+
+function cellsFor(world: WorldState, shape: EffectArea): number[] {
+  if (shape.kind === 'cityWide') return [];
   return coarseCellsOfShape(world, shape);
 }
 
