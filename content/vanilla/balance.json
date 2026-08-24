@@ -157,6 +157,104 @@
       "landValuePenalty": 15,
       "happinessPerLoss": 3
     },
+    "tornado": {
+      "speed": 1.5,
+      "lifetimeMin": 20,
+      "lifetimeMax": 45,
+      "widthMin": 2,
+      "widthMax": 5,
+      "turnDegrees": 12,
+      "igniteChance": 0.25,
+      "igniteIntensity": 110,
+      "happinessPerLoss": 3,
+      "survival": {
+        "forest": 0.05,
+        "abandoned": 0.1,
+        "residentialLow": 0.15,
+        "residentialHigh": 0.35,
+        "commercial": 0.4,
+        "industrial": 0.45,
+        "service": 0.55,
+        "utility": 0.55,
+        "road": 0.7,
+        "pipe": 0.9,
+        "rubble": 0.5,
+        "empty": 1
+      }
+    },
+
+    "earthquake": {
+      "magnitudeBase": 0.3,
+      "magnitudeSpan": 0.7,
+      "falloffShare": 0.7,
+      "falloffMin": 0.25,
+      "downgradeShare": 0.6,
+      "aftershocksMin": 2,
+      "aftershocksMax": 5,
+      "aftershockDelayMin": 15,
+      "aftershockDelayMax": 40,
+      "aftershockDecay": 0.45,
+      "fireChance": 0.3,
+      "floodChance": 0.4,
+      "floodBand": 3,
+      "floodDepth": 2,
+      "floodDuration": 12,
+      "igniteIntensity": 110,
+      "happinessPerLoss": 4,
+      "happinessPerDowngrade": 1,
+      "vulnerability": {
+        "abandoned": 1.3,
+        "residentialLow": 1,
+        "utility": 0.9,
+        "industrial": 0.85,
+        "commercial": 0.8,
+        "residentialHigh": 0.75,
+        "service": 0.7,
+        "pipe": 0.7,
+        "road": 0.45,
+        "forest": 0,
+        "rubble": 0,
+        "empty": 0
+      }
+    },
+
+    "blast": {
+      "resistance": {
+        "industrial": 0.15,
+        "residentialLow": 0.25,
+        "residentialHigh": 0.25,
+        "commercial": 0.25,
+        "abandoned": 0.25,
+        "service": 0.35,
+        "utility": 0.35,
+        "road": 0.6,
+        "pipe": 0.8,
+        "forest": 0.1,
+        "rubble": 0.5,
+        "empty": 1
+      },
+      "explosion": {
+        "radiusBase": 1,
+        "radiusPerLevel": 1.5,
+        "destroyChance": 0.75,
+        "igniteReach": 1.5,
+        "igniteChance": 0.5,
+        "igniteIntensity": 110,
+        "pollution": 0,
+        "happinessPerLoss": 3
+      },
+      "industrialAccident": {
+        "radiusBase": 2,
+        "radiusPerLevel": 2,
+        "destroyChance": 0.85,
+        "igniteReach": 1.5,
+        "igniteChance": 0.45,
+        "igniteIntensity": 120,
+        "pollution": 60,
+        "happinessPerLoss": 3
+      }
+    },
+
     "fire": {
       "tickInterval": 2,
       "suppressBase": 4,

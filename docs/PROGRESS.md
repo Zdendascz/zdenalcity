@@ -2002,18 +2002,92 @@ Mutační test 14 z 14; z prvních deseti chycených vyplynulo, že dva testy
 měřily vedle (cena půdy se ověřovala přes celé město, kde ji srazí i
 kriminalita) a dva kusy kódu byly mrtvé.
 
+- [x] T49 — povodeň: postup vlny, poškození, opadání
+
+Tři fáze a každá je jiné rozhodnutí. **Postup**: vlna jde od břehu dovnitř, ale
+jen tam, kam dosáhne hladina — vyvýšený břeh zůstane suchý a hráz o jedinou
+úroveň zastaví vlnu úplně. **Stání**: poškození se hromadí, takže rychlé
+opadnutí opravdu zachraňuje. **Opadání**: odpočet po dlaždicích, který hasiči
+zrychlují — čtvrť u hasičárny vyschne dřív než ta na druhém konci města.
+
+Zaplavená dlaždice nevede proud ani vodu a je neprůjezdná. Přerušené sítě bolí
+víc než pár zbořených domů, a to je záměr: hráč po povodni neopravuje domy,
+opravuje město.
+
+Vznik se váží **délkou pobřeží v okolí děleno pevninou v okolí**, ne podílem
+vody. Zátoka má na málo pevniny hodně břehu, rovná pláž ne — povodeň tak chodí
+tam, kam by chodila doopravdy, a `bayWeight: 4` z toho dělá 1,29× vyšší
+pravděpodobnost na dlaždici v zátoce.
+
+Tři metriky před ní byly špatně a stálo to nejvíc času z celé fáze: podíl vody
+v okně byl slabý, počet vodních sousedů taky, a délka pobřeží dělená celým
+oknem byla **horší než nic** — voda v okně jmenovatel nafoukne, takže zátoka
+vyšla hůř než pláž.
+
+Mutační test 21 z 21. Poprvé přežil mutant „žádné vážení" — a chyba byla v mém
+testovacím orákulu, ne v kódu: počítalo sousedy bez kontroly hranic, takže
+`index(-1, y)` spadlo na konec předchozího řádku a napočítalo 21 pobřežních
+dlaždic na opačné straně mapy. Druhá oprava byla v tom, co test měří: podíl
+zátahů na celkovém počtu je k ničemu, když zátoka tvoří polovinu pobřeží.
+Měří se pravděpodobnost **na dlaždici**.
+
+- [x] T51 — ničivé: tornádo, zemětřesení, výbuch, průmyslová havárie
+
+Čtyři katastrofy, jedna společná vrstva `damage.ts`. `rollDamage` dostane tvar
+a funkci „jaká je tady šance", zbytek — obsah dlaždice, celý půdorys budovy,
+trosky po ní, srovnání seznamů silnic — je společný. Bez toho by čtyři soubory
+čtyřikrát zapomněly odstranit budovu ze `zonedTiles`.
+
+Hází se **na budovu, ne na dlaždici**: velká továrna 3×3 by jinak dostala devět
+hodů a nepřežila by nikdy. Hází se ale **vždy**, i při nulové šanci, aby `rng`
+běžel stejně nezávisle na obsahu mapy (P2).
+
+**Tornádo** se pohybuje v čase: vzniká na okraji, míří do vnitrozemí, každý tik
+se stočí o pár stupňů. Síla jde 0,4 → 1,0 → 0,3 podle uplynulé části života.
+Proti zásahu obrana neexistuje a je to záměr — bránit se dá jen tomu, co přijde
+po něm, a následné požáry nadělají víc škody než tornádo samo.
+
+**Zemětřesení** losuje sílu jako `základ + rozpětí × rng³`. Třetí mocnina je
+tam schválně: velká rána musí být vzácná, jinak si na ni hráč zvykne a finanční
+rezerva ztratí smysl. Umí **nalomit**, ne jen bořit — snížená budova je mírnější
+trest, který hráč pozná na dani a kapacitě, ne na mapě. Dotřesy slábnou o 0,45
+a u pobřeží zaplaví pás do tří dlaždic.
+
+**Výbuch a havárie** jsou jedna mechanika a dvě sady čísel. Rozdíl je přesně
+tam, kde ho hráč pozná: havárie boří víc (0,85 proti 0,75) a kontaminuje,
+výbuch zapaluje víc (50 % proti 45 %). Obojí zapaluje **dál, než boří** — okraj
+tlakové vlny dům nesloží, ale zapálí ho. **Neřetězí se** (rozhodnutí autora):
+zasažená továrna hoří, nevybuchuje. Řetězení by z jedné havárie udělalo konec
+města a hráč by neměl co zachraňovat.
+
+Místo výbuchu se váží úrovní, nepokrytím hasiči a zanedbaností. Bouchne tedy
+nejspíš tam, kde hráč nechal starou nekrytou továrnu stát — je to zpráva, ne
+loterie.
+
+Pobřežní pás zemětřesení se počítá **průchodem od vody ven**, ne oknem kolem
+každé dlaždice. Okno 7×7 na 262 144 dlaždic velké mapy je dvanáct milionů
+porovnání na jeden otřes a otřesů je až osm.
+
+Validace `contentTable()` vyžaduje všech dvanáct druhů obsahu, protože chybějící
+klíč tiše znamená nulu. Hned to našlo chybějící `abandoned` v `tornado.survival`
+— ruiny by tornádo neumělo srovnat se zemí.
+
+Mutační test 26 z 26; první běh chytil 15. Tornádo bylo přitom testované jen na
+„něco spadlo“, což platí i pro tornádo s konstantní silou, letící po pravítku,
+vznikající pořád na západě a zapalující všechno, přes co přejede. Křivka síly
+a útlum od osy pásu se přes zásah do města spolehlivě změřit nedají, takže jsou
+teď vystavené a testované přímo; zbytek se ověřuje chováním.
+
 
 ## Rozpracované
 
 **Fáze 4.** Hotová je celá 4a (T42–T45; T46 odpadl podle měření) a z 4b
-kostra katastrof, oheň a trosky.
+kostra katastrof, oheň, trosky, povodeň a všechny čtyři ničivé katastrofy.
 
 Zbývá:
 
 | Úkol | Obsah |
 |---|---|
-| T49 | Záplava — vrstvy, šíření podle výšky, postupné poškození, opadání |
-| T51 | Ničivé: tornádo, zemětřesení, výbuch, průmyslová havárie |
 | T52 | Sociální: stávka, nepokoje, válka gangů, hromadná nehoda |
 | T53 | Síťové a zdravotní: blackout, epidemie, chemická havárie |
 | T54 | Sesuv půdy |

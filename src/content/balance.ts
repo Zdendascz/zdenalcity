@@ -138,6 +138,85 @@ export interface FloodBalance {
   happinessPerLoss: number;
 }
 
+/** Tabulka podle druhu obsahu dlaždice. Klíče viz `ContentKind`. */
+export type ContentTable = Readonly<Record<string, number>>;
+
+/**
+ * Tornádo (§6 fáze 4, katalog 3).
+ *
+ * Proti zásahu samotnému obrana neexistuje a je to záměr autora — tornádo
+ * nemá předpověď dráhy. Bránit se dá jen tomu, co přijde po něm: hasičské
+ * pokrytí tlumí druhou vlnu a **následné požáry způsobí víc škody než tornádo
+ * samo**.
+ */
+export interface TornadoBalance {
+  /** Dlaždic za tik. */
+  speed: number;
+  lifetimeMin: number;
+  lifetimeMax: number;
+  widthMin: number;
+  widthMax: number;
+  /** O kolik stupňů se dráha smí stočit za tik. */
+  turnDegrees: number;
+  igniteChance: number;
+  igniteIntensity: number;
+  happinessPerLoss: number;
+  /** Šance, že obsah dlaždice přímý zásah přežije. */
+  survival: ContentTable;
+}
+
+/**
+ * Zemětřesení (katalog 4).
+ *
+ * `magnitude = base + span × rng()³` — třetí mocnina dává silný sklon
+ * k nízkým hodnotám, takže velká rána je vzácná a hráč si na ni nemůže
+ * zvyknout.
+ */
+export interface EarthquakeBalance {
+  magnitudeBase: number;
+  magnitudeSpan: number;
+  /** Podíl hrany mapy, na kterém síla klesne k `falloffMin`. */
+  falloffShare: number;
+  falloffMin: number;
+  /** Nepovedl-li se zásah, tímhle podílem se zkouší aspoň snížení úrovně. */
+  downgradeShare: number;
+  aftershocksMin: number;
+  aftershocksMax: number;
+  aftershockDelayMin: number;
+  aftershockDelayMax: number;
+  aftershockDecay: number;
+  fireChance: number;
+  floodChance: number;
+  floodBand: number;
+  floodDepth: number;
+  floodDuration: number;
+  igniteIntensity: number;
+  happinessPerLoss: number;
+  happinessPerDowngrade: number;
+  vulnerability: ContentTable;
+}
+
+/** Společné pro výbuch a průmyslovou havárii — liší se jen čísly. */
+export interface BlastKindBalance {
+  radiusBase: number;
+  radiusPerLevel: number;
+  destroyChance: number;
+  /** Násobek poloměru, do kterého to ještě zapaluje. */
+  igniteReach: number;
+  igniteChance: number;
+  igniteIntensity: number;
+  /** Nula znamená „bez kontaminace" — tím se výbuch od havárie liší. */
+  pollution: number;
+  happinessPerLoss: number;
+}
+
+export interface BlastBalance {
+  /** Odolnost obsahu proti tlakové vlně. Sdílí ji obě varianty. */
+  resistance: ContentTable;
+  explosion: BlastKindBalance;
+  industrialAccident: BlastKindBalance;
+}
+
 export interface DisasterBalance {
   baseMonthlyChance: number;
   maxMonthlyChance: number;
@@ -384,6 +463,9 @@ export interface Balance {
     rubble: { clearCost: number; crimeWeight: number; landValuePenalty: number };
     fire: FireBalance;
     flood: FloodBalance;
+    tornado: TornadoBalance;
+    earthquake: EarthquakeBalance;
+    blast: BlastBalance;
     types: Readonly<Record<string, DisasterBalance>>;
   };
 
@@ -632,6 +714,9 @@ export function validateBalance(raw: unknown): {
       },
       fire: validateFire(issues, disasters),
       flood: validateFlood(issues, disasters),
+      tornado: validateTornado(issues, disasters),
+      earthquake: validateEarthquake(issues, disasters),
+      blast: validateBlast(issues, disasters),
       types: disasterTypes,
     },
     economy: {
@@ -1203,6 +1288,172 @@ function validateFlood(
       'disasters.flood.happinessPerLoss',
       0,
       255,
+    ),
+  };
+}
+
+/** Klíče, které musí každá tabulka obsahu nést. Chybějící se tiše chová jako nula. */
+const CONTENT_KINDS = [
+  'forest',
+  'abandoned',
+  'residentialLow',
+  'residentialHigh',
+  'commercial',
+  'industrial',
+  'service',
+  'utility',
+  'road',
+  'pipe',
+  'rubble',
+  'empty',
+] as const;
+
+/**
+ * Tabulka podle obsahu dlaždice.
+ *
+ * Kontroluje se **úplnost**: chybějící klíč se v kódu chová jako nula, což
+ * u odolnosti znamená „zničí se vždycky" a u zranitelnosti „nikdy". Obojí je
+ * tichá chyba, kterou by hráč objevil až tím, že mu tornádo nechává stát
+ * zrovna továrny.
+ */
+function contentTable(
+  issues: ValidationIssue[],
+  container: Record<string, unknown> | null,
+  key: string,
+  where: string,
+  max: number,
+): ContentTable {
+  const raw = container ? asRecord(container[key]) : null;
+  if (!raw) {
+    if (container) issues.push({ field: where, message: 'chybí, nebo není objekt' });
+    return {};
+  }
+
+  const table: Record<string, number> = {};
+  for (const name of Object.keys(raw).sort()) {
+    table[name] = num(issues, raw, name, `${where}.${name}`, 0, max);
+  }
+  for (const required of CONTENT_KINDS) {
+    if (table[required] === undefined) {
+      issues.push({ field: `${where}.${required}`, message: 'chybí' });
+    }
+  }
+  return table;
+}
+
+function validateTornado(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): TornadoBalance {
+  const raw = disasters ? asRecord(disasters['tornado']) : null;
+  if (!raw && disasters) {
+    issues.push({ field: 'disasters.tornado', message: 'chybí, nebo není objekt' });
+  }
+  const where = 'disasters.tornado';
+
+  const lifetimeMin = num(issues, raw, 'lifetimeMin', `${where}.lifetimeMin`, 1, 1000);
+  const lifetimeMax = num(issues, raw, 'lifetimeMax', `${where}.lifetimeMax`, 1, 1000);
+  if (lifetimeMax < lifetimeMin) {
+    issues.push({ field: `${where}.lifetimeMax`, message: 'nesmí být pod min' });
+  }
+  const widthMin = num(issues, raw, 'widthMin', `${where}.widthMin`, 1, 100);
+  const widthMax = num(issues, raw, 'widthMax', `${where}.widthMax`, 1, 100);
+  if (widthMax < widthMin) {
+    issues.push({ field: `${where}.widthMax`, message: 'nesmí být pod min' });
+  }
+
+  return {
+    speed: num(issues, raw, 'speed', `${where}.speed`, 0.1, 100),
+    lifetimeMin,
+    lifetimeMax,
+    widthMin,
+    widthMax,
+    turnDegrees: num(issues, raw, 'turnDegrees', `${where}.turnDegrees`, 0, 180),
+    igniteChance: num(issues, raw, 'igniteChance', `${where}.igniteChance`, 0, 1),
+    igniteIntensity: num(issues, raw, 'igniteIntensity', `${where}.igniteIntensity`, 1, 255),
+    happinessPerLoss: num(issues, raw, 'happinessPerLoss', `${where}.happinessPerLoss`, 0, 255),
+    survival: contentTable(issues, raw, 'survival', `${where}.survival`, 1),
+  };
+}
+
+function validateEarthquake(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): EarthquakeBalance {
+  const raw = disasters ? asRecord(disasters['earthquake']) : null;
+  if (!raw && disasters) {
+    issues.push({ field: 'disasters.earthquake', message: 'chybí, nebo není objekt' });
+  }
+  const where = 'disasters.earthquake';
+
+  return {
+    magnitudeBase: num(issues, raw, 'magnitudeBase', `${where}.magnitudeBase`, 0, 1),
+    magnitudeSpan: num(issues, raw, 'magnitudeSpan', `${where}.magnitudeSpan`, 0, 1),
+    falloffShare: num(issues, raw, 'falloffShare', `${where}.falloffShare`, 0.01, 10),
+    falloffMin: num(issues, raw, 'falloffMin', `${where}.falloffMin`, 0, 1),
+    downgradeShare: num(issues, raw, 'downgradeShare', `${where}.downgradeShare`, 0, 10),
+    aftershocksMin: num(issues, raw, 'aftershocksMin', `${where}.aftershocksMin`, 0, 100),
+    aftershocksMax: num(issues, raw, 'aftershocksMax', `${where}.aftershocksMax`, 0, 100),
+    aftershockDelayMin: num(issues, raw, 'aftershockDelayMin', `${where}.aftershockDelayMin`, 1, 1000),
+    aftershockDelayMax: num(issues, raw, 'aftershockDelayMax', `${where}.aftershockDelayMax`, 1, 1000),
+    aftershockDecay: num(issues, raw, 'aftershockDecay', `${where}.aftershockDecay`, 0, 1),
+    fireChance: num(issues, raw, 'fireChance', `${where}.fireChance`, 0, 1),
+    floodChance: num(issues, raw, 'floodChance', `${where}.floodChance`, 0, 1),
+    floodBand: num(issues, raw, 'floodBand', `${where}.floodBand`, 0, 100),
+    floodDepth: num(issues, raw, 'floodDepth', `${where}.floodDepth`, 0, 255),
+    floodDuration: num(issues, raw, 'floodDuration', `${where}.floodDuration`, 0, 255),
+    igniteIntensity: num(issues, raw, 'igniteIntensity', `${where}.igniteIntensity`, 1, 255),
+    happinessPerLoss: num(issues, raw, 'happinessPerLoss', `${where}.happinessPerLoss`, 0, 255),
+    happinessPerDowngrade: num(
+      issues,
+      raw,
+      'happinessPerDowngrade',
+      `${where}.happinessPerDowngrade`,
+      0,
+      255,
+    ),
+    vulnerability: contentTable(issues, raw, 'vulnerability', `${where}.vulnerability`, 10),
+  };
+}
+
+function blastKind(
+  issues: ValidationIssue[],
+  container: Record<string, unknown> | null,
+  key: string,
+  where: string,
+): BlastKindBalance {
+  const raw = container ? asRecord(container[key]) : null;
+  if (!raw && container) issues.push({ field: where, message: 'chybí, nebo není objekt' });
+
+  return {
+    radiusBase: num(issues, raw, 'radiusBase', `${where}.radiusBase`, 0, 100),
+    radiusPerLevel: num(issues, raw, 'radiusPerLevel', `${where}.radiusPerLevel`, 0, 100),
+    destroyChance: num(issues, raw, 'destroyChance', `${where}.destroyChance`, 0, 1),
+    igniteReach: num(issues, raw, 'igniteReach', `${where}.igniteReach`, 0, 10),
+    igniteChance: num(issues, raw, 'igniteChance', `${where}.igniteChance`, 0, 1),
+    igniteIntensity: num(issues, raw, 'igniteIntensity', `${where}.igniteIntensity`, 1, 255),
+    pollution: num(issues, raw, 'pollution', `${where}.pollution`, 0, 255),
+    happinessPerLoss: num(issues, raw, 'happinessPerLoss', `${where}.happinessPerLoss`, 0, 255),
+  };
+}
+
+function validateBlast(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): BlastBalance {
+  const raw = disasters ? asRecord(disasters['blast']) : null;
+  if (!raw && disasters) {
+    issues.push({ field: 'disasters.blast', message: 'chybí, nebo není objekt' });
+  }
+
+  return {
+    resistance: contentTable(issues, raw, 'resistance', 'disasters.blast.resistance', 1),
+    explosion: blastKind(issues, raw, 'explosion', 'disasters.blast.explosion'),
+    industrialAccident: blastKind(
+      issues,
+      raw,
+      'industrialAccident',
+      'disasters.blast.industrialAccident',
     ),
   };
 }
