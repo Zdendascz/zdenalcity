@@ -2,12 +2,18 @@ import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from './catalogue';
 import type { ReadonlyCoarseLayers } from './coarse';
 import {
+  addTransitStop,
   buildPipe,
   buildRoad,
   bulldoze,
+  createTransitLine,
+  deleteTransitLine,
   levelArea,
   placeDefinition,
   removePipe,
+  removeTransitStop,
+  setLineFare,
+  setLineVehicles,
   setServiceFunding,
   setTaxRate,
   terraformCorner,
@@ -135,6 +141,18 @@ class MainThreadSimHost implements SimHost {
         return levelArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, this.balance, cmd.mode);
       case 'set_service_funding':
         return setServiceFunding(this.world, cmd.serviceClass, cmd.funding);
+      case 'create_line':
+        return createTransitLine(this.world, this.balance, cmd.mode);
+      case 'delete_line':
+        return deleteTransitLine(this.world, cmd.lineId);
+      case 'add_stop':
+        return addTransitStop(this.world, this.catalogue, this.balance, cmd.lineId, cmd.buildingId);
+      case 'remove_stop':
+        return removeTransitStop(this.world, cmd.lineId, cmd.buildingId);
+      case 'set_vehicles':
+        return setLineVehicles(this.world, this.balance, cmd.lineId, cmd.vehicles);
+      case 'set_fare':
+        return setLineFare(this.world, cmd.lineId, cmd.fare);
       default:
         return assertNever(cmd);
     }

@@ -388,6 +388,28 @@ export interface ChemicalSpillBalance {
   neglectFactor: number;
 }
 
+/**
+ * Jeden mód MHD (§7 fáze 4).
+ *
+ * Vlastnosti jsou **obsah, ne kód**: mod si přidá vlastní mód a hra o něm
+ * nemusí vědět. Rozdíl mezi autobusem a tramvají je tady, ne v `if`.
+ */
+export interface TransitModeBalance {
+  /** Kolik lidí odveze jedno vozidlo za měsíc. */
+  capacity: number;
+  vehicleCost: number;
+  vehicleUpkeep: number;
+  /**
+   * Kolik kapacity silnice ukrojí kolej, 0–1.
+   *
+   * Nenulová jen u tramvaje, a je to jediné, co ji dělá horší volbou než
+   * autobus — bez toho by nebyl důvod autobus vůbec postavit.
+   */
+  roadShare: number;
+  /** Elektrická trakce: linka nejezdí, když zastávka nemá proud. */
+  needsPower: boolean;
+}
+
 export interface DisasterBalance {
   baseMonthlyChance: number;
   maxMonthlyChance: number;
@@ -645,6 +667,12 @@ export interface Balance {
     epidemic: EpidemicBalance;
     chemicalSpill: ChemicalSpillBalance;
     types: Readonly<Record<string, DisasterBalance>>;
+  };
+
+  transit: {
+    minStops: number;
+    maxStops: number;
+    modes: Readonly<Record<string, TransitModeBalance>>;
   };
 
   growth: {
@@ -1031,6 +1059,8 @@ export function validateBalance(raw: unknown): {
       decayPenalty: num(issues, levels, 'decayPenalty', 'levels.decayPenalty', 0, 255),
       demandRelief: num(issues, levels, 'demandRelief', 'levels.demandRelief', 0, 255),
     },
+    transit: validateTransit(issues, root),
+
     growth: {
       exponent: num(issues, growth, 'exponent', 'growth.exponent', 0, 10),
       demandPerAttempt: num(issues, growth, 'demandPerAttempt', 'growth.demandPerAttempt', 1, 1000),
@@ -1783,6 +1813,76 @@ function reactionPays(
     field,
     message: `reakce musí katastrofu zkracovat: ${faster} není víc než ${slower}`,
   });
+}
+
+/** Pravdivostní hodnota z balancu. Chybějící se hlásí, nedosazuje. */
+function flag(
+  issues: ValidationIssue[],
+  container: Record<string, unknown> | null,
+  key: string,
+  field: string,
+): boolean {
+  if (!container) return false;
+  const value = container[key];
+  if (typeof value !== 'boolean') {
+    issues.push({ field, message: 'musí být true nebo false' });
+    return false;
+  }
+  return value;
+}
+
+/**
+ * Módy MHD.
+ *
+ * Nekontroluje se, že existují zrovna `bus`, `tram` a `metro` — módy jsou
+ * obsah. Kontroluje se **tvar**: bez toho by mód s chybějící kapacitou tiše
+ * odvezl nula lidí a hráč by hledal chybu v počtu vozidel.
+ */
+function validateTransit(
+  issues: ValidationIssue[],
+  root: Record<string, unknown>,
+): Balance['transit'] {
+  const raw = section(issues, root, 'transit');
+  const modes: Record<string, TransitModeBalance> = {};
+
+  const rawModes = raw ? asRecord(raw['modes']) : null;
+  if (raw && !rawModes) {
+    issues.push({ field: 'transit.modes', message: 'chybí, nebo není objekt' });
+  }
+
+  for (const [name, value] of Object.entries(rawModes ?? {})) {
+    const where = `transit.modes.${name}`;
+    const mode = asRecord(value);
+    if (!mode) {
+      issues.push({ field: where, message: 'musí být objekt' });
+      continue;
+    }
+
+    modes[name] = {
+      capacity: num(issues, mode, 'capacity', `${where}.capacity`, 1, 100000),
+      vehicleCost: num(issues, mode, 'vehicleCost', `${where}.vehicleCost`, 0, 1000000),
+      vehicleUpkeep: num(issues, mode, 'vehicleUpkeep', `${where}.vehicleUpkeep`, 0, 100000),
+      roadShare: num(issues, mode, 'roadShare', `${where}.roadShare`, 0, 0.9),
+      needsPower: flag(issues, mode, 'needsPower', `${where}.needsPower`),
+    };
+  }
+
+  if (raw && Object.keys(modes).length === 0) {
+    issues.push({ field: 'transit.modes', message: 'aspoň jeden mód' });
+  }
+
+  const minStops = num(issues, raw, 'minStops', 'transit.minStops', 2, 100);
+  const maxStops = num(issues, raw, 'maxStops', 'transit.maxStops', 2, 100);
+  // Linka musí mít aspoň dvě zastávky, aby vůbec někam vedla, a strop nesmí
+  // být pod dnem — jinak by nešla založit žádná.
+  if (raw && maxStops < minStops) {
+    issues.push({
+      field: 'transit',
+      message: `strop zastávek nesmí být pod dnem: ${maxStops} < ${minStops}`,
+    });
+  }
+
+  return { minStops, maxStops, modes };
 }
 
 function validateBlackout(

@@ -18,6 +18,7 @@ import { createDisasterSystem } from '../disasters/scheduler';
 import { createFireSystem } from '../disasters/fire';
 import { createFloodSystem } from '../disasters/flood';
 import { DisasterRegistry } from '../disasters/registry';
+import { createTransitSystem } from './transit';
 
 export interface System {
   readonly name: string;
@@ -70,6 +71,9 @@ export function createDefaultSystems(
     // cooldown, ne ho dostat ve stejném tiku.
     createLevelSystem(catalogue, balance),
     createEconomySystem(catalogue, balance),
+    // Linky před dopravou: kolony si čtou, kolik kapacity silnici zbylo po
+    // kolejích, a přepočet až za nimi by se projevil o osm tiků později.
+    createTransitSystem(catalogue, balance),
     // Doprava před cenou půdy: kolony do ní vstupují od T26.
     createTrafficSystem(catalogue, balance),
     createPollutionSystem(catalogue, balance),
@@ -84,6 +88,7 @@ export function createDefaultSystems(
 }
 
 export {
+  createTransitSystem,
   createPowerSystem,
   createWaterSystem,
   createWaterDecaySystem,

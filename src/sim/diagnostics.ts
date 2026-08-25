@@ -12,6 +12,7 @@ import { seedDefinitions } from './levels';
 import { roadReach } from './systems/growth';
 import { waterProximity } from './systems/landValue';
 import type { WorldState } from './world';
+import { roadCapacityFactor } from './transit';
 
 /**
  * Diagnostika parcely (§12 zadání fáze 2).
@@ -93,7 +94,11 @@ export function coarseCongestion(
     const roadType = world.layers.road[tile] ?? ROAD.none;
     if (roadType === ROAD.none) continue;
 
-    const capacity = balance.traffic.roadTypes[roadType - 1]?.capacity ?? 0;
+    // Kolej ukusuje z vozovky (§7 fáze 4). Tramvaj je jediná, která do
+    // dopravního modelu zasahuje záporně — bez toho by nebyl důvod volit
+    // autobus. Zbytek kapacity je nikdy nulový, mód má strop 0,9.
+    const capacity =
+      (balance.traffic.roadTypes[roadType - 1]?.capacity ?? 0) * roadCapacityFactor(world, tile);
     if (capacity <= 0) continue;
 
     const x = tile % world.size;

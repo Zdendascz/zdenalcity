@@ -16,6 +16,7 @@ import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
 import { checkRequirements, presentDefinitions } from './requirements';
 import { needsClearing } from './terrain';
+import { createLine, findLine, modeOf, removeLine, stopMode } from './transit';
 import { extinguishTile } from './disasters/fire';
 import { clearRubble } from './disasters/rubble';
 import { OK, reject } from './result';
@@ -57,7 +58,21 @@ export type Command =
    * v úrovni horní krajiny (rozhodnutí autora, T41).
    */
   | { type: 'level_area'; x: number; y: number; w: number; h: number; mode?: 'average' | 'fill' }
-  | { type: 'set_speed'; speed: number };
+  | { type: 'set_speed'; speed: number }
+  /**
+   * Linky MHD (§7 fáze 4).
+   *
+   * Zastávka se do linky **přidává, ne kreslí** — trasa je abstrakce. Pořadí
+   * zastávek je pořadí, ve kterém linka jede, takže `add_stop` přidává na
+   * konec a `move_stop` je od toho, aby šlo změnit smyčku bez rozebrání celé
+   * linky.
+   */
+  | { type: 'create_line'; mode: string }
+  | { type: 'delete_line'; lineId: number }
+  | { type: 'add_stop'; lineId: number; buildingId: number }
+  | { type: 'remove_stop'; lineId: number; buildingId: number }
+  | { type: 'set_vehicles'; lineId: number; vehicles: number }
+  | { type: 'set_fare'; lineId: number; fare: number };
 
 /** Má dlaždice aspoň jednoho silničního souseda? Odsud se staví mosty dál. */
 function touchesRoad(world: WorldState, x: number, y: number): boolean {
@@ -648,4 +663,123 @@ export function levelArea(
 ): CommandResult {
   if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
   return commit(world, estimateLevelArea(world, x, y, w, h, balance, mode));
+}
+
+/* ------------------------------------------------------------------ MHD -- */
+
+/**
+ * Založí linku daného módu.
+ *
+ * Zastávky se přidávají zvlášť: prázdná linka je platný stav, jen nejezdí.
+ * Hráč tak může nejdřív založit linku a pak k ní sbírat zastávky, místo aby
+ * musel mít celou trasu hotovou předem.
+ *
+ * Id nové linky se nevrací — `CommandResult` je společný tvar pro všechny
+ * příkazy a rozšiřovat ho kvůli jednomu by znamenalo, že ostatní vracejí
+ * pole, které nikdy nevyplní. Nová linka je poslední v `world.lines`.
+ */
+export function createTransitLine(
+  world: WorldState,
+  balance: Balance | undefined,
+  mode: string,
+): CommandResult {
+  // Bez balancu není katalog módů, takže žádný mód není známý. `SimHost` se
+  // dá postavit i bez obsahu (dělají to testy jádra) a linka je první příkaz,
+  // který se bez něj neobejde.
+  if (!balance || !modeOf(balance, mode)) return reject('error.unknownTransitMode', { mode });
+  createLine(world, mode);
+  return OK;
+}
+
+export function deleteTransitLine(world: WorldState, lineId: number): CommandResult {
+  if (!removeLine(world, lineId)) return reject('error.unknownLine', { id: lineId });
+  return OK;
+}
+
+/**
+ * Přidá zastávku na konec linky.
+ *
+ * Kontroluje se **mód a duplicita**, ne vzdálenost: linka přes celé město je
+ * hráčova věc, jen bude potřebovat víc vozidel. Zastávka jiného módu ale
+ * nedává smysl vůbec — tramvaj po autobusové zastávce nepojede.
+ */
+export function addTransitStop(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  balance: Balance | undefined,
+  lineId: number,
+  buildingId: number,
+): CommandResult {
+  const line = findLine(world, lineId);
+  if (!line) return reject('error.unknownLine', { id: lineId });
+  if (!balance) return reject('error.unknownTransitMode', { mode: line.mode });
+  if (line.stops.length >= balance.transit.maxStops) {
+    return reject('error.tooManyStops', { max: balance.transit.maxStops });
+  }
+  if (line.stops.includes(buildingId)) return reject('error.stopAlreadyOnLine');
+
+  const mode = stopMode(world, catalogue, buildingId);
+  if (mode === null) return reject('error.notAStop');
+  if (mode !== line.mode) return reject('error.wrongStopMode', { mode, expected: line.mode });
+
+  line.stops.push(buildingId);
+  world.transitDirty = true;
+  return OK;
+}
+
+export function removeTransitStop(
+  world: WorldState,
+  lineId: number,
+  buildingId: number,
+): CommandResult {
+  const line = findLine(world, lineId);
+  if (!line) return reject('error.unknownLine', { id: lineId });
+
+  const at = line.stops.indexOf(buildingId);
+  if (at < 0) return reject('error.stopNotOnLine');
+  line.stops.splice(at, 1);
+  world.transitDirty = true;
+  return OK;
+}
+
+/**
+ * Nastaví počet vozidel. Rozdíl se **zaplatí, nebo vrátí**.
+ *
+ * Vrací se plná cena, ne část: vozidlo se dá přesunout na jinou linku a hráč
+ * by jinak platil pokutu za to, že si to rozmyslel. Údržbu řeší rozpočet.
+ */
+export function setLineVehicles(
+  world: WorldState,
+  balance: Balance | undefined,
+  lineId: number,
+  vehicles: number,
+): CommandResult {
+  const line = findLine(world, lineId);
+  if (!line) return reject('error.unknownLine', { id: lineId });
+  if (!Number.isInteger(vehicles) || vehicles < 0) {
+    return reject('error.invalidVehicles', { vehicles });
+  }
+
+  const mode = balance ? modeOf(balance, line.mode) : undefined;
+  if (!mode) return reject('error.unknownTransitMode', { mode: line.mode });
+
+  const added = vehicles - line.vehicles;
+  const cost = added * mode.vehicleCost;
+  if (cost > 0 && world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  }
+
+  world.economy.funds -= cost;
+  line.vehicles = vehicles;
+  return OK;
+}
+
+/** Nastaví jízdné. Účinek na využití a příjem přidává T56. */
+export function setLineFare(world: WorldState, lineId: number, fare: number): CommandResult {
+  const line = findLine(world, lineId);
+  if (!line) return reject('error.unknownLine', { id: lineId });
+  if (!Number.isFinite(fare) || fare < 0) return reject('error.invalidFare', { fare });
+
+  line.fare = fare;
+  return OK;
 }

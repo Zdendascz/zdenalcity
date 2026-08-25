@@ -107,6 +107,14 @@ export interface BuildingDefinition {
    * je to celoměstská kapacita po vzoru odpadů (R9), ne druhá síť trubek.
    */
   sewage?: { capacity: number };
+  /**
+   * Zastávka MHD (§7 fáze 4). `mode` je **jméno z katalogu**, ne výčet v kódu:
+   * mod si přidá vlastní mód a hra o něm nemusí vědět (P5).
+   *
+   * Budova se zastávkou se dá zařadit do linky téhož módu. Samotné pokrytí
+   * dělá dál `service` — linka je nadstavba, ne náhrada.
+   */
+  transit?: { mode: string };
   environment?: { pollution?: number };
   graphics: {
     color: string;
@@ -151,6 +159,7 @@ const DEFINITION_SECTIONS = [
   'power',
   'water',
   'sewage',
+  'transit',
   'environment',
   'graphics',
 ];
@@ -335,6 +344,7 @@ export function validateDefinition(
   const power = validatePower(issues, record);
   const water = validateWater(issues, record);
   const sewage = validateSewage(issues, record);
+  const transit = validateTransit(issues, record);
   const environment = validateEnvironment(issues, record);
   const population = validateCapacity(issues, record, 'population');
   const jobs = validateCapacity(issues, record, 'jobs');
@@ -379,6 +389,7 @@ export function validateDefinition(
       ...(power ? { power } : {}),
       ...(water ? { water } : {}),
       ...(sewage ? { sewage } : {}),
+      ...(transit ? { transit } : {}),
       ...(environment ? { environment } : {}),
       graphics,
     },
@@ -629,6 +640,18 @@ function validateSewage(
 
   const capacity = requireInt(issues, section, 'capacity', 'sewage.capacity', 0);
   return capacity === null ? undefined : { capacity };
+}
+
+function validateTransit(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+): BuildingDefinition['transit'] {
+  if (record['transit'] === undefined) return undefined;
+  const section = requireRecord(issues, record, 'transit', 'transit');
+  if (!section) return undefined;
+
+  const mode = requireString(issues, section, 'mode', 'transit.mode');
+  return mode === null ? undefined : { mode };
 }
 
 function validateEnvironment(

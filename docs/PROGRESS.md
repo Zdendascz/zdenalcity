@@ -2191,6 +2191,50 @@ dvěma nakaženými sousedy je řádově silnější než ústup. Po vypršení 
 epidemie jen dohasíná: nešíří se ani neroste. Nemocnice pořád rozhoduje o tom,
 jak zle a jak dlouho, jen už ne o tom, jestli vůbec.
 
+- [x] T55 — linky MHD: datový model, výběr zastávek, tři módy, tramvaj v dopravě
+
+Rozšiřuje třídu `transit` z fáze 3, kde zastávka nedělala nic než pokrytí.
+Linka je **nadstavba, ne náhrada**: zastávka pokrývá dál sama o sobě.
+
+**Mód je obsah, ne kód.** Rozdíl mezi autobusem, tramvají a metrem je
+v `balance.json` — kapacita vozidla, cena, údržba, kolik silnice ukrojí
+a jestli potřebuje proud. V kódu není jediný `if` na jméno módu, takže si mod
+může přidat vlastní a hra o něm nemusí vědět (P5).
+
+Jediná tramvaj má nenulový `roadShare`, a **to je jediný důvod, proč vůbec
+volit autobus**. Kdyby ukusovaly všechny nebo žádná, byla by volba módu jen
+otázka rozpočtu.
+
+**Trasa se nekreslí** (rozhodnutí autora). Kudy linka jede, se dopočítá jako
+úsečka mezi sousedními zastávkami a slouží to jedinému účelu — aby tramvaj
+měla čemu ubrat kapacitu. Není to hledání cesty schválně: kdyby se hledala
+skutečná trasa, hráč by čekal, že po ní tramvaj i pojede, a ona nikam nejede.
+
+Koridor se hledá **v pásu kolem úsečky, ne přímo na ní**. Zastávka stojí vedle
+silnice, ne na ní, takže spojnice dvou zastávek nemusí protnout vozovku vůbec.
+Vyzkoušené: linka podél ulice dala nula dlaždic, protože zastávky ležely o řadu
+vedle.
+
+Které silnice ukusuje kolej, drží `world.tramTiles` jako udržovaný seznam (R20)
+— kolony se počítají z každé silniční dlaždice a ptát se přitom pokaždé na
+všechny linky je součin dvou velkých čísel. Přepočítává se jen při změně,
+stejně jako elektřina nebo pokrytí.
+
+Kapacitu ubírá **kolej, ne provoz**: platí to i za blackoutu, kdy tramvaje
+stojí. Koleje z vozovky nezmizí tím, že po nich nikdo nejede.
+
+Zbouraná zastávka z linky **nezmizí sama** — smazat ji musí příkaz. Tiché mizení
+by hráči rozpadlo linku a on by nevěděl proč; systémy si ale s chybějící
+zastávkou poradí.
+
+Jízdné a kapacita se zatím jen ukládají. Co s nimi, přidává T56.
+
+Mutační test 31 z 31; první běh chytil 24. Šest přeživších mělo společnou
+příčinu: **příkazy nepovolenou linku nepustí**, takže se validace v modelu
+nikdy neuplatnila. Do rozbitého stavu se ale dá dostat jinudy — savem ze starší
+verze, savem z modu, obsahem, kde zastávka změnila mód — a model si na to musí
+umět odpovědět sám. Testy proto linku rozbíjejí přímo ve stavu, mimo příkaz.
+
 
 ## Rozpracované
 
@@ -2203,7 +2247,7 @@ Zbývá:
 | Úkol | Obsah |
 |---|---|
 | T54 | Sesuv půdy |
-| T55–T56 | Linky MHD |
+| T56 | Jízdné, kapacita, poptávka, účinek na dopravu, provozní náklady |
 | T57 | Půjčky, dotace, úvěrový rating |
 | T58 | Dluhopisy |
 | T59 | Save verze 6 |

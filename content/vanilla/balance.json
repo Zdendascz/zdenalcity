@@ -134,6 +134,34 @@
     "minAccessFactor": 0.15,
     "slopeFactor": 0.7
   },
+  "transit": {
+    "minStops": 2,
+    "maxStops": 12,
+    "modes": {
+      "bus": {
+        "capacity": 40,
+        "vehicleCost": 900,
+        "vehicleUpkeep": 45,
+        "roadShare": 0,
+        "needsPower": false
+      },
+      "tram": {
+        "capacity": 90,
+        "vehicleCost": 2600,
+        "vehicleUpkeep": 110,
+        "roadShare": 0.35,
+        "needsPower": true
+      },
+      "metro": {
+        "capacity": 220,
+        "vehicleCost": 7000,
+        "vehicleUpkeep": 260,
+        "roadShare": 0,
+        "needsPower": true
+      }
+    }
+  },
+
   "disasters": {
     "maxRiskMultiplier": 3,
     "indicators": { "uncoveredBelow": 60, "denseLevel": 4, "ageTicks": 3600 },

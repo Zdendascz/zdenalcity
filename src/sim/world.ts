@@ -1,6 +1,7 @@
 import { coarseCellsOf, createCoarseLayers } from './coarse';
 import { createDisasterState } from './disasters/state';
 import type { DisasterState } from './disasters/state';
+import type { TransitLine } from './transit';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
 import { createLayers, DEFAULT_MAP_SIZE, inBounds, index } from './layers';
@@ -321,6 +322,19 @@ export interface WorldState {
    * Prázdná mapa znamená „nic se neděje" a stojí to nula.
    */
   infection: Map<number, number>;
+
+  /** Linky MHD (§7 fáze 4). Prázdné pole je platný stav — město bez MHD. */
+  lines: TransitLine[];
+  nextLineId: number;
+  /**
+   * Kolik kapacity ukusuje kolejová doprava, po silničních dlaždicích.
+   *
+   * **Odvozené** z linek, udržované (R20): kolony se počítají z každé silniční
+   * dlaždice a ptát se přitom pokaždé na všechny linky je součin dvou velkých
+   * čísel. Po načtení savu se dopočítá.
+   */
+  tramTiles: Map<number, number>;
+  transitDirty: boolean;
 }
 
 /**
@@ -389,6 +403,10 @@ export function createWorld(
     fireFlags: new Uint8Array(size * size),
     rubble: new Uint8Array(size * size),
     infection: new Map(),
+    lines: [],
+    nextLineId: 1,
+    tramTiles: new Map(),
+    transitDirty: false,
     flood: new Uint8Array(size * size),
     floodDepth: new Uint8Array(size * size),
     floodDamage: new Uint8Array(size * size),

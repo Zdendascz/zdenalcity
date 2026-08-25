@@ -1,34 +1,37 @@
 {
-  "id": "vanilla:transit_stop",
+  "id": "vanilla:tram_stop",
   "type": "building",
   "category": "service",
   "menu": "transit",
-  "name": "building.transit_stop.name",
-  "description": "building.transit_stop.desc",
+  "name": "building.tram_stop.name",
+  "description": "building.tram_stop.desc",
   "footprint": [1, 1],
   "construction": {
-    "cost": 150,
+    "cost": 400,
     "requiresRoad": true,
-    "requiresPower": false,
+    "requiresPower": true,
     "allowedTerrain": [0, 2]
   },
   "economy": {
-    "upkeep": 30
+    "upkeep": 60
   },
   "requirements": {
     "services": {},
     "buildings": ["vanilla:transit_depot"]
   },
   "transit": {
-    "mode": "bus"
+    "mode": "tram"
+  },
+  "power": {
+    "consumption": 40
   },
   "service": {
     "class": "transit",
-    "radius": 3,
-    "strength": 110
+    "radius": 4,
+    "strength": 130
   },
   "graphics": {
-    "color": "#5aa9c7",
+    "color": "#c75a7a",
     "heightLevels": 1,
     "icon": "bus"
   }
