@@ -672,6 +672,14 @@ export interface Balance {
   transit: {
     minStops: number;
     maxStops: number;
+    /**
+     * Jízdné, při kterém přestane jezdit úplně každý.
+     *
+     * Ochota platit klesá lineárně do nuly, příjem je `přepraveno × jízdné` —
+     * součin je parabola s vrcholem v **polovině limitu**. Optimum se dá najít
+     * a to je smysl: jízdné je rozhodnutí, ne posuvník s jedním správným koncem.
+     */
+    fareLimit: number;
     modes: Readonly<Record<string, TransitModeBalance>>;
   };
 
@@ -1882,7 +1890,12 @@ function validateTransit(
     });
   }
 
-  return { minStops, maxStops, modes };
+  return {
+    minStops,
+    maxStops,
+    fareLimit: num(issues, raw, 'fareLimit', 'transit.fareLimit', 1, 100000),
+    modes,
+  };
 }
 
 function validateBlackout(

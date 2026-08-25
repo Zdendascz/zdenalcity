@@ -3,6 +3,7 @@ import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
 import { index, ROAD } from '../layers';
 import { isFlooded } from '../disasters/flood';
+import { transitReliefAt } from '../transit';
 import type { WorldState } from '../world';
 import type { Building } from '../world';
 import type { System } from './index';
@@ -198,29 +199,28 @@ function walkFrom(
 }
 
 /**
- * O kolik MHD ubere téhle budově dopravy (§6 fáze 3).
+ * O kolik MHD ubere téhle budově dopravy (§6 fáze 3, §7 fáze 4).
  *
- * MHD je ve 3a **obyčejná třída služby** nad mechanismem z T13 (rozhodnutí
- * autora — linky s vozidly jsou pozdější fáze), takže zastávka nedělá nic než
- * pokrytí a tenhle násobitel z něj čte.
+ * Ve 3a stačilo **pokrytí zastávkou**: stála-li poblíž zastávka, čtvrť jezdila
+ * míň autem. Od T56 rozhoduje **kolik lidí linka opravdu odveze** —
+ * `přepraveno / poptávka`. Linka s jedním autobusem a deseti tisíci obyvateli
+ * v dosahu prakticky nepomůže, a to je smysl: zastávka sama o sobě nikoho
+ * nikam nedopraví.
  *
  * Ubírá se **zátěž na silnicích, ne dosažitelnost práce**: obsloužená čtvrť
  * jezdí míň autem, ale do práce se z ní dostane pořád stejně dobře. Kdyby
  * zastávka zvedala i `jobAccess`, byla by to zkratka, jak růst rozjet úplně bez
  * silnic — a to je model, který tahle hra nemá.
  *
- * Plné pokrytí sebere `transitReduction`, ne všechno; i s dokonalou MHD něco
+ * Plná obsluha sebere `transitReduction`, ne všechno; i s dokonalou MHD něco
  * po silnicích jezdí dál.
  */
 function transitFactor(world: WorldState, balance: Balance, building: Building): number {
   const reduction = balance.traffic.transitReduction;
   if (reduction <= 0) return 1;
 
-  const coverage =
-    (world.coverage.get('transit')?.[
-      coarseIndex(building.x, building.y, world.size)
-    ] ?? 0) / 255;
-  return 1 - Math.max(0, Math.min(1, coverage)) * reduction;
+  const relief = transitReliefAt(world, coarseIndex(building.x, building.y, world.size));
+  return 1 - Math.max(0, Math.min(1, relief)) * reduction;
 }
 
 /**

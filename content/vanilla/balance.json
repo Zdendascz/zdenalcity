@@ -137,6 +137,7 @@
   "transit": {
     "minStops": 2,
     "maxStops": 12,
+    "fareLimit": 40,
     "modes": {
       "bus": {
         "capacity": 40,

@@ -246,6 +246,7 @@
   "ui.budget.income": "Příjem",
   "ui.budget.upkeep": "Údržba",
   "ui.budget.net": "Čistě",
+  "ui.budget.transit": "MHD",
   "ui.budget.roads": "Silnice",
   "ui.budget.total": "Celkem za měsíc",
   "ui.budget.funds": "Stav kasy: {funds}. Temná budova nevydělává ani nestojí údržbu.",

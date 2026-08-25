@@ -109,6 +109,20 @@ export class BudgetPanel {
       table.appendChild(row);
     }
 
+    // MHD taky vlastní řádek: vozidlo není budova a jízdné není daň.
+    if (budget.transit.lines > 0) {
+      const row = el('tr');
+      row.appendChild(el('td', 'sheet__name', t('ui.budget.transit')));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, formatNumber(budget.transit.vehicles)));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, `+${formatNumber(budget.transit.income)}`));
+      row.appendChild(el('td', undefined, `−${formatNumber(budget.transit.upkeep)}`));
+      const net = budget.transit.income - budget.transit.upkeep;
+      row.appendChild(el('td', net < 0 ? 'is-negative' : undefined, formatNumber(net)));
+      table.appendChild(row);
+    }
+
     const total = el('tr', 'sheet__total');
     total.appendChild(el('td', 'sheet__name', t('ui.budget.total')));
     total.appendChild(el('td'));

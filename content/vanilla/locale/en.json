@@ -246,6 +246,7 @@
   "ui.budget.income": "Income",
   "ui.budget.upkeep": "Upkeep",
   "ui.budget.net": "Net",
+  "ui.budget.transit": "Transit",
   "ui.budget.roads": "Roads",
   "ui.budget.total": "Monthly total",
   "ui.budget.funds": "Funds: {funds}. An unpowered building earns nothing and costs nothing.",

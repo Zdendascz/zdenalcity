@@ -4,6 +4,7 @@ import type { BuildingCatalogue } from '../catalogue';
 import { cellOfTile, strongestModifier } from '../disasters/effects';
 import { index, ROAD } from '../layers';
 import { isRciCategory } from '../rci';
+import { transitTotals } from '../transit';
 import { serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
 import type { System } from './index';
@@ -57,10 +58,23 @@ export interface RoadBudget {
   upkeep: number;
 }
 
+/** MHD v rozpočtu: jízdné proti údržbě vozidel (§7 fáze 4). */
+export interface TransitBudget {
+  lines: number;
+  vehicles: number;
+  income: number;
+  upkeep: number;
+}
+
 export interface Budget {
   lines: BudgetLine[];
   /** Údržba silnic. Nejsou to budovy, takže mají vlastní řádek (§4 fáze 3). */
   roads: RoadBudget;
+  /**
+   * MHD. Taky vlastní řádek: vozidlo není budova a jízdné není daň, takže
+   * do rozpisu po definicích nepatří ani jedno.
+   */
+  transit: TransitBudget;
   income: number;
   expenses: number;
   /** Kolik vynese jedna jednotka základu při 100 %. Do rozpisu v UI. */
@@ -210,6 +224,18 @@ export function computeBudget(
   roads.upkeep = Math.round(roads.upkeep);
   expenses += roads.upkeep;
 
+  // Jízdné a údržba vozidel. Obojí je měsíční a počítá ho `transitSystem`,
+  // rozpočet jen sečte — jinak by se výpis a skutečnost rozešly.
+  const totals = transitTotals(world);
+  const transit: TransitBudget = {
+    lines: world.lines.length,
+    vehicles: totals.vehicles,
+    income: totals.income,
+    upkeep: totals.upkeep,
+  };
+  income += transit.income;
+  expenses += transit.upkeep;
+
   // Daň se zaokrouhluje **jednou za řádek**, ne u každé budovy. Jinak by rozpis
   // v UI tvrdil něco jiného, než kolik ve sloupci opravdu stojí.
   for (const line of byDefinition.values()) {
@@ -222,6 +248,7 @@ export function computeBudget(
     // Stabilní pořadí, ať tabulka neposkakuje.
     lines: [...byDefinition.values()].sort((a, b) => a.definitionId.localeCompare(b.definitionId)),
     roads,
+    transit,
     income,
     expenses,
     valuePerUnit: balance.economy.taxableValuePerUnit,

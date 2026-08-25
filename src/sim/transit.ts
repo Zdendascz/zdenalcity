@@ -1,5 +1,6 @@
 import type { Balance, TransitModeBalance } from '@/content/balance';
 import type { BuildingCatalogue } from './catalogue';
+import { coarseIndex, coarseSizeOf } from './coarse';
 import { index, ROAD } from './layers';
 import type { WorldState } from './world';
 
@@ -289,4 +290,178 @@ export function removeLine(world: WorldState, id: number): boolean {
  */
 export function liveStops(world: WorldState, line: TransitLine): number[] {
   return line.stops.filter((stop) => world.buildings.has(stop));
+}
+
+/* ------------------------------------------------- jízdné a přeprava (T56) */
+
+/** Co linka za měsíc odveze a vydělá. Do rozpočtu, hlášení i panelu. */
+export interface LineStats {
+  /** Lidé v dosahu zastávek, o které se linka uchází. */
+  demand: number;
+  /** `vozidla × kapacita módu`. */
+  capacity: number;
+  /** Kolik jich opravdu odveze. Nikdy víc než kapacita ani než poptávka. */
+  transported: number;
+  /** `přepraveno × jízdné` za měsíc. */
+  income: number;
+  upkeep: number;
+}
+
+export function noStats(): LineStats {
+  return { demand: 0, capacity: 0, transported: 0, income: 0, upkeep: 0 };
+}
+
+/**
+ * Kolik lidí je ochotno zaplatit dané jízdné, 0–1.
+ *
+ * Lineární pokles do nuly na `fareLimit`. Příjem je `přepraveno × jízdné`,
+ * takže součin dává parabolu: **zvýšení jízdného zvedne příjem jen do
+ * poloviny limitu, pak ho sráží.** Optimum se dá najít, a to je smysl —
+ * jízdné je rozhodnutí, ne posuvník s jedním správným koncem.
+ */
+export function fareSensitivity(balance: Balance, fare: number): number {
+  const limit = balance.transit.fareLimit;
+  if (limit <= 0) return 1;
+  return Math.max(0, Math.min(1, 1 - fare / limit));
+}
+
+/**
+ * Buňky, které linka obsluhuje: dosah zastávek podle katalogu.
+ *
+ * Dosah je vlastnost **zastávky**, ne linky: metro obslouží víc než autobusová
+ * zastávka, protože k němu lidé dojdou dál. Sjednocené, ne sečtené — dvě
+ * zastávky vedle sebe nepokrývají tutéž ulici dvakrát.
+ */
+export function servedCells(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  line: TransitLine,
+): number[] {
+  const cells = new Set<number>();
+  const side = coarseSizeOf(world.size);
+
+  for (const stop of line.stops) {
+    const building = world.buildings.get(stop);
+    if (!building) continue;
+    const radius = catalogue.get(building.definitionId)?.service?.radius ?? 0;
+    if (radius <= 0) continue;
+
+    const origin = coarseIndex(building.x, building.y, world.size);
+    const originX = origin % side;
+    const originY = (origin - originX) / side;
+    const reach = Math.ceil(radius);
+
+    for (let dy = -reach; dy <= reach; dy++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        const cx = originX + dx;
+        const cy = originY + dy;
+        if (cx < 0 || cy < 0 || cx >= side || cy >= side) continue;
+        if (Math.hypot(dx, dy) > radius) continue;
+        cells.add(cy * side + cx);
+      }
+    }
+  }
+  return [...cells].sort((a, b) => a - b);
+}
+
+/** Lidé po buňkách: obyvatelé i pracovní místa. Obojí někam jezdí. */
+function ridersPerCell(world: WorldState): Map<number, number> {
+  const perCell = new Map<number, number>();
+  for (const building of world.buildings.values()) {
+    if (building.abandoned) continue;
+    const riders = building.population + building.jobs;
+    if (riders <= 0) continue;
+    const cell = coarseIndex(building.x, building.y, world.size);
+    perCell.set(cell, (perCell.get(cell) ?? 0) + riders);
+  }
+  return perCell;
+}
+
+/**
+ * Rozdělí cestující mezi linky a spočítá, co která odveze.
+ *
+ * **Lidé jsou společný a konečný fond.** Linky se o ně dělí v pořadí podle id,
+ * každá si vezme, co unese, a další už bere jen ze zbytku. Bez toho by šlo
+ * postavit deset stejných linek přes jednu čtvrť a každá by vozila — a
+ * vydělávala — na týchž lidech.
+ *
+ * Zároveň z toho plyne přesně to, co má hráč poznat: **druhá linka přes tutéž
+ * čtvrť pomůže, až když je ta první plná.** Přidat vozidla je většinou lepší
+ * než přidat linku.
+ */
+export function computeLineStats(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  balance: Balance,
+): void {
+  const total = ridersPerCell(world);
+  const left = new Map(total);
+  world.lineStats.clear();
+  world.transitRelief.clear();
+
+  // Vzestupně podle id: pořadí rozhoduje o tom, kdo bere první, takže nesmí
+  // záviset na pořadí v poli (to mění mazání linek).
+  for (const line of [...world.lines].sort((a, b) => a.id - b.id)) {
+    const stats = noStats();
+    world.lineStats.set(line.id, stats);
+
+    const mode = modeOf(balance, line.mode);
+    if (!mode) continue;
+
+    stats.upkeep = line.vehicles * mode.vehicleUpkeep;
+    if (!lineRuns(world, catalogue, balance, line)) continue;
+
+    stats.capacity = line.vehicles * mode.capacity;
+    const cells = servedCells(world, catalogue, line);
+
+    let available = 0;
+    for (const cell of cells) available += left.get(cell) ?? 0;
+    stats.demand = available;
+    if (available <= 0) continue;
+
+    const willing = available * fareSensitivity(balance, line.fare);
+    stats.transported = Math.min(stats.capacity, willing);
+    stats.income = Math.round(stats.transported * line.fare);
+    if (stats.transported <= 0) continue;
+
+    // Odebírá se **poměrně ze všech obsluhovaných buněk**, ne postupně od
+    // první. Jinak by čtvrť u první zastávky měla plnou obsluhu a ta u poslední
+    // žádnou, přestože jsou na téže lince.
+    const share = stats.transported / available;
+    for (const cell of cells) {
+      const here = left.get(cell) ?? 0;
+      if (here <= 0) continue;
+      const taken = here * share;
+      left.set(cell, here - taken);
+
+      const capacity = total.get(cell) ?? 0;
+      if (capacity <= 0) continue;
+      world.transitRelief.set(cell, (world.transitRelief.get(cell) ?? 0) + taken / capacity);
+    }
+  }
+
+  // Strop úlevy se **nehlídá**: plyne z toho, že se odebírá ze zbytku. Součet
+  // odvezených přes všechny linky nemůže překročit, kolik lidí v buňce je,
+  // takže součet podílů nemůže překročit jedničku. `Math.min(1, …)` navíc by
+  // byl kód, který nejde rozbít — a takový kód jen předstírá, že něco hlídá.
+}
+
+/** Kolik cest v buňce vezme MHD, 0–1. Čte doprava. */
+export function transitReliefAt(world: WorldState, cell: number): number {
+  if (world.transitRelief.size === 0) return 0;
+  return world.transitRelief.get(cell) ?? 0;
+}
+
+/** Součet přes všechny linky. Do rozpočtu. */
+export function transitTotals(world: WorldState): { income: number; upkeep: number; vehicles: number } {
+  let income = 0;
+  let upkeep = 0;
+  let vehicles = 0;
+  for (const line of world.lines) {
+    const stats = world.lineStats.get(line.id);
+    income += stats?.income ?? 0;
+    upkeep += stats?.upkeep ?? 0;
+    vehicles += line.vehicles;
+  }
+  return { income, upkeep, vehicles };
 }

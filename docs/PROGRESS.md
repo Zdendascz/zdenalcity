@@ -2235,6 +2235,41 @@ nikdy neuplatnila. Do rozbitého stavu se ale dá dostat jinudy — savem ze sta
 verze, savem z modu, obsahem, kde zastávka změnila mód — a model si na to musí
 umět odpovědět sám. Testy proto linku rozbíjejí přímo ve stavu, mimo příkaz.
 
+- [x] T56 — jízdné, kapacita, poptávka, účinek na dopravu, provozní náklady
+
+**Zastávka sama o sobě nikoho nikam nedopraví.** Do T55 ubíralo dopravu pouhé
+pokrytí zastávkou; teď rozhoduje `přepraveno / poptávka`. Linka s jedním
+autobusem a tisíci obyvateli v dosahu je gesto, ne doprava — a to je smysl:
+hráč nesmí uklidit kolony tím, že poseje město zastávkami.
+
+Je to změna proti fázi 3 a stálo to dva testy, které měřily starý model.
+
+**Lidé jsou společný a konečný fond.** Linky se o ně dělí v pořadí podle id,
+každá si vezme, co unese, další bere jen ze zbytku. Bez toho by šlo postavit
+deset stejných linek přes jednu čtvrť a každá by vozila — a vydělávala — na
+týchž lidech. Plyne z toho i to, co má hráč poznat: **druhá linka přes tutéž
+čtvrť pomůže, až když je ta první plná.** Přidat vozidla je většinou lepší než
+přidat linku.
+
+Odebírá se **poměrně ze všech obsluhovaných buněk**, ne postupně od první.
+Jinak by čtvrť u první zastávky měla plnou obsluhu a ta u poslední žádnou,
+přestože jsou na téže lince.
+
+**Jízdné má optimum.** Ochota platit klesá lineárně do nuly na `fareLimit`,
+příjem je `přepraveno × jízdné` — součin je parabola s vrcholem v polovině
+limitu. Zdarma nevydělá nic, na limitu taky ne, a mezi tím je maximum, které
+jde najít. Jízdné je rozhodnutí, ne posuvník s jedním správným koncem.
+
+Přepočítává se **jednou za herní měsíc**, ne každý tik. Kapacita v katalogu je
+měsíční a poptávka se mění pomalu; projít pro každou linku všechny obsluhované
+buňky čtyřikrát za sekundu by byla nejdražší věc v celé simulaci.
+
+Jízdné i údržba vozidel mají v rozpočtu **vlastní řádek**, vedle silnic —
+vozidlo není budova a jízdné není daň, takže do rozpisu po definicích nepatří
+ani jedno. Hráč musí vidět, kam peníze tečou.
+
+Údržba se platí i za linku, která nejezdí. Vozidlo v garáži taky stojí peníze.
+
 
 ## Rozpracované
 
@@ -2247,7 +2282,6 @@ Zbývá:
 | Úkol | Obsah |
 |---|---|
 | T54 | Sesuv půdy |
-| T56 | Jízdné, kapacita, poptávka, účinek na dopravu, provozní náklady |
 | T57 | Půjčky, dotace, úvěrový rating |
 | T58 | Dluhopisy |
 | T59 | Save verze 6 |

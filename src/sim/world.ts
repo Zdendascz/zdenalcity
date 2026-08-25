@@ -1,7 +1,7 @@
 import { coarseCellsOf, createCoarseLayers } from './coarse';
 import { createDisasterState } from './disasters/state';
 import type { DisasterState } from './disasters/state';
-import type { TransitLine } from './transit';
+import type { LineStats, TransitLine } from './transit';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
 import { createLayers, DEFAULT_MAP_SIZE, inBounds, index } from './layers';
@@ -335,6 +335,16 @@ export interface WorldState {
    */
   tramTiles: Map<number, number>;
   transitDirty: boolean;
+  /**
+   * Co která linka za měsíc odveze a vydělá. **Odvozené** — po načtení savu se
+   * dopočítá z linek a města.
+   */
+  lineStats: Map<number, LineStats>;
+  /**
+   * Kolik cest v buňce vezme MHD, 0–1. Odvozené z `lineStats`; drží se zvlášť,
+   * protože se na to ptá doprava u každé budovy.
+   */
+  transitRelief: Map<number, number>;
 }
 
 /**
@@ -407,6 +417,8 @@ export function createWorld(
     nextLineId: 1,
     tramTiles: new Map(),
     transitDirty: false,
+    lineStats: new Map(),
+    transitRelief: new Map(),
     flood: new Uint8Array(size * size),
     floodDepth: new Uint8Array(size * size),
     floodDamage: new Uint8Array(size * size),

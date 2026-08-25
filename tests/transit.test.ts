@@ -2,10 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { placeBuilding } from '@/sim/buildings';
-import { buildRoad, placeDefinition } from '@/sim/commands';
+import {
+  addTransitStop,
+  buildRoad,
+  createTransitLine,
+  placeDefinition,
+  setLineVehicles,
+} from '@/sim/commands';
+import { coarseCellsOf } from '@/sim/coarse';
 import { index, ROAD } from '@/sim/layers';
 import { presentDefinitions } from '@/sim/requirements';
-import { createServiceSystem, createTrafficSystem } from '@/sim/systems';
+import { createServiceSystem, createTrafficSystem, createTransitSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { powerAll } from './support/power';
@@ -34,6 +41,12 @@ function street(content: ContentRegistry, world: WorldState): void {
   placeBuilding(world, shop, 29, 11);
 }
 
+/** Obsluha MHD naplno ve všech buňkách. */
+function fullyServed(world: WorldState): void {
+  const cells = coarseCellsOf(world.size);
+  for (let cell = 0; cell < cells; cell++) world.transitRelief.set(cell, 1);
+}
+
 /** Celková zátěž na ulici po ustálení. */
 function roadLoad(world: WorldState): number {
   let total = 0;
@@ -43,28 +56,55 @@ function roadLoad(world: WorldState): number {
 }
 
 describe('MHD ubírá dopravu (§6)', () => {
-  it('zastávka v obytné čtvrti sníží zátěž na okolních silnicích', async () => {
+  it('linka sníží zátěž na okolních silnicích, samotná zastávka ne', async () => {
+    // Od T56 rozhoduje, **kolik lidí linka opravdu odveze**. Zastávka bez linky
+    // nikoho nikam nedopraví, takže dopravě nepomůže — a to je smysl: hráč
+    // nesmí uklidit kolony tím, že poseje město zastávkami.
     const content = await vanilla();
     const balance = content.getBalance();
 
-    const measure = (withStop: boolean): number => {
+    const measure = (build: 'nic' | 'zastávka' | 'linka'): number => {
       const world = createWorld(1, balance.economy);
       street(content, world);
-      if (withStop) {
+
+      if (build !== 'nic') {
         expect(placeDefinition(world, content, DEPOT, 20, 11).ok).toBe(true);
-        expect(placeDefinition(world, content, STOP, 12, 11).ok).toBe(true);
+        const stops = [12, 28].map((x) => {
+          const before = new Set(world.buildings.keys());
+          expect(placeDefinition(world, content, STOP, x, 11).ok).toBe(true);
+          const id = [...world.buildings.keys()].find((key) => !before.has(key));
+          if (id === undefined) throw new Error('zastávka nevznikla');
+          return id;
+        });
+
+        if (build === 'linka') {
+          expect(createTransitLine(world, balance, 'bus').ok).toBe(true);
+          const line = world.lines[world.lines.length - 1];
+          if (!line) throw new Error('linka nevznikla');
+          for (const stop of stops) {
+            expect(addTransitStop(world, content, balance, line.id, stop).ok).toBe(true);
+          }
+          expect(setLineVehicles(world, balance, line.id, 4).ok).toBe(true);
+        }
       }
-      const systems = [createServiceSystem(content), createTrafficSystem(content, balance)];
+
+      const systems = [
+        createServiceSystem(content),
+        createTransitSystem(content, balance),
+        createTrafficSystem(content, balance),
+      ];
       powerAll(world);
       for (let tick = 0; tick < 40; tick++) tickWorld(world, systems);
       return roadLoad(world);
     };
 
-    const without = measure(false);
-    const withStop = measure(true);
+    const bare = measure('nic');
+    const stopOnly = measure('zastávka');
+    const served = measure('linka');
 
-    expect(without).toBeGreaterThan(0);
-    expect(withStop).toBeLessThan(without);
+    expect(bare).toBeGreaterThan(0);
+    expect(stopOnly, 'zastávka bez linky ubrala dopravu').toBe(bare);
+    expect(served).toBeLessThan(bare);
   });
 
   it('plné pokrytí ubere přesně tolik, kolik říká balanc', async () => {
@@ -76,8 +116,10 @@ describe('MHD ubírá dopravu (§6)', () => {
     const measure = (covered: boolean): number => {
       const world = createWorld(1, balance.economy);
       street(content, world);
-      // Pokrytí naplno, bez ohledu na to, kolik zastávek by na to bylo třeba.
-      if (covered) world.coverage.set('transit', new Uint8Array(32 * 32).fill(255));
+      // Obsluha naplno, bez ohledu na to, kolik linek a vozidel by na to bylo
+      // třeba. Od T56 neubírá dopravu pokrytí zastávkou, ale **kolik lidí
+      // linka opravdu odveze** — a tenhle test měří jen ten násobitel.
+      if (covered) fullyServed(world);
       const systems = [createTrafficSystem(content, balance)];
       for (let tick = 0; tick < 16; tick++) tickWorld(world, systems);
       return roadLoad(world);
@@ -100,7 +142,7 @@ describe('MHD ubírá dopravu (§6)', () => {
     const measure = (covered: boolean): number => {
       const world = createWorld(1, balance.economy);
       street(content, world);
-      if (covered) world.coverage.set('transit', new Uint8Array(32 * 32).fill(255));
+      if (covered) fullyServed(world);
       const systems = [createTrafficSystem(content, balance)];
       for (let tick = 0; tick < 40; tick++) tickWorld(world, systems);
       return [...world.jobAccess.values()].reduce((sum, value) => sum + value, 0);
