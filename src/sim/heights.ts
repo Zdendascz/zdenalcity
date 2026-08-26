@@ -364,6 +364,28 @@ export function relaxHeights(heights: Uint8Array, maxPasses = 64): number {
 }
 
 /**
+ * Dozdí obdélník dlaždic na jeho **nejvyšší roh**.
+ *
+ * Jedno místo pro tři různé potřeby: srovnání sedla pod silnicí (T61),
+ * nabídku „dozdít" v terénním nástroji a automatické srovnání parcely pod
+ * budovou (T66). Kdyby si to každá počítala po svém, lišily by se v tom, jestli
+ * se kope nebo přisypává — a hráč by ze hry měl tři různá pravidla.
+ *
+ * Dozdívá se, ne odkopává: hráč staví násep, ne výkop, a odkopání by navíc
+ * sneslo terén i pod sousedy, kteří o to nežádali.
+ */
+export function planFillArea(
+  heights: Readonly<Uint8Array>,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): Map<number, number> {
+  const { max } = areaHeightRange(heights, x, y, w, h);
+  return planLevelArea(heights, x, y, w, h, max);
+}
+
+/**
  * Jak srovnat zkroucenou dlaždici, aby po ní šla vést vozovka.
  *
  * Zkroucená dlaždice je sedlo: `nw + se ≠ ne + sw`. Vozovka po ní nejde přejet
@@ -389,6 +411,5 @@ export function planUntwist(
 ): Map<number, number> {
   if (!isTwistedTile(heights, x, y)) return new Map();
 
-  const top = Math.max(...tileCorners(heights, x, y));
-  return planLevelArea(heights, x, y, 1, 1, top);
+  return planFillArea(heights, x, y, 1, 1);
 }

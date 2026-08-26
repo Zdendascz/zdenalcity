@@ -8,6 +8,7 @@ import {
   estimatePlacement,
   estimateRoad,
   placeDefinition,
+  zoneArea,
 } from '@/sim/commands';
 import {
   applyCornerChanges,
@@ -18,7 +19,7 @@ import {
   planCornerHeight,
   planUntwist,
 } from '@/sim/heights';
-import { index, ROAD, TERRAIN } from '@/sim/layers';
+import { index, ROAD, TERRAIN, ZONE } from '@/sim/layers';
 import { createTrafficSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
@@ -406,5 +407,76 @@ describe('mosty (§7 fáze 3)', () => {
 
     expect(bezMostu).toBe(0); // přes vodu se nedostane nikdo
     expect(sMostem).toBeGreaterThan(0);
+  });
+});
+
+describe('zóna se při vyznačení srovná (T66)', () => {
+  it('vyznačená zóna na svahu zplošťuje terén', () => {
+    // Do T66 dům ze zóny na svahu jen stál na podezdívce a vypadal jako na
+    // chůdách. Srovnat se to dá jen **při zónování** — pak je plocha ještě
+    // prázdná; jakmile v okolí něco stojí, rohy jsou zamčené.
+    const w = world();
+    raise(w, 12, 12, 3);
+    expect(isFlatTile(w.cornerHeight, 10, 10)).toBe(false);
+
+    expect(zoneArea(w, 8, 8, 6, 6, ZONE.residential).ok).toBe(true);
+
+    for (let y = 8; y < 14; y++) {
+      for (let x = 8; x < 14; x++) {
+        expect(isFlatTile(w.cornerHeight, x, y), `${x},${y}`).toBe(true);
+      }
+    }
+  });
+
+  it('rušení zóny terénem nehýbe', () => {
+    // `ZONE.none` je mazání značky, ne stavba. Srovnávat při něm by znamenalo,
+    // že hráč přijde o kopec tím, že si rozmyslel čtvrť.
+    const w = world();
+    zoneArea(w, 8, 8, 6, 6, ZONE.residential);
+    // Terén se zvedne **až po** vyznačení, aby při rušení bylo co srovnávat.
+    // Na rovině by se ta chyba schovala: prázdný plán terénem nehne tak jako tak.
+    raise(w, 12, 12, 3);
+    expect(isFlatTile(w.cornerHeight, 11, 11)).toBe(false);
+    const before = Uint8Array.from(w.cornerHeight);
+
+    expect(zoneArea(w, 8, 8, 6, 6, ZONE.none).ok).toBe(true);
+
+    expect([...w.cornerHeight]).toEqual([...before]);
+  });
+
+  it('velká plocha se nesrovnává', () => {
+    // Kdo táhne zónu přes celé údolí, nechce náhorní plošinu.
+    const w = world();
+    raise(w, 30, 30, 4);
+    const before = Uint8Array.from(w.cornerHeight);
+
+    zoneArea(w, 20, 20, 20, 20, ZONE.residential);
+
+    expect([...w.cornerHeight]).toEqual([...before]);
+  });
+
+  it('u vody se srovná aspoň vnitrozemní část', () => {
+    // Zvedat dno moře neumíme, takže celá plocha u břehu neprojde. Kdyby se to
+    // tím vzdalo, zůstala by na svahu i ta část, která s vodou nesousedí —
+    // proto se plocha půlí a zkouší po částech.
+    const w = world();
+    for (let y = 0; y < w.size; y++) w.layers.terrain[index(60, y, MAP_SIZE)] = TERRAIN.water;
+    raise(w, 68, 40, 3);
+
+    zoneArea(w, 61, 38, 8, 4, ZONE.residential);
+
+    // Vnitrozemní konec je rovný, i když u břehu se srovnat nedalo.
+    expect(isFlatTile(w.cornerHeight, 67, 39)).toBe(true);
+  });
+
+  it('srovnání není podmínkou zónování', () => {
+    // Když se srovnat nedá, zóna se stejně vyznačí. Jinak by se na kopcovité
+    // mapě nedalo zónovat vůbec.
+    const w = world();
+    for (let y = 0; y < w.size; y++) w.layers.terrain[index(50, y, MAP_SIZE)] = TERRAIN.water;
+    raise(w, 51, 40, 2);
+
+    expect(zoneArea(w, 51, 39, 1, 1, ZONE.residential).ok).toBe(true);
+    expect(w.layers.zone[index(51, 39, MAP_SIZE)]).toBe(ZONE.residential);
   });
 });

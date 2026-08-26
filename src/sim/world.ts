@@ -5,7 +5,7 @@ import type { Bond, Loan } from './finance';
 import type { LineStats, TransitLine } from './transit';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
-import { createLayers, DEFAULT_MAP_SIZE, inBounds, index } from './layers';
+import { createLayers, DEFAULT_MAP_SIZE, inBounds, index, TERRAIN } from './layers';
 import type { Layers } from './layers';
 import type { RciCategory } from './rci';
 import { Rng } from './rng';
@@ -601,6 +601,52 @@ export function markCoverageDirty(world: WorldState): void {
  * takže se s terénem musí posunout, a `dirty.tiles` se jich netýká — kreslí je
  * jiný renderer.
  */
+/** Dlaždice, které se dotýkají rohu. Roh drží čtyři, u kraje mapy míň. */
+export function tilesAroundCorner(world: WorldState, corner: number): number[] {
+  const cornerSize = world.size + 1;
+  const cx = corner % cornerSize;
+  const cy = (corner - cx) / cornerSize;
+
+  const tiles: number[] = [];
+  for (const [dx, dy] of [
+    [-1, -1],
+    [0, -1],
+    [-1, 0],
+    [0, 0],
+  ] as const) {
+    const x = cx + dx;
+    const y = cy + dy;
+    if (inBounds(x, y, world.size)) tiles.push(index(x, y, world.size));
+  }
+  return tiles;
+}
+
+/**
+ * Smí se terén na tomhle plánu vůbec hnout? Vrací jméno překážky, jinak `null`.
+ *
+ * Roh drží čtyři dlaždice, takže srovnání pod jednou budovou hne i terénem pod
+ * sousedy. Kdyby na některém stála stavba, spadla by do svahu, aniž by o to
+ * kdokoli řekl — a **hladinu moře zvedat neumíme** vůbec.
+ *
+ * Bydlí to ve `world.ts`, protože se na to ptají dvě různá místa: hráčův příkaz
+ * a růst zástavby. Dvě kopie téhož pravidla by se rozešly.
+ */
+export function reshapeBlocker(
+  world: WorldState,
+  changes: ReadonlyMap<number, number>,
+): 'building' | 'water' | null {
+  for (const [corner, target] of changes) {
+    const current = world.cornerHeight[corner] ?? 0;
+
+    for (const tile of tilesAroundCorner(world, corner)) {
+      if (world.layers.buildingId[tile] !== 0) return 'building';
+      if (target > current && world.layers.terrain[tile] === TERRAIN.water) return 'water';
+    }
+  }
+
+  return null;
+}
+
 export function applyHeightChanges(
   world: WorldState,
   changes: ReadonlyMap<number, number>,

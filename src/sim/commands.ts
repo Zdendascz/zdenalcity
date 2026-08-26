@@ -2,17 +2,17 @@ import type { Balance } from '@/content/balance';
 import { checkFootprint, placeBuilding } from './buildings';
 import type { BuildingCatalogue } from './catalogue';
 import {
-  areaHeightRange,
   cornerInBounds,
   cornerIndex,
   cornerSideOf,
   isTwistedTile,
   MAX_HEIGHT,
   planCornerHeight,
+  planFillArea,
   planLevelArea,
   planUntwist,
 } from './heights';
-import { inBounds, index, ROAD, TERRAIN } from './layers';
+import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
 import { checkRequirements, presentDefinitions } from './requirements';
@@ -41,6 +41,7 @@ import {
   markTerrainChanged,
   markTileDirty,
   removeBuilding,
+  reshapeBlocker,
   setRoadTile,
   setZoneTile,
 } from './world';
@@ -443,7 +444,60 @@ export function zoneArea(
     }
   }
 
+  if (changed > 0 && zone !== ZONE.none) levelZonedArea(world, x, y, w, h);
   return changed > 0 ? OK : reject(lastReason);
+}
+
+/** Nad tolik dlaždic se zóna už nesrovnává. Viz `levelZonedArea`. */
+const MAX_LEVELLED_ZONE = 64;
+
+/**
+ * Srovná právě vyznačenou zónu, aby na ní domy nestály na chůdách (T66).
+ *
+ * **Dělá se to při zónování, ne při růstu**, a je za tím geometrie. Sousední
+ * dlaždice sdílejí rohy, takže dvě sousední rovné dlaždice musí být ve stejné
+ * výšce; jakmile v okolí něco stojí, terén se nehne. Naměřeno na golden městě:
+ * ze 61 pokusů srovnat parcelu pod rostoucím domem jich 59 zablokovala budova.
+ * Ve chvíli zónování je ale plocha ještě prázdná a srovnat jde.
+ *
+ * Rovná se **na průměr, u vody na nejnižší roh** — tedy přesně tak, jak si
+ * parcelu srovnává ruční stavba. Dozdění na nejvyšší roh jako u silnice se
+ * neujalo: u pobřeží by zvedalo rohy sdílené s vodní dlaždicí a moře by se
+ * naklonilo. Naměřeno na golden městě: všechny tři zóny to takhle zablokovalo.
+ *
+ * **Zadarmo**: zónování samo nic nestojí a připsat mu tichou položku za terén
+ * by z něj udělalo nástroj, kterým hráč přijde o kasu, aniž by věděl jak.
+ *
+ * Velká plocha se **nesrovnává**: hráč, který táhne zónu přes celé údolí,
+ * nechce náhorní plošinu. Blok mezi ulicemi se pod ten strop vejde.
+ *
+ * Když srovnat nejde, zóna se prostě vyznačí a domy dostanou podezdívku jako
+ * dřív. Srovnání je vylepšení vzhledu, ne podmínka.
+ */
+function levelZonedArea(world: WorldState, x: number, y: number, w: number, h: number): void {
+  if (w < 1 || h < 1 || w * h > MAX_LEVELLED_ZONE) return;
+
+  const changes = planLevelArea(world.cornerHeight, x, y, w, h);
+  if (changes.size === 0) return;
+
+  if (reshapeBlocker(world, changes) === null) {
+    applyHeightChanges(world, changes);
+    return;
+  }
+
+  // Nešlo to celé — zkusí se to po polovinách. Typicky vadí jeden okraj,
+  // který sahá k vodě nebo k cizí stavbě, a zbytek plochy srovnat jde. Bez
+  // toho by pobřežní čtvrť zůstala celá na svahu kvůli jedné řadě u břehu.
+  if (w === 1 && h === 1) return;
+  if (w >= h) {
+    const half = Math.floor(w / 2);
+    levelZonedArea(world, x, y, half, h);
+    levelZonedArea(world, x + half, y, w - half, h);
+  } else {
+    const half = Math.floor(h / 2);
+    levelZonedArea(world, x, y, w, half);
+    levelZonedArea(world, x, y + half, w, h - half);
+  }
 }
 
 /**
@@ -641,48 +695,14 @@ export interface TerraformEstimate {
   changes: Map<number, number>;
 }
 
-/** Dlaždice, které se dotýkají rohu. Roh drží čtyři, u kraje mapy míň. */
-function tilesAroundCorner(world: WorldState, corner: number): number[] {
-  const cornerSize = world.size + 1;
-  const cx = corner % cornerSize;
-  const cy = (corner - cx) / cornerSize;
-
-  const tiles: number[] = [];
-  for (const [dx, dy] of [
-    [-1, -1],
-    [0, -1],
-    [-1, 0],
-    [0, 0],
-  ] as const) {
-    const x = cx + dx;
-    const y = cy + dy;
-    if (inBounds(x, y, world.size)) tiles.push(index(x, y, world.size));
-  }
-  return tiles;
-}
-
 /**
- * Smí se terén na tomhle plánu vůbec hnout?
- *
- * - **pod vodou se nezvedá** — zavážení moře je jiná mechanika, ne terraforming,
- * - **pod budovou se nehýbe vůbec.** Zadání zakazuje snižování; zvedání
- *   zakazuju taky, protože budova stojí na rovině a nakloněný terén pod ní by
- *   ji zavěsil do vzduchu. Srovnat parcelu jde **před** stavbou (to je T33).
- *
- * Silnice se hýbat smí — invariant drží svah v mezích sám.
+ * Smí se terén na tomhle plánu hnout? Pravidlo je ve `world.ts`, protože se na
+ * ně ptá i růst zástavby — tady se jen překládá na hlášku pro hráče.
  */
 function checkTerraform(world: WorldState, changes: ReadonlyMap<number, number>): CommandResult {
-  for (const [corner, target] of changes) {
-    const current = world.cornerHeight[corner] ?? 0;
-
-    for (const tile of tilesAroundCorner(world, corner)) {
-      if (world.layers.buildingId[tile] !== 0) return reject('error.terraformBuilding');
-      if (target > current && world.layers.terrain[tile] === TERRAIN.water) {
-        return reject('error.terraformWater');
-      }
-    }
-  }
-
+  const blocker = reshapeBlocker(world, changes);
+  if (blocker === 'building') return reject('error.terraformBuilding');
+  if (blocker === 'water') return reject('error.terraformWater');
   return OK;
 }
 
@@ -721,8 +741,7 @@ function planFilling(
   width: number,
   depth: number,
 ): Map<number, number> {
-  const { max } = areaHeightRange(world.cornerHeight, x, y, width, depth);
-  return planLevelArea(world.cornerHeight, x, y, width, depth, max);
+  return planFillArea(world.cornerHeight, x, y, width, depth);
 }
 
 /** Kolik by stálo srovnání oblasti. Nic nemění — jen počítá. */

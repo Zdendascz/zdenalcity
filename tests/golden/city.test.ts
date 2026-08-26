@@ -101,6 +101,12 @@ function findSite(world: WorldState): { x: number; y: number } {
  * vzniknout a zůstaly v ní díry; teď si sedla srovná a ulice je souvislá, takže
  * má víc parcel přístup k silnici a město vyroste na 192 obyvatel místo 180.
  */
+/*
+ * V T66 se posunuly **hashe terénu, ne město**: zóna se při vyznačení srovná
+ * (viz `levelZonedArea`), takže domy stojí na rovině místo na podezdívce.
+ * Počet budov, obyvatel i práce zůstal na chlup stejný — právě proto, že
+ * srovnání není podmínkou růstu, jen vzhledem.
+ */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
     const content = await vanilla();

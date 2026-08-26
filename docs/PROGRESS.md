@@ -2737,6 +2737,55 @@ opsaný z východního.
 
 1019 testů.
 
+- [x] T66 — zóna se při vyznačení srovná
+
+**Rozhodnutí autora** navazující na T65: dům ze zóny na kopci má stát na rovině,
+ne na podezdívce jako na chůdách.
+
+Srovnávat se to dá **jen při zónování**, ne až když dům roste, a je za tím
+geometrie, ne lenost. Sousední dlaždice **sdílejí rohy**, takže dvě sousední
+rovné dlaždice musí být ve stejné výšce; jakmile v okolí něco stojí, terén se
+nehne. Naměřeno na golden městě: ze 61 pokusů srovnat parcelu pod rostoucím
+domem jich **59 zablokovala budova** a rovných domů přibyly tři. Ve chvíli
+zónování je plocha ještě prázdná a jde to.
+
+Cesta k tomu byla přes tři slepé uličky a všechny stály za změření:
+
+| varianta | budov | obyvatel | domů na svahu |
+|---|---|---|---|
+| beze změny | 61 | 192 | 29 |
+| srovnat parcelu při růstu | 61 | 192 | 26 |
+| dozdít zónu na nejvyšší roh | 61 | 192 | 29 |
+| srovnat zónu, u vody na nejnižší roh | 33 | 104 | 4 |
+| **srovnat zónu a při blokaci ji půlit** | **61** | **192** | **3** |
+
+Dozdění na nejvyšší roh jako u silnice (T61) neprošlo vůbec: u pobřeží zvedá
+rohy sdílené s vodní dlaždicí a **zvedat dno moře neumíme**, takže to
+zablokovalo všechny tři zóny golden města. Srovnání na nejnižší roh u vody zase
+odkopalo pobřežní čtvrť až k hladině a růst se tím zpomalil na čtvrtinu — město
+došlo na stejný počet budov, ale trvalo mu to 4000 tiků místo 1000.
+
+Vyhrálo **půlení**: plocha se zkusí srovnat celá, a když to neprojde, rozdělí se
+na půlky a zkouší se po částech. Typicky vadí jedna řada u břehu a zbytek
+čtvrti srovnat jde. Bez toho by pobřežní čtvrť zůstala na svahu celá kvůli
+jedné dlaždici.
+
+Velká plocha se **nesrovnává** (strop 64 dlaždic): kdo táhne zónu přes celé
+údolí, nechce náhorní plošinu. Rušení zóny terénem nehýbe — je to mazání
+značky, ne stavba. A srovnání **není podmínkou** zónování: když nejde, zóna se
+stejně vyznačí a domy dostanou podezdívku jako dřív.
+
+**Zadarmo.** Zónování samo nic nestojí a připsat mu tichou položku za terén by
+z něj udělalo nástroj, kterým hráč přijde o kasu, aniž by věděl jak.
+
+Vedlejší úklid: pravidlo „smí se sem sáhnout terénem?" bydlelo jako soukromá
+funkce v `commands.ts` a potřebovala ho i tahle změna. Je teď ve `world.ts` jako
+`reshapeBlocker` a `commands.ts` ho jen překládá na hlášku pro hráče — dvě kopie
+téhož pravidla by se dřív nebo později rozešly.
+
+Ověřeno ve hře: vyznačení zóny 5×5 na kopci srovnalo 9 nerovných dlaždic z 25
+na nulu. Mutační test 5 z 5. 1024 testů.
+
 
 ## Rozpracované
 
