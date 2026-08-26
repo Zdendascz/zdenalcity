@@ -2540,6 +2540,21 @@ víc než světla), podloží černý bod na 45, aby v ikoně neexistovala úpln
 a dožene sytost na 1,25, protože podložení barvy vždycky trochu vysedí.
 Kontrolní míra: průměrný jas buldozeru je 129 proti panelu s 22.
 
+Společná gamma ale nestačila. Archy mají ikony různě exponované a rozdíl byl
+velký — blackout měl průměrný jas 67, kdežto *stáhnout do souboru* 172, takže
+na liště vedle sebe jedna svítila a druhá byla skvrna. Skript proto počítá
+gammu **pro každou ikonu zvlášť**, aby všechny skončily kolem 152. Jen
+prosvětluje, nikdy netmaví: už světlá ikona je v pořádku a stahovat ji dolů by
+jen ubralo kontrast proti panelu. Rozptyl spadl ze 67–172 na 139–172.
+
+Zkoušel se ještě **obrys kolem siluety**, klasický trik na ikonu v tmavém UI.
+Nefunguje tu: klíčování průhlednosti nechává na ikonách drobné vnitřní hrany
+a obrys je obtáhne všechny, takže z izometrického domku je roztřepená nálepka.
+Měkká záře místo obrysu zase dělá mlhu a ubírá detail. Zůstalo jen dorovnání.
+
+Tlačítka nakonec 46×44 px a ikona v nich 35 — o pět víc, než co stačilo na
+vzhled, protože se na ně taky musí trefit myš.
+
 Ověřeno ve hře: 104 obrázků v DOM, žádný rozbitý, dva polygonové zbytky —
 dosah sounáležitosti a dosah MHD, tedy přesně ty dvě třídy, ke kterým obrázek
 není. 974 testů.

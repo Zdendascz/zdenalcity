@@ -25,6 +25,8 @@ SIZE = 128          # cilova hrana; ikony jsou v archu ruzne velke
 GAMMA = 0.75        # prosvetleni strednich tonu
 FLOOR = 45          # cerny bod: nic v ikone nesmi byt tmavsi nez HUD
 SATURATION = 1.25   # nahrada sytosti, kterou podlozeni cerneho bodu ubere
+TARGET = 152        # na tenhle prumerny jas se dotahnou i nejtmavsi ikony
+MIN_GAMMA = 0.45    # dal uz se nedotahuje; z blackoutu nema byt poledne
 INSET = 8           # karta ma slaby ramecek; ten do ikony nepatri
 GAP = 8             # tolik prazdnych radku oddeluje ikonu od popisku
 TOL = 14            # odchylka od vyplne karty, ktera se jeste bere jako obsah
@@ -201,6 +203,30 @@ def lift(rgb):
     return np.clip(grey + (v - grey) * SATURATION, 0, 1) * 255.0
 
 
+def even_out(rgba):
+    """Dotahne tmave ikony na jas ostatnich.
+
+    Spolecna gamma nestaci: archy maji ikony ruzne exponovane a rozdil je velky
+    - blackout mel prumerny jas 67, kdezto stahnout do souboru 172. Na tlacitku
+    vedle sebe pak jedna svitila a druha byla skvrna. Pocita se proto gamma pro
+    kazdou ikonu zvlast, aby vsechny skoncily kolem TARGET.
+
+    Jen se **prosvetluje**, nikdy netmavi: uz svetla ikona je v poradku a
+    stahovat ji dolu by jen ubralo kontrast proti panelu.
+    """
+    opaque = rgba[:, :, 3] > 128
+    if not opaque.any():
+        return rgba
+    mean = rgba[:, :, :3][opaque].mean()
+    if mean >= TARGET:
+        return rgba
+
+    gamma = max(MIN_GAMMA, np.log(TARGET / 255.0) / np.log(max(mean, 1.0) / 255.0))
+    out = rgba.copy()
+    out[:, :, :3] = np.power(rgba[:, :, :3] / 255.0, gamma) * 255.0
+    return out
+
+
 def cut(cell, override=None):
     arr = np.asarray(cell.convert('RGB')).astype(int)
     fill = card_fill(arr)
@@ -235,8 +261,10 @@ def cut(cell, override=None):
 
     diff = np.abs(square - fill).max(axis=2)
     alpha = np.clip((diff - 6) * 255 / 18, 0, 255).astype(np.uint8)
-    rgba = np.dstack([lift(square).astype(np.uint8), alpha])
-    return Image.fromarray(rgba, 'RGBA').resize((SIZE, SIZE), Image.LANCZOS)
+    rgba = even_out(np.dstack([lift(square), alpha.astype(np.float64)]))
+    return Image.fromarray(np.clip(rgba, 0, 255).astype(np.uint8), 'RGBA').resize(
+        (SIZE, SIZE), Image.LANCZOS
+    )
 
 
 def main(src):
