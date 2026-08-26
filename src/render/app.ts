@@ -409,7 +409,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
   const host = createSimHost(
     simWorld,
-    createDefaultSystems(content, content.getBalance(), disasterRegistry),
+    createDefaultSystems(content, content.getBalance(), disasterRegistry, content.grants()),
     content,
     content.getBalance(),
   );

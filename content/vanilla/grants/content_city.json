@@ -1,0 +1,12 @@
+{
+  "id": "vanilla:grant_content_city",
+  "type": "grant",
+  "name": "grant.content_city.name",
+  "description": "grant.content_city.desc",
+  "amount": 15000,
+  "condition": {
+    "metric": "happiness",
+    "atLeast": 180,
+    "forTicks": 360
+  }
+}

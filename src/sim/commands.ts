@@ -15,6 +15,7 @@ import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
 import { checkRequirements, presentDefinitions } from './requirements';
+import { loanCap, loanProblems, takeLoan } from './finance';
 import { needsClearing } from './terrain';
 import { createLine, findLine, modeOf, removeLine, stopMode } from './transit';
 import { extinguishTile } from './disasters/fire';
@@ -72,7 +73,14 @@ export type Command =
   | { type: 'add_stop'; lineId: number; buildingId: number }
   | { type: 'remove_stop'; lineId: number; buildingId: number }
   | { type: 'set_vehicles'; lineId: number; vehicles: number }
-  | { type: 'set_fare'; lineId: number; fare: number };
+  | { type: 'set_fare'; lineId: number; fare: number }
+  /**
+   * Půjčka (§8 fáze 4).
+   *
+   * Splácet se nedá dřív: předčasné splacení by z půjčky udělalo bezúročný
+   * přesun peněz v čase, protože úrok se počítá z doby, na kterou se sjednala.
+   */
+  | { type: 'take_loan'; amount: number; termMonths: number };
 
 /** Má dlaždice aspoň jednoho silničního souseda? Odsud se staví mosty dál. */
 function touchesRoad(world: WorldState, x: number, y: number): boolean {
@@ -782,4 +790,38 @@ export function setLineFare(world: WorldState, lineId: number, fare: number): Co
 
   line.fare = fare;
   return OK;
+}
+
+/* ---------------------------------------------------------------- půjčka -- */
+
+/**
+ * Sjedná půjčku. Peníze přijdou hned, splácí se od příštího měsíce.
+ *
+ * Odmítnutí říká **proč** — strop, počet, doba, nebo nesmyslná částka. Půjčka
+ * je jediná cesta z mínusu a hráč, který ji nedostane, musí vědět, co s tím.
+ */
+export function requestLoan(
+  world: WorldState,
+  balance: Balance | undefined,
+  amount: number,
+  termMonths: number,
+): CommandResult {
+  if (!balance) return reject('error.noFinanceRules');
+
+  const problems = loanProblems(world, balance, amount, termMonths);
+  if (problems.includes('invalidAmount')) return reject('error.invalidAmount', { amount });
+  if (problems.includes('invalidTerm')) {
+    return reject('error.invalidTerm', {
+      min: balance.finance.minTermMonths,
+      max: balance.finance.maxTermMonths,
+    });
+  }
+  if (problems.includes('tooMany')) {
+    return reject('error.tooManyLoans', { max: balance.finance.maxLoans });
+  }
+  if (problems.includes('overCap')) {
+    return reject('error.overLoanCap', { cap: loanCap(world, balance) });
+  }
+
+  return takeLoan(world, balance, amount, termMonths) ? OK : reject('error.invalidAmount', { amount });
 }

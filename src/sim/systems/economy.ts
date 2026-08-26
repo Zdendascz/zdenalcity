@@ -4,6 +4,7 @@ import type { BuildingCatalogue } from '../catalogue';
 import { cellOfTile, strongestModifier } from '../disasters/effects';
 import { index, ROAD } from '../layers';
 import { isRciCategory } from '../rci';
+import { monthlyPayments, totalDebt } from '../finance';
 import { transitTotals } from '../transit';
 import { serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
@@ -66,6 +67,12 @@ export interface TransitBudget {
   upkeep: number;
 }
 
+export interface DebtBudget {
+  loans: number;
+  owed: number;
+  payment: number;
+}
+
 export interface Budget {
   lines: BudgetLine[];
   /** Údržba silnic. Nejsou to budovy, takže mají vlastní řádek (§4 fáze 3). */
@@ -75,6 +82,8 @@ export interface Budget {
    * do rozpisu po definicích nepatří ani jedno.
    */
   transit: TransitBudget;
+  /** Půjčky: kolik jich běží, kolik se dluží a kolik se tenhle měsíc platí. */
+  debt: DebtBudget;
   income: number;
   expenses: number;
   /** Kolik vynese jedna jednotka základu při 100 %. Do rozpisu v UI. */
@@ -236,6 +245,15 @@ export function computeBudget(
   income += transit.income;
   expenses += transit.upkeep;
 
+  // Splátky půjček. Vlastní řádek, protože to není údržba ničeho — je to
+  // cena za to, že si město kdysi vypomohlo.
+  const debt: DebtBudget = {
+    loans: world.loans.length,
+    owed: totalDebt(world),
+    payment: monthlyPayments(world),
+  };
+  expenses += debt.payment;
+
   // Daň se zaokrouhluje **jednou za řádek**, ne u každé budovy. Jinak by rozpis
   // v UI tvrdil něco jiného, než kolik ve sloupci opravdu stojí.
   for (const line of byDefinition.values()) {
@@ -249,6 +267,7 @@ export function computeBudget(
     lines: [...byDefinition.values()].sort((a, b) => a.definitionId.localeCompare(b.definitionId)),
     roads,
     transit,
+    debt,
     income,
     expenses,
     valuePerUnit: balance.economy.taxableValuePerUnit,

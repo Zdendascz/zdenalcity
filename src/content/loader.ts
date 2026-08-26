@@ -36,7 +36,7 @@ export function createVanillaSource(): ContentSource {
       manifest = data;
     } else if (path === 'balance.json') {
       balance = data;
-    } else if (path.startsWith('buildings/')) {
+    } else if (path.startsWith('buildings/') || path.startsWith('grants/')) {
       definitions.push({ path, data });
     } else if (path.startsWith('locale/')) {
       locales[path.slice('locale/'.length).replace(/\.json$/, '')] = data;

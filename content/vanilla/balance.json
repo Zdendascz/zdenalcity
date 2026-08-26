@@ -134,6 +134,17 @@
     "minAccessFactor": 0.15,
     "slopeFactor": 0.7
   },
+  "finance": {
+    "loanIncomeMultiple": 24,
+    "maxLoans": 3,
+    "minTermMonths": 12,
+    "maxTermMonths": 120,
+    "baseRate": 4,
+    "ratePenalty": 8,
+    "missedPenalty": 0.08,
+    "ratingRecovery": 0.01
+  },
+
   "transit": {
     "minStops": 2,
     "maxStops": 12,

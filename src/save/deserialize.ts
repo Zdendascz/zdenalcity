@@ -193,6 +193,10 @@ function parseState(raw: Record<string, unknown>): SaveState {
       taxRates,
       lastIncome: int(economyRaw, 'lastIncome', 'state.economy'),
       lastExpenses: int(economyRaw, 'lastExpenses', 'state.economy'),
+      // Rating a půjčky nese až save v6 (T59). Do té doby se načtené město
+      // probouzí s čistým štítem — což je milosrdnější než nula a hlavně to
+      // nepředstírá, že si formát pamatuje něco, co v něm není.
+      creditRating: 1,
     },
     demand,
   };

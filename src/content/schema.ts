@@ -124,7 +124,52 @@ export interface BuildingDefinition {
   };
 }
 
+/**
+ * Grant — jednorázová dotace za dosažený milník (§8 fáze 4).
+ *
+ * **Obsah, ne kód** (P5): mod si přidá vlastní milník a hra o něm nemusí vědět.
+ * Kód zná jen jména veličin, na které se dá ptát — stejně jako u ukazatelů
+ * rizika katastrof.
+ *
+ * Každý grant se přizná **jednou za hru**. Seznam přiznaných je v savu, jinak
+ * by se po načtení rozdaly znovu a hráč by měl nekonečný zdroj peněz.
+ */
+export interface GrantDefinition {
+  id: string;
+  type: 'grant';
+  name: string;
+  description: string;
+  /** Kolik se jednorázově vyplatí. */
+  amount: number;
+  condition: GrantCondition;
+}
+
+export interface GrantCondition {
+  /** Jméno veličiny: `population`, `buildings`, `happiness`, `building`. */
+  metric: string;
+  /** Práh, od kterého se milník počítá za dosažený. */
+  atLeast: number;
+  /** U veličiny `building`: která budova musí stát. */
+  definitionId?: string;
+  /**
+   * Jak dlouho musí podmínka platit **v kuse**.
+   *
+   * Bez toho by šel grant za spokojenost sebrat tím, že hráč na jeden tik
+   * srazí daně na nulu. Chybí-li, stačí okamžik.
+   */
+  forTicks?: number;
+}
+
+/**
+ * Definice budovy. **Zůstává jednotná**, i když typů obsahu je víc — sjednotit
+ * ji s grantem do unie by znamenalo, že každé místo, které sáhne na `graphics`
+ * nebo `footprint`, musí nejdřív dokazovat, o co jde. Grant je jiný druh věci
+ * a registr ho vede zvlášť.
+ */
 export type Definition = BuildingDefinition;
+
+/** Cokoli, co může být v souboru obsahu. Rozlišuje se podle `type`. */
+export type AnyDefinition = BuildingDefinition | GrantDefinition;
 
 /** `namespace` bez dvojtečky — viz `id` v manifestu. */
 const NAMESPACE = /^[a-z][a-z0-9_]*$/;
@@ -138,6 +183,8 @@ const TERRAIN_VALUES = new Set<number>(Object.values(TERRAIN));
 
 /** Nejvyšší úroveň budovy (§8 zadání fáze 2). Kam až se dojde, řídí balanc. */
 export const MAX_LEVEL = 5;
+
+const GRANT_SECTIONS = ['id', 'type', 'name', 'description', 'amount', 'condition'];
 
 const DEFINITION_SECTIONS = [
   'id',
@@ -303,15 +350,26 @@ export function validateManifest(raw: unknown): {
 export function validateDefinition(
   raw: unknown,
   expectedNamespace: string,
-): { definition: Definition | null; issues: ValidationIssue[] } {
+): { definition: AnyDefinition | null; issues: ValidationIssue[] } {
   const issues: ValidationIssue[] = [];
   const record = asRecord(raw);
   if (!record) {
     return { definition: null, issues: [{ field: '', message: 'definice musí být objekt' }] };
   }
 
+  // Typ se čte **první**: podle něj se liší i seznam povolených sekcí, takže
+  // grant validovaný jako budova by hlásil samé překlepy.
+  const type = record['type'];
+  if (type !== 'building' && type !== 'grant') {
+    return {
+      definition: null,
+      issues: [{ field: 'type', message: 'podporováno je "building" a "grant"' }],
+    };
+  }
+
+  const sections = type === 'grant' ? GRANT_SECTIONS : DEFINITION_SECTIONS;
   for (const key of Object.keys(record).sort()) {
-    if (!DEFINITION_SECTIONS.includes(key)) {
+    if (!sections.includes(key)) {
       issues.push({ field: key, message: 'neznámá sekce — překlep?' });
     }
   }
@@ -324,9 +382,7 @@ export function validateDefinition(
     });
   }
 
-  if (record['type'] !== 'building') {
-    issues.push({ field: 'type', message: 'zatím je podporován jen "building"' });
-  }
+  if (type === 'grant') return validateGrant(issues, record, id);
 
   const category = requireString(issues, record, 'category', 'category', NAMESPACE);
   let menu: string | undefined;
@@ -640,6 +696,65 @@ function validateSewage(
 
   const capacity = requireInt(issues, section, 'capacity', 'sewage.capacity', 0);
   return capacity === null ? undefined : { capacity };
+}
+
+/**
+ * Grant. Kontroluje se **tvar podmínky**, ne jméno veličiny.
+ *
+ * Neznámá veličina se pozná až za běhu, kdy se na ni nikdo neumí zeptat —
+ * a to je záměr: mod si smí přidat vlastní veličinu a hra ji nesmí odmítnout
+ * jen proto, že o ní neví. Chybějící `amount` nebo `atLeast` je ale překlep,
+ * ne rozšíření, a tichý grant za nula korun nikdo neodhalí.
+ */
+function validateGrant(
+  issues: ValidationIssue[],
+  record: Record<string, unknown>,
+  id: string | null,
+): { definition: AnyDefinition | null; issues: ValidationIssue[] } {
+  const name = requireString(issues, record, 'name', 'name', LOCALE_KEY);
+  const description = requireString(issues, record, 'description', 'description', LOCALE_KEY);
+  const amount = requireInt(issues, record, 'amount', 'amount', 1);
+
+  const section = requireRecord(issues, record, 'condition', 'condition');
+  const metric = section
+    ? requireString(issues, section, 'metric', 'condition.metric', NAMESPACE)
+    : null;
+  const atLeast = section
+    ? requireInt(issues, section, 'atLeast', 'condition.atLeast', 0)
+    : null;
+
+  let definitionId: string | undefined;
+  if (section && section['definitionId'] !== undefined) {
+    definitionId =
+      requireString(issues, section, 'definitionId', 'condition.definitionId', DEFINITION_ID) ??
+      undefined;
+  }
+
+  let forTicks: number | undefined;
+  if (section && section['forTicks'] !== undefined) {
+    forTicks = requireInt(issues, section, 'forTicks', 'condition.forTicks', 1) ?? undefined;
+  }
+
+  if (issues.length > 0 || !id || !name || !description || amount === null || !metric || atLeast === null) {
+    return { definition: null, issues };
+  }
+
+  return {
+    definition: {
+      id,
+      type: 'grant',
+      name,
+      description,
+      amount,
+      condition: {
+        metric,
+        atLeast,
+        ...(definitionId !== undefined ? { definitionId } : {}),
+        ...(forTicks !== undefined ? { forTicks } : {}),
+      },
+    },
+    issues,
+  };
 }
 
 function validateTransit(

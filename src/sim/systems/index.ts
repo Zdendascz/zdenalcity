@@ -19,6 +19,8 @@ import { createFireSystem } from '../disasters/fire';
 import { createFloodSystem } from '../disasters/flood';
 import { DisasterRegistry } from '../disasters/registry';
 import { createTransitSystem } from './transit';
+import { createFinanceSystem } from './finance';
+import type { GrantDefinition } from '@/content/schema';
 
 export interface System {
   readonly name: string;
@@ -46,6 +48,7 @@ export function createDefaultSystems(
   catalogue: BuildingCatalogue,
   balance: Balance,
   disasters: DisasterRegistry = new DisasterRegistry(),
+  grants: readonly GrantDefinition[] = [],
 ): System[] {
   // Pořadí podle tabulky v architektuře §5: systémy fáze 2 jsou za těmi z fáze 1.
   return [
@@ -71,6 +74,8 @@ export function createDefaultSystems(
     // cooldown, ne ho dostat ve stejném tiku.
     createLevelSystem(catalogue, balance),
     createEconomySystem(catalogue, balance),
+    // Splátky hned za rozpočtem: město má nejdřív vybrat daně a pak platit.
+    createFinanceSystem(catalogue, balance, grants),
     // Linky před dopravou: kolony si čtou, kolik kapacity silnici zbylo po
     // kolejích, a přepočet až za nimi by se projevil o osm tiků později.
     createTransitSystem(catalogue, balance),
@@ -88,6 +93,7 @@ export function createDefaultSystems(
 }
 
 export {
+  createFinanceSystem,
   createTransitSystem,
   createPowerSystem,
   createWaterSystem,

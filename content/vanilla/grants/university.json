@@ -1,0 +1,12 @@
+{
+  "id": "vanilla:grant_university",
+  "type": "grant",
+  "name": "grant.university.name",
+  "description": "grant.university.desc",
+  "amount": 25000,
+  "condition": {
+    "metric": "building",
+    "atLeast": 1,
+    "definitionId": "vanilla:university"
+  }
+}

@@ -2270,6 +2270,48 @@ ani jedno. Hráč musí vidět, kam peníze tečou.
 
 Údržba se platí i za linku, která nejezdí. Vozidlo v garáži taky stojí peníze.
 
+- [x] T57 — půjčky, granty, úvěrový rating
+
+Tři věci, které spolu drží, a všechny tři jsou o tom samém: **co se stane, když
+peníze dojdou.**
+
+**Půjčka je jediná cesta z mínusu.** Bankrot je v téhle hře měkký, takže bez
+úvěru se město po zemětřesení jen pomalu rozpadá a hráč nemá čím zasáhnout.
+Tím se zavírá otevřená otázka „z bankrotu není cesta zpátky" ze seznamu níž.
+
+Strop se odvozuje od **příjmu, ne od kasy**: půjčka má být přemostěním, ne
+způsobem, jak si koupit město, které se neuživí. Kasa o splatitelnosti neříká
+nic. Už půjčené se od stropu odečítá, takže druhá půjčka je menší než první.
+
+Úrok je **jednoduchý, ne složený** — vrátí se `jistina × (1 + sazba × roky)`,
+rozdělené na stejné splátky. Anuita by byla přesnější, ale hráč by z ní neuměl
+v hlavě odhadnout, kolik ho to bude stát, a tohle je hra, ne hypoteční
+kalkulačka.
+
+**Rating je paměť.** Nesplacená splátka se neodpouští ani nehromadí do skoku:
+dluh zůstane, měsíc se nepočítá jako splacený a rating klesne. Příští půjčka je
+pak dražší, a to je jediný trest, který za nesplácení existuje. Léčí se
+**pomaleji, než padá** — jinak by stačilo pár měsíců v černých číslech
+a nesplácení by nic nestálo. Hlídá to validace.
+
+**Granty jsou obsah** v `content/vanilla/grants/`, ne kód (P5). Přibyl druhý typ
+definice, `grant`, a registr ho vede **zvlášť od budov**: sjednotit obojí do
+jedné unie by znamenalo, že každé místo, které sáhne na `footprint`, musí
+nejdřív dokazovat, že nemá v ruce dotaci. Zkoušel jsem to a rozbilo to 479 míst.
+
+Podmínka s `forTicks` musí platit **v kuse**. Bez toho by šel grant za
+spokojenost sebrat tím, že hráč na jediný tik srazí daně na nulu, vybere si
+odměnu a hned je vrátí zpátky. Neznámá veličina grant nepřizná, ale nespadne —
+mod si smí přidat vlastní milník a hra ho nesmí odmítnout jen proto, že o něm
+neví.
+
+Splátky mají v rozpočtu vlastní řádek. Nejsou údržba ničeho — je to cena za to,
+že si město kdysi vypomohlo.
+
+Rating a půjčky **ještě nejsou v savu**: nese je až formát v6 (T59). Načtené
+město se do té doby probouzí s čistým štítem, což je milosrdnější než nula
+a hlavně to nepředstírá, že si formát pamatuje něco, co v něm není.
+
 
 ## Rozpracované
 
@@ -2282,7 +2324,6 @@ Zbývá:
 | Úkol | Obsah |
 |---|---|
 | T54 | Sesuv půdy |
-| T57 | Půjčky, dotace, úvěrový rating |
 | T58 | Dluhopisy |
 | T59 | Save verze 6 |
 | T60 | Vyhodnocení fáze 4 |
@@ -2302,8 +2343,8 @@ Mimo zadání fází, otevřené k rozhodnutí:
   předepisuje, žádný úkol ji nezadává. Dokud neexistuje, sahá `ui/` na
   `localStorage` a `File` přímo.
 - **Kopec před budovou ji nezakryje** — viz Známé problémy.
-- **Z bankrotu není cesta zpátky** — patří k T41, ale T57 (půjčky) by to
-  mohl vyřešit sám.
+- ~~**Z bankrotu není cesta zpátky**~~ — vyřešeno v T57. Půjčka se odvozuje od
+  příjmu, takže město s nulovou kasou, ale živým rozpočtem si na obnovu půjčí.
 
 ## Rozhodnutí učiněná během vývoje
 

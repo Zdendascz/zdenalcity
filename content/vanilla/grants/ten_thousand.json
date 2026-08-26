@@ -1,0 +1,11 @@
+{
+  "id": "vanilla:grant_ten_thousand",
+  "type": "grant",
+  "name": "grant.ten_thousand.name",
+  "description": "grant.ten_thousand.desc",
+  "amount": 40000,
+  "condition": {
+    "metric": "population",
+    "atLeast": 10000
+  }
+}

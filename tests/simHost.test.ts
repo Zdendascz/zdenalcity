@@ -128,6 +128,8 @@ describe('fázování systémů', () => {
       ['growth', 12, 2],
       ['levels', 20, 9],
       ['economy', 30, 0],
+      // Splátky a granty hned za rozpočtem: nejdřív vybrat daně, pak platit.
+      ['finance', 1, 0],
       // Linky před dopravou: kolony si čtou zbylou kapacitu po kolejích.
       ['transit', 1, 0],
       ['traffic', 8, 4],

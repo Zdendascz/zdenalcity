@@ -1,6 +1,7 @@
 import { coarseCellsOf, createCoarseLayers } from './coarse';
 import { createDisasterState } from './disasters/state';
 import type { DisasterState } from './disasters/state';
+import type { Loan } from './finance';
 import type { LineStats, TransitLine } from './transit';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
@@ -75,6 +76,13 @@ export interface EconomyState {
   /** Bilance posledního měsíčního rozpočtu. Nulová, dokud první neproběhne. */
   lastIncome: number;
   lastExpenses: number;
+  /**
+   * Úvěrový rating, 0–1 (§8 fáze 4). Jednička je čistý štít.
+   *
+   * Není odvozený: je to **paměť**. Nesplacená splátka ho srazí, klid ho
+   * pomalu léčí, a příští půjčka i emise dluhopisů se podle něj počítají.
+   */
+  creditRating: number;
 }
 
 /**
@@ -340,6 +348,18 @@ export interface WorldState {
    * dopočítá z linek a města.
    */
   lineStats: Map<number, LineStats>;
+  /** Běžící půjčky (§8 fáze 4). Prázdné pole je zdravý stav. */
+  loans: Loan[];
+  nextLoanId: number;
+  /** Id už přiznaných grantů. Do savu — jinak by se po loadu rozdaly znovu. */
+  grantsAwarded: Set<string>;
+  /**
+   * Kolik tiků v kuse platí podmínka grantu, který ji ještě nesplnil dost dlouho.
+   *
+   * Přeruší-li se, počítadlo se maže. Bez toho by šel grant za spokojenost
+   * sebrat tím, že hráč na jediný tik srazí daně na nulu.
+   */
+  grantProgress: Map<string, number>;
   /**
    * Kolik cest v buňce vezme MHD, 0–1. Odvozené z `lineStats`; drží se zvlášť,
    * protože se na to ptá doprava u každé budovy.
@@ -379,6 +399,7 @@ export function createWorld(
         commercial: economy.defaultTaxRate,
         industrial: economy.defaultTaxRate,
       },
+      creditRating: 1,
       lastIncome: 0,
       lastExpenses: 0,
     },
@@ -418,6 +439,10 @@ export function createWorld(
     tramTiles: new Map(),
     transitDirty: false,
     lineStats: new Map(),
+    loans: [],
+    nextLoanId: 1,
+    grantsAwarded: new Set(),
+    grantProgress: new Map(),
     transitRelief: new Map(),
     flood: new Uint8Array(size * size),
     floodDepth: new Uint8Array(size * size),

@@ -1,7 +1,7 @@
 import { validateBalance } from './balance';
 import type { Balance } from './balance';
 import { validateDefinition, validateManifest } from './schema';
-import type { Definition, ValidationIssue } from './schema';
+import type { AnyDefinition, Definition, GrantDefinition, ValidationIssue } from './schema';
 
 /** Jeden soubor zdroje. `path` slouží jen k tomu, aby chyba uměla říct kde. */
 export interface RawFile {
@@ -51,6 +51,7 @@ function describe(file: string, issues: readonly ValidationIssue[]): string[] {
 
 export class ContentRegistry {
   private readonly definitions = new Map<string, Definition>();
+  private readonly grantDefs = new Map<string, GrantDefinition>();
   private readonly sources: SourceInfo[] = [];
   /** jazyk → klíč → text, slito přes všechny zdroje (§10). */
   private readonly locales = new Map<string, Map<string, string>>();
@@ -89,14 +90,18 @@ export class ContentRegistry {
       for (const key of table.keys()) knownKeys.add(key);
     }
 
-    const accepted = new Map<string, Definition>();
+    const accepted = new Map<string, AnyDefinition>();
 
     for (const file of source.definitions) {
       const { definition, issues } = validateDefinition(file.data, manifest.id);
       problems.push(...describe(file.path, issues));
       if (!definition) continue;
 
-      if (this.definitions.has(definition.id) || accepted.has(definition.id)) {
+      if (
+        this.definitions.has(definition.id) ||
+        this.grantDefs.has(definition.id) ||
+        accepted.has(definition.id)
+      ) {
         problems.push(`${file.path}: id — "${definition.id}" je už definované`);
         continue;
       }
@@ -115,7 +120,11 @@ export class ContentRegistry {
     }
 
     for (const [id, definition] of accepted) {
-      this.definitions.set(id, definition);
+      // Grant není budova a vede se zvlášť. Sjednotit obojí do jedné mapy by
+      // znamenalo, že každé místo, které sáhne na `footprint`, musí nejdřív
+      // dokazovat, že nemá v ruce dotaci.
+      if (definition.type === 'grant') this.grantDefs.set(id, definition);
+      else this.definitions.set(id, definition);
     }
 
     if (incomingBalance) this.balance = incomingBalance;
@@ -156,6 +165,21 @@ export class ContentRegistry {
   }
 
   /** Pořadí je pořadí načtení — stabilní, takže se o něj smí opřít i simulace. */
+  /**
+   * Granty v pevném pořadí podle id.
+   *
+   * Pořadí je součást determinismu: přiznávají se v tomtéž tiku a každý přidá
+   * peníze, takže na pořadí by jinak záleželo podle toho, jak glob vrátil
+   * soubory (P2).
+   */
+  grants(): GrantDefinition[] {
+    return [...this.grantDefs.values()].sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  getGrant(id: string): GrantDefinition | undefined {
+    return this.grantDefs.get(id);
+  }
+
   getAll(type: string): Definition[] {
     return [...this.definitions.values()].filter((definition) => definition.type === type);
   }

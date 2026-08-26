@@ -15,6 +15,7 @@ import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { COARSE_CELLS } from './support/grid';
+import type { AnyDefinition } from '@/content/schema';
 
 function definition(
   id: string,
@@ -57,6 +58,11 @@ function withCoverage(world: WorldState, serviceClass: string, value: number): W
   return world;
 }
 
+/** Zúžení na budovu: `validateDefinition` umí i granty, ty `requirements` nemají. */
+function building(definition: AnyDefinition | null): Definition | undefined {
+  return definition?.type === 'building' ? definition : undefined;
+}
+
 describe('schéma prerekvizit', () => {
   const base = {
     id: 'testmod:thing',
@@ -76,7 +82,7 @@ describe('schéma prerekvizit', () => {
       'testmod',
     );
     expect(both.issues).toEqual([]);
-    expect(both.definition?.requirements).toEqual({
+    expect(building(both.definition)?.requirements).toEqual({
       services: { education: 40 },
       buildings: ['vanilla:school'],
     });
@@ -85,14 +91,14 @@ describe('schéma prerekvizit', () => {
       { ...base, requirements: { services: { police: 10 } } },
       'testmod',
     );
-    expect(onlyServices.definition?.requirements).toEqual({
+    expect(building(onlyServices.definition)?.requirements).toEqual({
       services: { police: 10 },
       buildings: [],
     });
   });
 
   it('bez sekce je definice bez podmínek', () => {
-    expect(validateDefinition(base, 'testmod').definition?.requirements).toBeUndefined();
+    expect(building(validateDefinition(base, 'testmod').definition)?.requirements).toBeUndefined();
   });
 
   it('odmítne překlep, ne aby budova tiše nikdy nevyrostla', () => {

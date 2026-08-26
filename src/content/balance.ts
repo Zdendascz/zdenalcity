@@ -669,6 +669,28 @@ export interface Balance {
     types: Readonly<Record<string, DisasterBalance>>;
   };
 
+  /**
+   * Půjčky a rating (§8 fáze 4).
+   *
+   * Strop se odvozuje od **příjmu, ne od kasy**: půjčka má být přemostěním,
+   * ne způsobem, jak si koupit město, které se neuživí.
+   */
+  finance: {
+    /** Kolikanásobek měsíčního příjmu si smí město půjčit dohromady. */
+    loanIncomeMultiple: number;
+    maxLoans: number;
+    minTermMonths: number;
+    maxTermMonths: number;
+    /** Roční úrok v procentech při čistém ratingu. */
+    baseRate: number;
+    /** O kolik procent výš si půjčí město s ratingem na nule. */
+    ratePenalty: number;
+    /** O kolik klesne rating za jednu nesplacenou splátku. */
+    missedPenalty: number;
+    /** O kolik se rating měsíčně léčí, když se splácí. */
+    ratingRecovery: number;
+  };
+
   transit: {
     minStops: number;
     maxStops: number;
@@ -1067,6 +1089,7 @@ export function validateBalance(raw: unknown): {
       decayPenalty: num(issues, levels, 'decayPenalty', 'levels.decayPenalty', 0, 255),
       demandRelief: num(issues, levels, 'demandRelief', 'levels.demandRelief', 0, 255),
     },
+    finance: validateFinance(issues, root),
     transit: validateTransit(issues, root),
 
     growth: {
@@ -1846,6 +1869,51 @@ function flag(
  * obsah. Kontroluje se **tvar**: bez toho by mód s chybějící kapacitou tiše
  * odvezl nula lidí a hráč by hledal chybu v počtu vozidel.
  */
+/**
+ * Půjčky a rating.
+ *
+ * Hlídá se jedna věc navíc: **uzdravování ratingu musí být pomalejší než
+ * pád**. Kdyby bylo rychlejší, stačilo by pár měsíců v černých číslech
+ * a nesplácení by nic nestálo — a rating je jediný trest, který za něj hra má.
+ */
+function validateFinance(
+  issues: ValidationIssue[],
+  root: Record<string, unknown>,
+): Balance['finance'] {
+  const raw = section(issues, root, 'finance');
+  const value: Balance['finance'] = {
+    loanIncomeMultiple: num(
+      issues,
+      raw,
+      'loanIncomeMultiple',
+      'finance.loanIncomeMultiple',
+      0,
+      1000,
+    ),
+    maxLoans: num(issues, raw, 'maxLoans', 'finance.maxLoans', 1, 100),
+    minTermMonths: num(issues, raw, 'minTermMonths', 'finance.minTermMonths', 1, 1000),
+    maxTermMonths: num(issues, raw, 'maxTermMonths', 'finance.maxTermMonths', 1, 1000),
+    baseRate: num(issues, raw, 'baseRate', 'finance.baseRate', 0, 100),
+    ratePenalty: num(issues, raw, 'ratePenalty', 'finance.ratePenalty', 0, 100),
+    missedPenalty: num(issues, raw, 'missedPenalty', 'finance.missedPenalty', 0, 1),
+    ratingRecovery: num(issues, raw, 'ratingRecovery', 'finance.ratingRecovery', 0, 1),
+  };
+
+  if (raw && value.maxTermMonths < value.minTermMonths) {
+    issues.push({
+      field: 'finance',
+      message: `nejdelší doba nesmí být kratší než nejkratší: ${value.maxTermMonths} < ${value.minTermMonths}`,
+    });
+  }
+  if (raw && value.ratingRecovery >= value.missedPenalty) {
+    issues.push({
+      field: 'finance',
+      message: `rating se musí léčit pomaleji, než padá: ${value.ratingRecovery} není míň než ${value.missedPenalty}`,
+    });
+  }
+  return value;
+}
+
 function validateTransit(
   issues: ValidationIssue[],
   root: Record<string, unknown>,

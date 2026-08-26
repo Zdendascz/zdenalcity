@@ -123,6 +123,19 @@ export class BudgetPanel {
       table.appendChild(row);
     }
 
+    // Splátky půjček. Nejsou údržba ničeho — je to cena za dřívější výpomoc.
+    if (budget.debt.loans > 0) {
+      const row = el('tr');
+      row.appendChild(el('td', 'sheet__name', t('ui.budget.debt')));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, formatNumber(budget.debt.loans)));
+      row.appendChild(el('td', undefined, formatNumber(budget.debt.owed)));
+      row.appendChild(el('td', undefined, '-'));
+      row.appendChild(el('td', undefined, `−${formatNumber(budget.debt.payment)}`));
+      row.appendChild(el('td', 'is-negative', formatNumber(-budget.debt.payment)));
+      table.appendChild(row);
+    }
+
     const total = el('tr', 'sheet__total');
     total.appendChild(el('td', 'sheet__name', t('ui.budget.total')));
     total.appendChild(el('td'));
