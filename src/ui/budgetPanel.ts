@@ -136,6 +136,20 @@ export class BudgetPanel {
       table.appendChild(row);
     }
 
+    // Dluhopisy zvlášť od půjček: úrok se platí ročně a jistina naráz, takže
+    // se to s měsíční splátkou nesčítá do jednoho čísla, které by nic neříkalo.
+    if (budget.debt.bonds > 0) {
+      const row = el('tr');
+      row.appendChild(el('td', 'sheet__name', t('ui.budget.bonds')));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, formatNumber(budget.debt.bonds)));
+      row.appendChild(el('td', undefined, formatNumber(budget.debt.bondOwed)));
+      row.appendChild(el('td', undefined, '-'));
+      row.appendChild(el('td', undefined, `−${formatNumber(budget.debt.bondPayment)}`));
+      row.appendChild(el('td', 'is-negative', formatNumber(-budget.debt.bondPayment)));
+      table.appendChild(row);
+    }
+
     const total = el('tr', 'sheet__total');
     total.appendChild(el('td', 'sheet__name', t('ui.budget.total')));
     total.appendChild(el('td'));

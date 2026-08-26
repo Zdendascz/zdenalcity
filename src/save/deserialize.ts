@@ -20,6 +20,7 @@ import {
   SaveFormatError,
 } from './format';
 import type { SaveData, SaveEntities, SaveMeta, SaveSourceInfo, SaveState } from './format';
+import { rememberPopulation } from '@/sim/finance';
 
 function fail(message: string): never {
   throw new SaveFormatError(message);
@@ -197,6 +198,7 @@ function parseState(raw: Record<string, unknown>): SaveState {
       // probouzí s čistým štítem — což je milosrdnější než nula a hlavně to
       // nepředstírá, že si formát pamatuje něco, co v něm není.
       creditRating: 1,
+      lastPopulation: 0,
     },
     demand,
   };
@@ -427,6 +429,10 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
     world.buildings.set(building.id, { ...building });
   }
   world.nextBuildingId = save.entities.nextBuildingId;
+  // Populace pro měření růstu je **odvozená** z budov, které save nese —
+  // dopočítá se, místo aby se ukládala. Načtené město tak startuje s nulovým
+  // růstem, ne s falešným skokem proti nule.
+  rememberPopulation(world);
 
   // Hrubé vrstvy nese formát verze 2. Starší save jimi projde s vynulovaným
   // `coarse.bin`, který mu doplnila migrace.

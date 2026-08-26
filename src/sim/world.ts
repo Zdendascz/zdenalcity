@@ -1,7 +1,7 @@
 import { coarseCellsOf, createCoarseLayers } from './coarse';
 import { createDisasterState } from './disasters/state';
 import type { DisasterState } from './disasters/state';
-import type { Loan } from './finance';
+import type { Bond, Loan } from './finance';
 import type { LineStats, TransitLine } from './transit';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
@@ -83,6 +83,11 @@ export interface EconomyState {
    * pomalu léčí, a příští půjčka i emise dluhopisů se podle něj počítají.
    */
   creditRating: number;
+  /**
+   * Populace při poslední měsíční uzávěrce. Proti ní se měří růst, který
+   * vstupuje do úspěšnosti emise dluhopisů.
+   */
+  lastPopulation: number;
 }
 
 /**
@@ -360,6 +365,16 @@ export interface WorldState {
    * sebrat tím, že hráč na jediný tik srazí daně na nulu.
    */
   grantProgress: Map<string, number>;
+  /** Vydané dluhopisy (§8 fáze 4). */
+  bonds: Bond[];
+  nextBondId: number;
+  /**
+   * Do kterého tiku je zakázáno vydat další emisi.
+   *
+   * Nesplacená jistina není jen sražený rating — je to **několik let bez
+   * přístupu na trh**. Kdo nezaplatil, tomu příště nikdo nepůjčí.
+   */
+  bondsBlockedUntil: number;
   /**
    * Kolik cest v buňce vezme MHD, 0–1. Odvozené z `lineStats`; drží se zvlášť,
    * protože se na to ptá doprava u každé budovy.
@@ -400,6 +415,7 @@ export function createWorld(
         industrial: economy.defaultTaxRate,
       },
       creditRating: 1,
+      lastPopulation: 0,
       lastIncome: 0,
       lastExpenses: 0,
     },
@@ -443,6 +459,9 @@ export function createWorld(
     nextLoanId: 1,
     grantsAwarded: new Set(),
     grantProgress: new Map(),
+    bonds: [],
+    nextBondId: 1,
+    bondsBlockedUntil: 0,
     transitRelief: new Map(),
     flood: new Uint8Array(size * size),
     floodDepth: new Uint8Array(size * size),

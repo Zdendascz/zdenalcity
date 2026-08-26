@@ -15,7 +15,15 @@ import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
 import { checkRequirements, presentDefinitions } from './requirements';
-import { loanCap, loanProblems, takeLoan } from './finance';
+import {
+  bondCap,
+  bondProblems,
+  issueBond,
+  issueFee,
+  loanCap,
+  loanProblems,
+  takeLoan,
+} from './finance';
 import { needsClearing } from './terrain';
 import { createLine, findLine, modeOf, removeLine, stopMode } from './transit';
 import { extinguishTile } from './disasters/fire';
@@ -80,7 +88,14 @@ export type Command =
    * Splácet se nedá dřív: předčasné splacení by z půjčky udělalo bezúročný
    * přesun peněz v čase, protože úrok se počítá z doby, na kterou se sjednala.
    */
-  | { type: 'take_loan'; amount: number; termMonths: number };
+  | { type: 'take_loan'; amount: number; termMonths: number }
+  /**
+   * Emise dluhopisů (§8 fáze 4).
+   *
+   * Hráč zadá **částku, úrok a splatnost** — a hádá, kolik se z toho upíše.
+   * Je to jediné místo ve hře, kde nabízí on.
+   */
+  | { type: 'issue_bond'; amount: number; rate: number; maturityTicks: number };
 
 /** Má dlaždice aspoň jednoho silničního souseda? Odsud se staví mosty dál. */
 function touchesRoad(world: WorldState, x: number, y: number): boolean {
@@ -824,4 +839,44 @@ export function requestLoan(
   }
 
   return takeLoan(world, balance, amount, termMonths) ? OK : reject('error.invalidAmount', { amount });
+}
+
+/**
+ * Vypíše emisi dluhopisů.
+ *
+ * Odmítnutí říká **proč**. Zvlášť u zablokované emise: hráč, který jednou
+ * nezaplatil, musí vědět, do kdy má zavřeno — jinak by jen klikal a nechápal.
+ */
+export function issueBondCommand(
+  world: WorldState,
+  balance: Balance | undefined,
+  amount: number,
+  rate: number,
+  maturityTicks: number,
+): CommandResult {
+  if (!balance) return reject('error.noFinanceRules');
+
+  const problems = bondProblems(world, balance, amount, rate, maturityTicks);
+  if (problems.includes('blocked')) {
+    return reject('error.bondsBlocked', { until: world.bondsBlockedUntil });
+  }
+  if (problems.includes('invalidAmount')) {
+    return reject('error.overBondCap', { cap: bondCap(world, balance) });
+  }
+  if (problems.includes('invalidRate')) {
+    return reject('error.invalidRate', { max: balance.finance.bonds.maxRate });
+  }
+  if (problems.includes('invalidMaturity')) {
+    return reject('error.invalidMaturity', {
+      min: balance.finance.bonds.minMaturityTicks,
+      max: balance.finance.bonds.maxMaturityTicks,
+    });
+  }
+  if (problems.includes('cannotAffordFee')) {
+    return reject('error.cannotAffordFee', { fee: issueFee(balance, amount) });
+  }
+
+  return issueBond(world, balance, amount, rate, maturityTicks) ? OK : reject('error.overBondCap', {
+    cap: bondCap(world, balance),
+  });
 }

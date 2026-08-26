@@ -142,7 +142,23 @@
     "baseRate": 4,
     "ratePenalty": 8,
     "missedPenalty": 0.08,
-    "ratingRecovery": 0.01
+    "ratingRecovery": 0.01,
+    "bonds": {
+      "incomeMultiple": 36,
+      "feeRate": 0.02,
+      "referenceRate": 5,
+      "maxRate": 20,
+      "minMaturityTicks": 1080,
+      "maxMaturityTicks": 5400,
+      "base": 0.1,
+      "rateWeight": 0.09,
+      "happinessWeight": 0.5,
+      "growthWeight": 0.6,
+      "crimeWeight": 0.4,
+      "debtWeight": 0.5,
+      "defaultPenalty": 0.5,
+      "blockTicks": 1800
+    }
   },
 
   "transit": {

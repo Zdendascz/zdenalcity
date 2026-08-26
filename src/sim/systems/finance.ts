@@ -1,7 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { GrantDefinition } from '@/content/schema';
 import type { BuildingCatalogue } from '../catalogue';
-import { awardGrants, payLoans } from '../finance';
+import { awardGrants, payLoans, rememberPopulation, serviceBonds } from '../finance';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
@@ -31,7 +31,16 @@ export function createFinanceSystem(
     offset: 0,
     run(world: WorldState) {
       awardGrants(world, catalogue, grants);
-      if ((world.tick - PAY_OFFSET) % MONTH === 0) payLoans(world, balance);
+      if ((world.tick - PAY_OFFSET) % MONTH !== 0) return;
+
+      payLoans(world, balance);
+      // Kupóny a splatnosti se zkoumají taky měsíčně, i když se platí ročně:
+      // termín se hlídá porovnáním tiků, ne počítáním měsíců, takže stačí se
+      // ptát dost často na to, aby se den splatnosti nepřehlédl.
+      serviceBonds(world, balance);
+      // Populace pro příští měření růstu. Až **po** všem ostatním: růst se
+      // měří mezi uzávěrkami, ne uvnitř jedné.
+      rememberPopulation(world);
     },
   };
 }

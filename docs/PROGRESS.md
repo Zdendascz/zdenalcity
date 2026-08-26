@@ -2312,6 +2312,42 @@ Rating a půjčky **ještě nejsou v savu**: nese je až formát v6 (T59). Načt
 město se do té doby probouzí s čistým štítem, což je milosrdnější než nula
 a hlavně to nepředstírá, že si formát pamatuje něco, co v něm není.
 
+- [x] T58 — dluhopisy: emise, úpis, výplata úroků, splatnost
+
+**Jediný nástroj ve hře, kde hráč licituje.** U půjčky je sazba dána; tady ji
+nabízí sám a hádá, kolik lidí to koupí. Úspěšnost se skládá z pěti věcí a každá
+je rozhodnutí, které udělal dřív: kolik nabídl nad referenční sazbu, jak se ve
+městě žije, jestli roste, kolik je v něm kriminality a kolik už dluží.
+
+**Poplatek se platí z celé nabídky, dostane se jen upsané** (R19). Bez toho by
+bylo optimální vypisovat nesmyslně velké emise s minimálním úrokem: co se
+upíše, je zisk, a co ne, nic nestojí. Takhle je nadsazená nabídka draho
+zaplacený omyl.
+
+Neupsaná část **propadá**. Nezůstane viset jako nabídka, kterou by někdo mohl
+koupit později — emise je jednorázová událost, ne trh.
+
+Úrok se vyplácí **ročně**, jistina jednorázově ve splatnosti. Zmeškaný kupón se
+**nehromadí do skoku**: termín se posune i tak, jinak by po letech přišel účet,
+kterým se město dorazí samo.
+
+**Nesplacená jistina je jiná liga než zmeškaný kupón.** Sráží rating výrazně
+a na několik let zavře přístup na trh — kdo nezaplatil, tomu příště nikdo
+nepůjčí. Validace hlídá, že to bolí víc než zmeškaná splátka; kdyby ne, byla by
+emise, kterou hráč nezaplatí, levnější než ta, kterou splácí poctivě.
+
+Klesající město se **netrestá dvakrát**: záporný růst se ořízne na nulu. Pokles
+už trestá spokojenost a kriminalita, a dvojí trest za totéž by z dluhopisů
+udělal past, ze které se padající město nedostane.
+
+Populace, proti které se měří růst, se po načtení savu **dopočítá z budov**,
+místo aby se ukládala. Načtené město tak startuje s nulovým růstem, ne
+s falešným skokem proti nule.
+
+Dluhopisy mají v rozpočtu vlastní řádek vedle půjček. Kupón se platí ročně, ale
+v měsíčním rozpisu se ukazuje dvanáctina — hráč si má umět srovnat, co ho to
+stojí měsíčně.
+
 
 ## Rozpracované
 
@@ -2324,7 +2360,6 @@ Zbývá:
 | Úkol | Obsah |
 |---|---|
 | T54 | Sesuv půdy |
-| T58 | Dluhopisy |
 | T59 | Save verze 6 |
 | T60 | Vyhodnocení fáze 4 |
 

@@ -4,7 +4,7 @@ import type { BuildingCatalogue } from '../catalogue';
 import { cellOfTile, strongestModifier } from '../disasters/effects';
 import { index, ROAD } from '../layers';
 import { isRciCategory } from '../rci';
-import { monthlyPayments, totalDebt } from '../finance';
+import { annualCoupons, bondDebt, monthlyPayments, totalDebt } from '../finance';
 import { transitTotals } from '../transit';
 import { serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
@@ -71,6 +71,10 @@ export interface DebtBudget {
   loans: number;
   owed: number;
   payment: number;
+  bonds: number;
+  bondOwed: number;
+  /** Dvanáctina ročních kupónů — v měsíčním rozpisu se počítá měsíčně. */
+  bondPayment: number;
 }
 
 export interface Budget {
@@ -251,8 +255,13 @@ export function computeBudget(
     loans: world.loans.length,
     owed: totalDebt(world),
     payment: monthlyPayments(world),
+    bonds: world.bonds.length,
+    bondOwed: bondDebt(world),
+    // Kupón se platí ročně; v měsíčním rozpisu se ukazuje dvanáctina, aby si
+    // hráč uměl srovnat, co ho to stojí měsíčně.
+    bondPayment: Math.round(annualCoupons(world) / 12),
   };
-  expenses += debt.payment;
+  expenses += debt.payment + debt.bondPayment;
 
   // Daň se zaokrouhluje **jednou za řádek**, ne u každé budovy. Jinak by rozpis
   // v UI tvrdil něco jiného, než kolik ve sloupci opravdu stojí.

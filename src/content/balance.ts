@@ -394,6 +394,36 @@ export interface ChemicalSpillBalance {
  * Vlastnosti jsou **obsah, ne kód**: mod si přidá vlastní mód a hra o něm
  * nemusí vědět. Rozdíl mezi autobusem a tramvají je tady, ne v `if`.
  */
+/**
+ * Dluhopisy (§8 fáze 4).
+ *
+ * Váhy určují, **za co si město koupí důvěru**: za nabídnutý úrok, za to, jak
+ * se v něm žije, a za to, že roste. Proti tomu stojí kriminalita a to, kolik
+ * už dluží. Jediný nástroj ve hře, kde hráč licituje.
+ */
+export interface BondBalance {
+  /** Kolikanásobek měsíčního příjmu smí město nabídnout dohromady. */
+  incomeMultiple: number;
+  /** Podíl z **celé nabídky**, který se platí za vydání (R19). */
+  feeRate: number;
+  /** Sazba, při které se nabídka nepřeplácí ani nepodhodnocuje. */
+  referenceRate: number;
+  maxRate: number;
+  minMaturityTicks: number;
+  maxMaturityTicks: number;
+  /** Kolik se upíše i bez jediného lákadla. */
+  base: number;
+  rateWeight: number;
+  happinessWeight: number;
+  growthWeight: number;
+  crimeWeight: number;
+  debtWeight: number;
+  /** O kolik klesne rating za nesplacenou jistinu. */
+  defaultPenalty: number;
+  /** Na jak dlouho se po nesplacení zavře přístup na trh. */
+  blockTicks: number;
+}
+
 export interface TransitModeBalance {
   /** Kolik lidí odveze jedno vozidlo za měsíc. */
   capacity: number;
@@ -689,6 +719,7 @@ export interface Balance {
     missedPenalty: number;
     /** O kolik se rating měsíčně léčí, když se splácí. */
     ratingRecovery: number;
+    bonds: BondBalance;
   };
 
   transit: {
@@ -1876,6 +1907,34 @@ function flag(
  * pád**. Kdyby bylo rychlejší, stačilo by pár měsíců v černých číslech
  * a nesplácení by nic nestálo — a rating je jediný trest, který za něj hra má.
  */
+function validateBonds(
+  issues: ValidationIssue[],
+  finance: Record<string, unknown> | null,
+): BondBalance {
+  const raw = finance ? asRecord(finance['bonds']) : null;
+  if (finance && !raw) {
+    issues.push({ field: 'finance.bonds', message: 'chybí, nebo není objekt' });
+  }
+
+  const where = 'finance.bonds';
+  return {
+    incomeMultiple: num(issues, raw, 'incomeMultiple', `${where}.incomeMultiple`, 0, 1000),
+    feeRate: num(issues, raw, 'feeRate', `${where}.feeRate`, 0, 1),
+    referenceRate: num(issues, raw, 'referenceRate', `${where}.referenceRate`, 0, 100),
+    maxRate: num(issues, raw, 'maxRate', `${where}.maxRate`, 0, 100),
+    minMaturityTicks: num(issues, raw, 'minMaturityTicks', `${where}.minMaturityTicks`, 1, 100000),
+    maxMaturityTicks: num(issues, raw, 'maxMaturityTicks', `${where}.maxMaturityTicks`, 1, 100000),
+    base: num(issues, raw, 'base', `${where}.base`, 0, 1),
+    rateWeight: num(issues, raw, 'rateWeight', `${where}.rateWeight`, 0, 10),
+    happinessWeight: num(issues, raw, 'happinessWeight', `${where}.happinessWeight`, 0, 10),
+    growthWeight: num(issues, raw, 'growthWeight', `${where}.growthWeight`, 0, 10),
+    crimeWeight: num(issues, raw, 'crimeWeight', `${where}.crimeWeight`, 0, 10),
+    debtWeight: num(issues, raw, 'debtWeight', `${where}.debtWeight`, 0, 10),
+    defaultPenalty: num(issues, raw, 'defaultPenalty', `${where}.defaultPenalty`, 0, 1),
+    blockTicks: num(issues, raw, 'blockTicks', `${where}.blockTicks`, 0, 100000),
+  };
+}
+
 function validateFinance(
   issues: ValidationIssue[],
   root: Record<string, unknown>,
@@ -1897,12 +1956,27 @@ function validateFinance(
     ratePenalty: num(issues, raw, 'ratePenalty', 'finance.ratePenalty', 0, 100),
     missedPenalty: num(issues, raw, 'missedPenalty', 'finance.missedPenalty', 0, 1),
     ratingRecovery: num(issues, raw, 'ratingRecovery', 'finance.ratingRecovery', 0, 1),
+    bonds: validateBonds(issues, raw),
   };
 
   if (raw && value.maxTermMonths < value.minTermMonths) {
     issues.push({
       field: 'finance',
       message: `nejdelší doba nesmí být kratší než nejkratší: ${value.maxTermMonths} < ${value.minTermMonths}`,
+    });
+  }
+  if (raw && value.bonds.maxMaturityTicks < value.bonds.minMaturityTicks) {
+    issues.push({
+      field: 'finance.bonds',
+      message: `nejdelší splatnost nesmí být kratší než nejkratší: ${value.bonds.maxMaturityTicks} < ${value.bonds.minMaturityTicks}`,
+    });
+  }
+  // Nesplacená jistina musí bolet víc než zmeškaná splátka. Kdyby ne, byla by
+  // emise, kterou hráč nezaplatí, levnější než ta, kterou splácí poctivě.
+  if (raw && value.bonds.defaultPenalty <= value.missedPenalty) {
+    issues.push({
+      field: 'finance.bonds',
+      message: `nesplacená jistina musí bolet víc než zmeškaná splátka: ${value.bonds.defaultPenalty} není víc než ${value.missedPenalty}`,
     });
   }
   if (raw && value.ratingRecovery >= value.missedPenalty) {

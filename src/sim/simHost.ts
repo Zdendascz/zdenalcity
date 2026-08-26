@@ -11,6 +11,7 @@ import {
   levelArea,
   placeDefinition,
   removePipe,
+  issueBondCommand,
   requestLoan,
   removeTransitStop,
   setLineFare,
@@ -156,6 +157,14 @@ class MainThreadSimHost implements SimHost {
         return setLineFare(this.world, cmd.lineId, cmd.fare);
       case 'take_loan':
         return requestLoan(this.world, this.balance, cmd.amount, cmd.termMonths);
+      case 'issue_bond':
+        return issueBondCommand(
+          this.world,
+          this.balance,
+          cmd.amount,
+          cmd.rate,
+          cmd.maturityTicks,
+        );
       default:
         return assertNever(cmd);
     }
