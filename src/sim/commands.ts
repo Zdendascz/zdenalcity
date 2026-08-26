@@ -12,7 +12,7 @@ import {
   planLevelArea,
   planUntwist,
 } from './heights';
-import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
+import { inBounds, index, ROAD, TERRAIN } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
 import { checkRequirements, presentDefinitions } from './requirements';
@@ -447,10 +447,13 @@ export function zoneArea(
 }
 
 /**
- * Boura vždycky to nejvrchnější: budovu, jinak silnici, jinak zónu.
+ * Boura vždycky to nejvrchnější: budovu, jinak silnici, jinak trosky, jinak
+ * terén.
  *
- * Zóna po zbourání budovy **zůstává**, aby na ní mohlo vyrůst něco nového —
- * hráč, který chce zónu zrušit, klikne podruhé.
+ * **Zóny se nedotkne** (rozhodnutí autora, T62). Zóna je značka pod tím, co na
+ * dlaždici stojí, a hráč, který bourá dům, chce skoro vždycky postavit jiný.
+ * Do T62 stačilo kliknout podruhé a zóna byla pryč — což se dělo omylem při
+ * probourávání průseku proti ohni. Na rušení zón je vlastní nástroj.
  */
 export function bulldoze(
   world: WorldState,
@@ -493,12 +496,6 @@ export function bulldoze(
     }
     world.economy.funds -= cost;
     clearRubble(world, tile);
-    markTileDirty(world, x, y);
-    return OK;
-  }
-
-  if (world.layers.zone[tile] !== ZONE.none) {
-    setZoneTile(world, tile, ZONE.none);
     markTileDirty(world, x, y);
     return OK;
   }

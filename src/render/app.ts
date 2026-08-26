@@ -320,6 +320,19 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupIcon: 'bulldoze',
       action: { kind: 'bulldoze' },
     },
+    // Rušení zón je **vlastní nástroj** (rozhodnutí autora, T62). Buldozer se
+    // zóny nedotkne, takže probourat průsek proti ohni už nesmaže čtvrť pod
+    // ním. Je to zóna s hodnotou „žádná", ne buldozer — dostane tím tažení
+    // přes obdélník zadarmo, což je přesně to, co hráč u rušení zón chce.
+    {
+      id: 'zone:clear',
+      labelKey: 'ui.tool.zone.clear',
+      icon: 'zone-clear',
+      hotkey: 'v',
+      groupKey: 'ui.menu.zone',
+      groupIcon: 'zone-residential',
+      action: { kind: 'zone', zone: ZONE.none },
+    },
     // Potrubí patří do nabídky Vodovod, mezi vodárnu a čerpací stanici —
     // hráč hledá vodovod na jednom místě, ne ve dvou.
     {

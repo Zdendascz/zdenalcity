@@ -409,16 +409,60 @@ describe('bourání', () => {
     expect(totalPopulation(world.buildings)).toBe(populationBefore - building.population);
   });
 
-  it('na dlaždici bez budovy zboří silnici, jinak zónu', () => {
+  it('na dlaždici bez budovy zboří silnici', () => {
     const world = createWorld(1);
     buildRoad(world, 5, 5);
-    zoneArea(world, 6, 5, 1, 1, ZONE.residential);
 
     bulldoze(world, 5, 5);
     expect(world.layers.road[index(5, 5, world.size)]).toBe(0);
+  });
 
-    bulldoze(world, 6, 5);
-    expect(world.layers.zone[index(6, 5, world.size)]).toBe(ZONE.none);
+  it('zóny se buldozer nedotkne', () => {
+    // Nahlásil autor: probourat průsek proti ohni znamenalo smazat i čtvrť pod
+    // ním. Zóna je značka pod tím, co na dlaždici stojí, a kdo bourá dům, chce
+    // skoro vždycky postavit jiný. Na rušení zón je vlastní nástroj (T62).
+    const world = createWorld(1);
+    zoneArea(world, 6, 5, 1, 1, ZONE.residential);
+
+    const result = bulldoze(world, 6, 5);
+
+    expect(world.layers.zone[index(6, 5, world.size)]).toBe(ZONE.residential);
+    // A protože na dlaždici nezbylo nic jiného, buldozer nemá co dělat.
+    expect(result.ok).toBe(false);
+  });
+
+  it('zónu ruší zónový nástroj s hodnotou „žádná"', () => {
+    const world = createWorld(1);
+    zoneArea(world, 6, 5, 3, 2, ZONE.residential);
+
+    expect(zoneArea(world, 6, 5, 3, 2, ZONE.none).ok).toBe(true);
+    for (let y = 5; y < 7; y++) {
+      for (let x = 6; x < 9; x++) {
+        expect(world.layers.zone[index(x, y, world.size)], `${x},${y}`).toBe(ZONE.none);
+      }
+    }
+  });
+
+  it('buldozer po zbourání domu nechá zónu stát', async () => {
+    // Tím se liší od zónového nástroje: hráč bourá dům proto, aby na tomtéž
+    // místě vyrostl jiný, ne aby přišel o čtvrť.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const world = cityWithZone(7);
+    assumeWatered(world);
+    run(world, content, 25);
+    const building = [...world.buildings.values()][0];
+    if (!building) throw new Error('nic nevyrostlo');
+    const tile = index(building.x, building.y, world.size);
+    const zone = world.layers.zone[tile];
+
+    const before = world.buildings.size;
+    bulldoze(world, building.x, building.y);
+
+    expect(world.buildings.has(building.id)).toBe(false);
+    expect(world.buildings.size).toBe(before - 1);
+    expect(world.layers.zone[tile]).toBe(zone);
   });
 });
 

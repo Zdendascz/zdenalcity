@@ -2646,6 +2646,26 @@ Mutační test 6 z 9. Tři přeživší jsou řádky uvnitř `createApp` — že
 a canvasu nedostane; ověřeno ručně ve hře, kde svět při otevřeném okně
 nepřetikal ani jednou.
 
+- [x] T63 — dva buldozery
+
+**Rozhodnutí autora.** Buldozer se **zóny nedotkne**. Do T63 stačilo kliknout
+podruhé a zóna byla pryč, což se dělo omylem právě při probourávání průseku
+proti ohni — hráč hasil a přitom mazal čtvrť pod sebou.
+
+Zóna je značka pod tím, co na dlaždici stojí, a kdo bourá dům, chce skoro
+vždycky postavit jiný. Buldozer proto boura budovu, silnici, trosky a terén,
+a když na dlaždici zbyla jen zóna, **odmítne to** hláškou „není co bourat".
+
+Rušit zóny umí vlastní nástroj. Není to druhý buldozer, ale **zóna s hodnotou
+„žádná"** — `zoneArea` ji uměla celou dobu, jen k ní nevedlo tlačítko. Dostane
+tím tažení přes obdélník zadarmo, což je přesně to, co hráč u rušení zón chce;
+buldozer maže po jedné.
+
+Ikonu `zone-clear` archy nemají. Skládá ji `tools/derive-icons.py` z odbarvené
+zóny a červeného křížku — odbarvené schválně, ať se to nečte jako „pryč
+s obytnou zónou", ale „pryč se zónováním". Je to **náhražka**: až přibude
+kreslená ikona toho jména, stačí ji do složky hodit a skript už nepouštět.
+
 
 ## Rozpracované
 
