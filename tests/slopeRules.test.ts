@@ -184,13 +184,12 @@ describe('silnice na svahu', () => {
     w.cornerHeight[cornerIndex(21, 21, CORNER_SIZE)] = 1;
 
     const plan = planUntwist(w.cornerHeight, 20, 20);
-    expect(plan).not.toBeNull();
-    expect(plan?.size).toBeGreaterThan(0);
+    expect(plan.size).toBeGreaterThan(0);
 
     const before = w.economy.funds;
     expect(buildRoad(w, 20, 20, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
     expect(before - w.economy.funds).toBe(
-      STREET_COST + (plan?.size ?? 0) * VANILLA_BALANCE.map.terraformCost,
+      STREET_COST + plan.size * VANILLA_BALANCE.map.terraformCost,
     );
   });
 
@@ -245,6 +244,56 @@ describe('silnice na svahu', () => {
     expect(buildRoad(w, 40, 40, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
     expect(isTwistedTile(w.cornerHeight, 40, 40)).toBe(false);
     for (const height of w.cornerHeight) expect(height).toBeLessThanOrEqual(MAX_HEIGHT);
+  });
+
+  it('srovnaná dlaždice je rovná terasa, ne osamocený špičák', () => {
+    // Nahlásil autor: silnice tažená šikmo přes svah nechala za sebou schodiště
+    // z jehel. Sedlo šlo zrušit i jedním rohem — levněji — jenže z dlaždice se
+    // pak stala špička mezi sousedy. Dozdí se proto **celá**.
+    const w = world();
+    // Roh 1 patro nad okolím: sedlo, které jedním rohem zrušit jde.
+    w.cornerHeight[cornerIndex(51, 51, CORNER_SIZE)] = 1;
+    expect(isTwistedTile(w.cornerHeight, 50, 50)).toBe(true);
+
+    expect(buildRoad(w, 50, 50, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+
+    const [nw, ne, sw, se] = [
+      [50, 50], [51, 50], [50, 51], [51, 51],
+    ].map(([cx, cy]) => w.cornerHeight[cornerIndex(cx ?? 0, cy ?? 0, CORNER_SIZE)] ?? 0);
+
+    expect(isTwistedTile(w.cornerHeight, 50, 50)).toBe(false);
+    // Rovná, ne jen nezkroucená: čtyři stejné rohy.
+    expect(new Set([nw, ne, sw, se]).size).toBe(1);
+    // A dozděná nahoru, ne odkopaná dolů.
+    expect(nw).toBe(1);
+  });
+
+  it('srovnání nikdy nekope', () => {
+    // Levnější cesta ze sedla často vede dolů. Kdyby si ji silnice vzala,
+    // vyhloubila by hráči ve svahu díru tam, kde čekal násep.
+    const w = world();
+    w.cornerHeight[cornerIndex(61, 61, CORNER_SIZE)] = 1;
+    const before = Uint8Array.from(w.cornerHeight);
+
+    expect(buildRoad(w, 60, 60, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+
+    for (let i = 0; i < before.length; i++) {
+      expect(w.cornerHeight[i] ?? 0, `roh ${i}`).toBeGreaterThanOrEqual(before[i] ?? 0);
+    }
+  });
+
+  it('nezkroucená dlaždice dostane prázdný plán, ne odmítnutí', () => {
+    // Dvě různé odpovědi: „nemám co dělat" je prázdný plán. Kdyby se místo něj
+    // vracelo odmítnutí, silnice by se neplatila jen na sedlech, ale nikde.
+    const w = world();
+    // Rovná dlaždice.
+    expect(planUntwist(w.cornerHeight, 70, 70).size).toBe(0);
+
+    // Rovnoměrný svah — taky není sedlo, i když rovný není.
+    w.cornerHeight[cornerIndex(71, 70, CORNER_SIZE)] = 1;
+    w.cornerHeight[cornerIndex(71, 71, CORNER_SIZE)] = 1;
+    expect(isTwistedTile(w.cornerHeight, 70, 70)).toBe(false);
+    expect(planUntwist(w.cornerHeight, 70, 70).size).toBe(0);
   });
 
   it('rovnou dlaždici nikdo nesrovnává', () => {

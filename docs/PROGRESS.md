@@ -2576,17 +2576,29 @@ a už tam byly: vykácet les 12, zavézt mokřad 40, odtěžit skálu 60. Rozdí
 nimi je celý smysl — přes skálu se dá jet, jen se to nevyplatí, a to je jiná
 věc než zákaz.
 
-Srovnání sedla plánuje `planUntwist`. Pro každý ze čtyř rohů existuje **právě
-jedna** výška, při které rovnost platí, takže se spočítají všechny čtyři a vezme
-se nejlevnější plán; při shodě ten, který dozdívá, protože hráč staví do kopce
-a čeká násep, ne výkop. Kombinace dvou rohů se nezkoušejí — vždycky stojí víc
-a vypadají stejně.
+Sedlo se **dozdí na nejvyšší roh** (rozhodnutí autora). Nejdřív to fungovalo
+jinak: pro každý ze čtyř rohů existuje právě jedna výška, při které rovnost
+platí, tak se počítaly všechny čtyři a brala se nejlevnější. Vycházelo to
+levněji a bylo to nahlášené jako chyba — z dlaždice se stal **osamocený špičák
+mezi sousedy** a svah po tažení vypadal jako schodiště poskládané z jehel.
+Ověřeno v číslech: dlaždice s rohy 1, 1, 2, 1 dostala jeden roh na 2 a zbytek
+nechala být.
 
-**Výsledek se ověřuje, ne předpokládá.** `planCornerHeight` cíl mimo rozsah
-ořízne a jeho kaskáda může sáhnout i na zbylé tři rohy téže dlaždice; obojí
-vede k plánu, který vznikne, ale dlaždici nesrovná. Původně tam byla i zvláštní
-kontrola rozsahu — vyhodila se, protože obě pojistky dělaly totéž a **kryly se
-navzájem**: mutační test žádnou z nich neuměl zabít, dokud jedna nezmizela.
+Dozdění nechá terasu, která k okolnímu kopci sedí, a **nikdy nekope** — hráč
+staví násep, ne výkop. Na stejném svahu vyjde po tažení nula jehel a žádný roh
+na mapě neklesne. Stojí to víc rohů, a je to tak správně.
+
+Vedlejší efekt je, že se to celé **zjednodušilo**. Rovná dlaždice má všechny
+čtyři rohy stejně, takže rovnost platí sama sebou a dozdít jde každé sedlo:
+`planUntwist` už nevrací „nedá se to" a `error.roadTwisted` zmizelo i z locale
+souborů. Odmítnout smí jen `checkTerraform`, a to kvůli budově nebo vodě
+v cestě, ne kvůli tvaru terénu.
+
+Zmizelo i ověřování výsledku. U hledání nejlevnějšího rohu bylo potřeba —
+`planCornerHeight` cíl mimo rozsah ořízne a jeho kaskáda umí sáhnout i zpátky
+na rohy téže dlaždice. U dozdění je to mrtvý kód, protože rovná dlaždice
+zkroucená být nemůže, a mutační test to ukázal: kontrolu nešlo zabít. Zaručuje
+to teď test, který tvrdí, že srovnaná dlaždice má **čtyři stejné rohy**.
 
 Náhled ceny při tažení počítá `estimateRoad`. Kdyby zůstal na sazbě za vozovku,
 hráč by viděl deset a zaplatil devadesát. Test drží obě cesty u sebe: co ukáže
@@ -2594,14 +2606,12 @@ cenovka, to se strhne z kasy. U tažení přes víc dlaždic je to odhad — sro
 jedné dlaždice hne rohem, o který se dělí se sousedy, takže sousední sedlo může
 zmizet samo a skutečná cena bývá **nižší, nikdy vyšší**.
 
-`error.roadTwisted` zůstává. Sedlo, které srovnat nejde, pořád existuje.
-
 Golden snapshot se posunul a je to důkaz, že to funguje: v řadě, kudy vede
 hlavní ulice, jsou na tom seedu **tři zkroucené dlaždice**. Dřív v ní zůstaly
 díry, teď je souvislá, a město vyroste na 192 obyvatel místo 180.
 
-Ověřeno ve hře: les 10 + 12, skála 10 + 60, mokřad 10 + 40, sedla srovnaná.
-Mutační test 10 z 10. 982 testů.
+Ověřeno ve hře: les 10 + 12, skála 10 + 60, mokřad 10 + 40, sedla srovnaná
+na terasy, nula jehel a nikde se nekopalo. Mutační test 5 z 5. 985 testů.
 
 
 ## Rozpracované

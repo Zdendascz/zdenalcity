@@ -305,7 +305,6 @@
   "error.terraformWater": "Zvedat dno moře neumíme.",
   "error.terraformNoChange": "Tady už je terén přesně takhle.",
   "error.notFlat": "Na svahu se stavět nedá. Nejdřív parcelu srovnej.",
-  "error.roadTwisted": "Zkroucený terén silnici nepobere. Srovnej ho.",
   "error.bridgeNeedsBank": "Most musí začínat na břehu, ne uprostřed vody.",
   "error.needsRoad": "Musí sousedit se silnicí.",
   "error.needsPower": "Potřebuje připojení k proudu.",

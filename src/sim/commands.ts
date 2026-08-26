@@ -165,10 +165,8 @@ export function buildRoad(
   let untwist: ReadonlyMap<number, number> | null = null;
   if (!overWater && isTwistedTile(world.cornerHeight, x, y)) {
     untwist = planUntwist(world.cornerHeight, x, y);
-    // Zbude jen to, co srovnat opravdu nejde — u okraje mapy nebo tam, kde by
-    // roh musel nad strop. Hláška zůstává, protože ta situace pořád existuje.
-    if (!untwist) return reject('error.roadTwisted');
-
+    // Odmítnout to smí jen `checkTerraform` — a to kvůli budově nebo vodě
+    // v cestě, ne kvůli tvaru terénu. Dozdít jde každé sedlo.
     const allowed = checkTerraform(world, untwist);
     if (!allowed.ok) return allowed;
   }

@@ -305,7 +305,6 @@
   "error.terraformWater": "Raising the sea floor is beyond us.",
   "error.terraformNoChange": "The ground is already exactly like this.",
   "error.notFlat": "Nothing builds on a slope. Level the plot first.",
-  "error.roadTwisted": "Twisted ground will not take a road. Level it.",
   "error.bridgeNeedsBank": "A bridge has to start on a bank, not mid-water.",
   "error.needsRoad": "It must touch a road.",
   "error.needsPower": "It needs a power connection.",
