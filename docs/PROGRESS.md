@@ -2802,15 +2802,35 @@ strhne `zoneArea`.
 zapisovatelný svět, počítal by to jinde a jinak — a přesně tak vznikají cenovky,
 které lžou.
 
-**Na co nejsou peníze, to se nesrovná — ale zóna se vyznačí.** Odmítnout celé
-tažení kvůli terénu by ze značkovacího nástroje udělalo stavbu, která chudému
-městu zakáže i rozvrhnout čtvrť. Liší se to od silnice schválně: vozovka je
-stavba a bez peněz nevznikne, zóna je značka.
+~~**Na co nejsou peníze, to se nesrovná — ale zóna se vyznačí.**~~ Rozhodnuto
+opačně hned v T68: bez peněz se nezónuje, jako se bez peněz nestaví silnice.
 
 Rušení zóny se neúčtuje a terénem nehýbe.
 
 Ověřeno ve hře: zóna 5×5 na kopci ukázala 80, strhla 80 a srovnala všech devět
 nerovných dlaždic. Mutační test 4 ze 4. 1029 testů.
+
+- [x] T68 — bez peněz se nezónuje
+
+**Rozhodnutí autora**, opačné než v T67. Když na srovnání terénu nejsou peníze,
+zónování se odmítne celé — přesně jako u silnice. Dřív se zóna vyznačila a jen
+se nesrovnala, takže cenovka ukázala číslo, které se pak nestrhlo.
+
+Vyžádalo si to **přepis `zoneArea` na dva průchody**. Značky se dřív psaly
+rovnou v cyklu a odmítnutí přišlo až po něm; teď se nejdřív jen sepíše, co by se
+změnilo, pak se plánuje a platí, a značky se píšou až po zaplacení. Bez toho by
+po odmítnutí zůstala vyznačená ta část čtvrti, kam se pisatel stihl dostat —
+a hráč by ji musel hledat a mazat.
+
+Prázdné tažení se dál odmítá **svým vlastním důvodem** (voda, silnice, obsazeno),
+ne nedostatkem peněz: hráč, který táhne zónu přes řeku, má slyšet o řece.
+
+Rušení zóny se neodmítá nikdy. Je to mazání značky, ne stavba, a hráč bez kasy
+by se jinak nezbavil ani zóny, kterou si omylem vyznačil.
+
+Ověřeno ve hře: na kopci s cenou 88 a kasou 87 přišlo `error.notEnoughFunds`
+a **ani jedna z 25 dlaždic nezůstala vyznačená**. Mutační test 4 ze 4.
+1031 testů.
 
 
 ## Rozpracované

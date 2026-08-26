@@ -533,19 +533,49 @@ describe('srovnání zóny se účtuje (T67)', () => {
     expect(w.economy.funds).toBe(before);
   });
 
-  it('chudé město zónu vyznačí, jen ji nesrovná', () => {
-    // Odmítnout celé tažení kvůli terénu by ze značkovacího nástroje udělalo
-    // stavbu, která chudému městu zakáže i rozvrhnout čtvrť.
+  it('bez peněz se nezónuje, jako se bez peněz nestaví silnice', () => {
+    // Rozhodnutí autora (T68). Dřív se zóna vyznačila a jen se nesrovnala;
+    // hráč pak viděl na cenovce číslo, které se nestrhlo.
     const w = world();
     raise(w, 12, 12, 3);
     w.economy.funds = estimateZoning(w, 8, 8, 6, 6, VANILLA_BALANCE) - 1;
     const heights = Uint8Array.from(w.cornerHeight);
     const before = w.economy.funds;
 
-    expect(zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE).ok).toBe(true);
+    const result = zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE);
 
-    expect(w.layers.zone[index(9, 9, MAP_SIZE)]).toBe(ZONE.residential);
-    expect([...w.cornerHeight]).toEqual([...heights]);
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toBe('error.notEnoughFunds');
     expect(w.economy.funds).toBe(before);
+    expect([...w.cornerHeight]).toEqual([...heights]);
+  });
+
+  it('odmítnuté tažení nenechá vyznačenou půlku čtvrti', () => {
+    // Značky se píšou až po zaplacení. Kdyby se psaly průběžně, zůstala by po
+    // odmítnutí zóna tam, kam se pisatel stihl dostat — a hráč by ji musel
+    // hledat a mazat.
+    const w = world();
+    raise(w, 12, 12, 3);
+    w.economy.funds = 0;
+
+    expect(zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE).ok).toBe(false);
+
+    for (let y = 8; y < 14; y++) {
+      for (let x = 8; x < 14; x++) {
+        expect(w.layers.zone[index(x, y, MAP_SIZE)], `${x},${y}`).toBe(ZONE.none);
+      }
+    }
+  });
+
+  it('bez peněz jde zónu pořád zrušit', () => {
+    // Mazání značky není stavba. Kdyby se odmítalo, hráč bez kasy by se
+    // nezbavil ani zóny, kterou si omylem vyznačil.
+    const w = world();
+    zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE);
+    raise(w, 12, 12, 3);
+    w.economy.funds = 0;
+
+    expect(zoneArea(w, 8, 8, 6, 6, ZONE.none, VANILLA_BALANCE).ok).toBe(true);
+    expect(w.layers.zone[index(9, 9, MAP_SIZE)]).toBe(ZONE.none);
   });
 });

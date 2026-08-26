@@ -412,7 +412,10 @@ export function zoneArea(
   zone: ZoneType,
   balance?: Balance,
 ): CommandResult {
-  let changed = 0;
+  // Nejdřív se **jen sepíše**, co by se změnilo, a teprve pak se sahá na svět.
+  // Srovnání terénu se od T68 platí a bez peněz se nezónuje; kdyby se značky
+  // psaly průběžně, zůstala by po odmítnutí půlka čtvrti vyznačená.
+  const toZone: number[] = [];
   let lastReason = 'error.zoneNoChange';
 
   for (let dy = 0; dy < h; dy++) {
@@ -439,28 +442,34 @@ export function zoneArea(
       }
       if (world.layers.zone[tile] === zone) continue;
 
-      setZoneTile(world, tile, zone);
-      markTileDirty(world, tileX, tileY);
-      changed++;
+      toZone.push(tile);
     }
   }
+
+  if (toZone.length === 0) return reject(lastReason);
 
   // Srovnání se **účtuje** (rozhodnutí autora, T67) a hráč ho vidí na cenovce
   // při tažení. Zóna sama nic nestojí; platí se za terén pod ní.
   //
-  // Na co nejsou peníze, to se **nesrovná — ale zóna se vyznačí**. Odmítnout
-  // celé tažení kvůli terénu by ze značkovacího nástroje udělalo stavbu, která
-  // chudému městu zakáže i rozvrhnout čtvrť.
-  if (changed > 0 && zone !== ZONE.none) {
-    const changes = planZoneLevelling(world, x, y, w, h);
-    const cost = changes.size * (balance?.map.terraformCost ?? 0);
-    if (changes.size > 0 && world.economy.funds >= cost) {
-      world.economy.funds -= cost;
-      applyHeightChanges(world, changes);
-    }
+  // Bez peněz se **nezónuje vůbec** (rozhodnutí autora, T68) — stejně jako se
+  // bez peněz nepostaví silnice. Rušení zóny je mazání značky, ne stavba, a
+  // neplatí se za ně nic.
+  const changes = zone === ZONE.none ? new Map<number, number>() : planZoneLevelling(world, x, y, w, h);
+  const cost = changes.size * (balance?.map.terraformCost ?? 0);
+  if (world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
   }
 
-  return changed > 0 ? OK : reject(lastReason);
+  world.economy.funds -= cost;
+  if (changes.size > 0) applyHeightChanges(world, changes);
+
+  for (const tile of toZone) {
+    const tileX = tile % world.size;
+    setZoneTile(world, tile, zone);
+    markTileDirty(world, tileX, (tile - tileX) / world.size);
+  }
+
+  return OK;
 }
 
 /** Nad tolik dlaždic se zóna už nesrovnává. Viz `planZoneLevelling`. */
