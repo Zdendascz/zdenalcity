@@ -191,7 +191,10 @@ describe('uvolňování chunků', () => {
     renderer.setOverlay('power');
     // Přepnutí jen zneplatní; upéct musí až `cull`.
     expect(renderer.getBakeCount()).toBe(before);
-    renderer.cull(WHOLE_MAP);
+
+    // Od T60 se to **rozloží do snímků** — jinak by při plném oddálení na
+    // 512 × 512 spadl snímek. Za dost snímků ale musí být přepečeno všechno.
+    for (let i = 0; i < renderer.getChunkCount(); i++) renderer.cull(WHOLE_MAP, 0);
     expect(renderer.getBakeCount()).toBe(before * 2);
   });
 
@@ -204,7 +207,7 @@ describe('uvolňování chunků', () => {
     const dirty = createDirtySet();
     dirty.fullRedraw = true;
     renderer.update(dirty);
-    renderer.cull(WHOLE_MAP);
+    for (let i = 0; i < renderer.getChunkCount(); i++) renderer.cull(WHOLE_MAP, 0);
 
     expect(renderer.getBakeCount()).toBe(before * 2);
   });
@@ -322,6 +325,103 @@ function raiseChunk(world: WorldState, cx: number, cy: number): void {
 }
 
 /** Stav chunku zevnitř. Díru v terénu nejde zvenčí poznat jinak než okem. */
+describe('přepnutí vrstvy zapékané do chunků', () => {
+  const WHOLE: Viewport = { minX: -1e9, maxX: 1e9, minY: -1e9, maxY: 1e9 };
+
+  /**
+   * Rozpočet nula: upeče se **právě jeden** zastaralý chunk za snímek.
+   *
+   * Test tím dostane deterministický krok místo hodinek. V ostrém provozu se
+   * měří čas, protože chunk prázdného moře stojí setinu milisekundy a chunk
+   * plný ulic dvě a půl — počet by jednou znamenal dvě milisekundy a jindy
+   * dvě stě.
+   */
+  const KROK = 0;
+
+  /** Mapa 512 × 512 se vším upečeným, tedy nejhorší případ plného oddálení. */
+  function bakedMap(): ChunkRenderer {
+    const renderer = new ChunkRenderer(createWorld(1, undefined, 512), new Container());
+    renderer.cull(WHOLE);
+    return renderer;
+  }
+
+  it('nepřepeče celou mapu v jednom snímku', () => {
+    // Naměřeno: přepnutí naráz stálo při plném oddálení 52 až 90 ms, tedy
+    // zahozený snímek. Rozpočet z toho dělá přebarvení místo bliknutí.
+    const renderer = bakedMap();
+    const before = renderer.getBakeCount();
+
+    renderer.setOverlay('power');
+    renderer.cull(WHOLE, KROK);
+
+    const upeceno = renderer.getBakeCount() - before;
+    expect(upeceno).toBe(1);
+    expect(upeceno).toBeLessThan(renderer.getChunkCount());
+  });
+
+  it('aspoň jeden chunk se upeče vždycky', () => {
+    // I s nulovým rozpočtem se musí něco pohnout. Jinak by se na mapě
+    // s drahými chunky nezměnilo nikdy nic.
+    const renderer = bakedMap();
+    renderer.setOverlay('underground');
+
+    for (let i = 0; i < 5; i++) {
+      const before = renderer.getBakeCount();
+      renderer.cull(WHOLE, KROK);
+      expect(renderer.getBakeCount()).toBeGreaterThan(before);
+    }
+  });
+
+  it('za dost snímků se přepeče všechno', () => {
+    // Rozpočet smí práci odložit, ne zahodit. Kdyby chunk zůstal zastaralý
+    // napořád, ukazovala by mapa navždycky starou vrstvu.
+    const renderer = bakedMap();
+    renderer.setOverlay('power');
+
+    for (let i = 0; i < renderer.getChunkCount(); i++) renderer.cull(WHOLE, KROK);
+
+    for (let i = 0; i < renderer.getChunkCount(); i++) {
+      expect(bakedState(renderer, i), `chunk ${i}`).toEqual({ baked: true, stale: false });
+    }
+  });
+
+  it('mezitím drží starý obrázek, ne díru', () => {
+    // Zastaralý chunk zůstává **upečený**. Kdyby se místo odložení vyprázdnil,
+    // byla by z přebarvení mapy díra a to je horší než bliknutí.
+    const renderer = bakedMap();
+    renderer.setOverlay('power');
+    renderer.cull(WHOLE, KROK);
+
+    for (let i = 0; i < renderer.getChunkCount(); i++) {
+      expect(bakedState(renderer, i).baked, `chunk ${i}`).toBe(true);
+    }
+  });
+
+  it('běžný zásah rozpočet neucítí', () => {
+    // Po postavení silnice zastarají jednotky chunků a upečou se hned. Odložit
+    // je by byla regrese, ne oprava — hráč má vidět, co postavil.
+    const world = createWorld(1, undefined, 512);
+    const renderer = new ChunkRenderer(world, new Container());
+    renderer.cull(WHOLE);
+
+    const dirty = createDirtySet();
+    dirty.tiles.add(100 * world.size + 100);
+    renderer.update(dirty);
+    renderer.cull(WHOLE, KROK);
+
+    expect(bakedState(renderer, chunkIndexOf(world, 100, 100))).toEqual({
+      baked: true,
+      stale: false,
+    });
+  });
+});
+
+/** Do kterého chunku spadá dlaždice. */
+function chunkIndexOf(world: WorldState, x: number, y: number): number {
+  const perAxis = Math.ceil(world.size / CHUNK_SIZE);
+  return Math.floor(y / CHUNK_SIZE) * perAxis + Math.floor(x / CHUNK_SIZE);
+}
+
 function bakedState(renderer: ChunkRenderer, chunkIndex: number): { baked: boolean; stale: boolean } {
   const chunks = (renderer as unknown as { chunks: readonly { baked: boolean; stale: boolean }[] })
     .chunks;

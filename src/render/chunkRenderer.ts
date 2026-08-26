@@ -67,6 +67,43 @@ export const CHUNK_MARGIN = 1;
  */
 export const RING_BUDGET = 2;
 
+/**
+ * Kolik milisekund smí v jednom snímku sežrat přepékání **zastaralých** chunků.
+ *
+ * Rozlišuje se prázdný chunk od zastaralého, a je v tom celý rozdíl. Prázdný je
+ * díra v mapě a musí se upéct hned, ať to stojí co chce. Zastaralý drží obrázek
+ * z minula — pořád je na co koukat, jen o chvíli starší.
+ *
+ * Naráz jich zastarají stovky jen při **přepnutí diagnostické vrstvy**, a to
+ * při plném oddálení na 512 × 512 stálo 52 až 90 ms v jednom snímku, tedy
+ * zahozený snímek. Naměřeno.
+ *
+ * Rozpočet je v **čase, ne v počtu**, a to je poučení z prvního pokusu: chunk
+ * prázdného moře se upeče za setinu milisekundy, chunk plný ulic za dvě a půl.
+ * Počet by tedy jednou znamenal dvě milisekundy a jindy dvě stě.
+ *
+ * Aspoň jeden chunk se upeče vždycky, i když ho rozpočet nepobere — jinak by
+ * se na mapě s drahými chunky nepohnulo nikdy nic.
+ *
+ * **Dvě milisekundy, ne čtyři**, a to je druhé poučení z měření: rozpočet měří
+ * jen pečení, jenže přepečený chunk se pak musí nahrát na GPU, a to stojí
+ * zhruba dvakrát tolik. Se čtyřmi vycházel snímek na 13 až 17 ms — v rozpočtu,
+ * ale bez rezervy.
+ *
+ * Přeteče se vždycky o jeden chunk: hodiny se čtou **před** pečením, ne během.
+ * Naměřeno na 512 × 512 při plném oddálení — tři až šest chunků za snímek,
+ * `cull` mezi 3 a 9 ms. Bez rozpočtu na tomtéž místě 207 ms v jediném snímku.
+ */
+export const STALE_BUDGET_MS = 2;
+
+/**
+ * Hodiny pro rozpočet. Vlastní funkce proto, že `performance` v čistém Node
+ * testu nemusí existovat — a renderer kvůli měření času spadnout nesmí.
+ */
+function now(): number {
+  return typeof performance === 'undefined' ? 0 : performance.now();
+}
+
 /** Obdélník v projekčních souřadnicích. */
 export interface Viewport {
   minX: number;
@@ -216,9 +253,11 @@ export class ChunkRenderer {
    * samotný je pár desítek bajtů a jeho opětovné zakládání by rozbilo pořadí
    * kreslení, které stojí na `zIndex`.
    */
-  cull(view: Viewport): void {
+  cull(view: Viewport, staleBudgetMs: number = STALE_BUDGET_MS): void {
     const ring = expand(view, CHUNK_MARGIN);
     let budget = RING_BUDGET;
+    const deadline = now() + staleBudgetMs;
+    let staleDone = 0;
 
     for (let i = 0; i < this.chunks.length; i++) {
       const chunk = this.chunks[i];
@@ -227,8 +266,14 @@ export class ChunkRenderer {
       const needsWork = !chunk.baked || chunk.stale;
 
       if (overlaps(chunk.bounds, view)) {
-        // Na tohle hráč kouká teď. Peče se bez ohledu na rozpočet.
-        if (needsWork) this.redraw(i);
+        if (!chunk.baked) {
+          // Prázdný chunk je **díra v mapě**. Peče se bez ohledu na rozpočet.
+          this.redraw(i);
+        } else if (chunk.stale && (staleDone === 0 || now() < deadline)) {
+          // Zastaralý drží obrázek z minula, takže smí počkat na příští snímek.
+          this.redraw(i);
+          staleDone++;
+        }
       } else if (overlaps(chunk.bounds, ring)) {
         // Zásoba za okrajem. Klidně počká na příští snímek.
         if (needsWork && budget > 0) {

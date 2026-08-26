@@ -2921,11 +2921,57 @@ texturovaných čtyřúhelníků, což je pro cokoli z posledních patnácti let
 Nastane při načtení města a po vygenerování mapy — tedy jednou, na místě, kde
 hráč stejně čeká.
 
-**Přepnutí diagnostické vrstvy stojí 52 až 90 ms**, protože `setOverlay`
-zneplatní všechny chunky a při plném oddálení jsou vidět všechny. Při běžném
-přiblížení je to 11 ms. Není to zadrhnutí, je to **jeden zahozený snímek** —
-blikne to. Rozložit pečení do několika snímků by to odstranilo; není to
-v kritériu a nechávám to jako nález, ne jako opravu.
+**Přepnutí vrstvy zapékané do chunků zahodilo snímek**, protože `setOverlay`
+zneplatní všechny a upekly se naráz. Opraveno hned potom — viz níž.
+
+- [x] Přepnutí vrstvy už nezahodí snímek
+
+Nález z ověřování kritéria 2. Chunky **v záběru se pekly bez rozpočtu** — a je
+to tam napsané schválně, protože odložit prázdný chunk znamená díru v mapě.
+Jenže po `setOverlay` zastarají všechny naráz a upečou se v jednom snímku.
+
+Rozlišuje se proto **prázdný chunk od zastaralého**, a v tom je celá oprava.
+Prázdný je díra a peče se hned, ať to stojí co chce. Zastaralý drží obrázek
+z minula — pořád je na co koukat, jen o chvíli starší — a smí počkat. Mapa se
+místo bliknutí přebarví.
+
+Cesta k tomu vedla přes dvě špatné domněnky a obě odhalilo měření.
+
+**Rozpočet v počtu chunků nefunguje.** První pokus pouštěl devadesát šest
+chunků za snímek, protože z „90 ms na 1024 chunků" vycházelo 0,09 ms na kus.
+Jenže snímek pak stál 73 ms při pouhých třiceti upečených. Cena chunku není
+konstanta: chunk prázdného moře se upeče za setinu milisekundy, chunk plný ulic
+za dvě až tři. Rozpočet je proto **v čase**.
+
+**Rozpočet nepokrývá celou cenu.** Se čtyřmi milisekundami vycházelo `cull` na
+4–6 ms, ale snímek na 13–17 ms: přepečený chunk se musí ještě nahrát na GPU
+a to stojí zhruba dvakrát tolik co pečení. Skutečná cena chunku je tedy asi
+trojnásobek toho, co rozpočet měří — proto jsou z něj **dvě milisekundy**.
+
+Naměřeno na 512 × 512 při plném oddálení, ve stejné scéně:
+
+| | nejhorší `cull` | za kolik snímků hotovo |
+|---|---|---|
+| bez rozpočtu | 207 ms | 1 |
+| **s rozpočtem** | **3–9 ms** | ~40 |
+
+Tři až šest chunků za snímek. Přeteče to vždycky o jeden, protože hodiny se
+čtou **před** pečením, ne během — rozdělit pečení jednoho chunku nejde.
+
+Aspoň jeden chunk se upeče vždycky, i když ho rozpočet nepobere: jinak by se na
+mapě s drahými chunky nepohnulo nikdy nic. A **běžný zásah rozpočet neucítí** —
+po postavení silnice zastarají jednotky chunků, ne stovky. Odložit hráči to, co
+právě postavil, by byla regrese, ne oprava; hlídá to test.
+
+Testy dostaly `cull(view, rozpocet)` s rozpočtem nula, tedy „právě jeden chunk
+za snímek". Deterministický krok místo hodinek — jinak by se v jsdomu, kde je
+pečení skoro zdarma, upeklo všechno naráz a test by neověřoval nic.
+
+Mutační test 3 ze 3. Při té příležitosti se ukázalo, že se **mapa 512 × 512 při
+plném oddálení na obrazovku nevejde**: `MIN_ZOOM` je 0,25 a vidět je z ní asi
+šestina, tedy 120 chunků z 1024.
+
+1062 testů.
 
 
 ## Rozpracované
