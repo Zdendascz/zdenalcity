@@ -59,6 +59,7 @@ import {
   storeAutosave,
 } from '@/ui/autosave';
 import { downloadBytes, readFileBytes } from '@/ui/saveFile';
+import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
 import { showNewGameDialog } from '@/ui/newGameDialog';
 import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
@@ -530,6 +531,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const notifications = new Notifications(mount);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
   const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance());
+  const alert = new DisasterAlert(mount, i18n, {
+    onIgnore: () => setSpeed(DEFAULT_SPEED_INDEX),
+    onShow: (x, y) => {
+      centreOn(x, y);
+      // Rychlost se **nevrací sama**. Hráč právě dostal na obrazovku hořící
+      // čtvrť a má si ji v klidu prohlédnout; rozjet hru je jeho rozhodnutí.
+    },
+  });
 
   /**
    * Hra nesmí mlčet. Odmítnutý příkaz i spadlý kód se musí objevit na obrazovce —
@@ -658,6 +667,52 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (requested < 0 || requested >= SPEEDS.length) return;
     speedIndex = requested;
     dispatch({ type: 'set_speed', speed: requested });
+  }
+
+  /**
+   * Katastrofy, o kterých už hráč ví. Hlásí se **jednou při vzniku**, ne
+   * pokaždé, co se na ně renderer podívá.
+   *
+   * Drží se tu id, ne počet: pohroma může skončit a hned začít jiná, a hráč
+   * má dostat dvě zprávy, ne žádnou.
+   */
+  const announced = new Set<number>();
+
+  /**
+   * Pohromy, které hráč spustil sám z menu. Ohlašovat mu je nemá cenu — ví
+   * o nich líp než hra, právě na ně klikl.
+   */
+  const armedManually = new Set<number>();
+
+  /**
+   * Ohlásí nově vzniklé pohromy a hru zastaví.
+   *
+   * Pauza je součást zprávy, ne zdvořilost. Hráč, který si zrovna odskočil, se
+   * jinak vrátí k ruině — přesně to se stalo autorovi a je to důvod, proč tohle
+   * okno vzniklo.
+   */
+  function announceDisasters(): void {
+    // Ručně spuštěné se odbydou hned: hráč o nich ví, jen ať nepřekáží ve
+    // frontě té, kterou poslal plánovač.
+    for (const id of armedManually) announced.add(id);
+    armedManually.clear();
+
+    const disaster = nextToAnnounce(world.disasters.active, announced, armedManually);
+    if (!disaster) return;
+
+    // `announced` se doplní **až když se okno opravdu otevřelo**. Kdyby se
+    // zapsalo dřív, pohroma, která přišla přes už otevřené okno, by se
+    // označila za ohlášenou a hráč by se o ní nedozvěděl nikdy.
+    if (!alert.open(disaster.kind, disaster.x, disaster.y)) return;
+    announced.add(disaster.id);
+    setSpeed(0);
+  }
+
+  /** Srovná kameru na dlaždici, ať je uprostřed obrazovky. */
+  function centreOn(x: number, y: number): void {
+    const point = gridToScreen(x, y);
+    camera.x = point.x;
+    camera.y = point.y;
   }
 
   function changeTax(zone: ZoneType, delta: number): void {
@@ -1031,7 +1086,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (armedDisaster === null) return false;
     const kind = armedDisaster;
     armedDisaster = null;
-    startDisaster(simWorld, content, content.getBalance(), disasterRegistry, kind, tile.x, tile.y);
+    const started = startDisaster(
+      simWorld,
+      content,
+      content.getBalance(),
+      disasterRegistry,
+      kind,
+      tile.x,
+      tile.y,
+    );
+    if (started) armedManually.add(started.id);
     message = { key: 'ui.disaster.started', params: { name: i18n.t(`ui.disaster.${kind}`) } };
     return true;
   }
@@ -1334,6 +1398,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   function renderFrame(deltaMS: number): void {
     host.step(deltaMS);
+
+    // Hlásí se **po kroku**: pohroma, která právě vznikla, se má ohlásit
+    // v témž snímku, ve kterém začala hořet, ne až v tom dalším.
+    announceDisasters();
 
     const dirty = host.consumeDirty();
     chunkRenderer.update(dirty);

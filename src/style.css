@@ -755,3 +755,55 @@ body {
   color: #0d1117;
   font-weight: 600;
 }
+
+/* --- hlášení o katastrofě ------------------------------------------------ */
+
+/*
+ * Schválně přes celou obrazovku a s vlastní barvou. Zpráva, kterou jde
+ * přehlédnout, je u pohromy k ničemu — hráč o město přišel právě proto, že
+ * mu hra neřekla nic (T62).
+ */
+.alert {
+  pointer-events: auto;
+  background: rgb(30 8 8 / 78%);
+}
+
+.alert__panel {
+  max-width: 520px;
+  border: 1px solid rgb(232 107 107 / 45%);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 70%);
+}
+
+.alert__head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.alert__icon {
+  display: flex;
+  flex: none;
+}
+
+.alert__icon .icon--image {
+  width: 64px;
+  height: 64px;
+}
+
+.alert__title {
+  font-size: 24px;
+  color: #e86b6b;
+}
+
+.alert__body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.alert__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

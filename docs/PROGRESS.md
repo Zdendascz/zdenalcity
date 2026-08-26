@@ -2613,6 +2613,39 @@ díry, teď je souvislá, a město vyroste na 192 obyvatel místo 180.
 Ověřeno ve hře: les 10 + 12, skála 10 + 60, mokřad 10 + 40, sedla srovnaná
 na terasy, nula jehel a nikde se nekopalo. Mutační test 5 z 5. 985 testů.
 
+- [x] T62 — katastrofa se ohlásí a hru zastaví
+
+**Nahlásil autor a je to nejhorší chyba, jakou fáze 4 měla.** Načetl uloženou
+pozici, odehrál dva herní roky a přišel o město. Hra mu neřekla ani slovo.
+
+Příčina byla trapná: rozhraní se na `world.disasters.active` **vůbec nedívalo**.
+Hlásila se jen katastrofa spuštěná ručně z menu — tedy ta jediná, o které hráč
+už stejně ví, protože na ni právě klikl. Ta, kterou pošle plánovač, běžela
+potichu.
+
+Nově je to **okno přes obrazovku**, ne řádek v rohu. Katastrofa je jediná věc
+ve hře, která běží proti hráči a sama nepřestane; zpráva, kterou jde
+přehlédnout, je u ní k ničemu. Okno nese jméno pohromy, její kreslenou ikonu
+a **větu o tom, co se s tím dá dělat** — u požáru že ho zastaví silnice, voda
+nebo průsek, u epidemie že ji zastaví jen pokrytí zdravotnictvím.
+
+**Hra se se zobrazením pauzne.** Není to laskavost, je to jediný způsob, jak dát
+hráči čas si to přečíst dřív, než mu shoří další čtvrť — a hráč, který si zrovna
+odskočil, se vrátí k pauze místo k ruině. Po „Ukázat" se rychlost **nevrací
+sama**: hráč právě dostal na obrazovku hořící čtvrť a rozjet hru je jeho
+rozhodnutí.
+
+Při psaní se ukázala druhá tichá ztráta, tentokrát moje: `announced` se plnilo
+dřív, než se okno otevřelo. Pohroma, která přišla přes už otevřené okno, by se
+označila za ohlášenou a hráč by se o ní **nedozvěděl nikdy**. Rozhodování je
+proto ve vlastní funkci `nextToAnnounce`, otestované bez DOM, a `announced` se
+doplňuje až po tom, co se okno opravdu otevřelo.
+
+Mutační test 6 z 9. Tři přeživší jsou řádky uvnitř `createApp` — že se
+`announceDisasters` volá a že se volá `setSpeed(0)`. Test se tam bez Pixi
+a canvasu nedostane; ověřeno ručně ve hře, kde svět při otevřeném okně
+nepřetikal ani jednou.
+
 
 ## Rozpracované
 

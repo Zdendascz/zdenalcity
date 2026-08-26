@@ -14,6 +14,15 @@ import type { LocaleTables } from '@/ui/i18n';
 import { uiIconShape } from '@/ui/icons';
 import { fromBase64, toBase64 } from '@/ui/autosave';
 import { groupTools } from '@/ui/toolbar';
+import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
+
+/** Všechny druhy pohrom, které hra registruje. Sedlo by se sem sáhnout do
+ * registru, jenže ten žije až v `app.ts` a ten potřebuje Pixi i canvas. */
+const DISASTER_KINDS = [
+  'fire', 'wildfire', 'flood', 'tornado', 'earthquake', 'explosion',
+  'industrialAccident', 'pileup', 'strike', 'riot', 'gangWar', 'blackout',
+  'epidemic', 'chemicalSpill', 'landslide',
+] as const;
 
 /**
  * Rozhraní.
@@ -180,5 +189,111 @@ describe('automatické uložení', () => {
 
   it('prázdné pole projde taky', () => {
     expect(fromBase64(toBase64(new Uint8Array(0))).length).toBe(0);
+  });
+});
+
+describe('hlášení o katastrofě', () => {
+  const fire = { id: 1, kind: 'fire', x: 5, y: 5 };
+  const flood = { id: 2, kind: 'flood', x: 9, y: 9 };
+
+  it('ohlásí první neohlášenou pohromu', () => {
+    expect(nextToAnnounce([fire, flood], new Set(), new Set())).toBe(fire);
+  });
+
+  it('už ohlášenou přeskočí', () => {
+    // Bez tohohle by okno naskakovalo každý snímek, dokud pohroma běží.
+    expect(nextToAnnounce([fire, flood], new Set([1]), new Set())).toBe(flood);
+    expect(nextToAnnounce([fire], new Set([1]), new Set())).toBeNull();
+  });
+
+  it('ručně spuštěnou přeskočí', () => {
+    // Hráč na ni klikl sám, ví o ní líp než hra.
+    expect(nextToAnnounce([fire], new Set(), new Set([1]))).toBeNull();
+  });
+
+  it('druhá pohroma počká, ale neztratí se', () => {
+    // Tohle je ta chyba, kvůli které tenhle test vznikl: kdyby se `announced`
+    // plnilo dřív, než se okno otevře, přišel by hráč o zprávu, kterou nikdy
+    // neviděl — přesně to ticho, kvůli kterému okno vzniklo.
+    const announced = new Set<number>();
+
+    const first = nextToAnnounce([fire, flood], announced, new Set());
+    expect(first).toBe(fire);
+    announced.add(first?.id ?? 0);
+
+    const second = nextToAnnounce([fire, flood], announced, new Set());
+    expect(second).toBe(flood);
+  });
+
+  it('každá pohroma má hlášku i tlačítka ve všech jazycích', async () => {
+    // Jméno pohromy je jedna věc, popis toho, co s tím dělat, druhá. Katastrofa
+    // bez popisu by hráči ukázala prázdné okno.
+    const content = await vanilla();
+    const locales = await tables(content);
+
+    for (const language of content.getLanguages()) {
+      const i18n = new I18n(locales, language);
+      for (const key of ['ui.alert.title', 'ui.alert.show', 'ui.alert.ignore']) {
+        expect(i18n.t(key), `${language}: ${key}`).not.toBe(key);
+      }
+      for (const kind of DISASTER_KINDS) {
+        const key = `ui.alert.body.${kind}`;
+        expect(i18n.t(key), `${language}: ${key}`).not.toBe(key);
+      }
+    }
+  });
+});
+
+describe('okno hlášení', () => {
+  async function alert(): Promise<{ node: HTMLElement; alert: DisasterAlert; shown: number[] }> {
+    const content = await vanilla();
+    const i18n = new I18n(await tables(content), 'cs');
+    const node = document.createElement('div');
+    const shown: number[] = [];
+    return {
+      node,
+      shown,
+      alert: new DisasterAlert(node, i18n, {
+        onIgnore: () => {},
+        onShow: (x, y) => shown.push(x, y),
+      }),
+    };
+  }
+
+  it('ukáže jméno pohromy i co s tím', async () => {
+    const { node, alert: a } = await alert();
+    expect(a.open('fire', 3, 4)).toBe(true);
+
+    const text = node.textContent ?? '';
+    expect(text).toContain('Požár');
+    // Ne jen jméno — hráč potřebuje vědět, co s tím může dělat.
+    expect(text.length).toBeGreaterThan(60);
+    expect(a.isOpen).toBe(true);
+  });
+
+  it('druhé hlášení první nepřebije', async () => {
+    // Kdyby přebilo, přišel by hráč o zprávu, kterou ještě nestihl přečíst —
+    // a to je přesně to ticho, kvůli kterému okno vzniklo.
+    const { node, alert: a } = await alert();
+    expect(a.open('fire', 3, 4)).toBe(true);
+    expect(a.open('flood', 9, 9)).toBe(false);
+    expect(node.textContent ?? '').toContain('Požár');
+  });
+
+  it('po zavření se dá ohlásit další', async () => {
+    const { alert: a } = await alert();
+    a.open('fire', 3, 4);
+    a.hide();
+    expect(a.isOpen).toBe(false);
+    expect(a.open('flood', 9, 9)).toBe(true);
+  });
+
+  it('ukázat pošle souřadnice pohromy, ne kurzoru', async () => {
+    const { node, alert: a, shown } = await alert();
+    a.open('tornado', 12, 34);
+    node.querySelector<HTMLButtonElement>('.chip--primary')?.click();
+
+    expect(shown).toEqual([12, 34]);
+    expect(a.isOpen).toBe(false);
   });
 });

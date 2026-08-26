@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from './catalogue';
 import type { ReadonlyCoarseLayers } from './coarse';
+import type { ActiveDisaster } from './disasters/state';
 import {
   addTransitStop,
   buildPipe,
@@ -69,6 +70,14 @@ export interface ReadonlyWorldView {
   /** Zbývající doba zaplavení a hloubka (§5 fáze 4). */
   readonly flood: Readonly<Uint8Array>;
   readonly floodDepth: Readonly<Uint8Array>;
+  /**
+   * Právě běžící pohromy.
+   *
+   * Rozhraní je musí vidět, aby uměla ohlásit, že město hoří. Do T62 je
+   * nevidělo a plánovaná katastrofa proběhla úplně potichu — autor přišel
+   * o město za dva herní roky, aniž by mu hra řekla jediné slovo.
+   */
+  readonly disasters: { readonly active: readonly Readonly<ActiveDisaster>[] };
 }
 
 /**
