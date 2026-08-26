@@ -468,7 +468,9 @@ Migrace v5 → v6: prázdné vrstvy, katastrofy zapnuté, `terraformTick` nula, 
 
 - Distribuce, platformy, Electron, Steam, GOG → fáze 5
 - Mody, content registry pro externí zdroje, perzistence savů, lokalizace → fáze 5
-- Sprity a grafika — zůstáváme u procedurálních kvádrů (rozhodnutí autora)
+- Sprity a grafika ve světě — zůstáváme u procedurálních kvádrů (rozhodnutí
+  autora). ~~Platí i pro rozhraní~~ — po T60 už ne: tlačítka nesou kreslené
+  ikony z obsahu, mapa dál kvádry.
 - Zvuk a hudba — nebudou (rozhodnutí autora)
 - Tutoriál a scénáře — až po odladění hry (rozhodnutí autora)
 - Obrazovka nastavení — zatím ne (rozhodnutí autora)

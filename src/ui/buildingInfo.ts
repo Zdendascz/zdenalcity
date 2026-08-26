@@ -3,6 +3,7 @@ import type { Definition } from '@/content/schema';
 import type { ParcelExplanation } from '@/sim/diagnostics';
 import { buildingMonthlyTax, buildingMonthlyUpkeep } from '@/sim/systems/economy';
 import type { Building, WorldState } from '@/sim/world';
+import { iconSvg } from './icons';
 import { button, el } from './dom';
 import { formatNumber, landValueTermKeys } from './format';
 import { dateParts } from './hud';
@@ -78,7 +79,7 @@ export class BuildingInfo {
     const header = el('div', 'sheet__header');
     header.appendChild(el('h2', 'sheet__title', title));
     const close = button('chip chip--tight', () => this.hide());
-    close.textContent = '×';
+    close.appendChild(iconSvg('close'));
     header.appendChild(close);
     this.root.append(header);
 

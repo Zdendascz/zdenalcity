@@ -15,7 +15,11 @@ Plná specifikace: `docs/01-ARCHITEKTURA.md`. Aktuální stav: `docs/PROGRESS.md
 `npm run check` musí projít.
 
 ## Nedělat
-Electron, Steam, sprity, převýšení terénu, React, state manager, monorepo, Web Worker.
+Electron, Steam, sprity ve světě, převýšení terénu, React, state manager, monorepo, Web Worker.
+
+Ikony rozhraní jsou od T60 kreslené obrázky v `content/vanilla/icons/` (rozhodnutí
+autora). Týká se to **jen tlačítek** — terén, silnice ani budovy na mapě sprity
+nedostávají, ty zůstávají procedurální.
 Nové závislosti jen po odsouhlasení autorem.
 
 ## Prostředí

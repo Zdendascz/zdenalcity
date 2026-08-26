@@ -22,6 +22,14 @@ export interface ContentSource {
   /** Klíč = kód jazyka (`cs`, `en`). Hodnota = plochý objekt klíč → text. */
   readonly locales: Readonly<Record<string, unknown>>;
   /**
+   * Obrázky ikon. Klíč = jméno bez přípony, hodnota = URL.
+   *
+   * Zdroj je mít nemusí — hra pak kreslí ikony z polygonů jako dřív. Jde tudy,
+   * a ne přímým sáhnutím rozhraní do `content/`, aby mod mohl ikony dodat nebo
+   * přepsat stejně jako budovu (P5).
+   */
+  readonly icons?: Readonly<Record<string, string>>;
+  /**
    * Balanc. Zdroj ho mít nemusí; když ho má, musí být úplný a přepíše ten
    * dosavadní — tak mod přeladí hru bez zásahu do definic.
    */
@@ -55,6 +63,8 @@ export class ContentRegistry {
   private readonly sources: SourceInfo[] = [];
   /** jazyk → klíč → text, slito přes všechny zdroje (§10). */
   private readonly locales = new Map<string, Map<string, string>>();
+  /** jméno ikony → URL obrázku, slito přes všechny zdroje. */
+  private readonly icons = new Map<string, string>();
   private balance: Balance | null = null;
 
   /**
@@ -129,6 +139,12 @@ export class ContentRegistry {
 
     if (incomingBalance) this.balance = incomingBalance;
 
+    // Ikony se přepisují stejně jako texty: pozdější zdroj smí cizí budově
+    // vyměnit obrázek, aniž by sahal na její definici.
+    for (const [name, url] of Object.entries(source.icons ?? {})) {
+      this.icons.set(name, url);
+    }
+
     // Pozdější zdroj smí text přepsat — tak se překládají nebo přejmenovávají
     // cizí budovy, aniž by se sahalo na jejich definici.
     for (const [language, table] of incomingLocales) {
@@ -154,6 +170,14 @@ export class ContentRegistry {
   /** Jazyky, ke kterým existuje aspoň jeden text. Seřazené, ať je pořadí stabilní. */
   getLanguages(): string[] {
     return [...this.locales.keys()].sort();
+  }
+
+  /**
+   * URL obrázků ikon. Prázdné, když je žádný zdroj nedodal — rozhraní si pak
+   * poradí polygony.
+   */
+  getIcons(): Record<string, string> {
+    return Object.fromEntries(this.icons);
   }
 
   getLocaleTable(language: string): Record<string, string> {

@@ -1,6 +1,7 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
+import type { Definition } from '@/content/schema';
 import {
   applySaveToWorld,
   collectLoadWarnings,
@@ -47,6 +48,7 @@ import { PriceTag } from '@/ui/priceTag';
 import { Notifications } from '@/ui/notifications';
 import { formatNumber } from '@/ui/format';
 import { Hud } from '@/ui/hud';
+import { setIconImages } from '@/ui/icons';
 import type { OverlayOption } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
@@ -145,28 +147,59 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
  */
 export function createViewOptions(): OverlayOption[] {
   return [
-    { id: 'surface', labelKey: 'ui.view.surface', icon: 'surface' },
-    { id: 'underground', labelKey: 'ui.view.underground', icon: 'underground' },
+    { id: 'surface', labelKey: 'ui.view.surface', icon: 'view-surface' },
+    { id: 'underground', labelKey: 'ui.view.underground', icon: 'view-underground' },
   ];
 }
 
 /** Diagnostické vrstvy: šest veličin plus dosah každé třídy služeb. */
 export function createLayerOptions(content: ContentRegistry): OverlayOption[] {
   return [
-    { id: 'power', labelKey: 'ui.overlay.power', icon: 'bolt' },
-    { id: 'pollution', labelKey: 'ui.overlay.pollution', icon: 'smoke' },
-    { id: 'landValue', labelKey: 'ui.overlay.landValue', icon: 'coins' },
-    { id: 'crime', labelKey: 'ui.overlay.crime', icon: 'shield' },
-    { id: 'happiness', labelKey: 'ui.overlay.happiness', icon: 'heart' },
-    { id: 'traffic', labelKey: 'ui.overlay.traffic', icon: 'street' },
-    // Ikonu dosahu služby nese obsah: je to týž symbol, jaký má budova na
-    // střeše, takže hráč nemusí luštit, čí dosah zrovna svítí (P5).
+    { id: 'power', labelKey: 'ui.overlay.power', icon: 'layer-power' },
+    { id: 'pollution', labelKey: 'ui.overlay.pollution', icon: 'layer-pollution' },
+    { id: 'landValue', labelKey: 'ui.overlay.landValue', icon: 'layer-landvalue' },
+    { id: 'crime', labelKey: 'ui.overlay.crime', icon: 'layer-crime' },
+    { id: 'happiness', labelKey: 'ui.overlay.happiness', icon: 'layer-happiness' },
+    { id: 'traffic', labelKey: 'ui.overlay.traffic', icon: 'layer-traffic' },
+    // Dosah služby má vlastní ikonu `coverage:<třída>`, když ji obsah dodal.
+    // Jinak se sáhne po symbolu, který nosí na střeše první budova té třídy —
+    // hráč tak pořád pozná, čí dosah svítí, i u třídy, kterou přinesl mod (P5).
     ...serviceClassesOf(content).map((serviceClass) => ({
       id: `coverage:${serviceClass}`,
       labelKey: `ui.overlay.coverage.${serviceClass}`,
-      icon: classIconsOf(content).get(serviceClass) ?? 'layers',
+      icon: coverageIconOf(content, serviceClass),
     })),
   ];
+}
+
+/**
+ * Ikona budovy do palety nástrojů.
+ *
+ * Přednost má obrázek pojmenovaný jako budova sama (`vanilla:hospital` →
+ * `hospital`), takže každá budova má v paletě svoji tvář. Když ho obsah nemá,
+ * vezme se `graphics.icon` — tedy symbol ze střechy, který dřív nosila paleta
+ * celý.
+ *
+ * `graphics.icon` se schválně **nepoužívá jako jméno obrázku**: řídí zároveň
+ * symbol na střeše ve 3D a ten je z polygonů. Kdyby se přejmenoval, zmizel by
+ * z domů ve městě.
+ */
+export function buildingIcon(content: ContentRegistry, definition: Definition): string {
+  const bare = definition.id.slice(definition.id.indexOf(':') + 1);
+  if (content.getIcons()[bare] !== undefined) return bare;
+  return definition.graphics.icon ?? 'gear';
+}
+
+/**
+ * Ikona pro vrstvu dosahu dané třídy služby.
+ *
+ * `coverage-<třída>` má přednost, protože kreslená vrstva ukazuje dosah, ne
+ * budovu. Když ji obsah nemá, vezme se střešní symbol první budovy té třídy.
+ */
+export function coverageIconOf(content: ContentRegistry, serviceClass: string): string {
+  const drawn = `coverage-${serviceClass}`;
+  if (content.getIcons()[drawn] !== undefined) return drawn;
+  return classIconsOf(content).get(serviceClass) ?? 'layers';
 }
 
 /** Třídy služeb, které v načteném obsahu opravdu existují, v pevném pořadí. */
@@ -207,74 +240,74 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     ...roadTypes.map((road, order) => ({
       id: `road:${road.id}`,
       labelKey: `ui.tool.road.${road.id}`,
-      icon: road.id,
+      icon: `road-${road.id}`,
       ...(order === 0 ? { hotkey: 'q' } : {}),
       groupKey: 'ui.menu.road',
-      groupIcon: roadTypes[0]?.id ?? 'street',
+      groupIcon: `road-${roadTypes[0]?.id ?? 'street'}`,
       cost: road.cost,
       action: { kind: 'road' as const, roadType: order + 1 },
     })),
     {
       id: 'terrain:raise',
       labelKey: 'ui.tool.terrain.raise',
-      icon: 'raise',
+      icon: 'terrain-raise',
       hotkey: 'e',
       groupKey: 'ui.menu.terrain',
-      groupIcon: 'raise',
+      groupIcon: 'terrain-raise',
       action: { kind: 'terraform', delta: 1 },
     },
     {
       id: 'terrain:lower',
       labelKey: 'ui.tool.terrain.lower',
-      icon: 'lower',
+      icon: 'terrain-lower',
       hotkey: 'd',
       groupKey: 'ui.menu.terrain',
-      groupIcon: 'raise',
+      groupIcon: 'terrain-raise',
       action: { kind: 'terraform', delta: -1 },
     },
     {
       id: 'terrain:level',
       labelKey: 'ui.tool.terrain.level',
-      icon: 'level',
+      icon: 'terrain-level',
       hotkey: 'f',
       groupKey: 'ui.menu.terrain',
-      groupIcon: 'raise',
+      groupIcon: 'terrain-raise',
       action: { kind: 'terraform', delta: 0 },
     },
     {
       id: 'terrain:fill',
       labelKey: 'ui.tool.terrain.fill',
-      icon: 'fill',
+      icon: 'terrain-fill',
       hotkey: 'g',
       groupKey: 'ui.menu.terrain',
-      groupIcon: 'raise',
+      groupIcon: 'terrain-raise',
       action: { kind: 'fill' },
     },
     {
       id: 'zone:residential',
       labelKey: 'ui.tool.zone.residential',
-      icon: 'zone',
+      icon: 'zone-residential',
       hotkey: 'r',
       groupKey: 'ui.menu.zone',
-      groupIcon: 'zone',
+      groupIcon: 'zone-residential',
       action: { kind: 'zone', zone: ZONE.residential },
     },
     {
       id: 'zone:commercial',
       labelKey: 'ui.tool.zone.commercial',
-      icon: 'zone',
+      icon: 'zone-commercial',
       hotkey: 'c',
       groupKey: 'ui.menu.zone',
-      groupIcon: 'zone',
+      groupIcon: 'zone-residential',
       action: { kind: 'zone', zone: ZONE.commercial },
     },
     {
       id: 'zone:industrial',
       labelKey: 'ui.tool.zone.industrial',
-      icon: 'zone',
+      icon: 'zone-industrial',
       hotkey: 'i',
       groupKey: 'ui.menu.zone',
-      groupIcon: 'zone',
+      groupIcon: 'zone-residential',
       action: { kind: 'zone', zone: ZONE.industrial },
     },
     {
@@ -294,7 +327,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       icon: 'pipe',
       hotkey: 'w',
       groupKey: 'ui.menu.water',
-      groupIcon: 'drop',
+      groupIcon: 'pump_station',
       cost: content.getBalance().water.pipeCost,
       action: { kind: 'pipe' },
     },
@@ -306,7 +339,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
   const firstIcon = new Map<string, string>();
   for (const definition of manual) {
     const menu = definition.menu ?? definition.category;
-    if (!firstIcon.has(menu)) firstIcon.set(menu, definition.graphics.icon ?? 'gear');
+    if (!firstIcon.has(menu)) firstIcon.set(menu, buildingIcon(content, definition));
   }
 
   manual.forEach((definition, order) => {
@@ -314,7 +347,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     tools.push({
       id: `place:${definition.id}`,
       labelKey: definition.name, // popisek pojmenuje obsah, ne kód
-      icon: definition.graphics.icon ?? 'gear',
+      icon: buildingIcon(content, definition),
       ...(order === 0 ? { hotkey: 'u' } : {}),
       groupKey: `ui.menu.${menu}`,
       groupIcon: firstIcon.get(menu) ?? 'gear',
@@ -337,6 +370,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // plátno — tichý pád s polovinou obsahu je horší než hlasitá chyba.
   const content = new ContentRegistry();
   await content.load(createVanillaSource());
+  setIconImages(content.getIcons());
 
   const tables: Record<string, Record<string, string>> = {};
   for (const language of content.getLanguages()) {

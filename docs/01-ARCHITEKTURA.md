@@ -274,6 +274,11 @@ Terén se renderuje do `RenderTexture` po chuncích **16×16 dlaždic**. Změna 
 
 Žádné sprity, žádné textury, žádný Blender. Vše kreslené procedurálně přes `Pixi.Graphics`:
 
+> Od T60 platí jen pro **svět**. Ikony v rozhraní jsou obrázky, které dodává
+> obsah (`content/vanilla/icons/`) — jde to přes `ContentSource`, aby je mod
+> mohl přidat i přepsat. Na mapě se nic nezměnilo.
+
+
 - Terén: izometrický diamant vyplněný barvou podle `terrain`
 - Silnice: tmavý diamant, auto-tiling přes bitmask sousedů (N=1, E=2, S=4, W=8)
 - Budovy: kvádr ze tří polygonů — horní plocha 100 % jasu, levá stěna 70 %, pravá 50 %

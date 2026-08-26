@@ -315,9 +315,18 @@ export class Hud {
     const group = el('div', 'segmented');
     this.speeds.forEach((speed, index) => {
       const label = speed === 0 ? this.i18n.t('ui.speed.pause') : this.i18n.t('ui.speed.value', { speed });
-      const node = button('segmented__button', () => this.callbacks.onSpeed(index));
-      node.textContent = label;
+      const node = button('segmented__button segmented__button--icon', () =>
+        this.callbacks.onSpeed(index),
+      );
+      // Pauza má vlastní ikonu, ostatní stupně se liší počtem šipek. Když
+      // obrázek chybí, spadne to zpátky na text — rychlost musí jít přepnout
+      // i bez grafiky.
+      const icon = speed === 0 ? 'speed-pause' : `speed-${speed}`;
+      const drawn = iconSvg(icon);
+      if (drawn.tagName === 'IMG') node.appendChild(drawn);
+      else node.textContent = label;
       node.title = `${this.i18n.t('ui.speed.label')}: ${label}`;
+      node.setAttribute('aria-label', label);
       group.appendChild(node);
       this.speedButtons.push(node);
     });
@@ -352,7 +361,7 @@ export class Hud {
   private buildGhost(): void {
     const label = this.i18n.t('ui.view.ghost');
     const node = button('toolbar__button', () => this.callbacks.onToggleGhost());
-    node.appendChild(iconSvg('ghost'));
+    node.appendChild(iconSvg('view-ghost'));
     node.title = label;
     node.setAttribute('aria-label', label);
     this.ghostButton = node;
@@ -372,7 +381,7 @@ export class Hud {
       {
         id: 'none',
         label: this.i18n.t('ui.overlay.none'),
-        icon: 'layers',
+        icon: 'layer-none',
         onSelect: () => this.callbacks.onToggleLayer('none'),
       },
       ...this.layers.map((layer) => ({
@@ -397,7 +406,7 @@ export class Hud {
     if (this.disasters.length === 0) return;
 
     const menu = new Menu({
-      icon: 'disaster',
+      icon: 'disasters',
       label: this.i18n.t('ui.disaster.title'),
       lockIcon: true,
       className: 'popover--alarm',
@@ -406,7 +415,7 @@ export class Hud {
       this.disasters.map((kind) => ({
         id: kind,
         label: this.i18n.t(`ui.disaster.${kind}`),
-        icon: 'disaster',
+        icon: kind,
         onSelect: () => this.callbacks.onArmDisaster(kind),
       })),
     );
@@ -414,7 +423,7 @@ export class Hud {
   }
 
   private buildTaxes(): void {
-    const popover = new Popover({ icon: 'coins', label: this.i18n.t('ui.tax.title') });
+    const popover = new Popover({ icon: 'taxes', label: this.i18n.t('ui.tax.title') });
     popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.tax.title')));
 
     for (const row of TAX_ROWS) {
@@ -422,14 +431,14 @@ export class Hud {
       line.appendChild(el('span', 'panel__label', this.i18n.t(row.labelKey)));
 
       const minus = button('chip chip--tight', () => this.callbacks.onTaxChange(row.zone, -1));
-      minus.textContent = '−';
+      minus.appendChild(iconSvg('tax-decrease'));
       minus.title = this.i18n.t('ui.tax.decrease');
 
       const value = el('span', 'panel__value', '-');
       this.values.set(`tax-${row.category}`, value);
 
       const plus = button('chip chip--tight', () => this.callbacks.onTaxChange(row.zone, 1));
-      plus.textContent = '+';
+      plus.appendChild(iconSvg('tax-increase'));
       plus.title = this.i18n.t('ui.tax.increase');
 
       line.append(minus, value, plus);
@@ -446,7 +455,7 @@ export class Hud {
   private buildFunding(): void {
     if (this.serviceClasses.length === 0) return;
 
-    const popover = new Popover({ icon: 'sliders', label: this.i18n.t('ui.funding.title') });
+    const popover = new Popover({ icon: 'funding', label: this.i18n.t('ui.funding.title') });
     popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.funding.title')));
 
     for (const serviceClass of this.serviceClasses) {
@@ -477,7 +486,7 @@ export class Hud {
   private buildBudget(): void {
     const label = this.i18n.t('ui.budget.toggle');
     const node = button('toolbar__button', () => this.callbacks.onToggleBudget());
-    node.appendChild(iconSvg('chart'));
+    node.appendChild(iconSvg('budget'));
     node.title = label;
     node.setAttribute('aria-label', label);
     this.budgetButton = node;
@@ -490,14 +499,14 @@ export class Hud {
 
     const row = el('div', 'panel__row');
     const quickSave = button('chip', () => this.callbacks.onQuickSave());
-    quickSave.textContent = this.i18n.t('ui.save.quicksave');
+    quickSave.append(iconSvg('quicksave'), this.i18n.t('ui.save.quicksave'));
     const quickLoad = button('chip', () => this.callbacks.onQuickLoad());
-    quickLoad.textContent = this.i18n.t('ui.save.quickload');
+    quickLoad.append(iconSvg('quickload'), this.i18n.t('ui.save.quickload'));
     row.append(quickSave, quickLoad);
 
     const fileRow = el('div', 'panel__row');
     const download = button('chip', () => this.callbacks.onDownload());
-    download.textContent = this.i18n.t('ui.save.download');
+    download.append(iconSvg('download'), this.i18n.t('ui.save.download'));
 
     const input = el('input', 'is-hidden');
     input.type = 'file';
@@ -510,7 +519,7 @@ export class Hud {
     this.fileInput = input;
 
     const open = button('chip', () => this.fileInput?.click());
-    open.textContent = this.i18n.t('ui.save.open');
+    open.append(iconSvg('open-file'), this.i18n.t('ui.save.open'));
     fileRow.append(download, open, input);
 
     popover.panel.append(row, fileRow);
@@ -518,7 +527,7 @@ export class Hud {
   }
 
   private buildLanguage(): void {
-    const popover = new Popover({ icon: 'globe', label: this.i18n.t('ui.language.label') });
+    const popover = new Popover({ icon: 'language', label: this.i18n.t('ui.language.label') });
     popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.language.label')));
 
     for (const language of this.i18n.getLanguages()) {

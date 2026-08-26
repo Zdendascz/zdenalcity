@@ -22,6 +22,20 @@ export function createVanillaSource(): ContentSource {
     import: 'default',
   });
 
+  // Ikony jsou binární, takže se neimportují jako data, ale jako URL. Vite je
+  // v produkci opatří otiskem a nakopíruje do buildu; za běhu je stáhne
+  // prohlížeč sám, až se objeví v `<img>`.
+  const iconFiles = import.meta.glob('../../content/vanilla/icons/*.png', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  });
+  const icons: Record<string, string> = {};
+  for (const absolute of Object.keys(iconFiles).sort()) {
+    const name = relativePath(absolute).slice('icons/'.length).replace(/\.png$/, '');
+    icons[name] = iconFiles[absolute] as string;
+  }
+
   let manifest: unknown = undefined;
   let balance: unknown = undefined;
   const definitions: RawFile[] = [];
@@ -43,5 +57,5 @@ export function createVanillaSource(): ContentSource {
     }
   }
 
-  return { label: SOURCE_ROOT.replace(/\/$/, ''), manifest, balance, definitions, locales };
+  return { label: SOURCE_ROOT.replace(/\/$/, ''), manifest, balance, definitions, locales, icons };
 }

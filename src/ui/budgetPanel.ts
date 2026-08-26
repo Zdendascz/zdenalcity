@@ -1,5 +1,6 @@
 import type { Definition } from '@/content/schema';
 import type { Budget, BudgetLine } from '@/sim/systems/economy';
+import { iconSvg } from './icons';
 import { button, el } from './dom';
 import { formatNumber } from './format';
 import type { I18n } from './i18n';
@@ -46,7 +47,7 @@ export class BudgetPanel {
     const header = el('div', 'sheet__header');
     header.appendChild(el('h2', 'sheet__title', t('ui.budget.title')));
     const close = button('chip chip--tight', () => this.toggle());
-    close.textContent = '×';
+    close.appendChild(iconSvg('close'));
     header.appendChild(close);
     this.root.appendChild(header);
 

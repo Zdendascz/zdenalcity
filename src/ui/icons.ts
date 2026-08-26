@@ -319,13 +319,50 @@ export function uiIconShape(name: string): Shape | undefined {
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
- * Ikona jako `<svg>`.
+ * Obrázky ikon z obsahu. Naplní se jednou při startu, viz `setIconImages`.
+ *
+ * Drží se v modulu, a ne v parametrech: `iconSvg` volají tři různá místa, která
+ * by jinak musela protahovat registr obsahu skrz Popover, Menu i Toolbar jen
+ * proto, aby se dostal až sem.
+ */
+let images: Readonly<Record<string, string>> = {};
+
+/**
+ * Předá rozhraní obrázky ikon z obsahu. Volá se jednou po načtení obsahu.
+ *
+ * Bez nich hra funguje dál — kreslí polygony jako předtím. Obrázek je vylepšení
+ * vzhledu, ne podmínka běhu, a mod, který žádný nedodá, nesmí hru zastavit.
+ */
+export function setIconImages(urls: Readonly<Record<string, string>>): void {
+  images = urls;
+}
+
+/**
+ * Ikona jako `<img>`, když ji obsah dodal, jinak jako `<svg>` z polygonů.
  *
  * Neznámé jméno vrátí **prázdnou ikonu**, ne výjimku: tlačítko si zaslouží
  * existovat i s chybějícím tvarem. Že žádné jméno nechybí, hlídá test —
  * potichu to tedy neprojde, jen to neshodí hru hráči pod rukama.
  */
-export function iconSvg(name: string): SVGSVGElement {
+export function iconSvg(name: string): Element {
+  const url = images[name];
+  if (url !== undefined) {
+    const node = document.createElement('img');
+    node.className = 'icon icon--image';
+    node.src = url;
+    node.alt = '';
+    // Ikona popisuje tlačítko, které svůj popisek už má — dvakrát ho číst
+    // odečítačce nemá cenu.
+    node.setAttribute('aria-hidden', 'true');
+    node.draggable = false;
+    return node;
+  }
+
+  return polygonIcon(name);
+}
+
+/** Ikona kreslená z polygonů. Záloha pro jména, ke kterým obsah obrázek nemá. */
+export function polygonIcon(name: string): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'icon');
   svg.setAttribute('viewBox', '0 0 1 1');

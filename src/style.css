@@ -275,6 +275,35 @@ body {
   fill: currentcolor;
 }
 
+/*
+ * Kreslené ikony snesou víc místa než jednobarevný polygon — mají detail, který
+ * se na osmnácti pixelech ztratí. `image-rendering` zůstává výchozí: obrázky
+ * jsou 128px a zmenšují se, takže hladké zmenšení je žádoucí.
+ */
+.icon--image {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  user-select: none;
+}
+
+.menu__item .icon--image,
+.popover__trigger .icon--image {
+  width: 28px;
+  height: 28px;
+}
+
+/* V panelech sedí ikona vedle textu, tam stačí menší. */
+.chip .icon--image {
+  width: 18px;
+  height: 18px;
+}
+
+.segmented__button--icon .icon--image {
+  width: 24px;
+  height: 24px;
+}
+
 /* --- paleta nástrojů: jedna řada ikon ----------------------------------- */
 
 .toolbar {
@@ -291,8 +320,10 @@ body {
   gap: 6px;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  height: 30px;
+  /* Kreslená ikona potřebuje víc než těch 30 px, co stačilo jednobarevnému
+     polygonu — na menším tlačítku se z izometrického domku stane skvrna. */
+  min-width: 40px;
+  height: 38px;
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 5px;

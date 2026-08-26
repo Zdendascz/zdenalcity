@@ -381,6 +381,18 @@ describe('kritérium 25 — všechen text hráče je v locale souborech', () => 
     }
   });
 
+  it('každá registrovaná katastrofa má vlastní ikonu', async () => {
+    // Roletka katastrof pojmenovává ikonu druhem pohromy, takže nová katastrofa
+    // bez obrázku by v ní byla prázdné místo. Do T60 nesly všechny tutéž ikonu
+    // a rozlišit je šlo jen textem.
+    const content = await vanilla();
+    const icons = content.getIcons();
+
+    for (const kind of fullRegistry().kinds()) {
+      expect(icons[kind], `katastrofa ${kind}`).toBeDefined();
+    }
+  });
+
   it('každá registrovaná katastrofa má jméno v obou jazycích', async () => {
     // Jména pohrom se skládají za běhu (`ui.disaster.${kind}`), takže kontrola
     // literálních klíčů v i18n testech je minout. Bez tohohle testu se dá přidat

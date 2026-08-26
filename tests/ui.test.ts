@@ -34,14 +34,26 @@ async function tables(content: ContentRegistry): Promise<LocaleTables> {
   return out as LocaleTables;
 }
 
+/**
+ * Ikona je nakreslitelná, když ji obsah dodal jako obrázek, nebo když na ni
+ * existuje polygon. Obojí je platná cesta — obrázek má přednost, polygon je
+ * záloha pro jména, ke kterým obsah nic nemá.
+ */
+function drawable(content: ContentRegistry, name: string): boolean {
+  return content.getIcons()[name] !== undefined || uiIconShape(name) !== undefined;
+}
+
 describe('paleta nástrojů', () => {
   it('každý nástroj má ikonu, kterou umíme nakreslit', async () => {
-    const tools = createTools(await vanilla());
+    const content = await vanilla();
+    const tools = createTools(content);
     expect(tools.length).toBeGreaterThan(20);
 
     for (const tool of tools) {
-      expect(uiIconShape(tool.icon), `chybí tvar ikony ${tool.icon} (${tool.id})`).toBeDefined();
-      expect(uiIconShape(tool.groupIcon), `chybí tvar ${tool.groupIcon}`).toBeDefined();
+      expect(drawable(content, tool.icon), `nekreslitelná ikona ${tool.icon} (${tool.id})`).toBe(
+        true,
+      );
+      expect(drawable(content, tool.groupIcon), `nekreslitelná ikona ${tool.groupIcon}`).toBe(true);
     }
   });
 
@@ -127,7 +139,7 @@ describe('pohledy a vrstvy', () => {
     for (const language of content.getLanguages()) {
       const i18n = new I18n(locales, language);
       for (const option of options) {
-        expect(uiIconShape(option.icon), `${option.id}: ${option.icon}`).toBeDefined();
+        expect(drawable(content, option.icon), `${option.id}: ${option.icon}`).toBe(true);
         expect(i18n.t(option.labelKey), `${language}: ${option.labelKey}`).not.toBe(
           option.labelKey,
         );
@@ -135,12 +147,24 @@ describe('pohledy a vrstvy', () => {
     }
   });
 
-  it('dosah služby nese týž symbol jako budova, která ji poskytuje', async () => {
+  it('dosah služby má vlastní ikonu, když ji obsah dodal', async () => {
     const content = await vanilla();
     const layers = createLayerOptions(content);
 
+    // Vrstva ukazuje dosah, ne budovu, tak má přednost kreslená `coverage-*`.
     const police = layers.find((layer) => layer.id === 'coverage:police');
-    expect(police?.icon).toBe(content.get('vanilla:police_small')?.graphics.icon);
+    expect(police?.icon).toBe('coverage-police');
+  });
+
+  it('dosah třídy bez vlastní ikony spadne na symbol její budovy', async () => {
+    const content = await vanilla();
+    const layers = createLayerOptions(content);
+
+    // `social` obrázek nemá — a nesmí kvůli tomu zůstat bez ikony, protože
+    // třídu služby smí přinést i mod, který ke své vrstvě žádnou nenakreslí.
+    const social = layers.find((layer) => layer.id === 'coverage:social');
+    expect(content.getIcons()['coverage-social']).toBeUndefined();
+    expect(social?.icon).toBe(content.get('vanilla:community_centre')?.graphics.icon);
   });
 });
 

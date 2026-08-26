@@ -2486,6 +2486,57 @@ Při soupisu se ukázalo i to, že tři zóny sdílejí jednu ikonu `zone`, čty
 dopravní stavby jednu `bus` a **všech čtrnáct katastrof jednu `disaster`** —
 v roletce se rozlišují pouze textem.
 
+- [x] Kreslené ikony v rozhraní
+
+**Rozhodnutí autora, které mění dosavadní pravidlo.** Architektura §6 i zadání
+fáze 4 §12 říkaly „žádné sprity". Po T60 to platí jen pro **svět** — terén,
+silnice a budovy na mapě zůstávají procedurální kvádry. Tlačítka nesou kreslené
+obrázky.
+
+Sto pět ikon přišlo v šesti arších po kartách. Rozřezal je skript v scratchpadu:
+karty se hledají jako souvislé světlejší oblasti, ne pevnou mřížkou, protože
+každý arch má jiný počet sloupců i rozteče.
+
+Odříznout popisek pod ikonou dalo víc práce než všechno ostatní. Mezera mezi
+nimi neexistuje — měkký stín ji přemostí. Podle velikosti útvaru to taky nejde,
+protože stín s textem splyne v jeden. Rozhodla nakonec **barva a tloušťka
+tahu**: popisek je jasná šedá tenkým písmem, ikony jsou barevné a jejich stín
+tmavý, a co ze šedé zbude po erozi, je zeď budovy, ne písmeno. Čtyři karty ze
+sta pěti to nerozsoudilo a mají v skriptu jmenovitý řez.
+
+Průhlednost se klíčuje proti výplni karty, počítané **pro každou kartu zvlášť**.
+Jedna společná hodnota pro celý arch nechávala na některých ikonách viditelný
+obdélník: karty se o pár jednotek liší a při klíčování se to pozná.
+
+Ikony jdou do hry přes `ContentSource`, ne přímým sáhnutím rozhraní do
+`content/` — mod je smí přidat i přepsat stejně jako budovu nebo text (P5).
+`iconSvg` vrátí `<img>`, když obsah obrázek má, jinak kreslí polygon jako dřív.
+Zůstat u polygonů je **platná cesta, ne selhání**: mod, který žádný obrázek
+nedodá, nesmí hru zastavit.
+
+`graphics.icon` se schválně nepřejmenovalo. Řídí zároveň symbol na střeše ve 3D
+a ten je z polygonů — kdyby se z něj stalo jméno obrázku, zmizely by symboly
+z domů ve městě. Paleta si jméno obrázku odvozuje z **id budovy**
+(`vanilla:hospital` → `hospital`) a na `graphics.icon` spadne, když obrázek
+chybí.
+
+Co se tím rozlišilo: tři zóny měly jeden kosočtverec, čtyři dopravní stavby
+jeden autobus a **všech čtrnáct katastrof jednu ikonu** — v roletce se daly
+rozeznat jen textem. Teď má každá svou. Rychlost taky poprvé má ikony místo
+holého textu.
+
+Testy, které hlídaly „každé jméno ikony má polygon", tvrdí nově „ikona je
+nakreslitelná" — obrázkem, nebo tvarem. Přibyl test, že každá registrovaná
+katastrofa má vlastní obrázek, a test, že třída služby bez vlastní ikony
+(`social`, `transit`) spadne na symbol své budovy místo aby zůstala prázdná.
+
+Tlačítka vyrostla z 30 na 38 px: na menším se z izometrického domku stane
+skvrna. 105 obrázků je 2,9 MB, build vyrostl na 3,7 MB.
+
+Ověřeno ve hře: 104 obrázků v DOM, žádný rozbitý, dva polygonové zbytky —
+dosah sounáležitosti a dosah MHD, tedy přesně ty dvě třídy, ke kterým obrázek
+není. 974 testů.
+
 
 ## Rozpracované
 
