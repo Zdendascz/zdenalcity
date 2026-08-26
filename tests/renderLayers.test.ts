@@ -324,8 +324,16 @@ function raiseChunk(world: WorldState, cx: number, cy: number): void {
   applyHeightChanges(world, changes);
 }
 
-/** Stav chunku zevnitř. Díru v terénu nejde zvenčí poznat jinak než okem. */
-describe('přepnutí vrstvy zapékané do chunků', () => {
+/**
+ * Stav chunku zevnitř. Díru v terénu nejde zvenčí poznat jinak než okem.
+ *
+ * Každý test tady prožene mapu 512 × 512 desítkami snímků, takže i na klidném
+ * stroji trvá 2–4,5 s. Výchozích 5 s vitestu nedává rezervu a testy padaly na
+ * timeout, kdykoli sada běžela paralelně na vytíženém stroji — na výsledku
+ * přitom nebylo nic špatně. Limit je proto na bloku, ne na jednom testu:
+ * pomalé jsou všechny z téhož důvodu.
+ */
+describe('přepnutí vrstvy zapékané do chunků', { timeout: 30_000 }, () => {
   const WHOLE: Viewport = { minX: -1e9, maxX: 1e9, minY: -1e9, maxY: 1e9 };
 
   /**
