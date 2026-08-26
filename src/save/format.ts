@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 7;
+export const CURRENT_FORMAT_VERSION = 8;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -85,6 +85,13 @@ export const SAVE_FILES = {
   state: 'state.json',
   /** Vrstvy ohně, povodně a trosek, od verze 6. */
   disasters: 'disasters.bin',
+  /**
+   * Tik poslední terénní úpravy dlaždice, od verze 8. Vlastní soubor ze
+   * stejného důvodu jako `heights.bin`: je **dvoubajtový**, kdežto vrstvy
+   * v `disasters.bin` jsou po jednom, a míchat je do jednoho bufferu by
+   * znamenalo číst bajty podle toho, co je zrovna v kódu.
+   */
+  terraform: 'terraform.bin',
 } as const;
 
 export interface SaveSourceInfo {
@@ -257,6 +264,8 @@ export interface SaveData {
   heights: Uint8Array;
   /** Obsah `disasters.bin` — vrstvy v `SAVE_DISASTER_LAYER_ORDER` (verze 6). */
   disasters: Uint8Array;
+  /** Obsah `terraform.bin` — tik úpravy dlaždice, dva bajty little-endian (verze 8). */
+  terraform: Uint8Array;
   entities: SaveEntities;
   state: SaveState;
 }

@@ -248,6 +248,36 @@ const migrateV6ToV7: Migration = (save) => ({
   },
 });
 
+/**
+ * Verze 7 → 8 (T54).
+ *
+ * Verze 8 přidala `terraform.bin` — tik poslední terénní úpravy dlaždice, pro
+ * sesuv půdy. Starý save ho nemá a **doplní se nulami**, tedy „nikdy se tu
+ * neupravovalo".
+ *
+ * Je to úmyslné podcenění, ne mezera: hráč, který si těsně před uložením
+ * srovnal svah, dostane po načtení mírně nižší riziko sesuvu na tom místě.
+ * Opačná volba — napsat všude aktuální tik — by mu z celého města udělala
+ * čerstvě přesypanou půdu a sesuv by se do roka chytal všude.
+ */
+const migrateV7ToV8: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 8 },
+  terraform: new Uint8Array(emptyTerraformBytes(save.meta.grid?.size ?? LEGACY_MAP_SIZE)),
+});
+
+/**
+ * Kolik bajtů zabere prázdný `terraform.bin`.
+ *
+ * Dva bajty na dlaždici, natvrdo. Migrace popisuje minulost: kdyby se ve verzi
+ * 9 vrstva rozšířila na čtyři bajty, tahle by začala vyrábět soubor, který
+ * verze 8 neumí přečíst.
+ */
+function emptyTerraformBytes(size: number): number {
+  const BYTES_PER_TILE_V8 = 2;
+  return size * size * BYTES_PER_TILE_V8;
+}
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
@@ -256,6 +286,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   4: migrateV4ToV5,
   5: migrateV5ToV6,
   6: migrateV6ToV7,
+  7: migrateV7ToV8,
 };
 
 /**

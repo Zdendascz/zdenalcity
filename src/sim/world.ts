@@ -342,6 +342,20 @@ export interface WorldState {
   rubbleOf: Map<number, string>;
 
   /**
+   * Kdy byla dlaždice naposledy upravena terénně (T54). Nula znamená nikdy.
+   *
+   * Používá to **jen sesuv půdy**: čerstvě přesypaná půda drží hůř, takže se
+   * na ni sesuv chytá ochotněji. Je to jediné místo ve hře, kde záleží na tom,
+   * **kdy** hráč terén upravil, ne jak.
+   *
+   * Uint16 přeteče po 65 536 ticích, tedy po 182 herních letech. Stáří se
+   * proto počítá po kruhu a jediná daň za to je, že dlaždice upravená přesně
+   * před 182 lety vypadá chvíli jako čerstvá. Zvedne to váhu jednoho místa
+   * v losu; víc si za dvojnásobnou paměť kupovat nemá cenu.
+   */
+  terraformTick: Uint16Array;
+
+  /**
    * Nakaženost po buňkách hrubé mřížky, 0–1 (T53).
    *
    * **Řídká mapa, ne vrstva.** Většina města je vždycky nenakažená; plná vrstva
@@ -464,6 +478,7 @@ export function createWorld(
     fireFlags: new Uint8Array(size * size),
     rubble: new Uint8Array(size * size),
     rubbleOf: new Map<number, string>(),
+    terraformTick: new Uint16Array(size * size),
     infection: new Map(),
     lines: [],
     nextLineId: 1,
@@ -570,6 +585,7 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.floodDamage = new Uint8Array(size * size);
   world.rubble = new Uint8Array(size * size);
   world.rubbleOf.clear();
+  world.terraformTick = new Uint16Array(size * size);
   world.disasters.active.length = 0;
   world.disasters.modifiers.length = 0;
   world.dirty.fullRedraw = true;
@@ -687,6 +703,10 @@ export function applyHeightChanges(
 
       const tile = index(x, y, world.size);
       world.dirty.tiles.add(tile);
+      // Čerstvě přesypaná půda drží hůř (T54). Zapisuje se **tady**, protože
+      // tudy jde každá změna terénu — ruční i ta, kterou si udělá silnice
+      // nebo zóna sama.
+      world.terraformTick[tile] = world.tick & 0xffff;
 
       const buildingId = world.layers.buildingId[tile] ?? 0;
       if (buildingId !== 0) world.dirty.buildings.add(buildingId);

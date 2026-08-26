@@ -564,6 +564,8 @@ export function unpackSave(bytes: Uint8Array): SaveData {
   const heights = files[SAVE_FILES.heights] ?? new Uint8Array(0);
   // `disasters.bin` má až verze 6; u starších je prázdný a naplní ho migrace.
   const disasters = files[SAVE_FILES.disasters] ?? new Uint8Array(0);
+  // `terraform.bin` až verze 8. Totéž.
+  const terraform = files[SAVE_FILES.terraform] ?? new Uint8Array(0);
 
   const meta = parseMeta(parseJson(files[SAVE_FILES.meta], SAVE_FILES.meta));
 
@@ -573,6 +575,7 @@ export function unpackSave(bytes: Uint8Array): SaveData {
     coarse,
     heights,
     disasters,
+    terraform,
     entities: parseEntities(parseJson(files[SAVE_FILES.entities], SAVE_FILES.entities)),
     state: parseState(
       parseJson(files[SAVE_FILES.state], SAVE_FILES.state),
@@ -749,6 +752,7 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
  */
 function applyDisastersToWorld(world: WorldState, save: SaveData, size: number): void {
   unpackDisasterLayersInto(save.disasters, world, size);
+  unpackTerraformInto(save.terraform, world, size);
 
   const raw = save.state.disasters;
   world.disasters.enabled = raw.enabled;
@@ -837,6 +841,23 @@ function applyFinanceToWorld(world: WorldState, save: SaveData): void {
  * Buffer jiné délky, než jakou má mapa, je **chyba, ne důvod k dopočtu**:
  * tichý fallback by z poškozeného savu udělal město, ve kterém náhodně hoří.
  */
+/**
+ * Tiky terénních úprav ze savu. Čte se **little-endian**, jak se zapsalo.
+ *
+ * Jiná délka je chyba, ne důvod k dopočtu: z poškozeného souboru by se stalo
+ * město, ve kterém sesuv padá na místa, kde nikdo nic neupravoval.
+ */
+function unpackTerraformInto(bytes: Uint8Array, world: WorldState, size: number): void {
+  const cells = size * size;
+  if (bytes.byteLength !== cells * 2) {
+    fail(`${SAVE_FILES.terraform} má ${bytes.byteLength} bajtů, čeká se ${cells * 2}`);
+  }
+
+  for (let tile = 0; tile < cells; tile++) {
+    world.terraformTick[tile] = (bytes[tile * 2] ?? 0) | ((bytes[tile * 2 + 1] ?? 0) << 8);
+  }
+}
+
 function unpackDisasterLayersInto(bytes: Uint8Array, world: WorldState, size: number): void {
   const cells = size * size;
   const expected = cells * SAVE_DISASTER_LAYER_ORDER.length;

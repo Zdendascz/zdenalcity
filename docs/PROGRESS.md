@@ -2832,24 +2832,76 @@ Ověřeno ve hře: na kopci s cenou 88 a kasou 87 přišlo `error.notEnoughFunds
 a **ani jedna z 25 dlaždic nezůstala vyznačená**. Mutační test 4 ze 4.
 1031 testů.
 
+- [x] T54 — sesuv půdy, save verze 8
+
+**Poslední z patnácti.** Byl podmíněný fází 3b (R22): bez převýšení nemá co
+přesouvat. Fáze 3b je dávno hotová, takže podmínka padla — riziko i katalogový
+záznam byly připravené už z T47, chyběla jen mechanika.
+
+Sesuv je **jediná katastrofa, která mění mapu**. Ostatní ničí, co na ní stojí;
+tahle přesune samotnou zem: horní rohy dráhy klesnou o patro, dolní o patro
+stoupnou. Rohy se sčítají přes celou dráhu, takže roh, který je horní pro jednu
+dlaždici a dolní pro její sousedku, vyjde na nulu — hlína přes něj jen projela.
+
+Výsledek pak projde `planCornerHeight`, který dorovná sousední rohy do jednoho
+patra. **Kaskáda je součást jevu, ne úklid po něm**: utržený svah strhne i to
+nad sebou, a co stálo na rozích, kterými pohnula, spadne taky.
+
+Je **okamžitý**, ne postupný. Roztáhnout ho do dvaceti tiků by z něj udělalo
+pomalé tornádo, a to už ve hře je. Nezapaluje a nezamořuje — sesuv je hlína,
+ne exploze; jeho cena je v tom, že přeruší sítě vedené po spádnici.
+
+Voda si vyžádala tři pravidla, každé jinak:
+
+- **Dráha u vody končí.** Kdyby ji přeskočila, objevil by se sesuv na druhém
+  břehu.
+- **U břehu se nepřisypává.** Zvednout roh sdílený s vodní dlaždicí by naklonilo
+  hladinu a kaskáda by to nesla dál.
+- **Okraj dráhy vodu nebere.** Naměřeno: bez toho se břeh vedle dráhy propadne
+  o tři patra místo o jedno.
+
+Nová vrstva `terraformTick` si pamatuje, kdy se dlaždice naposledy upravila —
+čerstvě přesypaná půda drží hůř, takže se na ni sesuv chytá ochotněji. Zapisuje
+se v `applyHeightChanges`, protože tudy jde **každá** změna terénu: ruční
+i ta, kterou si udělá silnice nebo zóna sama.
+
+Uint16 přeteče po 65 536 ticích, tedy po 182 herních letech, a stáří se proto
+počítá po kruhu. Jediná daň je, že dlaždice upravená přesně před 182 lety
+vypadá chvíli jako čerstvá — zvedne to váhu jednoho místa v losu a víc si za
+dvojnásobnou paměť kupovat nemá cenu.
+
+Save je **verze 8** s novým souborem `terraform.bin`. Vlastní soubor ze stejného
+důvodu jako `heights.bin`: vrstva je **dvoubajtová**, kdežto ty v `disasters.bin`
+jsou po jednom. Bajty se skládají ručně, ne přes `new Uint8Array(buffer)` —
+to druhé závisí na endianitě stroje a save z jednoho by se na druhém četl
+obráceně. Migrace v7 → v8 doplní nuly, tedy „nikdy se tu neupravovalo";
+napsat všude aktuální tik by z celého města udělalo čerstvě přesypanou půdu.
+
+Mutační test 12 z 12, ale dostat se tam trvalo. Dvě stráže byly **nadbytečné**
+a šly pryč: vlastní kontrola sklonu (rovinu odfiltruje `steepestDescent` sám —
+a dlaždice na hraně srázu je rovná, přitom je to přesně místo, kde se svah
+utrhne) a přeskočení nulové změny (`planCornerHeight` vrátí prázdný plán sám).
+Dva testy zase nedosáhly do své větve: jeden zkoušel přetečení hodin číslem,
+u kterého vyšel prostý odečet stejně jako výpočet po kruhu, druhý zkoušel okraj
+dráhy se seedem, který dává **šířku jedna** — dráha pak žádné okraje nemá.
+
+Ověřeno ve hře: sesuv na svahu snížil tři rohy, zvedl šest, nenechal jediné
+porušení invariantu a nezaložil žádný oheň. Registr hlásí **patnáct katastrof**.
+
+1057 testů.
+
 
 ## Rozpracované
 
-**Fáze 4.** Hotová je celá 4a (T42–T45; T46 odpadl podle měření) i 4b až po
-vyhodnocení (T47–T53, T55–T60) — **čtrnáct katastrof z patnácti**, MHD,
-finance, save v6. Chybí jen sesuv půdy, který čeká na 3b.
+**Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c
+(T47–T60) a nakonec T54 — **patnáct katastrof z patnácti**, MHD, finance,
+save v8.
 
 Jedno akceptační kritérium fáze zůstává **neověřené**: 512×512 při 60 FPS
 (§11 bod 2). Měření se v poslední relaci nedalo provést a chce ruční pohled.
 
 Mimo kritéria zůstává **bez rozhraní celá 4c** — půjčky, dluhopisy a linky MHD
 jdou jen přes `dispatch`. Viz vyhodnocení T60.
-
-Zbývá:
-
-| Úkol | Obsah |
-|---|---|
-| T54 | Sesuv půdy — čeká na fázi 3b (R22) |
 
 _(T41 — vyhodnocení fáze 3 — zůstává otevřené. Je to rozhodovací bod pro
 autora, ne technický úkol.)_

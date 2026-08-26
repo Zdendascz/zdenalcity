@@ -359,6 +359,26 @@ export interface EpidemicBalance {
 }
 
 /** Chemická havárie (katalog 15). Nejsilnější zdroj znečištění ve hře. */
+/**
+ * Sesuv půdy (katalog 14). Jediná katastrofa, která **mění mapu** — ostatní
+ * ničí jen to, co na ní stojí.
+ */
+export interface LandslideBalance {
+  /** Délka dráhy po spádnici, v dlaždicích. */
+  lengthMin: number;
+  lengthMax: number;
+  /** Šířka dráhy napříč spádnicí. */
+  widthMin: number;
+  widthMax: number;
+  happinessPerLoss: number;
+  /** Jak dlouho po terénní úpravě se půda počítá za čerstvou. */
+  recentTerraformTicks: number;
+  /** O kolik se v losu místa zvedne váha dlaždice se zástavbou. */
+  builtWeight: number;
+  /** A o kolik dlaždice čerstvě upravené. */
+  freshTerraformWeight: number;
+}
+
 export interface ChemicalSpillBalance {
   durationMin: number;
   durationMax: number;
@@ -705,6 +725,7 @@ export interface Balance {
     blackout: BlackoutBalance;
     epidemic: EpidemicBalance;
     chemicalSpill: ChemicalSpillBalance;
+    landslide: LandslideBalance;
     types: Readonly<Record<string, DisasterBalance>>;
   };
 
@@ -1010,6 +1031,7 @@ export function validateBalance(raw: unknown): {
       blackout: validateBlackout(issues, disasters),
       epidemic: validateEpidemic(issues, disasters),
       chemicalSpill: validateChemicalSpill(issues, disasters),
+      landslide: validateLandslide(issues, disasters),
       types: disasterTypes,
     },
     economy: {
@@ -2135,6 +2157,44 @@ function validateEpidemic(
     });
   }
   return value;
+}
+
+function validateLandslide(
+  issues: ValidationIssue[],
+  disasters: Record<string, unknown> | null,
+): LandslideBalance {
+  const raw = disasterSection(issues, disasters, 'landslide');
+  return {
+    lengthMin: num(issues, raw, 'lengthMin', 'disasters.landslide.lengthMin', 1, 64),
+    lengthMax: num(issues, raw, 'lengthMax', 'disasters.landslide.lengthMax', 1, 64),
+    widthMin: num(issues, raw, 'widthMin', 'disasters.landslide.widthMin', 1, 16),
+    widthMax: num(issues, raw, 'widthMax', 'disasters.landslide.widthMax', 1, 16),
+    happinessPerLoss: num(
+      issues,
+      raw,
+      'happinessPerLoss',
+      'disasters.landslide.happinessPerLoss',
+      0,
+      100,
+    ),
+    recentTerraformTicks: num(
+      issues,
+      raw,
+      'recentTerraformTicks',
+      'disasters.landslide.recentTerraformTicks',
+      0,
+      65535,
+    ),
+    builtWeight: num(issues, raw, 'builtWeight', 'disasters.landslide.builtWeight', 0, 10),
+    freshTerraformWeight: num(
+      issues,
+      raw,
+      'freshTerraformWeight',
+      'disasters.landslide.freshTerraformWeight',
+      0,
+      10,
+    ),
+  };
 }
 
 function validateChemicalSpill(

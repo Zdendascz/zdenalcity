@@ -88,6 +88,24 @@ export function packCoarseLayers(coarse: CoarseLayers): Uint8Array {
  * nedotčené — prázdný buffer se v ZIPu smrskne skoro na nic a podmíněný soubor
  * by znamenal, že se save čte jinak podle toho, co se ve městě zrovna dělo.
  */
+/**
+ * Tiky terénních úprav do bajtů, **little-endian**.
+ *
+ * Pořadí bajtů se píše ručně a ne přes `new Uint8Array(buffer)`, protože to
+ * druhé závisí na endianitě stroje — save uložený na jednom by se na druhém
+ * četl obráceně.
+ */
+export function packTerraform(world: WorldState): Uint8Array {
+  const cells = world.size * world.size;
+  const bytes = new Uint8Array(cells * 2);
+  for (let tile = 0; tile < cells; tile++) {
+    const value = world.terraformTick[tile] ?? 0;
+    bytes[tile * 2] = value & 0xff;
+    bytes[tile * 2 + 1] = (value >> 8) & 0xff;
+  }
+  return bytes;
+}
+
 export function packDisasterLayers(world: WorldState): Uint8Array {
   const cells = world.size * world.size;
   const buffer = new Uint8Array(cells * SAVE_DISASTER_LAYER_ORDER.length);
@@ -191,6 +209,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
     coarse: packCoarseLayers(world.coarse),
     // Patra jdou do savu tak, jak jsou: jeden bajt na roh, žádné pořadí vrstev.
     heights: Uint8Array.from(world.cornerHeight),
+    terraform: packTerraform(world),
     disasters: packDisasterLayers(world),
     entities: {
       nextBuildingId: world.nextBuildingId,
@@ -235,6 +254,7 @@ export function packSave(save: SaveData): Uint8Array {
     [SAVE_FILES.coarse]: [save.coarse, { level: 9, mtime }],
     [SAVE_FILES.heights]: [save.heights, { level: 9, mtime }],
     [SAVE_FILES.disasters]: [save.disasters, { level: 9, mtime }],
+    [SAVE_FILES.terraform]: [save.terraform, { level: 9, mtime }],
     [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level: 9, mtime }],
     [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level: 9, mtime }],
   });

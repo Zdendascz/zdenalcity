@@ -411,6 +411,16 @@
       "happiness": 35,
       "happinessCity": 8
     },
+    "landslide": {
+      "lengthMin": 2,
+      "lengthMax": 5,
+      "widthMin": 1,
+      "widthMax": 3,
+      "happinessPerLoss": 3,
+      "recentTerraformTicks": 360,
+      "builtWeight": 1.5,
+      "freshTerraformWeight": 1
+    },
     "chemicalSpill": {
       "durationMin": 15,
       "durationMax": 40,

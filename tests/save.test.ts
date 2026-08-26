@@ -567,7 +567,7 @@ describe('chybějící obsah při načtení', () => {
 });
 
 describe('ZIP kontejner', () => {
-  it('obsahuje právě sedm očekávaných souborů', async () => {
+  it('obsahuje právě osm očekávaných souborů', async () => {
     const { world } = await builtCity();
     const files = unzipSync(serializeSave(world, OPTIONS));
     expect(Object.keys(files).sort()).toEqual(
@@ -581,6 +581,9 @@ describe('ZIP kontejner', () => {
         'layers.bin',
         'meta.json',
         'state.json',
+        // Tik terénní úpravy dlaždice, od verze 8. Vlastní soubor proto, že je
+        // **dvoubajtový** — do `disasters.bin` s jednobajtovými vrstvami nepatří.
+        'terraform.bin',
       ].sort(),
     );
   });

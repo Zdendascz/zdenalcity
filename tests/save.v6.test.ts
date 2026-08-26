@@ -7,13 +7,14 @@ import { floodTile } from '@/sim/disasters/flood';
 import { clearRubble, isRubbleMarkOrigin, spawnRubble } from '@/sim/disasters/rubble';
 import { destroyTile, noLosses } from '@/sim/disasters/damage';
 import { issueBond, takeLoan } from '@/sim/finance';
+import { planCornerHeight } from '@/sim/heights';
 import { index, ROAD } from '@/sim/layers';
 import { createLine } from '@/sim/transit';
 import { applySaveToWorld, unpackSave } from '@/save/deserialize';
 import { CURRENT_FORMAT_VERSION, SAVE_DISASTER_LAYER_ORDER, SaveFormatError } from '@/save/format';
 import { migrate } from '@/save/migrations';
 import { serializeSave, toSaveData } from '@/save/serialize';
-import { createWorld } from '@/sim/world';
+import { applyHeightChanges, createWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { MAP_SIZE } from './support/grid';
 
@@ -538,5 +539,40 @@ describe('značka na troskách', () => {
     ]);
 
     expect(isRubbleMarkOrigin(rubbleOf, at(0, 5), SIZE)).toBe(true);
+  });
+});
+
+describe('razítka terénu (verze 8)', () => {
+  it('tik úpravy přežije uložení a načtení', async () => {
+    // Bez toho by po načtení nebyla nikde čerstvá půda a sesuv by ztratil
+    // jeden ze dvou důvodů, proč padá zrovna sem.
+    const { world } = await city();
+    world.tick = 4321;
+    applyHeightChanges(world, planCornerHeight(world.cornerHeight, 30, 30, 2));
+    const tile = index(30, 30, MAP_SIZE);
+    expect(world.terraformTick[tile]).toBe(4321);
+
+    const restored = roundTrip(world);
+
+    expect(restored.terraformTick[tile]).toBe(4321);
+  });
+
+  it('razítko nad 255 se nezkrátí na bajt', async () => {
+    // Vlastní soubor `terraform.bin` existuje právě proto, že vrstva je
+    // dvoubajtová. Kdyby se přilepila k `disasters.bin`, přetekl by každý tik
+    // nad 255 a čerstvá půda by se hlásila v úplně jiných letech.
+    const { world } = await city();
+    const tile = index(31, 31, MAP_SIZE);
+    world.terraformTick[tile] = 40000;
+
+    expect(roundTrip(world).terraformTick[tile]).toBe(40000);
+  });
+
+  it('poškozený terraform.bin je chyba, ne důvod k dopočtu', async () => {
+    const { world } = await city();
+    const save = unpackSave(serializeSave(world, OPTIONS));
+    const broken = { ...save, terraform: save.terraform.subarray(0, save.terraform.length - 2) };
+
+    expect(() => applySaveToWorld(createWorld(1), migrate(broken))).toThrow(SaveFormatError);
   });
 });
