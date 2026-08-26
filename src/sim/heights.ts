@@ -95,6 +95,34 @@ export function tileCorners(
   ];
 }
 
+/**
+ * Výška terénu v **libovolném bodě** mřížky, ne jen v rohu.
+ *
+ * Mezi rohy se interpoluje bilineárně — stejně, jako plochu vidí oko, když
+ * renderer nakreslí dlaždici ze čtyř různě vysokých vrcholů. Potřebuje to
+ * podezdívka budovy: půdorys je zasazený dovnitř dlaždice, takže její spodní
+ * hrana na celé rohy nepadne.
+ *
+ * Mimo mapu vrací nulu, ne výjimku. Je to dotaz na vzhled, ne na pravidlo, a
+ * budova u kraje mapy nemá kvůli němu spadnout.
+ */
+export function groundHeightAt(heights: Readonly<Uint8Array>, fx: number, fy: number): number {
+  const side = cornerSideOf(heights);
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const tx = fx - x0;
+  const ty = fy - y0;
+
+  const at = (cx: number, cy: number): number => {
+    if (!cornerInBounds(cx, cy, side)) return 0;
+    return heights[cornerIndex(cx, cy, side)] ?? 0;
+  };
+
+  const north = at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx;
+  const south = at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx;
+  return north * (1 - ty) + south * ty;
+}
+
 /** Rovná dlaždice má všechny čtyři rohy stejně vysoko. Na těch stojí budovy. */
 export function isFlatTile(heights: Readonly<Uint8Array>, x: number, y: number): boolean {
   const [nw, ne, sw, se] = tileCorners(heights, x, y);

@@ -13,11 +13,12 @@ import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { iconShape } from '@/render/icons';
 import { containsPoint, pickTile } from '@/render/picking';
-import { createCornerHeights, cornerIndex, MAX_HEIGHT } from '@/sim/heights';
+import { createCornerHeights, cornerIndex, groundHeightAt, MAX_HEIGHT } from '@/sim/heights';
 import {
   cuboidFaces,
   diamondPoints,
   gridToScreen,
+  skirtFaces,
   LEVEL_H,
   slopeLight,
   tileQuad,
@@ -507,5 +508,156 @@ describe('overlay spokojenosti', () => {
     // Toho si všimlo až měření pixelů: první verze škálovala od 128, takže
     // rozdíl mezi „ujde to“ a „zle“ byl v obrázku skoro neviditelný.
     expect(unhappinessValue(76) - unhappinessValue(130)).toBeGreaterThan(60);
+  });
+});
+
+describe('výška terénu mezi rohy', () => {
+  /** Mřížka 3×3 rohů: západní sloupec dole, východní nahoře. */
+  function slope(): Uint8Array {
+    const heights = createCornerHeights(2);
+    const side = 3;
+    for (let y = 0; y < side; y++) {
+      heights[cornerIndex(0, y, side)] = 0;
+      heights[cornerIndex(1, y, side)] = 1;
+      heights[cornerIndex(2, y, side)] = 2;
+    }
+    return heights;
+  }
+
+  it('v rohu vrátí přesně jeho výšku', () => {
+    const heights = slope();
+    expect(groundHeightAt(heights, 0, 0)).toBe(0);
+    expect(groundHeightAt(heights, 1, 0)).toBe(1);
+    expect(groundHeightAt(heights, 2, 1)).toBe(2);
+  });
+
+  it('mezi rohy interpoluje', () => {
+    // Podezdívka je zasazená dovnitř dlaždice, takže na celé rohy nepadne.
+    // Kdyby se zaokrouhlovalo na nejbližší roh, spodní hrana by po svahu
+    // skákala po patrech místo aby ho kopírovala.
+    const heights = slope();
+    expect(groundHeightAt(heights, 0.5, 0)).toBeCloseTo(0.5);
+    expect(groundHeightAt(heights, 0.25, 0)).toBeCloseTo(0.25);
+    expect(groundHeightAt(heights, 1.5, 0.5)).toBeCloseTo(1.5);
+  });
+
+  it('interpoluje i podél druhé osy', () => {
+    // Svah k jihu se musí chovat stejně jako svah k východu. Bez toho by
+    // podezdívka kopírovala terén jen v jednom směru a v druhém by ho řezala.
+    const heights = createCornerHeights(2);
+    const side = 3;
+    for (let x = 0; x < side; x++) {
+      heights[cornerIndex(x, 0, side)] = 0;
+      heights[cornerIndex(x, 1, side)] = 1;
+      heights[cornerIndex(x, 2, side)] = 2;
+    }
+
+    expect(groundHeightAt(heights, 0, 0.5)).toBeCloseTo(0.5);
+    expect(groundHeightAt(heights, 1, 1.25)).toBeCloseTo(1.25);
+  });
+
+  it('mimo mapu vrátí nulu, ne výjimku', () => {
+    // Je to dotaz na vzhled, ne na pravidlo. Budova u kraje mapy nemá kvůli
+    // němu spadnout.
+    expect(groundHeightAt(slope(), -3, -3)).toBe(0);
+    expect(groundHeightAt(slope(), 99, 99)).toBe(0);
+  });
+
+  it('za levým okrajem nesáhne na konec předchozího řádku', () => {
+    // Ošemetné: index rohu je `y * side + x`, takže `x = -1` na druhém řádku
+    // vyjde jako poslední roh řádku prvního. To je platný index a čte se z něj
+    // úplně jiné místo mapy — bez stráže by u západního okraje vyrostl kopec
+    // opsaný z východního.
+    const heights = slope();
+    expect(groundHeightAt(heights, -0.5, 1)).toBe(0);
+  });
+});
+
+describe('podezdívka kopíruje terén', () => {
+  function heightsFor(values: readonly (readonly number[])[]): Uint8Array {
+    const side = values.length;
+    const heights = createCornerHeights(side - 1);
+    for (let y = 0; y < side; y++) {
+      for (let x = 0; x < side; x++) {
+        heights[cornerIndex(x, y, side)] = values[y]?.[x] ?? 0;
+      }
+    }
+    return heights;
+  }
+
+  /** Svislé souřadnice bodů, které leží na spodní hraně (za dvěma horními). */
+  function bottomY(face: number[]): number[] {
+    const out: number[] = [];
+    for (let i = 4; i < face.length; i += 2) out.push(face[i + 1] ?? 0);
+    return out;
+  }
+
+  it('na svahu se spodní hrana liší od rovné země', () => {
+    // Tohle je celá ta nahlášená chyba: podezdívka měla spodní hranu vodorovnou
+    // a svah pod ní se sklápěl, takže budova terén protínala. Porovnává se
+    // s rovinou, ne „mají body různé y" — v izometrii se hrana sklání i na
+    // rovině, protože se vzdaluje od pozorovatele.
+    const heights = heightsFor([
+      [0, 1],
+      [0, 1],
+    ]);
+    const sloped = skirtFaces(0.12, 0.12, 0.76, 0.76, 1, (fx, fy) =>
+      groundHeightAt(heights, fx, fy),
+    );
+    const flat = skirtFaces(0.12, 0.12, 0.76, 0.76, 1, () => 0);
+
+    expect(bottomY(sloped.left)).not.toEqual(bottomY(flat.left));
+    expect(bottomY(sloped.right)).not.toEqual(bottomY(flat.right));
+  });
+
+  it('na rovné parcele vyjde totéž co dřív', () => {
+    // Ruční stavby si parcelu srovnají. Tam se nesmí nic změnit — jinak by
+    // oprava svahu rozhodila všechny budovy ve městě.
+    const heights = heightsFor([
+      [3, 3],
+      [3, 3],
+    ]);
+    const following = skirtFaces(0.12, 0.12, 0.76, 0.76, 3, (fx, fy) =>
+      groundHeightAt(heights, fx, fy),
+    );
+    const flat = skirtFaces(0.12, 0.12, 0.76, 0.76, 3, () => 3);
+
+    expect(following).toEqual(flat);
+  });
+
+  it('přes víc dlaždic se hrana láme na každé hranici', () => {
+    // Rovná čára od rohu k rohu by na lomeném svahu budovu buď podřízla, nebo
+    // ji nechala viset — proto se vzorkuje i uvnitř půdorysu.
+    const heights = heightsFor([
+      [0, 2, 0],
+      [0, 2, 0],
+      [0, 2, 0],
+    ]);
+    const faces = skirtFaces(0.12, 0.12, 1.76, 1.76, 2, (fx, fy) =>
+      groundHeightAt(heights, fx, fy),
+    );
+
+    // Dva konce plus jedna vnitřní hranice dlaždic.
+    expect(bottomY(faces.left).length).toBe(3);
+    const [start, middle, end] = bottomY(faces.left);
+    expect(middle).not.toBe(start);
+    expect(middle).not.toBe(end);
+  });
+
+  it('horní hrana zůstává rovná', () => {
+    // Na podezdívce stojí dům a ten rovný je.
+    const heights = heightsFor([
+      [0, 2],
+      [1, 3],
+    ]);
+    const faces = skirtFaces(0.12, 0.12, 0.76, 0.76, 3, (fx, fy) =>
+      groundHeightAt(heights, fx, fy),
+    );
+
+    // První dva body každé stěny jsou horní; v izometrii se liší jen posunem
+    // daným půdorysem, ne výškou terénu.
+    const flat = skirtFaces(0.12, 0.12, 0.76, 0.76, 3, () => 3);
+    expect(faces.left.slice(0, 4)).toEqual(flat.left.slice(0, 4));
+    expect(faces.right.slice(0, 4)).toEqual(flat.right.slice(0, 4));
   });
 });

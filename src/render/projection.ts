@@ -130,6 +130,72 @@ export function cuboidFaces(
 }
 
 /**
+ * Stěny podezdívky, jejíž **spodní hrana kopíruje terén**.
+ *
+ * Rovný kvádr od nejnižšího rohu k nejvyššímu na svahu nestačí: jeho spodní
+ * hrana je vodorovný diamant, kdežto země pod ní se svažuje. Podezdívka pak
+ * budovu nedrží, ale protíná — a hráč nepozná, na které dlaždici stavba stojí.
+ * Přesně to autor nahlásil.
+ *
+ * Horní hrana zůstává **rovná ve výšce `top`**: na ní stojí dům a ten rovný je.
+ * Spodní se láme na každé hranici dlaždic, protože terén se tam taky láme;
+ * rovná čára od rohu k rohu by přes dvě dlaždice zase někde uťala kopec.
+ *
+ * `groundAt(fx, fy)` vrací výšku terénu v libovolném bodě mřížky, tedy i mezi
+ * rohy — půdorys je zasazený dovnitř dlaždice, takže na celé rohy nepadne.
+ */
+export function skirtFaces(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  top: number,
+  groundAt: (fx: number, fy: number) => number,
+): { right: number[]; left: number[] } {
+  const lift = (fx: number, fy: number): [number, number] => {
+    const point = gridToScreen(fx, fy, top);
+    return [point.x, point.y];
+  };
+  const drop = (fx: number, fy: number): [number, number] => {
+    const point = gridToScreen(fx, fy, groundAt(fx, fy));
+    return [point.x, point.y];
+  };
+
+  // Vidět jsou dvě stěny: východní (x + w) a jižní (y + h). Ostatní dvě jsou
+  // odvrácené a kreslit je nemá smysl.
+  const east = edgeSteps(y, y + h);
+  const south = edgeSteps(x, x + w);
+
+  return {
+    right: [
+      ...lift(x + w, y),
+      ...lift(x + w, y + h),
+      ...east.reverse().flatMap((fy) => drop(x + w, fy)),
+    ],
+    left: [
+      ...lift(x + w, y + h),
+      ...lift(x, y + h),
+      ...south.flatMap((fx) => drop(fx, y + h)),
+    ],
+  };
+}
+
+/**
+ * Body podél hrany: oba konce a každá hranice dlaždic mezi nimi.
+ *
+ * Bez těch mezilehlých by spodní hrana přes víc dlaždic vedla rovně a na
+ * lomeném svahu by budovu buď podřízla, nebo nechala viset.
+ */
+function edgeSteps(from: number, to: number): number[] {
+  const steps: number[] = [from];
+  for (let edge = Math.ceil(from); edge < to; edge++) {
+    if (edge > from) steps.push(edge);
+  }
+  steps.push(to);
+  return steps;
+}
+
+/**
  * Čtyři vrcholy diamantu jako plochý seznam souřadnic pro `Graphics.poly`.
  * `originX/Y` je horní vrchol.
  */

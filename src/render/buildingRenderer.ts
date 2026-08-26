@@ -14,8 +14,8 @@ import {
   WALL_RIGHT_SHADE,
   FOUNDATION_COLOR,
 } from './palette';
-import { areaHeightRange, MAX_HEIGHT } from '@/sim/heights';
-import { cuboidFaces, gridToScreen, LEVEL_H } from './projection';
+import { areaHeightRange, groundHeightAt, MAX_HEIGHT } from '@/sim/heights';
+import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
 
 /**
  * Co renderer potřebuje vědět o definici budovy. Úzké rozhraní, aby `render/`
@@ -157,7 +157,7 @@ export class BuildingRenderer {
       width,
       depth,
     );
-    const drop = (max - min) * LEVEL_H;
+
 
     const insetX = building.x + BUILDING_INSET;
     const insetY = building.y + BUILDING_INSET;
@@ -168,10 +168,16 @@ export class BuildingRenderer {
 
     view.clear();
 
-    if (drop > 0) {
+    if (max > min) {
       // Podezdívka je **kámen, ne barva domu**: má být vidět, že je to terénní
       // úprava pod stavbou, a ne že dům na svahu povyrostl o dvě patra.
-      const foundation = cuboidFaces(insetX, insetY, insetW, insetD, drop, min);
+      //
+      // Spodní hrana **kopíruje terén**. Rovný kvádr od nejnižšího rohu
+      // k nejvyššímu se svahem protínal a hráč pak nepoznal, na které dlaždici
+      // budova stojí — nahlásil to autor.
+      const foundation = skirtFaces(insetX, insetY, insetW, insetD, max, (fx, fy) =>
+        groundHeightAt(this.world.cornerHeight, fx, fy),
+      );
       view
         .poly(foundation.right)
         .fill({ color: shade(FOUNDATION_COLOR, WALL_RIGHT_SHADE) })

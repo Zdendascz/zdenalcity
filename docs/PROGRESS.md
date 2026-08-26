@@ -2705,6 +2705,38 @@ dlaždice ne — tam by bez stráže dostala značku prázdná parcela.
 
 1010 testů.
 
+- [x] T65 — podezdívka kopíruje svah
+
+**Nahlásil autor:** na kopci nebylo poznat, na které dlaždici budova stojí.
+
+Podezdívka se kreslila jako **rovný kvádr** od nejnižšího rohu půdorysu
+k nejvyššímu. Jeho spodní hrana je vodorovný diamant, jenže země pod ní se
+svažuje — takže podezdívka budovu nedržela, ale protínala. Rámeček pod kurzorem
+je přitom zkosený podle terénu správně, a ty dva tvary vedle sebe si
+protiřečily.
+
+Nově má podezdívka **rovnou horní hranu a spodní podle terénu**. Nahoře na ní
+stojí dům a ten rovný je; dole se láme na každé hranici dlaždic, protože se tam
+láme i terén. Rovná čára od rohu k rohu by u víc než jedné dlaždice na lomeném
+svahu budovu buď podřízla, nebo ji nechala viset.
+
+Výška se čte `groundHeightAt` a **interpoluje se bilineárně**. Půdorys je
+zasazený o 0,12 dlaždice dovnitř, takže na celé rohy nepadne; zaokrouhlení na
+nejbližší roh by nechalo spodní hranu skákat po patrech místo aby kopírovala
+svah.
+
+Na rovné parcele vyjde přesně totéž co dřív — hlídá to test, aby oprava svahu
+nerozhodila každou budovu ve městě.
+
+Mutační test 5 z 5. Dva přeživší byly poučné a oba stejného druhu: testy
+zkoušely svah jen podél jedné osy a okraj mapy jen daleko za hranou. Chybělo
+tedy pokrytí svislé interpolace a případu `x = -1`, který se v indexu
+`y * side + x` promění na **poslední roh předchozího řádku** — platný index
+z úplně jiného místa mapy, ze kterého by u západního okraje vyrostl kopec
+opsaný z východního.
+
+1019 testů.
+
 
 ## Rozpracované
 
