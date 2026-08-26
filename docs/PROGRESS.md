@@ -2348,6 +2348,52 @@ Dluhopisy mají v rozpočtu vlastní řádek vedle půjček. Kupón se platí ro
 v měsíčním rozpisu se ukazuje dvanáctina — hráč si má umět srovnat, co ho to
 stojí měsíčně.
 
+- [x] T59 — save verze 6, migrace, fixtura
+
+**Ukládá se i probíhající pohroma** (rozhodnutí autora). Jinak by si hráč
+uložil, nechal město shořet a načetl zpátky — a katastrofy by přestaly být
+rozhodnutím, jak zareagovat, a staly by se otázkou, kdy stisknout načíst.
+
+Sedm vrstev katastrof — oheň, palivo, příznaky ohně, povodeň, hloubka,
+poškození, trosky — jde do **vlastního souboru** `disasters.bin`. Ne přílepkem
+k `layers.bin`: jsou to vrstvy, které umí být celé nulové po celou hru, a kdyby
+se přilepily doprostřed, musel by se buffer při každé změně přeskládat.
+V ZIPu se prázdný soubor smrskne skoro na nic.
+
+Do `state.json` přibyly tři sekce: **katastrofy** (přepínač, hájení, běžící
+pohromy s vlastním stavem, dočasné postihy, odpojené elektrárny, nakaženost),
+**linky** a **finance** (půjčky, dluhopisy, rating, přiznané granty).
+
+**Vlastní stav pohromy se ukládá, jak přišel.** Save o něm nic neví a je to
+záměr: tvar si určuje implementace a mod si smí přidat vlastní. Kdo mu po
+načtení nerozumí, ten katastrofu ukončí — dělá to plánovač.
+
+**Odvozené se neukládá.** Počet hořících dlaždic, mapa kolejí ani statistiky
+linek do savu nepatří; dopočítají se. Jinak by stačil jeden ručně upravený save
+k tomu, aby si hra myslela, že hoří něco, co nehoří.
+
+Poškozený `disasters.bin` je **chyba, ne důvod k dopočtu**: tichý fallback by
+z rozbitého souboru udělal město, ve kterém náhodně hoří.
+
+Migrace v5 → v6 dá starému savu prázdné vrstvy, zapnuté katastrofy, žádné linky
+ani závazky a rating na čistém štítu. Počet vrstev je v ní **natvrdo**, ne
+z `SAVE_DISASTER_LAYER_ORDER` — migrace popisuje minulost, ne současnost. Kdyby
+ve verzi 7 přibyla osmá vrstva, začala by tahle migrace vyrábět buffer, který
+verze 6 neumí přečíst.
+
+`terraformTick` ze zadání **není**: patří k sesuvu půdy (T54), který se
+neimplementoval. Přidávat do formátu vrstvu, kterou nikdo nezapisuje ani nečte,
+by znamenalo verzi navíc, až se sesuv doopravdy udělá.
+
+Fixtura `v6.city.base64` je skutečné odehrané město: 60 budov, 192 obyvatel,
+**hořící dlaždice a běžící požár**, autobusová linka se třemi vozy, půjčka
+i dluhopis. Vygenerovalo ji dočasné `tests/_fixturegen.test.ts`, které se po
+vygenerování smazalo — v repozitáři zůstal jen výsledek, stejně jako u v5.
+
+Vyplavalo při tom, že `applySaveToWorld` dostával v testu save zastavený na
+verzi 5. Kontrakt je, že se do světa dává **zmigrovaný** save; teď to test
+respektuje a `disasters.bin` se vyžaduje.
+
 
 ## Rozpracované
 
@@ -2360,7 +2406,6 @@ Zbývá:
 | Úkol | Obsah |
 |---|---|
 | T54 | Sesuv půdy |
-| T59 | Save verze 6 |
 | T60 | Vyhodnocení fáze 4 |
 
 _(T41 — vyhodnocení fáze 3 — zůstává otevřené. Je to rozhodovací bod pro

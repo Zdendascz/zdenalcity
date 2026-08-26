@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 5;
+export const CURRENT_FORMAT_VERSION = 6;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -47,6 +47,29 @@ export const SAVE_COARSE_LAYER_ORDER = [
   'crime',
 ] as const satisfies readonly (keyof CoarseLayers)[];
 
+/**
+ * Pořadí vrstev katastrof v `disasters.bin` (verze 6).
+ *
+ * Vlastní soubor, ne přílepek k `layers.bin`: sedm vrstev, které umí být celé
+ * nulové po celou hru. Kdyby se přilepily doprostřed stávajícího bufferu,
+ * musel by se při každé změně přeskládat — a hlavně by se rozbila migrace,
+ * která dnes jen připisuje bajty na konec.
+ *
+ * **Ukládá se i probíhající pohroma** (rozhodnutí autora). Bez toho by si hráč
+ * uložil, nechal město shořet a načetl zpátky.
+ */
+export const SAVE_DISASTER_LAYER_ORDER = [
+  'fire',
+  'fuel',
+  'fireFlags',
+  'flood',
+  'floodDepth',
+  'floodDamage',
+  'rubble',
+] as const;
+
+export type SaveDisasterLayer = (typeof SAVE_DISASTER_LAYER_ORDER)[number];
+
 export const SAVE_FILES = {
   meta: 'meta.json',
   layers: 'layers.bin',
@@ -60,6 +83,8 @@ export const SAVE_FILES = {
   heights: 'heights.bin',
   entities: 'entities.json',
   state: 'state.json',
+  /** Vrstvy ohně, povodně a trosek, od verze 6. */
+  disasters: 'disasters.bin',
 } as const;
 
 export interface SaveSourceInfo {
@@ -113,6 +138,105 @@ export interface SaveState {
    * kurzoru by se po loadu začalo vzorkovat od začátku a determinismus by padl.
    */
   trafficCursor: number;
+  /** Katastrofy (verze 6). */
+  disasters: SaveDisasterState;
+  /** Linky MHD (verze 6). Statistiky se dopočítají, do savu nepatří. */
+  transit: SaveTransitState;
+  /** Závazky a rating (verze 6). */
+  finance: SaveFinanceState;
+}
+
+/**
+ * Katastrofy v savu (verze 6).
+ *
+ * Ukládá se **evidence, ne odvozené**: počet hořících dlaždic ani mapa kolejí
+ * se nezapisují, po načtení se dopočítají z vrstev a linek.
+ */
+export interface SaveDisasterState {
+  enabled: boolean;
+  /** Tik posledního výskytu podle typu. Chybějící klíč znamená „nikdy". */
+  lastOccurrence: Readonly<Record<string, number>>;
+  active: SaveActiveDisaster[];
+  modifiers: SaveModifier[];
+  nextId: number;
+  /** Nejvyšší dosažený faktor typu v době, kdy nebyl rozpočet v mínusu (R16). */
+  riskCeiling: Readonly<Record<string, number>>;
+  /** Elektrárny odpojené blackoutem. */
+  offlinePlants: number[];
+  /** Nakaženost po buňkách, řídce: `[buňka, 0..1]`. */
+  infection: [number, number][];
+}
+
+export interface SaveActiveDisaster {
+  id: number;
+  kind: string;
+  startedAtTick: number;
+  x: number;
+  y: number;
+  /**
+   * Vlastní stav katastrofy.
+   *
+   * Save o něm **nic neví** a je to záměr: tvar si určuje implementace pohromy
+   * a nový mod si smí přidat vlastní. Ukládá se, jak přišel; kdo mu nerozumí,
+   * ten katastrofu při načtení ukončí.
+   */
+  state: Record<string, unknown>;
+  finished: boolean;
+}
+
+export interface SaveModifier {
+  kind: string;
+  serviceClass?: string;
+  cells: number[];
+  amount: number;
+  until: number;
+  source: number;
+}
+
+export interface SaveTransitState {
+  lines: SaveTransitLine[];
+  nextLineId: number;
+}
+
+export interface SaveTransitLine {
+  id: number;
+  mode: string;
+  stops: number[];
+  vehicles: number;
+  fare: number;
+}
+
+export interface SaveFinanceState {
+  loans: SaveLoan[];
+  nextLoanId: number;
+  bonds: SaveBond[];
+  nextBondId: number;
+  bondsBlockedUntil: number;
+  /** Id přiznaných grantů. Bez nich by se po načtení rozdaly znovu. */
+  grantsAwarded: string[];
+  /** Rozpracované podmínky s `forTicks`: `[id grantu, tiky v kuse]`. */
+  grantProgress: [string, number][];
+}
+
+export interface SaveLoan {
+  id: number;
+  principal: number;
+  remaining: number;
+  rate: number;
+  payment: number;
+  termMonths: number;
+  paidMonths: number;
+}
+
+export interface SaveBond {
+  id: number;
+  offered: number;
+  subscribed: number;
+  rate: number;
+  issuedAtTick: number;
+  maturityTick: number;
+  lastCouponTick: number;
+  defaulted: boolean;
 }
 
 export interface SaveData {
@@ -123,6 +247,8 @@ export interface SaveData {
   coarse: Uint8Array;
   /** Obsah `heights.bin` — patra v rozích, po jednom bajtu (verze 4). */
   heights: Uint8Array;
+  /** Obsah `disasters.bin` — vrstvy v `SAVE_DISASTER_LAYER_ORDER` (verze 6). */
+  disasters: Uint8Array;
   entities: SaveEntities;
   state: SaveState;
 }

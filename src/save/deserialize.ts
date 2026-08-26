@@ -15,12 +15,24 @@ import type {
 } from '@/sim/world';
 import {
   SAVE_COARSE_LAYER_ORDER,
+  SAVE_DISASTER_LAYER_ORDER,
   SAVE_FILES,
   SAVE_LAYER_ORDER,
   SaveFormatError,
 } from './format';
-import type { SaveData, SaveEntities, SaveMeta, SaveSourceInfo, SaveState } from './format';
+import type {
+  SaveData,
+  SaveDisasterState,
+  SaveEntities,
+  SaveFinanceState,
+  SaveMeta,
+  SaveSourceInfo,
+  SaveState,
+  SaveTransitState,
+} from './format';
 import { rememberPopulation } from '@/sim/finance';
+import { countBurning } from '@/sim/disasters/fire';
+import type { Modifier } from '@/sim/disasters/state';
 
 function fail(message: string): never {
   throw new SaveFormatError(message);
@@ -67,6 +79,159 @@ function parseJson(bytes: Uint8Array | undefined, what: string): Record<string, 
     if (error instanceof SaveFormatError) throw error;
     fail(`${what} není platný JSON`);
   }
+}
+
+
+/**
+ * Katastrofy ze savu (verze 6).
+ *
+ * Vlastní stav pohromy se **nekontroluje**: jeho tvar si určuje implementace
+ * a mod si smí přidat vlastní. Bere se, jak přišel — kdo mu nerozumí, ten
+ * katastrofu při načtení ukončí (dělá to plánovač).
+ */
+function parseDisasters(raw: Record<string, unknown>): SaveDisasterState {
+  const what = 'state.disasters';
+  const active = asArray(raw['active'], `${what}.active`).map((value, i) => {
+    const entry = asRecord(value, `${what}.active[${i}]`);
+    return {
+      id: int(entry, 'id', `${what}.active[${i}]`),
+      kind: str(entry, 'kind', `${what}.active[${i}]`),
+      startedAtTick: int(entry, 'startedAtTick', `${what}.active[${i}]`),
+      x: int(entry, 'x', `${what}.active[${i}]`),
+      y: int(entry, 'y', `${what}.active[${i}]`),
+      state: asRecord(entry['state'], `${what}.active[${i}].state`),
+      finished: bool(entry, 'finished', `${what}.active[${i}]`),
+    };
+  });
+
+  const modifiers = asArray(raw['modifiers'], `${what}.modifiers`).map((value, i) => {
+    const entry = asRecord(value, `${what}.modifiers[${i}]`);
+    const serviceClass = entry['serviceClass'];
+    if (serviceClass !== undefined && typeof serviceClass !== 'string') {
+      fail(`${what}.modifiers[${i}].serviceClass musí být řetězec`);
+    }
+    return {
+      kind: str(entry, 'kind', `${what}.modifiers[${i}]`),
+      ...(serviceClass !== undefined ? { serviceClass } : {}),
+      cells: numberArray(entry['cells'], `${what}.modifiers[${i}].cells`),
+      amount: num(entry, 'amount', `${what}.modifiers[${i}]`),
+      until: int(entry, 'until', `${what}.modifiers[${i}]`),
+      source: int(entry, 'source', `${what}.modifiers[${i}]`),
+    };
+  });
+
+  return {
+    enabled: bool(raw, 'enabled', what),
+    lastOccurrence: numberRecord(raw['lastOccurrence'], `${what}.lastOccurrence`),
+    active,
+    modifiers,
+    nextId: int(raw, 'nextId', what),
+    riskCeiling: numberRecord(raw['riskCeiling'], `${what}.riskCeiling`),
+    offlinePlants: numberArray(raw['offlinePlants'], `${what}.offlinePlants`),
+    infection: pairArray(raw['infection'], `${what}.infection`),
+  };
+}
+
+function parseTransit(raw: Record<string, unknown>): SaveTransitState {
+  const what = 'state.transit';
+  return {
+    lines: asArray(raw['lines'], `${what}.lines`).map((value, i) => {
+      const line = asRecord(value, `${what}.lines[${i}]`);
+      return {
+        id: int(line, 'id', `${what}.lines[${i}]`),
+        mode: str(line, 'mode', `${what}.lines[${i}]`),
+        stops: numberArray(line['stops'], `${what}.lines[${i}].stops`),
+        vehicles: int(line, 'vehicles', `${what}.lines[${i}]`),
+        fare: num(line, 'fare', `${what}.lines[${i}]`),
+      };
+    }),
+    nextLineId: int(raw, 'nextLineId', what),
+  };
+}
+
+function parseFinance(raw: Record<string, unknown>): SaveFinanceState {
+  const what = 'state.finance';
+  return {
+    loans: asArray(raw['loans'], `${what}.loans`).map((value, i) => {
+      const loan = asRecord(value, `${what}.loans[${i}]`);
+      const where = `${what}.loans[${i}]`;
+      return {
+        id: int(loan, 'id', where),
+        principal: int(loan, 'principal', where),
+        remaining: int(loan, 'remaining', where),
+        rate: num(loan, 'rate', where),
+        payment: int(loan, 'payment', where),
+        termMonths: int(loan, 'termMonths', where),
+        paidMonths: int(loan, 'paidMonths', where),
+      };
+    }),
+    nextLoanId: int(raw, 'nextLoanId', what),
+    bonds: asArray(raw['bonds'], `${what}.bonds`).map((value, i) => {
+      const bond = asRecord(value, `${what}.bonds[${i}]`);
+      const where = `${what}.bonds[${i}]`;
+      return {
+        id: int(bond, 'id', where),
+        offered: int(bond, 'offered', where),
+        subscribed: int(bond, 'subscribed', where),
+        rate: num(bond, 'rate', where),
+        issuedAtTick: int(bond, 'issuedAtTick', where),
+        maturityTick: int(bond, 'maturityTick', where),
+        lastCouponTick: int(bond, 'lastCouponTick', where),
+        defaulted: bool(bond, 'defaulted', where),
+      };
+    }),
+    nextBondId: int(raw, 'nextBondId', what),
+    bondsBlockedUntil: int(raw, 'bondsBlockedUntil', what),
+    grantsAwarded: asArray(raw['grantsAwarded'], `${what}.grantsAwarded`).map((value, i) => {
+      if (typeof value !== 'string') fail(`${what}.grantsAwarded[${i}] musí být řetězec`);
+      return value;
+    }),
+    grantProgress: asArray(raw['grantProgress'], `${what}.grantProgress`).map((value, i) => {
+      const pair = asArray(value, `${what}.grantProgress[${i}]`);
+      const [id, ticks] = pair;
+      if (typeof id !== 'string' || typeof ticks !== 'number' || !Number.isInteger(ticks)) {
+        fail(`${what}.grantProgress[${i}] musí být [řetězec, celé číslo]`);
+      }
+      return [id, ticks] as [string, number];
+    }),
+  };
+}
+
+function asArray(value: unknown, what: string): unknown[] {
+  if (!Array.isArray(value)) fail(`${what} musí být pole`);
+  return value;
+}
+
+function numberArray(value: unknown, what: string): number[] {
+  return asArray(value, what).map((item, i) => {
+    if (typeof item !== 'number' || !Number.isFinite(item)) {
+      fail(`${what}[${i}] musí být číslo`);
+    }
+    return item;
+  });
+}
+
+function numberRecord(value: unknown, what: string): Record<string, number> {
+  const record = asRecord(value, what);
+  const out: Record<string, number> = {};
+  for (const [key, item] of Object.entries(record)) {
+    if (typeof item !== 'number' || !Number.isFinite(item)) {
+      fail(`${what}.${key} musí být číslo`);
+    }
+    out[key] = item;
+  }
+  return out;
+}
+
+function pairArray(value: unknown, what: string): [number, number][] {
+  return asArray(value, what).map((item, i) => {
+    const pair = asArray(item, `${what}[${i}]`);
+    const [a, b] = pair;
+    if (typeof a !== 'number' || typeof b !== 'number') {
+      fail(`${what}[${i}] musí být dvojice čísel`);
+    }
+    return [a, b] as [number, number];
+  });
 }
 
 export function parseMeta(raw: Record<string, unknown>): SaveMeta {
@@ -154,7 +319,43 @@ function parseEntities(raw: Record<string, unknown>): SaveEntities {
   return { nextBuildingId: int(raw, 'nextBuildingId', 'entities'), buildings };
 }
 
-function parseState(raw: Record<string, unknown>): SaveState {
+/** Prázdné katastrofy pro save, který je ještě nenese. */
+function emptyDisasters(): SaveDisasterState {
+  return {
+    enabled: true,
+    lastOccurrence: {},
+    active: [],
+    modifiers: [],
+    nextId: 1,
+    riskCeiling: {},
+    offlinePlants: [],
+    infection: [],
+  };
+}
+
+function emptyFinance(): SaveFinanceState {
+  return {
+    loans: [],
+    nextLoanId: 1,
+    bonds: [],
+    nextBondId: 1,
+    bondsBlockedUntil: 0,
+    grantsAwarded: [],
+    grantProgress: [],
+  };
+}
+
+/**
+ * Od téhle verze nese save celou fázi 4. Předává se z `meta`, protože stav
+ * sám o sobě neví, jak je starý.
+ */
+const PHASE_FOUR_VERSION = 6;
+
+function parseState(
+  raw: Record<string, unknown>,
+  formatVersion: number = PHASE_FOUR_VERSION,
+): SaveState {
+  const hasPhaseFour = formatVersion >= PHASE_FOUR_VERSION;
   const economyRaw = asRecord(raw['economy'], 'state.economy');
   const taxRatesRaw = asRecord(economyRaw['taxRates'], 'state.economy.taxRates');
   const demandRaw = asRecord(raw['demand'], 'state.demand');
@@ -189,16 +390,38 @@ function parseState(raw: Record<string, unknown>): SaveState {
     trafficCursor,
     tick: int(raw, 'tick', 'state'),
     rngState,
+    // Katastrofy, linky a finance nese až verze 6. Starší save je nemá a
+    // doplní mu je migrace — proto se u něj **nevyžadují**. U verze 6 a výš ale
+    // ano: chybějící sekce je poškozený soubor, ne starý formát, a tiše ho
+    // načíst jako prázdný by znamenalo, že hráč přijde o linky a dluhy, aniž
+    // by se dozvěděl proč.
+    disasters: hasPhaseFour
+      ? parseDisasters(asRecord(raw['disasters'], 'state.disasters'))
+      : emptyDisasters(),
+    transit: hasPhaseFour
+      ? parseTransit(asRecord(raw['transit'], 'state.transit'))
+      : { lines: [], nextLineId: 1 },
+    finance: hasPhaseFour
+      ? parseFinance(asRecord(raw['finance'], 'state.finance'))
+      : emptyFinance(),
     economy: {
       funds: int(economyRaw, 'funds', 'state.economy'),
       taxRates,
       lastIncome: int(economyRaw, 'lastIncome', 'state.economy'),
       lastExpenses: int(economyRaw, 'lastExpenses', 'state.economy'),
-      // Rating a půjčky nese až save v6 (T59). Do té doby se načtené město
-      // probouzí s čistým štítem — což je milosrdnější než nula a hlavně to
-      // nepředstírá, že si formát pamatuje něco, co v něm není.
-      creditRating: 1,
-      lastPopulation: 0,
+      // Rating nese až verze 6. Starší save ho nemá a probouzí se s čistým
+      // štítem — což je milosrdnější než nula a hlavně to nepředstírá, že si
+      // formát pamatuje něco, co v něm není.
+      creditRating:
+        economyRaw['creditRating'] === undefined
+          ? 1
+          : num(economyRaw, 'creditRating', 'state.economy'),
+      // Populace pro měření růstu je odvozená z budov — `applySaveToWorld` ji
+      // stejně dopočítá, tohle je jen aby prošel round-trip stavu.
+      lastPopulation:
+        economyRaw['lastPopulation'] === undefined
+          ? 0
+          : int(economyRaw, 'lastPopulation', 'state.economy'),
     },
     demand,
   };
@@ -320,14 +543,22 @@ export function unpackSave(bytes: Uint8Array): SaveData {
   // prázdné a naplní je migrace.
   const coarse = files[SAVE_FILES.coarse] ?? new Uint8Array(0);
   const heights = files[SAVE_FILES.heights] ?? new Uint8Array(0);
+  // `disasters.bin` má až verze 6; u starších je prázdný a naplní ho migrace.
+  const disasters = files[SAVE_FILES.disasters] ?? new Uint8Array(0);
+
+  const meta = parseMeta(parseJson(files[SAVE_FILES.meta], SAVE_FILES.meta));
 
   return {
-    meta: parseMeta(parseJson(files[SAVE_FILES.meta], SAVE_FILES.meta)),
+    meta,
     layers,
     coarse,
     heights,
+    disasters,
     entities: parseEntities(parseJson(files[SAVE_FILES.entities], SAVE_FILES.entities)),
-    state: parseState(parseJson(files[SAVE_FILES.state], SAVE_FILES.state)),
+    state: parseState(
+      parseJson(files[SAVE_FILES.state], SAVE_FILES.state),
+      meta.formatVersion,
+    ),
   };
 }
 
@@ -480,7 +711,120 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
     ? { ...save.meta.map }
     : { seed: save.meta.city.seed, generated: false };
 
+  applyDisastersToWorld(world, save, size);
+  applyTransitToWorld(world, save);
+  applyFinanceToWorld(world, save);
+
   // Po loadu se kreslí všechno a síť se přepočítá znovu.
   world.dirty = { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true };
   world.powerNetworkDirty = true;
+}
+
+/**
+ * Katastrofy do světa (verze 6).
+ *
+ * **Ukládá se i probíhající pohroma** (rozhodnutí autora), takže načtené město
+ * hoří dál. Odvozené se ale nepřebírá: počet hořících dlaždic se dopočítá
+ * z vrstvy, protože jinak by stačil jeden ručně upravený save k tomu, aby si
+ * hra myslela, že hoří něco, co nehoří.
+ */
+function applyDisastersToWorld(world: WorldState, save: SaveData, size: number): void {
+  unpackDisasterLayersInto(save.disasters, world, size);
+
+  const raw = save.state.disasters;
+  world.disasters.enabled = raw.enabled;
+  world.disasters.nextId = raw.nextId;
+
+  world.disasters.lastOccurrence.clear();
+  for (const [kind, tick] of Object.entries(raw.lastOccurrence)) {
+    world.disasters.lastOccurrence.set(kind, tick);
+  }
+
+  world.disasters.riskCeiling.clear();
+  for (const [kind, ceiling] of Object.entries(raw.riskCeiling)) {
+    world.disasters.riskCeiling.set(kind, ceiling);
+  }
+
+  world.disasters.active = raw.active.map((entry) => ({
+    id: entry.id,
+    kind: entry.kind,
+    startedAtTick: entry.startedAtTick,
+    x: entry.x,
+    y: entry.y,
+    state: { ...entry.state },
+    finished: entry.finished,
+  }));
+
+  world.disasters.modifiers = raw.modifiers.map((modifier) => ({
+    kind: modifier.kind as Modifier['kind'],
+    ...(modifier.serviceClass !== undefined ? { serviceClass: modifier.serviceClass } : {}),
+    cells: [...modifier.cells],
+    amount: modifier.amount,
+    until: modifier.until,
+    source: modifier.source,
+  }));
+
+  world.disasters.offlinePlants = new Set(raw.offlinePlants);
+
+  world.infection.clear();
+  for (const [cell, level] of raw.infection) world.infection.set(cell, level);
+
+  // Počítadlo hořících dlaždic je odvozené — spočítá se z vrstvy, ne ze savu.
+  countBurning(world);
+}
+
+/**
+ * Linky do světa (verze 6).
+ *
+ * Statistiky přepravy se **nepřebírají**: jsou odvozené z linek a města
+ * a přepočítají se při první měsíční uzávěrce. Koridor tramvají se označí za
+ * špinavý, aby se dopočítal hned.
+ */
+function applyTransitToWorld(world: WorldState, save: SaveData): void {
+  world.lines = save.state.transit.lines.map((line) => ({
+    id: line.id,
+    mode: line.mode,
+    stops: [...line.stops],
+    vehicles: line.vehicles,
+    fare: line.fare,
+  }));
+  world.nextLineId = save.state.transit.nextLineId;
+
+  world.lineStats.clear();
+  world.transitRelief.clear();
+  world.tramTiles.clear();
+  world.transitDirty = true;
+}
+
+function applyFinanceToWorld(world: WorldState, save: SaveData): void {
+  const raw = save.state.finance;
+  world.loans = raw.loans.map((loan) => ({ ...loan }));
+  world.nextLoanId = raw.nextLoanId;
+  world.bonds = raw.bonds.map((bond) => ({ ...bond }));
+  world.nextBondId = raw.nextBondId;
+  world.bondsBlockedUntil = raw.bondsBlockedUntil;
+
+  world.grantsAwarded = new Set(raw.grantsAwarded);
+  world.grantProgress.clear();
+  for (const [id, ticks] of raw.grantProgress) world.grantProgress.set(id, ticks);
+}
+
+/**
+ * Rozbalí `disasters.bin` do vrstev světa (verze 6).
+ *
+ * Buffer jiné délky, než jakou má mapa, je **chyba, ne důvod k dopočtu**:
+ * tichý fallback by z poškozeného savu udělal město, ve kterém náhodně hoří.
+ */
+function unpackDisasterLayersInto(bytes: Uint8Array, world: WorldState, size: number): void {
+  const cells = size * size;
+  const expected = cells * SAVE_DISASTER_LAYER_ORDER.length;
+  if (bytes.byteLength !== expected) {
+    fail(`${SAVE_FILES.disasters} má ${bytes.byteLength} bajtů, čeká se ${expected}`);
+  }
+
+  let offset = 0;
+  for (const name of SAVE_DISASTER_LAYER_ORDER) {
+    world[name].set(bytes.subarray(offset, offset + cells));
+    offset += cells;
+  }
 }

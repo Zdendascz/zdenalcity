@@ -166,12 +166,74 @@ function appendEmptyLayer(layers: Uint8Array): Uint8Array {
   return out;
 }
 
+/**
+ * Verze 5 → 6 (§9 zadání fáze 4).
+ *
+ * Verze 6 přinesla celou fázi 4: vrstvy katastrof, běžící pohromy, linky MHD
+ * a finanční závazky. Starý save o nich neví, takže:
+ *
+ * - `disasters.bin` je **prázdný**, tedy nic nehoří, nic není zaplavené
+ *   a nikde neleží trosky,
+ * - katastrofy jsou **zapnuté** a nikdy se žádná nestala — hráč, který si
+ *   uložil ve verzi 5, si je nemohl vypnout, takže výchozí stav je zapnuto,
+ * - žádné linky ani závazky, rating na čistém štítu.
+ *
+ * `terraformTick` ze zadání tu **není**: patří k sesuvu půdy (T54), který se
+ * neimplementoval. Přidávat do formátu vrstvu, kterou nikdo nezapisuje ani
+ * nečte, by znamenalo verzi navíc, až se sesuv doopravdy udělá.
+ */
+const migrateV5ToV6: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 6 },
+  // Velikost mapy zná `meta.grid` od verze 2; u starších ji doplnila migrace,
+  // takže se na ni tady dá spolehnout.
+  disasters: new Uint8Array(
+    emptyDisasterBytes(save.meta.grid?.size ?? LEGACY_MAP_SIZE),
+  ),
+  state: {
+    ...save.state,
+    disasters: {
+      enabled: true,
+      lastOccurrence: {},
+      active: [],
+      modifiers: [],
+      nextId: 1,
+      riskCeiling: {},
+      offlinePlants: [],
+      infection: [],
+    },
+    transit: { lines: [], nextLineId: 1 },
+    finance: {
+      loans: [],
+      nextLoanId: 1,
+      bonds: [],
+      nextBondId: 1,
+      bondsBlockedUntil: 0,
+      grantsAwarded: [],
+      grantProgress: [],
+    },
+  },
+});
+
+/**
+ * Kolik bajtů zabere prázdný `disasters.bin`.
+ *
+ * Počet vrstev je tu **natvrdo**, ne z `SAVE_DISASTER_LAYER_ORDER`: migrace
+ * popisuje minulost. Kdyby ve verzi 7 přibyla osmá vrstva, tahle migrace by
+ * začala vyrábět buffer, který verze 6 neumí přečíst.
+ */
+function emptyDisasterBytes(size: number): number {
+  const DISASTER_LAYERS_V6 = 7;
+  return size * size * DISASTER_LAYERS_V6;
+}
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
   2: migrateV2ToV3,
   3: migrateV3ToV4,
   4: migrateV4ToV5,
+  5: migrateV5ToV6,
 };
 
 /**

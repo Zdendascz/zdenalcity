@@ -567,12 +567,15 @@ describe('chybějící obsah při načtení', () => {
 });
 
 describe('ZIP kontejner', () => {
-  it('obsahuje právě šest očekávaných souborů', async () => {
+  it('obsahuje právě sedm očekávaných souborů', async () => {
     const { world } = await builtCity();
     const files = unzipSync(serializeSave(world, OPTIONS));
     expect(Object.keys(files).sort()).toEqual(
       [
         'coarse.bin',
+        // Vrstvy ohně, povodně a trosek, od verze 6. Vlastní soubor: sedm
+        // vrstev, které umí být celé nulové po celou hru.
+        'disasters.bin',
         'entities.json',
         'heights.bin',
         'layers.bin',

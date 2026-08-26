@@ -8,10 +8,17 @@ import {
   CURRENT_FORMAT_VERSION,
   GAME_VERSION,
   SAVE_COARSE_LAYER_ORDER,
+  SAVE_DISASTER_LAYER_ORDER,
   SAVE_FILES,
   SAVE_LAYER_ORDER,
 } from './format';
-import type { SaveData, SaveSourceInfo } from './format';
+import type {
+  SaveData,
+  SaveDisasterState,
+  SaveFinanceState,
+  SaveSourceInfo,
+  SaveTransitState,
+} from './format';
 
 export interface SaveOptions {
   cityName: string;
@@ -74,6 +81,87 @@ export function packCoarseLayers(coarse: CoarseLayers): Uint8Array {
   return buffer;
 }
 
+/**
+ * Vrstvy katastrof do jednoho bufferu (verze 6).
+ *
+ * Všech sedm je jednobajtových. Ukládají se **vždycky**, i když je město celé
+ * nedotčené — prázdný buffer se v ZIPu smrskne skoro na nic a podmíněný soubor
+ * by znamenal, že se save čte jinak podle toho, co se ve městě zrovna dělo.
+ */
+export function packDisasterLayers(world: WorldState): Uint8Array {
+  const cells = world.size * world.size;
+  const buffer = new Uint8Array(cells * SAVE_DISASTER_LAYER_ORDER.length);
+  let offset = 0;
+  for (const name of SAVE_DISASTER_LAYER_ORDER) {
+    buffer.set(world[name], offset);
+    offset += cells;
+  }
+  return buffer;
+}
+
+/** Katastrofy do savu. Odvozené se vynechává — dopočítá se po načtení. */
+function packDisasters(world: WorldState): SaveDisasterState {
+  const state = world.disasters;
+  return {
+    enabled: state.enabled,
+    // Setříděné klíče, ať je save bajtově stabilní.
+    lastOccurrence: sortedRecord(state.lastOccurrence),
+    active: state.active.map((entry) => ({
+      id: entry.id,
+      kind: entry.kind,
+      startedAtTick: entry.startedAtTick,
+      x: entry.x,
+      y: entry.y,
+      state: { ...entry.state },
+      finished: entry.finished,
+    })),
+    modifiers: state.modifiers.map((modifier) => ({
+      kind: modifier.kind,
+      ...(modifier.serviceClass !== undefined ? { serviceClass: modifier.serviceClass } : {}),
+      cells: [...modifier.cells],
+      amount: modifier.amount,
+      until: modifier.until,
+      source: modifier.source,
+    })),
+    nextId: state.nextId,
+    riskCeiling: sortedRecord(state.riskCeiling),
+    offlinePlants: [...state.offlinePlants].sort((a, b) => a - b),
+    infection: [...world.infection.entries()].sort(([a], [b]) => a - b),
+  };
+}
+
+function packTransit(world: WorldState): SaveTransitState {
+  return {
+    lines: [...world.lines]
+      .sort((a, b) => a.id - b.id)
+      .map((line) => ({
+        id: line.id,
+        mode: line.mode,
+        stops: [...line.stops],
+        vehicles: line.vehicles,
+        fare: line.fare,
+      })),
+    nextLineId: world.nextLineId,
+  };
+}
+
+function packFinance(world: WorldState): SaveFinanceState {
+  return {
+    loans: [...world.loans].sort((a, b) => a.id - b.id).map((loan) => ({ ...loan })),
+    nextLoanId: world.nextLoanId,
+    bonds: [...world.bonds].sort((a, b) => a.id - b.id).map((bond) => ({ ...bond })),
+    nextBondId: world.nextBondId,
+    bondsBlockedUntil: world.bondsBlockedUntil,
+    grantsAwarded: [...world.grantsAwarded].sort(),
+    grantProgress: [...world.grantProgress.entries()].sort(([a], [b]) => a.localeCompare(b)),
+  };
+}
+
+/** Mapa na objekt se setříděnými klíči — save musí být bajtově stabilní. */
+function sortedRecord(map: ReadonlyMap<string, number>): Record<string, number> {
+  return Object.fromEntries([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
 export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
   return {
     meta: {
@@ -100,6 +188,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
     coarse: packCoarseLayers(world.coarse),
     // Patra jdou do savu tak, jak jsou: jeden bajt na roh, žádné pořadí vrstev.
     heights: Uint8Array.from(world.cornerHeight),
+    disasters: packDisasterLayers(world),
     entities: {
       nextBuildingId: world.nextBuildingId,
       // Pořadí podle id, ať je save bajtově stabilní.
@@ -117,6 +206,9 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
       serviceFunding: Object.fromEntries(
         [...world.serviceFunding.entries()].sort(([a], [b]) => a.localeCompare(b)),
       ),
+      disasters: packDisasters(world),
+      transit: packTransit(world),
+      finance: packFinance(world),
     },
   };
 }
@@ -139,6 +231,7 @@ export function packSave(save: SaveData): Uint8Array {
     [SAVE_FILES.layers]: [save.layers, { level: 9, mtime }],
     [SAVE_FILES.coarse]: [save.coarse, { level: 9, mtime }],
     [SAVE_FILES.heights]: [save.heights, { level: 9, mtime }],
+    [SAVE_FILES.disasters]: [save.disasters, { level: 9, mtime }],
     [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level: 9, mtime }],
     [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level: 9, mtime }],
   });

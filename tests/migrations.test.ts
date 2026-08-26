@@ -184,8 +184,11 @@ describe('fixtury savů', () => {
     // …a nová je prázdná: síť, kterou hráč nepostavil, se vymýšlet nesmí.
     expect([...after.layers.subarray(before.layers.byteLength)].every((v) => v === 0)).toBe(true);
 
+    // Do světa se dává **zmigrovaný** save, ne zastavený na půl cesty: verze 5
+    // ještě nemá `disasters.bin` a `applySaveToWorld` ho vyžaduje. Bajtové
+    // kontroly výš měří samotný krok v4 → v5, tohle měří výsledek.
     const world = createWorld(1);
-    applySaveToWorld(world, after);
+    applySaveToWorld(world, migrate(before));
     expect([...world.layers.pipe].every((value) => value === 0)).toBe(true);
   });
 
