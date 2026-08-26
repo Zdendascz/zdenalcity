@@ -22,6 +22,9 @@ from scipy import ndimage
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    'content', 'vanilla', 'icons')
 SIZE = 128          # cilova hrana; ikony jsou v archu ruzne velke
+GAMMA = 0.75        # prosvetleni strednich tonu
+FLOOR = 45          # cerny bod: nic v ikone nesmi byt tmavsi nez HUD
+SATURATION = 1.25   # nahrada sytosti, kterou podlozeni cerneho bodu ubere
 INSET = 8           # karta ma slaby ramecek; ten do ikony nepatri
 GAP = 8             # tolik prazdnych radku oddeluje ikonu od popisku
 TOL = 14            # odchylka od vyplne karty, ktera se jeste bere jako obsah
@@ -182,6 +185,22 @@ def icon_box(arr, fill):
     return int(xs[0]), int(ys[0]), int(xs[-1]) + 1, int(ys[-1]) + 1
 
 
+def lift(rgb):
+    """Prosvetli ikonu, aby nesplynula s tmavym panelem.
+
+    Archy jsou kreslene na tmave pozadi a nejtmavsi mista ikon maji temer
+    stejny jas jako HUD, takze podstavce a stiny na tlacitku zmizi. Nestaci
+    zesvetlit vsechno stejne - to jen vybeli to, co uz videt bylo. Zvedne se
+    tedy gamma (stredni tony vic nez svetla), pod cerny bod se podlozi FLOOR,
+    aby uplna cern neexistovala, a sytost se dozene zpatky, protoze podlozeni
+    barvy vzdycky trochu vysedi.
+    """
+    v = np.power(rgb / 255.0, GAMMA)
+    v = FLOOR / 255.0 + v * (1 - FLOOR / 255.0)
+    grey = v.mean(axis=2, keepdims=True)
+    return np.clip(grey + (v - grey) * SATURATION, 0, 1) * 255.0
+
+
 def cut(cell, override=None):
     arr = np.asarray(cell.convert('RGB')).astype(int)
     fill = card_fill(arr)
@@ -216,7 +235,7 @@ def cut(cell, override=None):
 
     diff = np.abs(square - fill).max(axis=2)
     alpha = np.clip((diff - 6) * 255 / 18, 0, 255).astype(np.uint8)
-    rgba = np.dstack([square.astype(np.uint8), alpha])
+    rgba = np.dstack([lift(square).astype(np.uint8), alpha])
     return Image.fromarray(rgba, 'RGBA').resize((SIZE, SIZE), Image.LANCZOS)
 
 

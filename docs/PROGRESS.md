@@ -2533,6 +2533,13 @@ katastrofa má vlastní obrázek, a test, že třída služby bez vlastní ikony
 Tlačítka vyrostla z 30 na 38 px: na menším se z izometrického domku stane
 skvrna. 105 obrázků je 2,9 MB, build vyrostl na 3,7 MB.
 
+**Prosvětlení.** Archy jsou kreslené na tmavé pozadí a v HUD, který je taky
+tmavý, podstavce a stíny ikon zanikly. Zesvětlit všechno stejně nepomůže — to
+jen vybělí, co už vidět bylo. Skript proto zvedne gammu na 0,75 (střední tóny
+víc než světla), podloží černý bod na 45, aby v ikoně neexistovala úplná čerň,
+a dožene sytost na 1,25, protože podložení barvy vždycky trochu vysedí.
+Kontrolní míra: průměrný jas buldozeru je 129 proti panelu s 22.
+
 Ověřeno ve hře: 104 obrázků v DOM, žádný rozbitý, dva polygonové zbytky —
 dosah sounáležitosti a dosah MHD, tedy přesně ty dvě třídy, ke kterým obrázek
 není. 974 testů.
