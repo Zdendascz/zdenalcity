@@ -7,7 +7,9 @@ import {
   bulldoze,
   estimatePlacement,
   estimateRoad,
+  estimateZoning,
   placeDefinition,
+  planZoneLevelling,
   zoneArea,
 } from '@/sim/commands';
 import {
@@ -478,5 +480,72 @@ describe('zóna se při vyznačení srovná (T66)', () => {
 
     expect(zoneArea(w, 51, 39, 1, 1, ZONE.residential).ok).toBe(true);
     expect(w.layers.zone[index(51, 39, MAP_SIZE)]).toBe(ZONE.residential);
+  });
+});
+
+describe('srovnání zóny se účtuje (T67)', () => {
+  it('cenovka sedí na to, co se strhne', () => {
+    // Cenovku při tažení počítá `estimateZoning`, kasu strhává `zoneArea`.
+    // Jsou to dvě cesty ke stejnému číslu a musí se shodnout — jinak hráč vidí
+    // jedno a zaplatí druhé.
+    const w = world();
+    raise(w, 12, 12, 3);
+
+    const preview = estimateZoning(w, 8, 8, 6, 6, VANILLA_BALANCE);
+    const before = w.economy.funds;
+
+    expect(zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE).ok).toBe(true);
+
+    expect(preview).toBeGreaterThan(0);
+    expect(before - w.economy.funds).toBe(preview);
+  });
+
+  it('účtuje se po rozích, ne paušálem', () => {
+    const w = world();
+    raise(w, 12, 12, 3);
+    const changes = planZoneLevelling(w, 8, 8, 6, 6);
+    const before = w.economy.funds;
+
+    zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE);
+
+    expect(before - w.economy.funds).toBe(changes.size * VANILLA_BALANCE.map.terraformCost);
+  });
+
+  it('na rovině se neplatí nic', () => {
+    const w = world();
+    const before = w.economy.funds;
+
+    expect(zoneArea(w, 8, 8, 4, 4, ZONE.residential, VANILLA_BALANCE).ok).toBe(true);
+
+    expect(w.economy.funds).toBe(before);
+    expect(estimateZoning(w, 8, 8, 4, 4, VANILLA_BALANCE)).toBe(0);
+  });
+
+  it('rušení zóny se neúčtuje', () => {
+    // Mazání značky není stavba a platit se za ni nemá.
+    const w = world();
+    zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE);
+    raise(w, 12, 12, 3);
+    const before = w.economy.funds;
+
+    expect(zoneArea(w, 8, 8, 6, 6, ZONE.none, VANILLA_BALANCE).ok).toBe(true);
+
+    expect(w.economy.funds).toBe(before);
+  });
+
+  it('chudé město zónu vyznačí, jen ji nesrovná', () => {
+    // Odmítnout celé tažení kvůli terénu by ze značkovacího nástroje udělalo
+    // stavbu, která chudému městu zakáže i rozvrhnout čtvrť.
+    const w = world();
+    raise(w, 12, 12, 3);
+    w.economy.funds = estimateZoning(w, 8, 8, 6, 6, VANILLA_BALANCE) - 1;
+    const heights = Uint8Array.from(w.cornerHeight);
+    const before = w.economy.funds;
+
+    expect(zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE).ok).toBe(true);
+
+    expect(w.layers.zone[index(9, 9, MAP_SIZE)]).toBe(ZONE.residential);
+    expect([...w.cornerHeight]).toEqual([...heights]);
+    expect(w.economy.funds).toBe(before);
   });
 });

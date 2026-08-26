@@ -45,7 +45,7 @@ import {
   setRoadTile,
   setZoneTile,
 } from './world';
-import type { WorldState } from './world';
+import type { ReshapeView, WorldState } from './world';
 
 /**
  * Všechny hráčské akce jdou přes `SimHost.dispatch`. `WorldState` se nikdy
@@ -410,6 +410,7 @@ export function zoneArea(
   w: number,
   h: number,
   zone: ZoneType,
+  balance?: Balance,
 ): CommandResult {
   let changed = 0;
   let lastReason = 'error.zoneNoChange';
@@ -444,60 +445,112 @@ export function zoneArea(
     }
   }
 
-  if (changed > 0 && zone !== ZONE.none) levelZonedArea(world, x, y, w, h);
+  // Srovnání se **účtuje** (rozhodnutí autora, T67) a hráč ho vidí na cenovce
+  // při tažení. Zóna sama nic nestojí; platí se za terén pod ní.
+  //
+  // Na co nejsou peníze, to se **nesrovná — ale zóna se vyznačí**. Odmítnout
+  // celé tažení kvůli terénu by ze značkovacího nástroje udělalo stavbu, která
+  // chudému městu zakáže i rozvrhnout čtvrť.
+  if (changed > 0 && zone !== ZONE.none) {
+    const changes = planZoneLevelling(world, x, y, w, h);
+    const cost = changes.size * (balance?.map.terraformCost ?? 0);
+    if (changes.size > 0 && world.economy.funds >= cost) {
+      world.economy.funds -= cost;
+      applyHeightChanges(world, changes);
+    }
+  }
+
   return changed > 0 ? OK : reject(lastReason);
 }
 
-/** Nad tolik dlaždic se zóna už nesrovnává. Viz `levelZonedArea`. */
+/** Nad tolik dlaždic se zóna už nesrovnává. Viz `planZoneLevelling`. */
 const MAX_LEVELLED_ZONE = 64;
 
 /**
- * Srovná právě vyznačenou zónu, aby na ní domy nestály na chůdách (T66).
+ * Co je potřeba srovnat pod právě vyznačenou zónou (T66). Nic nemění.
  *
  * **Dělá se to při zónování, ne při růstu**, a je za tím geometrie. Sousední
  * dlaždice sdílejí rohy, takže dvě sousední rovné dlaždice musí být ve stejné
  * výšce; jakmile v okolí něco stojí, terén se nehne. Naměřeno na golden městě:
  * ze 61 pokusů srovnat parcelu pod rostoucím domem jich 59 zablokovala budova.
- * Ve chvíli zónování je ale plocha ještě prázdná a srovnat jde.
+ * Ve chvíli zónování je plocha ještě prázdná a srovnat jde.
  *
- * Rovná se **na průměr, u vody na nejnižší roh** — tedy přesně tak, jak si
- * parcelu srovnává ruční stavba. Dozdění na nejvyšší roh jako u silnice se
- * neujalo: u pobřeží by zvedalo rohy sdílené s vodní dlaždicí a moře by se
- * naklonilo. Naměřeno na golden městě: všechny tři zóny to takhle zablokovalo.
+ * Rovná se **na průměr**. Dozdění na nejvyšší roh jako u silnice (T61) neprošlo:
+ * u pobřeží zvedá rohy sdílené s vodní dlaždicí a moře by se naklonilo.
  *
- * **Zadarmo**: zónování samo nic nestojí a připsat mu tichou položku za terén
- * by z něj udělalo nástroj, kterým hráč přijde o kasu, aniž by věděl jak.
+ * Když celá plocha neprojde, **rozpůlí se a zkouší po částech**. Typicky vadí
+ * jedna řada u břehu a zbytek čtvrti srovnat jde; bez půlení by pobřežní čtvrť
+ * zůstala na svahu celá kvůli jedné dlaždici.
  *
- * Velká plocha se **nesrovnává**: hráč, který táhne zónu přes celé údolí,
- * nechce náhorní plošinu. Blok mezi ulicemi se pod ten strop vejde.
+ * Velká plocha se **nesrovnává**: kdo táhne zónu přes celé údolí, nechce
+ * náhorní plošinu.
  *
- * Když srovnat nejde, zóna se prostě vyznačí a domy dostanou podezdívku jako
- * dřív. Srovnání je vylepšení vzhledu, ne podmínka.
+ * Počítá se nad **pracovní kopií výšek**, ne nad světem. Půlení totiž staví
+ * druhou půlku na tom, co udělala první, a kdyby se přitom sahalo na svět,
+ * nešlo by cenu spočítat předem — a cenovka by hráči lhala.
  */
-function levelZonedArea(world: WorldState, x: number, y: number, w: number, h: number): void {
+export function planZoneLevelling(
+  world: ReshapeView,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): Map<number, number> {
+  const working = Uint8Array.from(world.cornerHeight);
+  const changes = new Map<number, number>();
+  collectZoneLevelling(world, working, changes, x, y, w, h);
+  return changes;
+}
+
+function collectZoneLevelling(
+  world: ReshapeView,
+  working: Uint8Array,
+  changes: Map<number, number>,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
   if (w < 1 || h < 1 || w * h > MAX_LEVELLED_ZONE) return;
 
-  const changes = planLevelArea(world.cornerHeight, x, y, w, h);
-  if (changes.size === 0) return;
+  const step = planLevelArea(working, x, y, w, h);
+  if (step.size === 0) return;
 
-  if (reshapeBlocker(world, changes) === null) {
-    applyHeightChanges(world, changes);
+  if (reshapeBlocker(world, step) === null) {
+    for (const [corner, height] of step) {
+      working[corner] = height;
+      changes.set(corner, height);
+    }
     return;
   }
 
-  // Nešlo to celé — zkusí se to po polovinách. Typicky vadí jeden okraj,
-  // který sahá k vodě nebo k cizí stavbě, a zbytek plochy srovnat jde. Bez
-  // toho by pobřežní čtvrť zůstala celá na svahu kvůli jedné řadě u břehu.
   if (w === 1 && h === 1) return;
   if (w >= h) {
     const half = Math.floor(w / 2);
-    levelZonedArea(world, x, y, half, h);
-    levelZonedArea(world, x + half, y, w - half, h);
+    collectZoneLevelling(world, working, changes, x, y, half, h);
+    collectZoneLevelling(world, working, changes, x + half, y, w - half, h);
   } else {
     const half = Math.floor(h / 2);
-    levelZonedArea(world, x, y, w, half);
-    levelZonedArea(world, x, y + half, w, h - half);
+    collectZoneLevelling(world, working, changes, x, y, w, half);
+    collectZoneLevelling(world, working, changes, x, y + half, w, h - half);
   }
+}
+
+/**
+ * Co bude stát vyznačení zóny. Nic nemění — jen počítá.
+ *
+ * Existuje kvůli cenovce při tažení, stejně jako `estimateRoad`. Zóna sama nic
+ * nestojí; platí se **srovnání terénu pod ní** (rozhodnutí autora, T67).
+ */
+export function estimateZoning(
+  world: ReshapeView,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  balance?: Balance,
+): number {
+  return planZoneLevelling(world, x, y, w, h).size * (balance?.map.terraformCost ?? 0);
 }
 
 /**

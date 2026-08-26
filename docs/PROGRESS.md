@@ -2775,8 +2775,7 @@ Velká plocha se **nesrovnává** (strop 64 dlaždic): kdo táhne zónu přes ce
 značky, ne stavba. A srovnání **není podmínkou** zónování: když nejde, zóna se
 stejně vyznačí a domy dostanou podezdívku jako dřív.
 
-**Zadarmo.** Zónování samo nic nestojí a připsat mu tichou položku za terén by
-z něj udělalo nástroj, kterým hráč přijde o kasu, aniž by věděl jak.
+~~**Zadarmo.**~~ Rozhodnuto opačně hned v T67 — účtuje se, ale s cenovkou.
 
 Vedlejší úklid: pravidlo „smí se sem sáhnout terénem?" bydlelo jako soukromá
 funkce v `commands.ts` a potřebovala ho i tahle změna. Je teď ve `world.ts` jako
@@ -2785,6 +2784,33 @@ téhož pravidla by se dřív nebo později rozešly.
 
 Ověřeno ve hře: vyznačení zóny 5×5 na kopci srovnalo 9 nerovných dlaždic z 25
 na nulu. Mutační test 5 z 5. 1024 testů.
+
+- [x] T67 — srovnání zóny se účtuje a má cenovku
+
+**Rozhodnutí autora**, opačné než v T66. Srovnání terénu pod zónou se platí
+a hráč cenu vidí při tažení, stejně jako u silnice.
+
+Podmínka byla jasná: cenovka nesmí lhát. Plánování se proto vytáhlo do čisté
+funkce `planZoneLevelling` a počítá se nad **pracovní kopií výšek**, ne nad
+světem. Půlení plochy totiž staví druhou půlku na tom, co udělala první — kdyby
+se přitom sahalo na svět, nešlo by cenu spočítat předem, aniž by se terén
+mezitím hnul. Cenovku i účet drží u sebe test: co ukáže `estimateZoning`, to
+strhne `zoneArea`.
+
+`reshapeBlocker` dostal užší tvar světa (`ReshapeView`). Renderer má po ruce jen
+`ReadonlyWorldView` a musí spočítat totéž co příkaz; kdyby k tomu potřeboval
+zapisovatelný svět, počítal by to jinde a jinak — a přesně tak vznikají cenovky,
+které lžou.
+
+**Na co nejsou peníze, to se nesrovná — ale zóna se vyznačí.** Odmítnout celé
+tažení kvůli terénu by ze značkovacího nástroje udělalo stavbu, která chudému
+městu zakáže i rozvrhnout čtvrť. Liší se to od silnice schválně: vozovka je
+stavba a bez peněz nevznikne, zóna je značka.
+
+Rušení zóny se neúčtuje a terénem nehýbe.
+
+Ověřeno ve hře: zóna 5×5 na kopci ukázala 80, strhla 80 a srovnala všech devět
+nerovných dlaždic. Mutační test 4 ze 4. 1029 testů.
 
 
 ## Rozpracované

@@ -601,8 +601,25 @@ export function markCoverageDirty(world: WorldState): void {
  * takže se s terénem musí posunout, a `dirty.tiles` se jich netýká — kreslí je
  * jiný renderer.
  */
+/**
+ * Co potřebuje `reshapeBlocker` vědět o světě.
+ *
+ * Úmyslně užší než `WorldState`, aby se na to uměl zeptat i renderer, který má
+ * po ruce jen `ReadonlyWorldView` — cenovka při tažení musí spočítat totéž co
+ * příkaz, a kdyby k tomu potřebovala zapisovatelný svět, počítala by to jinde
+ * a jinak.
+ */
+export interface ReshapeView {
+  readonly size: number;
+  readonly cornerHeight: Readonly<Uint8Array>;
+  readonly layers: {
+    readonly buildingId: Readonly<Uint16Array>;
+    readonly terrain: Readonly<Uint8Array>;
+  };
+}
+
 /** Dlaždice, které se dotýkají rohu. Roh drží čtyři, u kraje mapy míň. */
-export function tilesAroundCorner(world: WorldState, corner: number): number[] {
+export function tilesAroundCorner(world: ReshapeView, corner: number): number[] {
   const cornerSize = world.size + 1;
   const cx = corner % cornerSize;
   const cy = (corner - cx) / cornerSize;
@@ -632,7 +649,7 @@ export function tilesAroundCorner(world: WorldState, corner: number): number[] {
  * a růst zástavby. Dvě kopie téhož pravidla by se rozešly.
  */
 export function reshapeBlocker(
-  world: WorldState,
+  world: ReshapeView,
   changes: ReadonlyMap<number, number>,
 ): 'building' | 'water' | null {
   for (const [corner, target] of changes) {

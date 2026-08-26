@@ -9,7 +9,7 @@ import {
   unpackSave,
 } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
-import { estimatePlacement, estimateRoad } from '@/sim/commands';
+import { estimatePlacement, estimateRoad, estimateZoning } from '@/sim/commands';
 import { explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
@@ -1476,13 +1476,31 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       // nástroje mají cenu pevnou a sčítat se u nich nemá co.
       const road = activeTool.action.kind === 'road' ? activeTool.action.roadType : null;
       const each = activeTool.cost ?? 0;
-      const total =
-        road === null
-          ? each * tiles.length
-          : tiles.reduce(
-              (sum, tile) => sum + estimateRoad(world, tile.x, tile.y, road, content.getBalance()).total,
-              0,
-            );
+      let total = each * tiles.length;
+
+      if (road !== null) {
+        total = tiles.reduce(
+          (sum, tile) => sum + estimateRoad(world, tile.x, tile.y, road, content.getBalance()).total,
+          0,
+        );
+      } else if (
+        hoveredTile &&
+        activeTool.action.kind === 'zone' &&
+        activeTool.action.zone !== ZONE.none
+      ) {
+        // Zóna sama nic nestojí; platí se **srovnání terénu pod ní** (T67).
+        // Počítá se za celý obdélník naráz, ne po dlaždicích: srovnání je jeden
+        // plán přes celou plochu a součet po jedné by vyšel úplně jinak.
+        const corner = hoveredTile;
+        total = estimateZoning(
+          world,
+          Math.min(dragAnchor.x, corner.x),
+          Math.min(dragAnchor.y, corner.y),
+          Math.abs(corner.x - dragAnchor.x) + 1,
+          Math.abs(corner.y - dragAnchor.y) + 1,
+          content.getBalance(),
+        );
+      }
 
       if (total > 0 && tiles.length > 0) {
         priceTag.show(pointerX, pointerY, formatNumber(total));

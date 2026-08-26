@@ -132,7 +132,7 @@ class MainThreadSimHost implements SimHost {
       case 'bulldoze':
         return bulldoze(this.world, cmd.x, cmd.y, this.balance);
       case 'zone':
-        return zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone);
+        return zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone, this.balance);
       case 'place_building':
         return placeDefinition(
           this.world,
