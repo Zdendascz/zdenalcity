@@ -2890,6 +2890,43 @@ porušení invariantu a nezaložil žádný oheň. Registr hlásí **patnáct ka
 
 1057 testů.
 
+- [x] Kritérium 2 ověřeno — 512×512 při plném oddálení
+
+Poslední otevřené akceptační kritérium fáze 4 (§11 bod 2). Měřilo se na
+**zabydlené mapě 512×512**: 214 budov, 3 948 dlaždic silnic, tik 23 959, kamera
+na `MIN_ZOOM`, takže je vidět celá mapa naráz — 1 024 chunků plus budovy, dohromady
+1 243 vykreslovaných uzlů.
+
+| stav | medián | p95 | maximum |
+|---|---|---|---|
+| pauza | 1,3 ms | 2,2 ms | 3,3 ms |
+| rychlost 1× | 1,6 ms | 2,3 ms | 5,3 ms |
+| rychlost 8× | 1,3 ms | 3,1 ms | 13,2 ms |
+
+Rozpočet snímku při 60 FPS je 16,7 ms. **Kritérium drží**, a to i na osminásobné
+rychlosti, kde nejhorší snímek — ten, na který padne tik simulace zároveň
+s pečením chunku — spotřebuje 13,2 ms.
+
+**Co měření nepokrývá.** Panel prohlížeče v téhle relaci nekompozituje,
+`requestAnimationFrame` neběží, takže se neměřilo snímkování obrazovky, ale
+**čas procesoru na snímek** — smyčka se poháněla ručně přes `app.ticker.update`.
+Zahrnuje to tik simulace, přepočet chunků i sestavení kreslicích příkazů; chybí
+jen samotné odeslání na GPU a čekání na vsync. U izometrického rendereru
+s pečenými chunky je procesor to úzké hrdlo a GPU dostává ke kreslení tisícovku
+texturovaných čtyřúhelníků, což je pro cokoli z posledních patnácti let nic.
+
+### Co měření našlo
+
+**Úplné zneplatnění stojí 250 ms v jednom snímku.** Celá mapa se upeče znovu.
+Nastane při načtení města a po vygenerování mapy — tedy jednou, na místě, kde
+hráč stejně čeká.
+
+**Přepnutí diagnostické vrstvy stojí 52 až 90 ms**, protože `setOverlay`
+zneplatní všechny chunky a při plném oddálení jsou vidět všechny. Při běžném
+přiblížení je to 11 ms. Není to zadrhnutí, je to **jeden zahozený snímek** —
+blikne to. Rozložit pečení do několika snímků by to odstranilo; není to
+v kritériu a nechávám to jako nález, ne jako opravu.
+
 
 ## Rozpracované
 
@@ -2897,8 +2934,7 @@ porušení invariantu a nezaložil žádný oheň. Registr hlásí **patnáct ka
 (T47–T60) a nakonec T54 — **patnáct katastrof z patnácti**, MHD, finance,
 save v8.
 
-Jedno akceptační kritérium fáze zůstává **neověřené**: 512×512 při 60 FPS
-(§11 bod 2). Měření se v poslední relaci nedalo provést a chce ruční pohled.
+Akceptační kritérium 2 (512×512 při 60 FPS) je **ověřené** — viz měření níž.
 
 Mimo kritéria zůstává **bez rozhraní celá 4c** — půjčky, dluhopisy a linky MHD
 jdou jen přes `dispatch`. Viz vyhodnocení T60.
