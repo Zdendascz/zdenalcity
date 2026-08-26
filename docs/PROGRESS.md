@@ -2559,6 +2559,50 @@ Ověřeno ve hře: 104 obrázků v DOM, žádný rozbitý, dva polygonové zbytk
 dosah sounáležitosti a dosah MHD, tedy přesně ty dvě třídy, ke kterým obrázek
 není. 974 testů.
 
+- [x] T61 — silnice si poradí s lesem i se sedlem
+
+**Není ze zadání fáze.** Je to UX požadavek autora po dohrání fáze 4; číslo
+navazuje na T60, aby se na něj dalo odkazovat.
+
+Silnice do té doby odmítala dvě věci, které hráč ve skutečnosti řešit nechtěl.
+Na lese, skále a v mokřadu hlásila „na tenhle terén se to postavit nedá",
+takže trasa přes remízek byla dvacet kliků buldozerem a teprve pak dvacet
+kliků silnicí. Na **zkroucené dlaždici** — sedle, kde `nw + se ≠ ne + sw` —
+hlásila `error.roadTwisted` a hráč musel uhodnout, který ze čtyř rohů má
+srovnat. Většinou to skončilo oklikou kolem kopce.
+
+Nově si vozovka obojí vyřídí sama a **připočte cenu**. Sazby jsou v datech
+a už tam byly: vykácet les 12, zavézt mokřad 40, odtěžit skálu 60. Rozdíl mezi
+nimi je celý smysl — přes skálu se dá jet, jen se to nevyplatí, a to je jiná
+věc než zákaz.
+
+Srovnání sedla plánuje `planUntwist`. Pro každý ze čtyř rohů existuje **právě
+jedna** výška, při které rovnost platí, takže se spočítají všechny čtyři a vezme
+se nejlevnější plán; při shodě ten, který dozdívá, protože hráč staví do kopce
+a čeká násep, ne výkop. Kombinace dvou rohů se nezkoušejí — vždycky stojí víc
+a vypadají stejně.
+
+**Výsledek se ověřuje, ne předpokládá.** `planCornerHeight` cíl mimo rozsah
+ořízne a jeho kaskáda může sáhnout i na zbylé tři rohy téže dlaždice; obojí
+vede k plánu, který vznikne, ale dlaždici nesrovná. Původně tam byla i zvláštní
+kontrola rozsahu — vyhodila se, protože obě pojistky dělaly totéž a **kryly se
+navzájem**: mutační test žádnou z nich neuměl zabít, dokud jedna nezmizela.
+
+Náhled ceny při tažení počítá `estimateRoad`. Kdyby zůstal na sazbě za vozovku,
+hráč by viděl deset a zaplatil devadesát. Test drží obě cesty u sebe: co ukáže
+cenovka, to se strhne z kasy. U tažení přes víc dlaždic je to odhad — srovnání
+jedné dlaždice hne rohem, o který se dělí se sousedy, takže sousední sedlo může
+zmizet samo a skutečná cena bývá **nižší, nikdy vyšší**.
+
+`error.roadTwisted` zůstává. Sedlo, které srovnat nejde, pořád existuje.
+
+Golden snapshot se posunul a je to důkaz, že to funguje: v řadě, kudy vede
+hlavní ulice, jsou na tom seedu **tři zkroucené dlaždice**. Dřív v ní zůstaly
+díry, teď je souvislá, a město vyroste na 192 obyvatel místo 180.
+
+Ověřeno ve hře: les 10 + 12, skála 10 + 60, mokřad 10 + 40, sedla srovnaná.
+Mutační test 10 z 10. 982 testů.
+
 
 ## Rozpracované
 

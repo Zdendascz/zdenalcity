@@ -10,6 +10,7 @@ import {
   MAX_HEIGHT,
   planCornerHeight,
   planLevelArea,
+  planUntwist,
 } from './heights';
 import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
@@ -151,14 +152,25 @@ export function buildRoad(
   const overWater = world.layers.terrain[tile] === TERRAIN.water;
   if (overWater && !touchesRoad(world, x, y)) return reject('error.bridgeNeedsBank');
 
-  if (!overWater && needsClearing(world.layers.terrain[tile] ?? TERRAIN.grass)) {
-    return reject('error.terrainNotAllowed');
-  }
+  const terrain = world.layers.terrain[tile] ?? TERRAIN.grass;
 
-  // Rovnoměrný svah vozovka snese, sedlo ne: zkroucenou dlaždici nejde
-  // přejet po rovině a ani nakreslit jako vozovku (§7).
+  // Les, skála ani mokřad silnici nezastaví — jen ji prodraží o vyklizení.
+  // Do T61 se stavba odmítla a hráč musel napřed ručně bagrovat každou
+  // dlaždici zvlášť; trasa přes remízek tak byla dvacet kliků místo jednoho.
+  const clearing = !overWater && needsClearing(terrain) ? clearingCost(balance, terrain) : 0;
+
+  // Rovnoměrný svah vozovka snese, sedlo ne: zkroucenou dlaždici nejde přejet
+  // po rovině ani nakreslit jako vozovku (§7). Místo odmítnutí se **srovná
+  // roh** a připočte terraforming, jak to dělá Transport Tycoon.
+  let untwist: ReadonlyMap<number, number> | null = null;
   if (!overWater && isTwistedTile(world.cornerHeight, x, y)) {
-    return reject('error.roadTwisted');
+    untwist = planUntwist(world.cornerHeight, x, y);
+    // Zbude jen to, co srovnat opravdu nejde — u okraje mapy nebo tam, kde by
+    // roh musel nad strop. Hláška zůstává, protože ta situace pořád existuje.
+    if (!untwist) return reject('error.roadTwisted');
+
+    const allowed = checkTerraform(world, untwist);
+    if (!allowed.ok) return allowed;
   }
 
   const current = world.layers.road[tile] ?? ROAD.none;
@@ -167,18 +179,104 @@ export function buildRoad(
   // a postaví — jinak by se dala třída „prodat" za rozdíl cen.
   if (current > type) return reject('error.roadDowngrade');
 
-  const cost = overWater
-    ? (balance?.traffic.bridgeCost ?? 0)
-    : (balance?.traffic.roadTypes[type - 1]?.cost ?? 0);
+  const levelling = (untwist?.size ?? 0) * (balance?.map.terraformCost ?? 0);
+  const cost =
+    (overWater
+      ? (balance?.traffic.bridgeCost ?? 0)
+      : (balance?.traffic.roadTypes[type - 1]?.cost ?? 0)) +
+    clearing +
+    levelling;
   if (world.economy.funds < cost) {
     return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
   }
   world.economy.funds -= cost;
 
+  // Nejdřív srovnat, pak vyklidit, pak položit. Obráceně by vozovka na chvíli
+  // ležela na sedle a renderer by ji tak i nakreslil.
+  if (untwist) applyHeightChanges(world, untwist);
+  if (clearing > 0) {
+    world.layers.terrain[tile] = TERRAIN.grass;
+    markTerrainChanged(world);
+  }
+
   setRoadTile(world, tile, type);
   markRoadNeighbourhoodDirty(world, x, y);
   markPowerNetworkDirty(world); // silnice je vodič
   return OK;
+}
+
+/**
+ * Co stojí vyklizení dlaždice. Sazba je v datech podle terénu (P5) — vykácet
+ * les je levnější než odtěžit skálu a hráč to má poznat i na účtu.
+ */
+function clearingCost(balance: Balance | undefined, terrain: number): number {
+  if (terrain === TERRAIN.forest) return balance?.map.clearForestCost ?? 0;
+  if (terrain === TERRAIN.rock) return balance?.map.clearRockCost ?? 0;
+  return balance?.map.fillMarshCost ?? 0;
+}
+
+/**
+ * Co `estimateRoad` opravdu potřebuje: terén, rohy a velikost mapy.
+ *
+ * Úmyslně užší než `WorldState`, aby cenu uměl spočítat i renderer, který má
+ * po ruce jen `ReadonlyWorldView`. Kdyby se bral celý svět, musel by si UI
+ * sáhnout na zapisovatelný stav jen kvůli tomu, aby ukázalo číslo.
+ */
+export interface RoadCostView {
+  readonly size: number;
+  readonly layers: { readonly terrain: Readonly<Uint8Array> };
+  readonly cornerHeight: Readonly<Uint8Array>;
+}
+
+/** Z čeho se skládá cena jedné dlaždice vozovky. */
+export interface RoadEstimate {
+  /** Samotná vozovka, nebo most nad vodou. */
+  road: number;
+  /** Vykácení lesa, odtěžení skály, zavezení mokřadu. Nula na volné dlaždici. */
+  clearing: number;
+  /** Srovnání zkroucené dlaždice. Nula, když je rovná nebo v rovnoměrném svahu. */
+  levelling: number;
+  total: number;
+}
+
+/**
+ * Co bude stát vozovka na téhle dlaždici. Nic nemění — jen počítá.
+ *
+ * Existuje kvůli náhledu ceny při tažení. Od T61 může být silnice na lese nebo
+ * na sedle dražší než sazba za vozovku, a cenovka, která by ukazovala jen tu
+ * sazbu, by hráči lhala — zaplatil by devadesát tam, kde viděl deset.
+ *
+ * U tažení přes víc dlaždic je to **odhad**: srovnání jedné dlaždice hne rohem,
+ * o který se dělí se sousedy, takže po jejím postavení může sousední sedlo
+ * zmizet samo. Skutečná cena tažení proto bývá stejná nebo nižší, nikdy vyšší.
+ */
+export function estimateRoad(
+  world: RoadCostView,
+  x: number,
+  y: number,
+  type: number = ROAD.street,
+  balance?: Balance,
+): RoadEstimate {
+  const empty = { road: 0, clearing: 0, levelling: 0, total: 0 };
+  if (!inBounds(x, y, world.size)) return empty;
+
+  const tile = index(x, y, world.size);
+  const overWater = world.layers.terrain[tile] === TERRAIN.water;
+  const terrain = world.layers.terrain[tile] ?? TERRAIN.grass;
+
+  const road = overWater
+    ? (balance?.traffic.bridgeCost ?? 0)
+    : (balance?.traffic.roadTypes[type - 1]?.cost ?? 0);
+
+  const clearing = !overWater && needsClearing(terrain) ? clearingCost(balance, terrain) : 0;
+
+  let levelling = 0;
+  if (!overWater && isTwistedTile(world.cornerHeight, x, y)) {
+    const plan = planUntwist(world.cornerHeight, x, y);
+    levelling = (plan?.size ?? 0) * (balance?.map.terraformCost ?? 0);
+  }
+
+  return { road, clearing, levelling, total: road + clearing + levelling };
 }
 
 /**

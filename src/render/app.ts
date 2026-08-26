@@ -9,7 +9,7 @@ import {
   unpackSave,
 } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
-import { estimatePlacement } from '@/sim/commands';
+import { estimatePlacement, estimateRoad } from '@/sim/commands';
 import { explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
@@ -1383,9 +1383,22 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
       // Cena celého tažení, ne jedné dlaždice — u dvaceti polí je to rozdíl,
       // který hráč potřebuje vidět předem.
+      //
+      // U silnice se počítá **po dlaždicích**: od T61 si vozovka umí vyklidit
+      // les a srovnat sedlo, takže sazba za vozovku už není celá cena. Ostatní
+      // nástroje mají cenu pevnou a sčítat se u nich nemá co.
+      const road = activeTool.action.kind === 'road' ? activeTool.action.roadType : null;
       const each = activeTool.cost ?? 0;
-      if (each > 0 && tiles.length > 0) {
-        priceTag.show(pointerX, pointerY, formatNumber(each * tiles.length));
+      const total =
+        road === null
+          ? each * tiles.length
+          : tiles.reduce(
+              (sum, tile) => sum + estimateRoad(world, tile.x, tile.y, road, content.getBalance()).total,
+              0,
+            );
+
+      if (total > 0 && tiles.length > 0) {
+        priceTag.show(pointerX, pointerY, formatNumber(total));
       } else {
         priceTag.hide();
       }

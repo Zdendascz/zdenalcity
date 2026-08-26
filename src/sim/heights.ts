@@ -334,3 +334,80 @@ export function relaxHeights(heights: Uint8Array, maxPasses = 64): number {
 
   return maxPasses;
 }
+
+/**
+ * Jak srovnat zkroucenou dlaždici, aby po ní šla vést vozovka.
+ *
+ * Zkroucená dlaždice je sedlo: `nw + se ≠ ne + sw`. Vozovka po ní nejde přejet
+ * po rovině a nejde ji ani nakreslit, tak ji hráč musel do T61 srovnat ručně —
+ * a protože se to muselo trefit na správný roh, končilo to většinou tím, že si
+ * kolem kopce udělal okliku.
+ *
+ * Srovnává se **jedním rohem**. Pro každý ze čtyř existuje právě jedna výška,
+ * při které rovnost platí, takže stačí spočítat všechny čtyři a vzít ten
+ * nejlevnější plán. Hledat kombinace dvou rohů nemá smysl: vždycky stojí víc
+ * a výsledek vypadá stejně.
+ *
+ * Vrací `null`, když to nejde — třeba když by roh musel nad `MAX_HEIGHT` nebo
+ * když kaskáda sousedům dlaždici zkroutí znovu. Kaskáda drží mezi sousedními
+ * rohy nejvýš jedno patro a přitom může sáhnout i na zbylé tři rohy téhle
+ * dlaždice, takže se u každého plánu **ověřuje výsledek**, ne že vznikl.
+ */
+export function planUntwist(
+  heights: Readonly<Uint8Array>,
+  x: number,
+  y: number,
+): Map<number, number> | null {
+  if (!isTwistedTile(heights, x, y)) return new Map();
+
+  const side = cornerSideOf(heights);
+  const [nw, ne, sw, se] = tileCorners(heights, x, y);
+
+  // Pořadí je pevné, aby při shodné ceně vyšel pokaždé týž roh (P2).
+  const candidates: [number, number, number, number][] = [
+    [x, y, nw, ne + sw - se],
+    [x + 1, y, ne, nw + se - sw],
+    [x, y + 1, sw, nw + se - ne],
+    [x + 1, y + 1, se, ne + sw - nw],
+  ];
+
+  let best: Map<number, number> | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (const [cx, cy, current, target] of candidates) {
+    const changes = planCornerHeight(heights, cx, cy, target);
+    if (changes.size === 0) continue;
+
+    // Ověřuje se **výsledek**, ne cíl. Roh mimo rozsah `planCornerHeight` sám
+    // ořízne a kaskáda může sáhnout i na zbylé tři rohy téhle dlaždice — obojí
+    // vede k plánu, který vznikne, ale dlaždici nesrovná. Kontrolovat rozsah
+    // zvlášť by byla druhá pojistka na totéž a ani jedna by pak nebyla vidět
+    // v testu, protože by se navzájem kryly.
+    if (!untwistsTile(heights, changes, x, y, side)) continue;
+
+    // Levnější plán vyhrává; při shodě ten, který dozdívá. Odkopat roh je sice
+    // stejně drahé, ale hráč staví silnici do kopce a čeká náspu, ne výkop.
+    const score = changes.size * 2 + (target > current ? 0 : 1);
+    if (score < bestScore) {
+      bestScore = score;
+      best = changes;
+    }
+  }
+
+  return best;
+}
+
+/** Ověří, že po provedení změn už dlaždice zkroucená není. */
+function untwistsTile(
+  heights: Readonly<Uint8Array>,
+  changes: ReadonlyMap<number, number>,
+  x: number,
+  y: number,
+  side: number,
+): boolean {
+  const at = (cx: number, cy: number): number => {
+    const corner = cornerIndex(cx, cy, side);
+    return changes.get(corner) ?? heights[corner] ?? 0;
+  };
+  return at(x, y) + at(x + 1, y + 1) === at(x + 1, y) + at(x, y + 1);
+}

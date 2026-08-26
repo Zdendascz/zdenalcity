@@ -95,6 +95,12 @@ function findSite(world: WorldState): { x: number; y: number } {
   return best;
 }
 
+/*
+ * Snapshot se v T61 posunul a je to v pořádku: v řadě, kudy vede hlavní ulice,
+ * jsou na tomhle seedu **tři zkroucené dlaždice**. Do T61 tam silnice odmítla
+ * vzniknout a zůstaly v ní díry; teď si sedla srovná a ulice je souvislá, takže
+ * má víc parcel přístup k silnici a město vyroste na 192 obyvatel místo 180.
+ */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
     const content = await vanilla();

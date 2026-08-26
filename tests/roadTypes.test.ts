@@ -103,13 +103,58 @@ describe('stavba silnic', () => {
     expect(w.layers.road[index(10, 10, MAP_SIZE)]).toBe(ROAD.none);
   });
 
-  it('na vodu ani do lesa se silnice neklade', () => {
+  it('na vodu se silnice bez břehu neklade', () => {
     const w = world();
     w.layers.terrain[index(10, 10, MAP_SIZE)] = TERRAIN.water;
-    w.layers.terrain[index(11, 10, MAP_SIZE)] = TERRAIN.forest;
 
     expect(buildRoad(w, 10, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(false);
-    expect(buildRoad(w, 11, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(false);
+  });
+
+  it('les silnici nezastaví, jen ji prodraží o vykácení', () => {
+    // Trasa přes remízek byla do T61 dvacet kliků buldozerem. Silnice si les
+    // vyklidí sama a účet za to hráč uvidí na kase.
+    const w = world();
+    const tile = index(11, 10, MAP_SIZE);
+    w.layers.terrain[tile] = TERRAIN.forest;
+    const before = w.economy.funds;
+
+    expect(buildRoad(w, 11, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    expect(w.layers.terrain[tile]).toBe(TERRAIN.grass);
+    expect(before - w.economy.funds).toBe(
+      (STREET?.cost ?? 0) + VANILLA_BALANCE.map.clearForestCost,
+    );
+  });
+
+  it('skála a mokřad stojí každý svou sazbu', () => {
+    // Sazby se liší schválně: odtěžit skálu je dražší než vykácet les, takže
+    // se hráči vyplatí trasu vést kolem — ne proto, že by nesměl skrz.
+    const w = world();
+    w.layers.terrain[index(13, 10, MAP_SIZE)] = TERRAIN.rock;
+    w.layers.terrain[index(15, 10, MAP_SIZE)] = TERRAIN.marsh;
+
+    const beforeRock = w.economy.funds;
+    expect(buildRoad(w, 13, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    const rockPaid = beforeRock - w.economy.funds;
+
+    const beforeMarsh = w.economy.funds;
+    expect(buildRoad(w, 15, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    const marshPaid = beforeMarsh - w.economy.funds;
+
+    expect(rockPaid).toBe((STREET?.cost ?? 0) + VANILLA_BALANCE.map.clearRockCost);
+    expect(marshPaid).toBe((STREET?.cost ?? 0) + VANILLA_BALANCE.map.fillMarshCost);
+    expect(rockPaid).toBeGreaterThan(marshPaid);
+  });
+
+  it('na vyklizení musí hráč mít', () => {
+    // Silnice sama by na kasu stačila, vyklizení už ne. Odmítnout se to musí
+    // celé — jinak by hráč zaplatil silnici a les by zůstal.
+    const w = world();
+    const tile = index(17, 10, MAP_SIZE);
+    w.layers.terrain[tile] = TERRAIN.rock;
+    w.economy.funds = (STREET?.cost ?? 0) + VANILLA_BALANCE.map.clearRockCost - 1;
+
+    expect(buildRoad(w, 17, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(false);
+    expect(w.layers.terrain[tile]).toBe(TERRAIN.rock);
   });
 });
 

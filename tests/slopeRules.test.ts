@@ -6,13 +6,17 @@ import {
   buildRoad,
   bulldoze,
   estimatePlacement,
+  estimateRoad,
   placeDefinition,
 } from '@/sim/commands';
 import {
   applyCornerChanges,
   cornerIndex,
   isFlatTile,
+  isTwistedTile,
+  MAX_HEIGHT,
   planCornerHeight,
+  planUntwist,
 } from '@/sim/heights';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { createTrafficSystem } from '@/sim/systems';
@@ -21,6 +25,9 @@ import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { assumeWatered } from './support/water';
 import { MAP_SIZE, CORNER_SIZE } from './support/grid';
+
+/** Cena ulice z dat, ať test nepřepisuje balanc. */
+const STREET_COST = VANILLA_BALANCE.traffic.roadTypes[0]?.cost ?? 0;
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -155,16 +162,118 @@ describe('silnice na svahu', () => {
     expect(buildRoad(w, 10, 10, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
   });
 
-  it('zkroucená dlaždice ji nepobere', () => {
-    // Sedlo: protilehlé rohy nahoře. Po takové dlaždici se nedá jet po rovině.
+  it('zkroucenou dlaždici si silnice srovná sama', () => {
+    // Sedlo: protilehlé rohy nahoře. Po takové dlaždici se nedá jet po rovině,
+    // ale hráč kvůli tomu nemá hledat, na který ze čtyř rohů má kliknout —
+    // silnice roh srovná a připočte terraforming (T61).
+    const w = world();
+    w.cornerHeight[cornerIndex(20, 20, CORNER_SIZE)] = 1;
+    w.cornerHeight[cornerIndex(21, 21, CORNER_SIZE)] = 1;
+    const before = w.economy.funds;
+
+    expect(buildRoad(w, 20, 20, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    expect(isTwistedTile(w.cornerHeight, 20, 20)).toBe(false);
+    expect(before - w.economy.funds).toBeGreaterThan(STREET_COST);
+  });
+
+  it('srovnání se účtuje po rozích, ne paušálem', () => {
+    // Cena musí sedět na počet rohů, které se opravdu hnuly. Paušál by dělal
+    // z mělkého sedla stejně drahou stavbu jako z hlubokého.
     const w = world();
     w.cornerHeight[cornerIndex(20, 20, CORNER_SIZE)] = 1;
     w.cornerHeight[cornerIndex(21, 21, CORNER_SIZE)] = 1;
 
+    const plan = planUntwist(w.cornerHeight, 20, 20);
+    expect(plan).not.toBeNull();
+    expect(plan?.size).toBeGreaterThan(0);
+
+    const before = w.economy.funds;
+    expect(buildRoad(w, 20, 20, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    expect(before - w.economy.funds).toBe(
+      STREET_COST + (plan?.size ?? 0) * VANILLA_BALANCE.map.terraformCost,
+    );
+  });
+
+  it('náhled ceny sedí na to, co se strhne', () => {
+    // Cenovka při tažení počítá `estimateRoad`, kasu strhává `buildRoad`.
+    // Jsou to dvě cesty ke stejnému číslu a musí se shodnout — jinak hráč
+    // vidí deset a zaplatí devadesát.
+    const cases: [number, number, () => WorldState][] = [
+      [30, 30, () => world()],
+      [31, 31, () => {
+        const w = world();
+        w.layers.terrain[index(31, 31, MAP_SIZE)] = TERRAIN.forest;
+        return w;
+      }],
+      [32, 32, () => {
+        const w = world();
+        w.layers.terrain[index(32, 32, MAP_SIZE)] = TERRAIN.rock;
+        return w;
+      }],
+      [33, 33, () => {
+        const w = world();
+        w.cornerHeight[cornerIndex(33, 33, CORNER_SIZE)] = 1;
+        w.cornerHeight[cornerIndex(34, 34, CORNER_SIZE)] = 1;
+        return w;
+      }],
+    ];
+
+    for (const [x, y, make] of cases) {
+      const w = make();
+      const preview = estimateRoad(w, x, y, ROAD.street, VANILLA_BALANCE).total;
+      const before = w.economy.funds;
+
+      expect(buildRoad(w, x, y, ROAD.street, VANILLA_BALANCE).ok, `${x},${y}`).toBe(true);
+      expect(before - w.economy.funds, `${x},${y}`).toBe(preview);
+    }
+  });
+
+  it('u stropu výšky se roh nezvedá nad něj', () => {
+    // Sedlo těsně pod stropem. Dva ze čtyř rohů by se musely zvednout na 16;
+    // `planCornerHeight` cíl ořízne na 15, takže plán vznikne — a byl by
+    // dokonce ten nejlevnější, jen by dlaždici nesrovnal. Proto se výsledek
+    // ověřuje, ne předpokládá.
+    const w = world();
+    // Náhorní plošina, ať kaskáda nesjíždí až k nule a plán zůstane malý.
+    for (let cy = 36; cy <= 46; cy++) {
+      for (let cx = 36; cx <= 46; cx++) raise(w, cx, cy, MAX_HEIGHT - 1);
+    }
+    w.cornerHeight[cornerIndex(40, 40, CORNER_SIZE)] = MAX_HEIGHT;
+    w.cornerHeight[cornerIndex(41, 41, CORNER_SIZE)] = MAX_HEIGHT;
+    expect(isTwistedTile(w.cornerHeight, 40, 40)).toBe(true);
+
+    expect(buildRoad(w, 40, 40, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    expect(isTwistedTile(w.cornerHeight, 40, 40)).toBe(false);
+    for (const height of w.cornerHeight) expect(height).toBeLessThanOrEqual(MAX_HEIGHT);
+  });
+
+  it('rovnou dlaždici nikdo nesrovnává', () => {
+    // Kdyby se plán počítal vždycky, platil by hráč terraforming i na rovině.
+    const w = world();
+    const before = w.economy.funds;
+
+    expect(buildRoad(w, 22, 22, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    expect(before - w.economy.funds).toBe(STREET_COST);
+  });
+
+  it('budova u sedla srovnání zastaví', () => {
+    // Srovnání hne rohem, o který se dělí čtyři dlaždice. Kdyby na jedné
+    // stála budova, spadla by hráči do svahu, aniž by o to řekl.
+    const w = world();
+    w.cornerHeight[cornerIndex(20, 20, CORNER_SIZE)] = 1;
+    w.cornerHeight[cornerIndex(21, 21, CORNER_SIZE)] = 1;
+    for (const [bx, by] of [
+      [19, 19], [20, 19], [21, 19],
+      [19, 20], [21, 20],
+      [19, 21], [20, 21], [21, 21],
+    ] as const) {
+      w.layers.buildingId[index(bx, by, MAP_SIZE)] = 7;
+    }
+
     const result = buildRoad(w, 20, 20, ROAD.street, VANILLA_BALANCE);
 
     expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toBe('error.roadTwisted');
+    expect(result.ok === false && result.reason).toBe('error.terraformBuilding');
   });
 });
 
