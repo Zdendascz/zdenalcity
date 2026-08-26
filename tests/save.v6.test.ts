@@ -4,7 +4,8 @@ import { ContentRegistry } from '@/content/registry';
 import { buildRoad, placeDefinition } from '@/sim/commands';
 import { spikeCrime, suppressService } from '@/sim/disasters/effects';
 import { floodTile } from '@/sim/disasters/flood';
-import { spawnRubble } from '@/sim/disasters/rubble';
+import { clearRubble, isRubbleMarkOrigin, spawnRubble } from '@/sim/disasters/rubble';
+import { destroyTile, noLosses } from '@/sim/disasters/damage';
 import { issueBond, takeLoan } from '@/sim/finance';
 import { index, ROAD } from '@/sim/layers';
 import { createLine } from '@/sim/transit';
@@ -407,3 +408,135 @@ function fixture(name: string): Uint8Array {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
+
+describe('paměť trosek (verze 7)', () => {
+  it('trosky si pamatují, co na nich stálo, i po načtení', async () => {
+    // Nahlásil autor: po vyhořelém městě se nedalo poznat, co kde bylo.
+    // Hromada po nemocnici vypadala stejně jako hromada po hasičárně.
+    const { world, content } = await city();
+    const balance = content.getBalance();
+    expect(placeDefinition(world, content, 'vanilla:clinic', 25, 21, balance).ok).toBe(true);
+
+    const tile = index(25, 21, MAP_SIZE);
+    destroyTile(world, content, tile, noLosses());
+    expect(world.rubbleOf.get(tile)).toBe('vanilla:clinic');
+
+    const restored = roundTrip(world);
+
+    expect(restored.rubble[tile]).not.toBe(0);
+    expect(restored.rubbleOf.get(tile)).toBe('vanilla:clinic');
+  });
+
+  it('úklid trosek smaže i paměť', async () => {
+    // Prázdná parcela se nesmí pořád hlásit jako bývalá klinika.
+    const { world, content } = await city();
+    const balance = content.getBalance();
+    placeDefinition(world, content, 'vanilla:clinic', 25, 21, balance);
+    const tile = index(25, 21, MAP_SIZE);
+    destroyTile(world, content, tile, noLosses());
+
+    clearRubble(world, tile);
+
+    expect(world.rubbleOf.has(tile)).toBe(false);
+    expect(roundTrip(world).rubbleOf.has(tile)).toBe(false);
+  });
+
+  it('trosky po silnici jsou bezejmenné', async () => {
+    // Hromada po silnici vypadá jako hromada a hráč silnici najde podle
+    // sousedů. Ukládat u ní id by byl zbytečný záznam v každém savu.
+    const { world } = await city();
+    const tile = index(15, 20, MAP_SIZE);
+    spawnRubble(world, tile);
+
+    expect(world.rubble[tile]).not.toBe(0);
+    expect(world.rubbleOf.has(tile)).toBe(false);
+  });
+
+  it('starý save se načte, jen bez paměti', async () => {
+    // Migrace nemá co doplnit — ta informace v savu verze 6 nikdy nebyla.
+    // Hádat ji podle okolí by znamenalo napsat hráči do města nemocnici,
+    // která tam nikdy nestála.
+    const { world, content } = await city();
+    const balance = content.getBalance();
+    placeDefinition(world, content, 'vanilla:clinic', 25, 21, balance);
+    const tile = index(25, 21, MAP_SIZE);
+    destroyTile(world, content, tile, noLosses());
+
+    const save = unpackSave(serializeSave(world, OPTIONS));
+    // Verze 6 klíč `rubbleOf` neměla vůbec, takže se doopravdy odstraní —
+    // `undefined` by byl jiný stav než „chybí" a test by neověřil to, co má.
+    const disastersV6: Record<string, unknown> = { ...save.state.disasters };
+    delete disastersV6['rubbleOf'];
+    const asV6 = {
+      ...save,
+      meta: { ...save.meta, formatVersion: 6 },
+      state: { ...save.state, disasters: disastersV6 },
+    } as unknown as typeof save;
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(asV6));
+
+    expect(restored.rubble[tile]).not.toBe(0);
+    expect(restored.rubbleOf.size).toBe(0);
+  });
+});
+
+describe('značka na troskách', () => {
+  const SIZE = MAP_SIZE;
+  const at = (x: number, y: number): number => index(x, y, SIZE);
+
+  it('velká budova dostane jednu značku, ne devět', async () => {
+    // Devět křížků po nemocnici by udělalo mřížku, ze které se nepozná,
+    // jestli padla jedna velká budova nebo devět malých.
+    const { world, content } = await city();
+    const balance = content.getBalance();
+    placeDefinition(world, content, 'vanilla:hospital', 25, 21, balance);
+    destroyTile(world, content, at(25, 21), noLosses());
+
+    const marks = [...world.rubbleOf.keys()].filter((tile) =>
+      isRubbleMarkOrigin(world.rubbleOf, tile, SIZE),
+    );
+
+    expect(world.rubbleOf.size).toBeGreaterThan(1);
+    expect(marks).toEqual([at(25, 21)]);
+  });
+
+  it('dvě různé budovy vedle sebe mají značku každá', async () => {
+    // Kdyby se blok poznával jen podle „jsou tu trosky", splynuly by dvě
+    // sousední budovy v jednu a hráč by přišel o půlku informace.
+    const rubbleOf = new Map<number, string>([
+      [at(10, 10), 'vanilla:clinic'],
+      [at(11, 10), 'vanilla:fire_station'],
+    ]);
+
+    expect(isRubbleMarkOrigin(rubbleOf, at(10, 10), SIZE)).toBe(true);
+    expect(isRubbleMarkOrigin(rubbleOf, at(11, 10), SIZE)).toBe(true);
+  });
+
+  it('bezejmenné trosky značku nemají', async () => {
+    expect(isRubbleMarkOrigin(new Map<number, string>(), at(10, 10), SIZE)).toBe(false);
+  });
+
+  it('prázdná dlaždice obklopená troskami značku nedostane', async () => {
+    // Ošemetný případ: sousedé nesou id, tahle dlaždice ne. Bez kontroly „mám
+    // vůbec co značit" by porovnání `undefined !== 'clinic'` vyšlo jako
+    // „jsem roh" a hráč by dostal křížek na prázdné parcele.
+    const rubbleOf = new Map<number, string>([
+      [at(10, 11), 'vanilla:clinic'],
+      [at(11, 10), 'vanilla:clinic'],
+    ]);
+
+    expect(isRubbleMarkOrigin(rubbleOf, at(11, 11), SIZE)).toBe(false);
+  });
+
+  it('u levého okraje mapy se nekouká za hranu', async () => {
+    // Dlaždice ve sloupci 0 nemá souseda vlevo. Bez té stráže by se sáhlo na
+    // poslední sloupec předchozího řádku, což je úplně jiné místo mapy.
+    const rubbleOf = new Map<number, string>([
+      [at(SIZE - 1, 4), 'vanilla:clinic'],
+      [at(0, 5), 'vanilla:clinic'],
+    ]);
+
+    expect(isRubbleMarkOrigin(rubbleOf, at(0, 5), SIZE)).toBe(true);
+  });
+});

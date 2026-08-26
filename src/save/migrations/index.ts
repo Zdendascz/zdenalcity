@@ -201,6 +201,7 @@ const migrateV5ToV6: Migration = (save) => ({
       riskCeiling: {},
       offlinePlants: [],
       infection: [],
+      rubbleOf: [],
     },
     transit: { lines: [], nextLineId: 1 },
     finance: {
@@ -227,6 +228,26 @@ function emptyDisasterBytes(size: number): number {
   return size * size * DISASTER_LAYERS_V6;
 }
 
+/**
+ * Verze 6 → 7 (T64).
+ *
+ * Verze 7 přidala troskám paměť, co na nich stálo. Starý save ji nemá a mít
+ * nemůže — ta informace v něm nikdy nebyla. Hromady z verze 6 proto zůstanou
+ * **bezejmenné** a hráč u nich uvidí jen „trosky", ne „bývalá nemocnice".
+ *
+ * Domyslet by to nešlo: vrstva trosek ví, že tam něco leželo, ne co to bylo.
+ * Hádat podle okolí by znamenalo napsat hráči do savu nemocnici, která tam
+ * nikdy nestála.
+ */
+const migrateV6ToV7: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 7 },
+  state: {
+    ...save.state,
+    disasters: { ...save.state.disasters, rubbleOf: [] },
+  },
+});
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
@@ -234,6 +255,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   3: migrateV3ToV4,
   4: migrateV4ToV5,
   5: migrateV5ToV6,
+  6: migrateV6ToV7,
 };
 
 /**

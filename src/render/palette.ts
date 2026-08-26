@@ -162,6 +162,16 @@ export const RUBBLE_COLOR = 0x6b6560;
 export const RUBBLE_ALPHA = 0.85;
 
 /**
+ * Značka na troskách po budově: symbol toho, co tu stálo, v barvě poplachu.
+ *
+ * Nahlásil autor: po vyhořelém městě se nedalo poznat, co kde bylo. Hromada po
+ * nemocnici vypadala stejně jako hromada po hasičárně, takže z obnovy bylo
+ * hádání — a přitom právě u služeb je rozdíl, kterou postavit dřív.
+ */
+export const RUBBLE_MARK_COLOR = 0xe86b6b;
+export const RUBBLE_MARK_ALPHA = 0.95;
+
+/**
  * Oheň. Škála od doutnání k plamenům — hráč musí na první pohled poznat, kde
  * hoří nejvíc, protože právě tam se rozhoduje, jestli dům shoří.
  */

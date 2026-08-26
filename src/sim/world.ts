@@ -328,6 +328,20 @@ export interface WorldState {
   rubble: Uint8Array;
 
   /**
+   * Co na dlaždici stálo, než ji katastrofa srovnala. Klíč = dlaždice,
+   * hodnota = `definitionId`.
+   *
+   * **Řídká mapa, ne vrstva.** Trosky s pamětí jsou jen tam, kde stála budova;
+   * po silnici ani potrubí se nic nepamatuje. Plná vrstva by navíc musela
+   * ukládat čísla místo id, a do savu čísla definic nepatří (P6).
+   *
+   * Nahlásil autor: po vyhořelém městě se nedalo poznat, co kde bylo, takže
+   * z obnovy bylo hádání. Zvlášť u služeb — nemocnice a hasičárna po sobě
+   * nechají tutéž hromadu.
+   */
+  rubbleOf: Map<number, string>;
+
+  /**
    * Nakaženost po buňkách hrubé mřížky, 0–1 (T53).
    *
    * **Řídká mapa, ne vrstva.** Většina města je vždycky nenakažená; plná vrstva
@@ -449,6 +463,7 @@ export function createWorld(
     fuel: new Uint8Array(size * size),
     fireFlags: new Uint8Array(size * size),
     rubble: new Uint8Array(size * size),
+    rubbleOf: new Map<number, string>(),
     infection: new Map(),
     lines: [],
     nextLineId: 1,
@@ -554,6 +569,7 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.floodDepth = new Uint8Array(size * size);
   world.floodDamage = new Uint8Array(size * size);
   world.rubble = new Uint8Array(size * size);
+  world.rubbleOf.clear();
   world.disasters.active.length = 0;
   world.disasters.modifiers.length = 0;
   world.dirty.fullRedraw = true;

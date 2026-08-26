@@ -23,6 +23,8 @@ import {
   ROAD_COLORS,
   RUBBLE_ALPHA,
   RUBBLE_COLOR,
+  RUBBLE_MARK_ALPHA,
+  RUBBLE_MARK_COLOR,
   ROAD_WIDTHS,
   shade,
   TERRAIN_COLORS,
@@ -38,7 +40,9 @@ import {
   ZONE_COLOR_BY_VALUE,
   ZONE_OVERLAY_ALPHA,
 } from './palette';
-import { LEVEL_H, slopeLight, TILE_H, TILE_W, tileQuad } from './projection';
+import { gridToScreen, LEVEL_H, slopeLight, TILE_H, TILE_W, tileQuad } from './projection';
+import { iconShape } from './icons';
+import { isRubbleMarkOrigin } from '@/sim/disasters/rubble';
 import { roadMask, roadPolygons } from './roads';
 
 /** Chunk = 16×16 dlaždic. Změna jedné dlaždice invaliduje jeden chunk, ne mapu. */
@@ -104,8 +108,18 @@ interface Chunk {
  * a mezi překreslením se jen vykresluje, takže výkonový důvod chunkování
  * (nepřepočítávat 16 384 dlaždic každý snímek) platí dál za zlomek paměti.
  */
+/**
+ * Jméno střešního symbolu pro definici budovy. Renderer terénu obsah nezná
+ * a znát nemá — dostane jen tuhle jednu funkci.
+ */
+export type RoofIconLookup = (definitionId: string) => string | undefined;
+
+/** Jak velký je symbol na troskách vůči dlaždici. */
+const MARK_SCALE = 0.42;
+
 export class ChunkRenderer {
   private readonly world: ReadonlyWorldView;
+  private readonly roofIcon: RoofIconLookup | undefined;
   private readonly chunksPerAxis: number;
   private readonly chunks: Chunk[] = [];
   private readonly container: Container;
@@ -122,8 +136,9 @@ export class ChunkRenderer {
    */
   private bakes = 0;
 
-  constructor(world: ReadonlyWorldView, parent: Container) {
+  constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
+    this.roofIcon = roofIcon;
     this.chunksPerAxis = Math.ceil(world.size / CHUNK_SIZE);
 
     // Chunky se musí kreslit zezadu dopředu, tedy podle `cx + cy`. Na ploché
@@ -349,11 +364,52 @@ export class ChunkRenderer {
     // Trosky pod oheň: hořící suť má být vidět jako oheň, ne jako suť.
     if ((this.world.rubble[tileIndex] ?? 0) !== 0) {
       graphics.poly(points).fill({ color: RUBBLE_COLOR, alpha: RUBBLE_ALPHA });
+      this.drawRubbleMark(graphics, points, tileIndex);
     }
 
     // Oheň úplně nahoru, přes silnici i překryvy. Není to diagnostická vrstva,
     // kterou si hráč zapíná — je to věc, na kterou musí reagovat hned.
     this.drawFire(graphics, points, tileIndex);
+  }
+
+  /**
+   * Symbol toho, co na troskách stálo.
+   *
+   * Kreslí se jen na **levý horní roh** bloku, ne na každou dlaždici: nemocnice
+   * po sobě nechá devět hromad a devět křížků by z toho udělalo mřížku. Roh se
+   * pozná tím, že soused nahoře ani vlevo nenese totéž id — žádný extra stav
+   * to nepotřebuje.
+   *
+   * Symbol je ten, který budova nosila na střeše, v barvě poplachu. Hráč tak
+   * pozná, že tady byla nemocnice, aniž by na hromadu musel klikat.
+   */
+  private drawRubbleMark(graphics: Graphics, points: number[], tileIndex: number): void {
+    const was = this.world.rubbleOf.get(tileIndex);
+    if (was === undefined) return;
+    if (!isRubbleMarkOrigin(this.world.rubbleOf, tileIndex, this.world.size)) return;
+
+    const shape = iconShape(this.roofIcon?.(was));
+    if (!shape) return;
+
+    // Střed dlaždice ze čtyř jejích rohů — trosky leží na terénu, který se
+    // může naklánět, a symbol se musí naklonit s ním.
+    let cx = 0;
+    let cy = 0;
+    for (let i = 0; i < points.length; i += 2) {
+      cx += points[i] ?? 0;
+      cy += points[i + 1] ?? 0;
+    }
+    cx /= points.length / 2;
+    cy /= points.length / 2;
+
+    for (const polygon of shape) {
+      const mark: number[] = [];
+      for (const [u, v] of polygon) {
+        const point = gridToScreen(u - 0.5, v - 0.5);
+        mark.push(cx + point.x * MARK_SCALE, cy + point.y * MARK_SCALE);
+      }
+      graphics.poly(mark).fill({ color: RUBBLE_MARK_COLOR, alpha: RUBBLE_MARK_ALPHA });
+    }
   }
 
   /**

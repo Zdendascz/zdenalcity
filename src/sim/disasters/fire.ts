@@ -295,7 +295,7 @@ function burnDown(
         if (x >= world.size || y >= world.size) continue;
         const tile = index(x, y, world.size);
         extinguishTile(world, tile);
-        spawnRubble(world, tile);
+        spawnRubble(world, tile, building.definitionId);
       }
     }
 

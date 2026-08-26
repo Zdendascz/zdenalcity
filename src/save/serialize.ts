@@ -127,6 +127,9 @@ function packDisasters(world: WorldState): SaveDisasterState {
     riskCeiling: sortedRecord(state.riskCeiling),
     offlinePlants: [...state.offlinePlants].sort((a, b) => a - b),
     infection: [...world.infection.entries()].sort(([a], [b]) => a - b),
+    // Setříděné podle dlaždice, ať je save bajtově stabilní — `Map` si pamatuje
+    // pořadí vkládání a to závisí na tom, v jakém pořadí co shořelo.
+    rubbleOf: [...world.rubbleOf.entries()].sort(([a], [b]) => a - b),
   };
 }
 

@@ -194,7 +194,7 @@ function washAway(
         const x = building.x + dx;
         const y = building.y + dy;
         if (x >= world.size || y >= world.size) continue;
-        spawnRubble(world, index(x, y, world.size));
+        spawnRubble(world, index(x, y, world.size), building.definitionId);
       }
     }
 

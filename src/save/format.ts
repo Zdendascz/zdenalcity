@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 6;
+export const CURRENT_FORMAT_VERSION = 7;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -165,6 +165,14 @@ export interface SaveDisasterState {
   offlinePlants: number[];
   /** Nakaženost po buňkách, řídce: `[buňka, 0..1]`. */
   infection: [number, number][];
+  /**
+   * Co na dlaždici stálo, než ji katastrofa srovnala (verze 7).
+   *
+   * Řídce jako `[dlaždice, definitionId]`. Ukládá se **id, ne číslo** (P6) —
+   * a je to jediný důvod, proč to není další vrstva: vrstva by musela nést
+   * čísla a ta by po přidání budovy do obsahu znamenala něco jiného.
+   */
+  rubbleOf: [number, string][];
 }
 
 export interface SaveActiveDisaster {

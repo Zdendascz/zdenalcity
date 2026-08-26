@@ -2666,6 +2666,45 @@ zóny a červeného křížku — odbarvené schválně, ať se to nečte jako �
 s obytnou zónou", ale „pryč se zónováním". Je to **náhražka**: až přibude
 kreslená ikona toho jména, stačí ji do složky hodit a skript už nepouštět.
 
+- [x] T64 — trosky si pamatují, co na nich stálo (save v7)
+
+**Nahlásil autor:** po vyhořelém městě se nedalo poznat, co kde bylo. Hromada
+po nemocnici vypadá stejně jako hromada po hasičárně, takže z obnovy bylo
+hádání — a přitom právě u služeb je celý rozdíl v tom, kterou postavit dřív.
+
+Trosky proto nesou `definitionId` toho, co je způsobilo. Je to **řídká mapa,
+ne vrstva**: paměť má smysl jen tam, kde stála budova, a vrstva by musela nést
+čísla místo id, což do savu nepatří (P6). Zapisují ji všechna tři místa, kde
+budovy padají — škody, oheň i povodeň.
+
+Silnice a potrubí id nedostávají schválně. Hromada po silnici vypadá jako
+hromada a hráč silnici najde podle sousedů; záznam u každé z nich by jen
+nafukoval save.
+
+Na mapě to nese **symbol té budovy v barvě poplachu**, ten samý, který nosila
+na střeše. Kreslí se jen na **levý horní roh** bloku: nemocnice po sobě nechá
+devět hromad a devět křížků by z toho udělalo mřížku, ze které se nepozná,
+jestli padla jedna velká budova nebo devět malých. Roh se pozná tím, že soused
+nahoře ani vlevo nenese totéž id — žádný extra stav to nepotřebuje. Dva stejné
+domy vedle sebe splynou v jeden blok a je to cena za to, že se nikde nevede,
+kde budova začínala.
+
+Úklid trosek maže i paměť. Prázdná parcela se nesmí pořád hlásit jako bývalá
+klinika.
+
+Save je **verze 7**. Migrace v6 → v7 nemá co doplnit a nedoplňuje: ta informace
+v savu verze 6 nikdy nebyla, takže staré hromady zůstanou bezejmenné. Hádat je
+podle okolí by znamenalo napsat hráči do města nemocnici, která tam nikdy
+nestála. Fixtura `v7.city.base64` je odehrané město s devíti dlaždicemi trosek
+po nemocnici a běžícím požárem.
+
+Mutační test 10 z 10. Poslední přeživší byl poučný: stráž „mám vůbec co
+značit" nešlo zabít, protože u prázdné mapy vyšlo `undefined === undefined`
+stejně jako se stráží. Chytil ji až případ, kdy sousedé id nesou a prostřední
+dlaždice ne — tam by bez stráže dostala značku prázdná parcela.
+
+1010 testů.
+
 
 ## Rozpracované
 

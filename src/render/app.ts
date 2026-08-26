@@ -489,7 +489,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     return unhappiness;
   };
 
-  const chunkRenderer = new ChunkRenderer(world, worldContainer);
+  const chunkRenderer = new ChunkRenderer(
+    world,
+    worldContainer,
+    // Trosky nesou symbol toho, co tu stálo. Renderer terénu obsah nezná,
+    // dostane jen tuhle jednu funkci (P5).
+    (definitionId) => content.get(definitionId)?.graphics.icon,
+  );
   const buildingRenderer = new BuildingRenderer(
     world,
     worldContainer,

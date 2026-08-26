@@ -129,6 +129,12 @@ function parseDisasters(raw: Record<string, unknown>): SaveDisasterState {
     riskCeiling: numberRecord(raw['riskCeiling'], `${what}.riskCeiling`),
     offlinePlants: numberArray(raw['offlinePlants'], `${what}.offlinePlants`),
     infection: pairArray(raw['infection'], `${what}.infection`),
+    // Verze 7. Starší save paměť trosek nemá a je to v pořádku — hromady po
+    // něm zůstanou bezejmenné, ne že by se hra odmítla načíst.
+    rubbleOf:
+      raw['rubbleOf'] === undefined
+        ? []
+        : tileIdPairs(raw['rubbleOf'], `${what}.rubbleOf`),
   };
 }
 
@@ -221,6 +227,18 @@ function numberRecord(value: unknown, what: string): Record<string, number> {
     out[key] = item;
   }
   return out;
+}
+
+/** Řídká mapa `dlaždice → id definice`. Id je řetězec (P6), ne číslo. */
+function tileIdPairs(value: unknown, what: string): [number, string][] {
+  return asArray(value, what).map((item, i) => {
+    const pair = asArray(item, `${what}[${i}]`);
+    const [tile, id] = pair;
+    if (typeof tile !== 'number' || typeof id !== 'string') {
+      fail(`${what}[${i}] musí být [dlaždice, id definice]`);
+    }
+    return [tile, id] as [number, string];
+  });
 }
 
 function pairArray(value: unknown, what: string): [number, number][] {
@@ -330,6 +348,7 @@ function emptyDisasters(): SaveDisasterState {
     riskCeiling: {},
     offlinePlants: [],
     infection: [],
+    rubbleOf: [],
   };
 }
 
@@ -768,6 +787,9 @@ function applyDisastersToWorld(world: WorldState, save: SaveData, size: number):
 
   world.infection.clear();
   for (const [cell, level] of raw.infection) world.infection.set(cell, level);
+
+  world.rubbleOf.clear();
+  for (const [tile, definitionId] of raw.rubbleOf) world.rubbleOf.set(tile, definitionId);
 
   // Počítadlo hořících dlaždic je odvozené — spočítá se z vrstvy, ne ze savu.
   countBurning(world);
