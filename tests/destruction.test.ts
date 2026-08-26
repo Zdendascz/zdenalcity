@@ -80,9 +80,9 @@ describe('obsah dlaždice', () => {
 
     const tile = index(building.x, building.y, MAP_SIZE);
     building.level = 1;
-    const low = contentKindAt(world, content, tile);
+    const low = contentKindAt(world, content, VANILLA_BALANCE, tile);
     building.level = 4;
-    const high = contentKindAt(world, content, tile);
+    const high = contentKindAt(world, content, VANILLA_BALANCE, tile);
 
     expect(low).toBe('residentialLow');
     expect(high).toBe('residentialHigh');
@@ -96,7 +96,7 @@ describe('obsah dlaždice', () => {
 
     const tile = index(building.x, building.y, MAP_SIZE);
     building.abandoned = true;
-    expect(contentKindAt(world, content, tile)).toBe('abandoned');
+    expect(contentKindAt(world, content, VANILLA_BALANCE, tile)).toBe('abandoned');
   });
 
   it('silnice, potrubí, les i prázdno mají vlastní druh', async () => {
@@ -108,10 +108,10 @@ describe('obsah dlaždice', () => {
     buildPipe(world, 11, 10, content.getBalance());
     world.layers.terrain[index(12, 10, MAP_SIZE)] = TERRAIN.forest;
 
-    expect(contentKindAt(world, content, index(10, 10, MAP_SIZE))).toBe('road');
-    expect(contentKindAt(world, content, index(11, 10, MAP_SIZE))).toBe('pipe');
-    expect(contentKindAt(world, content, index(12, 10, MAP_SIZE))).toBe('forest');
-    expect(contentKindAt(world, content, index(13, 10, MAP_SIZE))).toBe('empty');
+    expect(contentKindAt(world, content, VANILLA_BALANCE, index(10, 10, MAP_SIZE))).toBe('road');
+    expect(contentKindAt(world, content, VANILLA_BALANCE, index(11, 10, MAP_SIZE))).toBe('pipe');
+    expect(contentKindAt(world, content, VANILLA_BALANCE, index(12, 10, MAP_SIZE))).toBe('forest');
+    expect(contentKindAt(world, content, VANILLA_BALANCE, index(13, 10, MAP_SIZE))).toBe('empty');
   });
 
   it('tabulky odolnosti jsou úplné', () => {
@@ -253,12 +253,12 @@ describe('hod na zničení', () => {
     // Šance nula: nic se nezničí, počítají se čistě hody.
     const shape = { kind: 'radius' as const, x: 21, y: 21, radius: 4 };
     const tiles = tilesOf(world, shape).length;
-    rollDamage(world, content, shape, () => 0, noLosses());
+    rollDamage(world, content, VANILLA_BALANCE, shape, () => 0, noLosses());
     expect(draws).toBe(tiles);
 
     // A při jistotě: devět dlaždic nemocnice spolkne jediný hod navíc.
     draws = 0;
-    const hit = rollDamage(world, content, shape, () => 1, noLosses());
+    const hit = rollDamage(world, content, VANILLA_BALANCE, shape, () => 1, noLosses());
     expect(draws).toBe(tiles);
     expect(hit).toHaveLength(tiles - 8);
     expect(world.buildings.size).toBe(0);
@@ -620,7 +620,7 @@ describe('výbuch a průmyslová havárie', () => {
       const origin = accident.pickOrigin(world, content, content.getBalance());
       if (!origin) continue;
       const tile = index(origin.x, origin.y, MAP_SIZE);
-      const kind = contentKindAt(world, content, tile);
+      const kind = contentKindAt(world, content, VANILLA_BALANCE, tile);
       expect(['industrial', 'abandoned'], `pokus ${attempt}`).toContain(kind);
     }
   });

@@ -680,6 +680,15 @@ export interface Balance {
     maxRiskMultiplier: number;
     indicators: { uncoveredBelow: number; denseLevel: number; ageTicks: number };
     /**
+     * Od téhle úrovně výš je zástavba pro účely škod „vysoká" — panelák snese
+     * tornádo i otřes líp než chalupa. Sdílí ji tornádo, zemětřesení i výbuchy,
+     * aby se nelišily v tom, jestli se počítá od tří nebo od čtyř.
+     *
+     * Není to `indicators.denseLevel`: ten říká, odkud je čtvrť hustá pro
+     * výpočet rizika, tohle říká, odkud je dům pevný. Můžou se lišit.
+     */
+    damage: { highLevel: number };
+    /**
      * Trosky (R15). Chovají se jako opuštěné budovy z fáze 2 — sráží cenu půdy
      * a živí kriminalitu — a stojí peníze, než je hráč uklidí.
      */
@@ -951,6 +960,16 @@ export function validateBalance(raw: unknown): {
           'disasters.indicators.ageTicks',
           0,
           1000000,
+        ),
+      },
+      damage: {
+        highLevel: num(
+          issues,
+          disasters ? asRecord(disasters['damage']) : null,
+          'highLevel',
+          'disasters.damage.highLevel',
+          1,
+          5,
         ),
       },
       rubble: {

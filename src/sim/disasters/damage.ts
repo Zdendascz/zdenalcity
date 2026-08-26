@@ -15,8 +15,9 @@ import type { Shape, ShapeFilter } from './shapes';
  * zemětřesení zranitelnost, výbuchy odolnost. Čísla se liší, **klíč je
  * stejný** — druh toho, co na dlaždici stojí. Kdyby si každá katastrofa
  * zjišťovala obsah po svém, lišily by se v tom, jestli je opuštěný dům pořád
- * obytný a jestli se úroveň počítá od tří nebo od čtyř, a hráč by z toho měl
- * čtyři různá pravidla místo jednoho.
+ * obytný a odkud se počítá vysoká zástavba, a hráč by z toho měl čtyři různá
+ * pravidla místo jednoho. Práh vysoké zástavby je v datech
+ * (`disasters.damage.highLevel`), ne tady (P5).
  */
 
 /**
@@ -40,12 +41,10 @@ export type ContentKind =
   | 'rubble'
   | 'empty';
 
-/** Od téhle úrovně výš je zástavba „vysoká". Sdílí ji tornádo i zemětřesení. */
-const HIGH_LEVEL = 3;
-
 export function contentKindAt(
   world: WorldState,
   catalogue: BuildingCatalogue,
+  balance: Balance,
   tile: number,
 ): ContentKind {
   const buildingId = world.layers.buildingId[tile] ?? 0;
@@ -55,7 +54,9 @@ export function contentKindAt(
       if (building.abandoned) return 'abandoned';
       const category = catalogue.get(building.definitionId)?.category ?? 'service';
       if (category === 'residential') {
-        return building.level >= HIGH_LEVEL ? 'residentialHigh' : 'residentialLow';
+        return building.level >= balance.disasters.damage.highLevel
+          ? 'residentialHigh'
+          : 'residentialLow';
       }
       if (category === 'commercial') return 'commercial';
       if (category === 'industrial') return 'industrial';
@@ -180,6 +181,7 @@ export function downgradeTile(
 export function rollDamage(
   world: WorldState,
   catalogue: BuildingCatalogue,
+  balance: Balance,
   shape: Shape,
   chanceAt: (tile: number, kind: ContentKind) => number,
   losses: Losses,
@@ -189,7 +191,7 @@ export function rollDamage(
   const seen = new Set<number>();
 
   for (const tile of tilesOf(world, shape, filter)) {
-    const kind = contentKindAt(world, catalogue, tile);
+    const kind = contentKindAt(world, catalogue, balance, tile);
     const chance = chanceAt(tile, kind);
     const roll = world.rng.next();
     if (roll >= chance) continue;

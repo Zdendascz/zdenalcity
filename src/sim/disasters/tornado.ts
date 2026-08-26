@@ -96,6 +96,7 @@ function advance(context: DisasterContext, active: ActiveDisaster): void {
   const hit = rollDamage(
     world,
     catalogue,
+    balance,
     shape,
     (tile, kind) => {
       // Útlum od osy: na kraji pásu tornádo jen olízne.

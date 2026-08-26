@@ -103,7 +103,7 @@ function shake(context: DisasterContext, magnitude: number): void {
     if (!building) continue;
 
     const tile = index(building.x, building.y, world.size);
-    const kind = contentKindAt(world, catalogue, tile);
+    const kind = contentKindAt(world, catalogue, balance, tile);
     const hit = magnitude * falloff(world, quake, context, building.x, building.y) *
       lookup(quake.vulnerability, kind);
 
@@ -171,7 +171,7 @@ function shakeInfrastructure(
   for (const tile of candidates) {
     const x = tile % world.size;
     const y = (tile - x) / world.size;
-    const kind = contentKindAt(world, catalogue, tile);
+    const kind = contentKindAt(world, catalogue, balance, tile);
     const hit = magnitude * falloff(world, quake, context, x, y) * lookup(quake.vulnerability, kind);
     if (world.rng.next() >= hit) continue;
     destroyTile(world, catalogue, tile, losses);

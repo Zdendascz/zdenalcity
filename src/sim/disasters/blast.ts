@@ -68,6 +68,7 @@ function detonate(
   rollDamage(
     world,
     catalogue,
+    balance,
     blast,
     (tile, content) => {
       const falloff = distanceFalloff(world, tile, context.x, context.y, radius);

@@ -62,6 +62,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
   rollDamage(
     world,
     catalogue,
+    balance,
     { kind: 'radius', x: context.x, y: context.y, radius: spill.blastRadius },
     (tile) =>
       tile === index(context.x, context.y, world.size)

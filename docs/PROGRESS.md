@@ -2394,19 +2394,116 @@ Vyplavalo při tom, že `applySaveToWorld` dostával v testu save zastavený na
 verzi 5. Kontrakt je, že se do světa dává **zmigrovaný** save; teď to test
 respektuje a `disasters.bin` se vyžaduje.
 
+- [x] T60 — vyhodnocení fáze 4
+
+Dvacet pět kritérií z §11. Většinu z nich pokrývaly testy jednotlivých úkolů;
+šest ne — ta byla průřezová, tvrdila něco o tom, že spolu věci drží, a takové
+tvrzení nemá kde vzniknout, když každý úkol testuje jen sebe. Dostala vlastní
+sadu `tests/phase4.test.ts`: determinismus po 5000 tikách se **všemi čtrnácti**
+katastrofami, linkou a půjčkou najednou (22), blackout jako zesilovač rizika
+požáru (11), podfinancované hasičárny (6), dozvuk chemické havárie (15),
+vypnuté katastrofy přes save (4) a všechny čtyři velikosti mapy (1).
+
+Kritérium 6 stálo za čtyři pokusy a je poučné, proč. První verze měřila dobu
+hoření v zástavbě — jenže dům shoří a tím oheň skončí, takže test měřil
+životnost domu, ne práci hasičů. Druhá měřila les, který byl tak malý, že oheň
+došlo palivo dřív, než na něm záleželo financování. Třetí měla les tak velký,
+že přerostl dosah jedné stanice, a rozdíl mezi plným a nulovým rozpočtem se
+utopil v tom, že většina lesa nebyla pokrytá tak jako tak. Sondovací test
+nakonec ukázal skutečný vztah: při pokrytí 0 hoří 163 tiků a shoří 50 dlaždic,
+při 40 to je 41 tiků a 7 dlaždic, při 255 pak 23 tiků a 4 dlaždice. Finální
+test blanketuje menší les třemi stanicemi a tvrdí obojí — delší hoření
+**i** větší spáleniště.
+
+### Co audit našel
+
+**Kritérium 24 — konstanta balancu v kódu.** `damage.ts` si držel
+`HIGH_LEVEL = 3`, práh, od kterého je obytná zástavba pro účely škod „vysoká".
+Sdílelo ho tornádo, zemětřesení i výbuchy — a přitom v datech už seděl
+`disasters.indicators.denseLevel` na čtyřech, tedy jiné číslo pro velmi
+podobnou myšlenku. Práh je teď v datech jako `disasters.damage.highLevel`
+a `contentKindAt` i `rollDamage` dostaly `balance`.
+
+Schválně **nesloučený** s `denseLevel`: ten říká, odkud je čtvrť hustá pro
+výpočet rizika, tenhle odkud je dům pevný. Že mají obě čísla stejný typ, z nich
+nedělá totéž. Sloučení by změnilo, co tornádo srovná se zemí, a to je rozhodnutí
+o ladění, ne o úklidu kódu — leží teď v datech vedle sebe a je vidět.
+
+**Kritérium 25 — text mimo locale.** Kontrola našla něco jiného, než hledala:
+`ui.disaster.pileup`, `strike`, `riot`, `gangWar`, `blackout`, `epidemic`
+a `chemicalSpill` byly v `cs.json` i `en.json` **dvakrát**. Vzniklo to při T52
+a T53, kdy každý úkol vložil svou skupinu na vlastní místo. `JSON.parse`
+duplicitní klíč mlčky přepíše posledním, takže hra fungovala, žádný test
+nespadl a v souboru to bylo vidět jen tomu, kdo se dívá.
+
+Kontrola proto sahá na **syrový text**, ne na rozparsovaný objekt — přes
+`import.meta.glob` s `?raw`, aby si nevyžádala `@types/node`. Druhý nový test
+hlídá, že každá registrovaná katastrofa má jméno v obou jazycích: jména se
+skládají za běhu jako `ui.disaster.${kind}`, takže kontrola literálních klíčů
+v `i18n.test.ts` je míjela a nová katastrofa se mohla hráči ohlásit syrovým
+klíčem.
+
+Zůstává známé omezení: duplicitu hlídá **test, ne hra**. Vanilla obsah se
+parsuje ve Vite při buildu a runtime už syrový text nemá. Až se ve fázi 5
+načtou mody ze ZIPu, bude se `ContentSource` muset zeptat na text sám.
+
+### Co se nezměřilo
+
+**Kritérium 2 — 512×512 při 60 FPS: neověřeno v téhle relaci.** Panel prohlížeče
+nekompozituje, `requestAnimationFrame` neběží vůbec (nula snímků za pět sekund),
+takže žádné číslo, které bych naměřil, by nebylo o snímkování. Chce to jeden
+ruční pohled.
+
+Co změřit šlo, změřeno bylo: **1,59 ms na tik** na prázdné mapě 512×512.
+Proti 0,49 ms z T45 je to trojnásobek — plánovač katastrof, riziko, linky
+a finance přibyly a platí se za ně. Při třech ticích za sekundu je to 4,8 ms
+práce na sekundu; do rozpočtu snímku se tik vejde s velkou rezervou i tehdy,
+když padne přesně do něj. Simulace tedy pořád není úzké hrdlo a **T46 zůstává
+odepsaný** ze stejného důvodu jako v T45.
+
+### Zbytek
+
+Kritéria 3, 5, 7–10, 12–14, 16–21 a 23 drží sady jednotlivých úkolů; golden
+testy prochází beze změny. Mutační test nových míst 3 ze 3.
+
+Celkem 972 testů.
+
+### Co fáze 4 nedodělala v rozhraní
+
+Sedm příkazů z 4c nemá **žádné tlačítko** a jde k nim jen přes `dispatch`:
+`take_loan`, `issue_bond`, `create_line`, `delete_line`, `add_stop`,
+`remove_stop`, `set_vehicles`, `set_fare`. Rozpočtový panel přitom řádky
+*dluh*, *dluhopisy* a *MHD* už zobrazuje — hráč vidí čísla, která nemá jak
+ovlivnit. Chybí i přepínač katastrof za běhu; dá se jen při zakládání města,
+i když save si stav poctivě nese (T59).
+
+Zadání fáze 4 tahle tlačítka nikde nepředepisuje a akceptační kritéria je
+netestují — kritéria 16 až 20 mluví o chování linek a závazků, ne o tom, kudy
+se k nim hráč dostane. Testy je proto volají přímo. Není to tedy nesplněné
+kritérium, ale díra mezi tím, co simulace umí, a co jde odehrát.
+
+Při soupisu se ukázalo i to, že tři zóny sdílejí jednu ikonu `zone`, čtyři
+dopravní stavby jednu `bus` a **všech čtrnáct katastrof jednu `disaster`** —
+v roletce se rozlišují pouze textem.
+
 
 ## Rozpracované
 
-**Fáze 4.** Hotová je celá 4a (T42–T45; T46 odpadl podle měření) a z 4b
-kostra katastrof a **čtrnáct katastrof z patnácti** — chybí jen sesuv půdy,
-který čeká na 3b.
+**Fáze 4.** Hotová je celá 4a (T42–T45; T46 odpadl podle měření) i 4b až po
+vyhodnocení (T47–T53, T55–T60) — **čtrnáct katastrof z patnácti**, MHD,
+finance, save v6. Chybí jen sesuv půdy, který čeká na 3b.
+
+Jedno akceptační kritérium fáze zůstává **neověřené**: 512×512 při 60 FPS
+(§11 bod 2). Měření se v poslední relaci nedalo provést a chce ruční pohled.
+
+Mimo kritéria zůstává **bez rozhraní celá 4c** — půjčky, dluhopisy a linky MHD
+jdou jen přes `dispatch`. Viz vyhodnocení T60.
 
 Zbývá:
 
 | Úkol | Obsah |
 |---|---|
-| T54 | Sesuv půdy |
-| T60 | Vyhodnocení fáze 4 |
+| T54 | Sesuv půdy — čeká na fázi 3b (R22) |
 
 _(T41 — vyhodnocení fáze 3 — zůstává otevřené. Je to rozhodovací bod pro
 autora, ne technický úkol.)_

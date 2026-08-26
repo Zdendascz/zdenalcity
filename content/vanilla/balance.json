@@ -193,6 +193,7 @@
   "disasters": {
     "maxRiskMultiplier": 3,
     "indicators": { "uncoveredBelow": 60, "denseLevel": 4, "ageTicks": 3600 },
+    "damage": { "highLevel": 3 },
     "rubble": {
       "clearCost": 25,
       "crimeWeight": 1.5,
