@@ -3112,13 +3112,6 @@ Mimo zadání fází, otevřené k rozhodnutí:
   koeficientu ~2,4; žádný koeficient nedá zároveň obě čísla z prózy. Kód se
   řídí **vzorcem**, protože ten je normativní. Rozhodnutí patří autorovi — je
   to jedno číslo v `balance.json`.
-- **Katastrofy se neukládají.** `world.disasters`, vrstvy `fire`, `fuel`,
-  `fireFlags` a `rubble` jsou runtime stav; formát savu je pořád verze 5.
-  Patří to do T59 (save v6) a do té doby se rozehraná pohroma načtením savu
-  ztratí.
-- **Vrstva `flood` neexistuje.** `floodArea()` v `effects.ts` je proto prázdná
-  operace, která vrací nulu. Přidává ji T49; ostatní katastrofy na ni už
-  odkazují, aby volání existovalo a nemuselo se čekat s prázdným `TODO`.
 - **Past na jméno souboru `locale.py`.** Pomocný skript v adresáři, ze kterého
   se pouští Python, může zastínit modul ze standardní knihovny — Python dává
   adresář skriptu na začátek cesty k modulům. Konkrétně `locale.py` se
@@ -3126,16 +3119,6 @@ Mimo zadání fází, otevřené k rozhodnutí:
   spustil a přepsal `content/vanilla/locale/*.json`. Projevilo se to jako
   „záhadně přeformátované locale soubory" a chvíli se to hledalo. Pomocné
   skripty nepojmenovávat jako moduly stdlib.
-
-- **Z bankrotu není cesta zpátky.** Daně platí jen obyvatelé a pracovní místa
-  v zónách; služby a infrastruktura nevydělávají nic. Město, které utratí vše
-  na elektrárnu, vodárnu a kliniku dřív, než mu vyroste první dům, má příjem
-  nula, údržbu pár set měsíčně a růst zastavený kvůli mínusu — a **nemá jak se
-  z toho dostat**, protože bourání údržbu snižuje, ale peníze nepřidá. Narazil
-  na to autor při hraní: kasa −1 066, nula obyvatel, 58 míst, bilance +0/−536.
-  Hláška o bankrotu na to teď aspoň upozorní, ale řešení je rozhodnutí o
-  designu — nabízí se vypnout službám údržbu, když na ně nejsou peníze
-  (přestanou fungovat, ale nezadluží), nebo půjčka. Patří to k T41.
 
 - **Kopec před budovou ji nezakryje.** Renderer kreslí nejdřív celý terén a pak
   všechny budovy, takže budova je vždycky nad terénem. Správně by se muselo
@@ -3159,49 +3142,16 @@ Mimo zadání fází, otevřené k rozhodnutí:
   zalamují a nic nepřeteče, ale mapa pod nimi skoro není vidět. Na běžném okně
   (1100 px a víc) je to v pořádku. Kdyby měla hra běžet i v malém okně, chce to
   kompaktní režim — panely na ikony a poptávku jen jako tři proužky.
-- **Město se dá pojmenovat jen v kódu.** Save ukládá `cityName: 'quicksave'`,
-  protože dialog nové hry neexistuje. Formát na jméno připravený je.
 - **Druhá elektrárna se dnes finančně nevyplatí.** Změřeno: s jednou byla
   bilance +1032/−755 (čistých 277), se dvěma +1222/−1070 (čistých 152).
   Rozsvícené budovy začnou platit údržbu a elektrárna má svých 200, takže
   se dosvícení zbytku města prodělá. Je to balanc, tedy věc T10 — nabízí se
   buď levnější provoz elektrárny, nebo vyšší daňový výnos.
-- **Zóna musí být tak hluboká jako footprint budovy, a hráč to nepozná.**
-  `industrial_small` má footprint 2×2, takže v jednořadé zóně nevyroste nic —
-  narazil jsem na to sám při ověřování T7 a chvíli hledal chybu v kódu, která
-  tam nebyla. Hra o tom mlčí. Nabízí se ukázat při zónování obrys toho, co se
-  tam vejde, nebo nechat vyrůst menší budovu. Patří to k T9 nebo T10.
 - **`requiresPower` a `power.consumption` se překrývají.** `requiresPower` říká
   „bez proudu nevyrostu", `consumption > 0` říká „beru proud". Zatím to jsou dva
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
   nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
   z nich pravděpodobně zmizí.
-- **Konstanty fáze 1 zůstávají v kódu.** `balance.json` je podle zadání balanc
-  fáze 2, takže hodnota daňové jednotky, startovní kapitál, váhy poptávky
-  a podíl pracujících jsou pořád v `demand.ts`, `economy.ts` a `world.ts`.
-  Podíl pracujících navíc existuje na dvou místech — v `demand.ts` a v `crime.ts`,
-  kde musí sedět. Sjednotit by to chtělo, až se bude ladit balanc fáze 1.
-- **Kriminalita zatím nepočítá s opuštěnými budovami** — ty vznikají až v T17.
-- **Na mapě není ani kapka vody, takže bonus vody nemá kde platit.** Zadání
-  fáze 2 s ním počítá jako s jediným vstupem nezávislým na hráči, „aby mapa
-  nebyla homogenní ještě než hráč cokoli postaví" — jenže fáze 1 žádný generátor
-  terénu nepostavila a mapa je stoprocentně tráva. Mechanismus je hotový
-  a otestovaný (test si vodu do mapy dokreslí), ale ve hře se neprojeví.
-  **Generátor mapy není v žádném úkolu fáze 2** — rozhodnutí patří autorovi.
-- **Cena půdy dnes nepřekročí 65** (základ 40 + bonus vody 25), a bez vody 40.
-  Prahy úrovní budov začínají na 90, takže dokud služby nezačnou do vzorce
-  přispívat (T13–T14), nic se nepovýší. Pořadí úkolů to řeší — T16 přijde až
-  po nich — ale **při T13 se nesmí zapomenout přidat pokrytí do vzorce ceny půdy**.
-- **Co dnes rozhoduje o vzniku budovy** (odpověď na dotaz autora, podklad pro fázi 2):
-  nezáporná kasa → systém běží 1× za 12 tiků a udělá 4 pokusy → každý pokus má
-  40% šanci → náhodná volná zónovaná dlaždice, rovnoměrně → poptávka kategorie
-  musí být kladná → náhodná definice z kategorie → půdorys volný, povolený terén,
-  sousedící silnice. **Nic jiného vliv nemá.** Z toho plynou tři slabiny:
-  - **Poptávka je vypínač, ne váha.** Poptávka 1 a 100 stavějí stejně rychle.
-  - **Daně na růst nemají vliv vůbec.** Chybí vazba „vysoké daně odrazují".
-  - **Silnice se vyhodnocuje jako přímé sousedství**, ne dosah. Dlaždice o dvě
-    pole dál je nedosažitelná napořád, a co hůř: takové dlaždice pořád padají
-    do losu, takže velká zóna daleko od silnic zpomaluje růst i tam, kde stavět jde.
 - **Zóna mělčí než půdorys budovy pořád mlčí.** Rámeček řeší ruční stavbu, ale
   u zóny hráč nevidí, že se do ní zvolená budova nikdy nevejde. Zbývá z původní
   dvojice problémů.
@@ -3214,3 +3164,24 @@ Mimo zadání fází, otevřené k rozhodnutí:
   Node ≥ 20.12). Registr je v pořádku, stačí **restart terminálu / Claude Code**.
   Jednorázová objížďka bez restartu:
   `$env:PATH = "C:\Users\Intel\scoop\apps\nodejs-lts\current;$env:PATH"`.
+
+### Vyřešeno (odstraněno ze seznamu)
+
+Seznam se od fáze 1 nečistil a tvrdil věci, které dávno neplatí. Kdo by ho
+četl, dozvěděl by se, že se katastrofy neukládají a že na mapě není voda.
+Co odsud zmizelo a kde se to vyřešilo:
+
+| Problém | Vyřešeno |
+|---|---|
+| Katastrofy se neukládají, save je verze 5 | T59, dnes verze 8 |
+| Vrstva `flood` neexistuje | T49 |
+| Z bankrotu není cesta zpátky | T57 — půjčka se odvozuje od příjmu |
+| Město se dá pojmenovat jen v kódu | dialog nové hry |
+| Kriminalita nepočítá s opuštěnými budovami | T17 |
+| Na mapě není ani kapka vody | generátor terénu |
+| Cena půdy nepřekročí 65, služby do vzorce nepřispívají | T13–T14 |
+| Poptávka je vypínač, daně na růst nemají vliv, silnice se bere jako sousedství | T18 — přepis růstu na váhy, daňový faktor a dosah |
+| Konstanty fáze 1 zůstávají v kódu | balanc je v datech; naposledy prověřeno auditem kritéria 24 v T60 |
+
+Zóna mělčí než půdorys budovy zůstává — dvě odrážky o tomtéž se slily do jedné.
+

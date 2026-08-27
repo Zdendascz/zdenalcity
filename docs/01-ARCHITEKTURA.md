@@ -575,13 +575,19 @@ Plus technická kritéria:
 
 ## 14. Plán fází
 
-| Fáze | Obsah |
-|---|---|
-| **1** | Smyčka výše. Plochá mapa, procedurální grafika, R/C/I, elektřina, daně, save. |
-| **2** | Znečištění, cena půdy, doprava, kriminalita, hasiči/policie/školy, úrovně budov, demolice, převýšení terénu. |
-| **3** | Content registry pro externí zdroje, mod loading, kompletní lokalizace, save migrace v ostrém provozu, sprity. |
-| **4** | Electron, Steamworks, Steam Cloud, achievementy, Workshop, GOG. |
-| **5** | DLC, případný backend pro cross-platform savy, telemetrie. |
+> **Tahle tabulka je původní hrubý plán a se skutečností se rozešla.** Práce
+> nakonec šla jinudy: převýšení terénu se udělalo ve fázi 3 místo 2, katastrofy
+> a MHD si vyžádaly vlastní fázi 4, a distribuce se zatím neřešila vůbec.
+> Co se doopravdy stalo, je v `docs/PROGRESS.md`; zadání jednotlivých fází
+> v `03-FAZE-2.md`, `04-FAZE-3.md` a `05-FAZE-4.md`.
+
+| Fáze | Původní plán | Jak to dopadlo |
+|---|---|---|
+| **1** | Smyčka výše. Plochá mapa, procedurální grafika, R/C/I, elektřina, daně, save. | hotovo podle plánu |
+| **2** | Znečištění, cena půdy, doprava, kriminalita, hasiči/policie/školy, úrovně budov, demolice, převýšení terénu. | hotovo, jen **převýšení terénu** se přesunulo do fáze 3 |
+| **3** | Content registry pro externí zdroje, mod loading, kompletní lokalizace, save migrace v ostrém provozu, sprity. | místo toho **převýšení terénu, voda, mosty, generátor map**; mody a sprity se odložily |
+| **4** | Electron, Steamworks, Steam Cloud, achievementy, Workshop, GOG. | místo toho **velikosti map, patnáct katastrof, MHD, finance, save v8** |
+| **5** | DLC, případný backend pro cross-platform savy, telemetrie. | **zadání neexistuje** — co dál, je otevřené rozhodnutí |
 
 ---
 
