@@ -242,6 +242,7 @@
   "ui.save.open": "Načíst ze souboru",
   "ui.save.saved": "Uloženo ({size} kB)",
   "ui.save.loaded": "Načteno",
+  "ui.save.storeFailed": "Uložit se nepovedlo — úložiště prohlížeče je plné nebo vypnuté.",
   "ui.save.empty": "Zatím není co načíst",
   "ui.save.failed": "Save se nepodařilo přečíst: {reason}",
   "ui.save.noWaterNetwork": "Načtené město nemá vodovod: {count} budov začne bez vody chátrat. Postav vodárnu a potrubí.",

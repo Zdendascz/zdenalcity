@@ -12,7 +12,7 @@ import { createLayerOptions, createTools, createViewOptions } from '@/render/app
 import { I18n } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
 import { uiIconShape } from '@/ui/icons';
-import { fromBase64, toBase64 } from '@/ui/autosave';
+import { fromBase64, toBase64 } from '@/platform/browser';
 import { groupTools } from '@/ui/toolbar';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
 

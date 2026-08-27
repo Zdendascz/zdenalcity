@@ -1,0 +1,75 @@
+/**
+ * Platform abstrakce (architektura §9).
+ *
+ * **Steam se nikdy nevolá přímo z herního kódu** a stejně tak `localStorage`,
+ * `Blob` ani `File`. Herní kód si řekne o „ulož tohle město" a nezajímá ho,
+ * jestli to skončí v prohlížeči, v souboru vedle .exe, nebo ve Steam Cloudu.
+ *
+ * Rozhraní §9 mluví o Steamu, DLC a Workshopu — to jsou zatím zaslepené metody,
+ * přesně jak dokument předepisuje. Co je dnes **skutečně potřeba**, je
+ * `storage` a `files`: tudy chodí savy. Do §9 to patří, protože `getSavePath()`
+ * tam už tvrdí „null = browser, ukládá se do prohlížeče" — jen k tomu chybělo
+ * rozhraní, kterým se to dělá.
+ *
+ * `src/sim/` sem nesmí (P1). Platforma je věc rozhraní a hostitele, ne
+ * simulace — svět se ukládá tak, že ho někdo serializuje a předá sem.
+ */
+
+/** Mod ze Steam Workshopu. Tvar podle §9; nic ho zatím nevrací. */
+export interface ModInfo {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+}
+
+/**
+ * Sloty, do kterých se ukládá.
+ *
+ * Pojmenované, ne číslované: `'quick'` a `'autosave'` mají různý životní cyklus
+ * a míchat je do jednoho pole by znamenalo pamatovat si, který index je který.
+ */
+export type SaveSlot = 'autosave' | 'quick';
+
+/**
+ * Úložiště savů.
+ *
+ * **Asynchronní schválně**, i když dnešní implementace píše synchronně. Každé
+ * skutečné úložiště — IndexedDB, soubor na disku, Steam Cloud — je asynchronní,
+ * a předělávat kvůli tomu později všechna volající místa by byl přesně ten
+ * refaktor, kterému má tahle vrstva předejít.
+ *
+ * Zápis pod tím **musí zůstat synchronní**, dokud se ukládá na `pagehide`:
+ * prohlížeč stránku zabalí dřív, než by se asynchronní zápis stihl dokončit,
+ * a hráč by o město přišel právě ve chvíli, kdy zavírá kartu.
+ */
+export interface SaveStorage {
+  read(slot: SaveSlot): Promise<Uint8Array | null>;
+  /** Vrací `false`, když se nepovedlo uložit. Nikdy nevyhazuje. */
+  write(slot: SaveSlot, bytes: Uint8Array): Promise<boolean>;
+  has(slot: SaveSlot): Promise<boolean>;
+  remove(slot: SaveSlot): Promise<void>;
+}
+
+/** Předání souboru hráči a od hráče. */
+export interface FileTransfer {
+  /** Nabídne bajty ke stažení pod daným jménem. */
+  save(bytes: Uint8Array, fileName: string): void;
+  /** Přečte, co hráč vybral. `File` sem dá rozhraní — výběr je věc UI. */
+  read(file: File): Promise<Uint8Array>;
+}
+
+export interface Platform {
+  readonly id: 'browser' | 'electron' | 'steam' | 'gog';
+  readonly storage: SaveStorage;
+  readonly files: FileTransfer;
+
+  getUserId(): Promise<string | null>;
+  hasDlc(id: string): boolean;
+  unlockAchievement(id: string): void;
+  /** Cesta ke složce savů. `null` znamená, že platforma soubory nemá. */
+  getSavePath(): string | null;
+  workshopAvailable(): boolean;
+  listWorkshopMods(): Promise<ModInfo[]>;
+}
+
+export { createBrowserPlatform } from './browser';

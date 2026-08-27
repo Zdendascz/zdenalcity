@@ -242,6 +242,7 @@
   "ui.save.open": "Load from file",
   "ui.save.saved": "Saved ({size} kB)",
   "ui.save.loaded": "Loaded",
+  "ui.save.storeFailed": "Saving failed — browser storage is full or disabled.",
   "ui.save.empty": "Nothing saved yet",
   "ui.save.failed": "Save could not be read: {reason}",
   "ui.save.noWaterNetwork": "The loaded city has no water network: {count} buildings will decay without water. Build a water works and pipes.",

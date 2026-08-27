@@ -442,18 +442,27 @@ Steam se nikdy nevolá přímo z herního kódu.
 ```ts
 interface Platform {
   readonly id: 'browser' | 'electron' | 'steam' | 'gog';
+  readonly storage: SaveStorage;         // savy — jediná část, která dnes něco dělá
+  readonly files: FileTransfer;          // stažení a otevření souboru
+
   getUserId(): Promise<string | null>;
   hasDlc(id: string): boolean;
   unlockAchievement(id: string): void;
-  getSavePath(): string | null;          // null = browser, ukládá se do IndexedDB
+  getSavePath(): string | null;          // null = platforma soubory nemá
   workshopAvailable(): boolean;
   listWorkshopMods(): Promise<ModInfo[]>;
 }
 ```
 
-Implementace: `BrowserPlatform` (fáze 1), `ElectronPlatform`, `SteamPlatform`, `GogPlatform`.
+Implementace: `BrowserPlatform`, později `ElectronPlatform`, `SteamPlatform`, `GogPlatform`.
 
-Fáze 1 implementuje pouze `BrowserPlatform` se stubovanými metodami. Rozhraní ale existuje od začátku, aby se Steam později přilepil bez zásahu do herního kódu.
+Steam, DLC ani Workshop v prohlížeči nejsou a ty metody jsou zaslepené. Rozhraní ale existuje, aby se Steam později přilepil bez zásahu do herního kódu.
+
+**Vynuceno ESLintem:** `src/ui/` a `src/render/` nesmějí sáhnout na `localStorage`, `sessionStorage` ani `indexedDB`. Dokud to hlídal jen tenhle dokument, sahalo `ui/` na úložiště přímo a abstrakce zůstala roky nenaplněná.
+
+`SaveStorage` je **asynchronní**, i když prohlížečová implementace píše synchronně: každé skutečné úložiště — soubor na disku, Steam Cloud — asynchronní je, a předělávat kvůli tomu později všechna volající místa by byl přesně ten refaktor, kterému má vrstva předejít.
+
+**V prohlížeči se ukládá do `localStorage`, ne do IndexedDB**, jak tvrdila dřívější verze tohohle odstavce. Ukládá se mimo jiné na `pagehide`, kde prohlížeč stránku zabalí dřív, než by se asynchronní zápis stihl dokončit — hráč by přišel o město právě ve chvíli, kdy zavírá kartu. Cena je kvóta kolem pěti megabajtů a base64, které save nafoukne o třetinu; až na to město naroste, je IndexedDB náhrada za jediný soubor.
 
 ---
 

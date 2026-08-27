@@ -53,13 +53,7 @@ import { setIconImages } from '@/ui/icons';
 import type { OverlayOption } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
-import {
-  clearAutosave,
-  hasAutosave,
-  loadAutosave,
-  storeAutosave,
-} from '@/ui/autosave';
-import { downloadBytes, readFileBytes } from '@/ui/saveFile';
+import { createBrowserPlatform } from '@/platform';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
 import { showNewGameDialog } from '@/ui/newGameDialog';
 import { Toolbar } from '@/ui/toolbar';
@@ -398,8 +392,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   // Hra začíná dialogem: hráč si vybere jméno města a seed a rovnou vidí, jakou
   // mapu dostane (§3 fáze 3). Teprve pak vzniká svět.
+  // Úložiště i soubory jdou přes platform vrstvu (§9). Herní kód nesahá na
+  // `localStorage` ani `Blob` — až přijde Electron, přibude jiná implementace
+  // a tady se nezmění nic.
+  const platform = createBrowserPlatform();
+
   const newGame = await showNewGameDialog(mount, i18n, content.getBalance(), {
-    canResume: hasAutosave(),
+    canResume: await platform.storage.has('autosave'),
   });
 
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
@@ -437,7 +436,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,
   // že se hráč do hry nedostane vůbec.
   let cityName = newGame.cityName;
-  const resumed = newGame.resume ? loadAutosave() : null;
+  const resumed = newGame.resume ? await platform.storage.read('autosave') : null;
   let restored = false;
   if (resumed) {
     try {
@@ -445,7 +444,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       cityName = readSaveMeta(resumed).city.name;
       restored = true;
     } catch {
-      clearAutosave();
+      void platform.storage.remove('autosave');
     }
   }
 
@@ -580,7 +579,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const startedAt = Date.now();
   const createdAt = new Date(startedAt).toISOString();
   /** Rychlý save drží jen v paměti; do souboru se ukládá tlačítkem. */
-  let quickSave: Uint8Array | null = null;
   let message: Message | null = null;
 
   function saveOptions() {
@@ -630,23 +628,32 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   function autosaveNow(): void {
     try {
-      storeAutosave(serializeSave(simWorld, saveOptions()));
+      // Bez `await`: na `pagehide` už není kam čekat. Zápis v prohlížeči běží
+      // synchronně, takže se stihne — a kdyby jednou neběžel, je to věc
+      // platform vrstvy, ne tohohle místa.
+      void platform.storage.write('autosave', serializeSave(simWorld, saveOptions()));
     } catch {
       // Rozehranou hru neshodí ani plné úložiště.
     }
   }
 
-  function quickSaveNow(): void {
-    quickSave = serializeSave(simWorld, saveOptions());
-    message = { key: 'ui.save.saved', params: { size: (quickSave.byteLength / 1024).toFixed(1) } };
+  async function quickSaveNow(): Promise<void> {
+    const bytes = serializeSave(simWorld, saveOptions());
+    const stored = await platform.storage.write('quick', bytes);
+    // Rychlý save **přežije obnovení stránky**. Když se uložit nepovede, hráč
+    // to musí vědět hned — jinak by se na něj spolehl a přišel o město.
+    message = stored
+      ? { key: 'ui.save.saved', params: { size: (bytes.byteLength / 1024).toFixed(1) } }
+      : { key: 'ui.save.storeFailed' };
   }
 
-  function quickLoadNow(): void {
-    if (!quickSave) {
+  async function quickLoadNow(): Promise<void> {
+    const bytes = await platform.storage.read('quick');
+    if (!bytes) {
       message = { key: 'ui.save.empty' };
       return;
     }
-    loadFromBytes(quickSave);
+    loadFromBytes(bytes);
   }
 
   const camera = (() => {
@@ -896,15 +903,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, disasterRegistry.kinds(), {
     onSpeed: setSpeed,
     onTaxChange: changeTax,
-    onQuickSave: quickSaveNow,
-    onQuickLoad: quickLoadNow,
+    onQuickSave: () => void quickSaveNow(),
+    onQuickLoad: () => void quickLoadNow(),
     onDownload: () => {
       const bytes = serializeSave(simWorld, saveOptions());
-      downloadBytes(bytes, 'mesto.city');
+      platform.files.save(bytes, 'mesto.city');
       message = { key: 'ui.save.saved', params: { size: (bytes.byteLength / 1024).toFixed(1) } };
     },
     onOpenFile: (file) => {
-      void readFileBytes(file).then(loadFromBytes);
+      void platform.files.read(file).then(loadFromBytes);
     },
     onToggleLayer: toggleLayer,
     onSetView: setView,
@@ -1335,8 +1342,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     if (event.code === 'F5' || event.code === 'F9') {
       event.preventDefault(); // jinak by F5 obnovilo stránku
-      if (event.code === 'F5') quickSaveNow();
-      else quickLoadNow();
+      if (event.code === 'F5') void quickSaveNow();
+      else void quickLoadNow();
       return;
     }
 

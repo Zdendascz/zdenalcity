@@ -2973,6 +2973,44 @@ plném oddálení na obrazovku nevejde**: `MIN_ZOOM` je 0,25 a vidět je z ní a
 
 1062 testů.
 
+## Platform vrstva (§9) — rozhodnutí autora
+
+Architektura §9 předepisuje `Platform` od začátku, aby se Steam později přilepil
+bez zásahu do herního kódu. Rozhraní existovalo jen v dokumentu: `ui/` sahalo na
+`localStorage`, `Blob` i `File` přímo.
+
+Vzniklo `src/platform/` — `index.ts` s rozhraním a `browser.ts` s prohlížečovou
+implementací. Zrušeny `src/ui/autosave.ts` a `src/ui/saveFile.ts`; `app.ts` teď
+zná jen `platform.storage` a `platform.files`.
+
+**Rozhraní je asynchronní, implementace píše synchronně**, a obojí je schválně.
+Každé skutečné úložiště — soubor na disku, Steam Cloud — asynchronní je, takže
+volající místa musí umět čekat už teď. Pod tím ale zůstává `localStorage`, ne
+IndexedDB, jak §9 zmiňovala: ukládá se mimo jiné na `pagehide`, kde prohlížeč
+stránku zabalí dřív, než by se asynchronní zápis stihl dokončit. Hráč by přišel
+o město právě ve chvíli, kdy zavírá kartu. Cena je kvóta kolem pěti megabajtů;
+až na to město naroste, je IndexedDB náhrada za jeden soubor. §9 tuhle odchylku
+teď popisuje.
+
+Tím padá **„rychlý save se ztrácí s obnovením stránky"** ze Známých problémů —
+držel se v proměnné, teď je ve slotu `quick` vedle autosavu. Ověřeno v prohlížeči:
+uložit, F5, založit nové město (0 silnic), načíst → 14 silnic zpátky. Když
+úložiště zápis odmítne, hráč se to dozví (`ui.save.storeFailed`) místo aby hru
+shodila výjimka.
+
+Klíč autosavu **zůstal `citybuilder:autosave`**. Přejmenovat ho by znamenalo, že
+každý hráč přijde o rozehrané město tím, že si stáhne novou verzi.
+
+Aby vrstva nezůstala nenaplněná jako předtím, hlídá ji **ESLint**: `src/ui/` ani
+`src/render/` nesmí na `localStorage`, `sessionStorage` a `indexedDB`. Tři testy
+v `boundaries.test.ts` ověřují, že pravidlo kousne — a jeden jako kontrola, že
+v `src/platform/` nekouše.
+
+Mutační test 6 ze 7. Přeživší mutant je drát uvnitř `createApp` (rychlý save se
+serializuje, ale neuloží) — tam se test bez Pixi nedostane, ověřeno ručně výš.
+
+1077 testů.
+
 
 ## Rozpracované
 
@@ -2983,7 +3021,9 @@ save v8.
 Akceptační kritérium 2 (512×512 při 60 FPS) je **ověřené** — viz měření níž.
 
 Mimo kritéria zůstává **bez rozhraní celá 4c** — půjčky, dluhopisy a linky MHD
-jdou jen přes `dispatch`. Viz vyhodnocení T60.
+jdou jen přes `dispatch`. Viz vyhodnocení T60. To je další práce v pořadí.
+
+`src/platform/` je hotová, viz výš.
 
 _(T41 — vyhodnocení fáze 3 — zůstává otevřené. Je to rozhodovací bod pro
 autora, ne technický úkol.)_
@@ -2996,9 +3036,6 @@ znamenalo tvrdit, že elektřina ani save neexistují.)_
 
 Mimo zadání fází, otevřené k rozhodnutí:
 
-- **`src/platform/`** — abstrakce nad úložištěm a soubory. Architektura §9 ji
-  předepisuje, žádný úkol ji nezadává. Dokud neexistuje, sahá `ui/` na
-  `localStorage` a `File` přímo.
 - **Kopec před budovou ji nezakryje** — viz Známé problémy.
 - ~~**Z bankrotu není cesta zpátky**~~ — vyřešeno v T57. Půjčka se odvozuje od
   příjmu, takže město s nulovou kasou, ale živým rozpočtem si na obnovu půjčí.
@@ -3134,8 +3171,6 @@ Mimo zadání fází, otevřené k rozhodnutí:
 - **`GAME_VERSION` v `save/format.ts` duplikuje `version` z `package.json`.**
   Hlídá to test, který obojí porovná, takže rozejít se to nemůže potichu.
   Načítat package.json v runtime kódu by ale bylo čistší.
-- **Rychlý save se ztrácí s obnovením stránky.** Drží v proměnné, ne v IndexedDB.
-  Skutečná persistence je platform vrstva (§9) a patří do fáze 4.
 - **HUD při šířce okna kolem 280 px zabírá skoro celou plochu.** Panely se sice
   zalamují a nic nepřeteče, ale mapa pod nimi skoro není vidět. Na běžném okně
   (1100 px a víc) je to v pořádku. Kdyby měla hra běžet i v malém okně, chce to

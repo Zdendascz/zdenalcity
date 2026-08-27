@@ -47,6 +47,39 @@ describe('P1 — simulace nezná renderer', () => {
   });
 });
 
+describe('§9 — úložiště jde přes platform vrstvu', () => {
+  it('zakáže localStorage v src/ui/', async () => {
+    // Dokud to hlídal jen komentář, sahalo `ui/` na `localStorage` přímo
+    // a abstrakce z architektury zůstala roky nenaplněná.
+    const ruleIds = await ruleIdsFor(
+      `export const a = localStorage.getItem('x');
+`,
+      'src/ui/__probe.ts',
+    );
+    expect(ruleIds).toContain('no-restricted-globals');
+  });
+
+  it('zakáže localStorage i v src/render/', async () => {
+    const ruleIds = await ruleIdsFor(
+      `export const a = localStorage.getItem('x');
+`,
+      'src/render/__probe.ts',
+    );
+    expect(ruleIds).toContain('no-restricted-globals');
+  });
+
+  it('v src/platform/ ho naopak povolí', async () => {
+    // Kontrolní případ: bez něj by test procházel i s pravidlem, které zakazuje
+    // úložiště všude — a platform vrstva by neměla čím ukládat.
+    const ruleIds = await ruleIdsFor(
+      `export const a = localStorage.getItem('x');
+`,
+      'src/platform/__probe.ts',
+    );
+    expect(ruleIds).not.toContain('no-restricted-globals');
+  });
+});
+
 describe('P2 — determinismus', () => {
   it('zakáže Math.random() v src/sim/', async () => {
     const ruleIds = await ruleIdsFor(
