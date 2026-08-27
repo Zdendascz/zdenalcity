@@ -357,6 +357,7 @@
   "ui.parcel.blocked.noZone": "Bez zóny se tu nic nepostaví.",
   "ui.parcel.blocked.bankrupt": "Kasa je v mínusu — dokud v ní nebude aspoň nula, nic nevyroste.",
   "ui.parcel.blocked.noDemand": "Po téhle zóně teď není poptávka.",
+  "ui.parcel.blocked.zoneTooSmall": "Zóna je mělčí, než co se do ní vejde. Rozšiř ji aspoň na hloubku budovy.",
   "ui.parcel.blocked.tooFarFromRoad": "Moc daleko od silnice.",
   "ui.parcel.blocked.noDefinition": "Pro tuhle zónu není co postavit.",
   "ui.notice.nothingGrows": "V zónách nic neroste: {reason}",

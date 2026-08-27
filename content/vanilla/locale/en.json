@@ -357,6 +357,7 @@
   "ui.parcel.blocked.noZone": "Nothing is built here without a zone.",
   "ui.parcel.blocked.bankrupt": "The treasury is in the red — nothing grows until it is back at zero.",
   "ui.parcel.blocked.noDemand": "There is no demand for this zone right now.",
+  "ui.parcel.blocked.zoneTooSmall": "The zone is shallower than anything that fits. Widen it to the building depth.",
   "ui.parcel.blocked.tooFarFromRoad": "Too far from a road.",
   "ui.parcel.blocked.noDefinition": "There is nothing to build for this zone.",
   "ui.notice.nothingGrows": "Nothing grows in the zones: {reason}",

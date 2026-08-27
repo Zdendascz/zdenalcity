@@ -3007,6 +3007,10 @@ Mimo zadání fází, otevřené k rozhodnutí:
 
 | Datum | Rozhodnutí | Důvod |
 |---|---|---|
+| 2026-08-27 | **Blackout zůstává u vzorce**, próza v katalogu je nezávazná | Koeficient 24, tedy strmý náběh: nad stropem rizika je město s energetickou rezervou pod ~21 %. Katalog vedle vzorce popisoval mírnější náběh a obojí nešlo splnit. Rozhodl autor. |
+| 2026-08-27 | **`src/platform/` se udělá** | Architektura §9 ji předepisuje a `ui/` zatím sahá na `localStorage` a `File` přímo. Vyřeší to i to, že rychlý save nepřežije obnovení stránky. Rozhodl autor. |
+| 2026-08-27 | **Mělká zóna se hlásí v diagnostice**, obrys při zónování ani menší budova ne | Hláška „v zónách nic neroste" už umí říct proč; přibude důvod „zóna je mělčí, než co se do ní vejde". Nechat vyrůst menší budovu by změnilo hratelnost — jednořadé zóny podél silnic by se staly strategií. Rozhodl autor. |
+| 2026-08-27 | **Další práce: rozhraní pro 4c** | Půjčky, dluhopisy a linky MHD mají hotovou simulaci i testy, ale nevede k nim tlačítko. Rozpočtový panel jejich řádky zobrazuje, takže hráč vidí čísla, která nemá jak ovlivnit. Rozhodl autor. |
 | 2026-08-14 | Projekt v `D:\Projekty\citybuilder` | Vedle ostatních projektů autora. `C:\Users\Intel\Documents` je přesměrováno do OneDrive — `node_modules` by se synchronizovaly. D: má 344 GB volných. |
 | 2026-08-14 | Node 24.19.0 LTS nainstalován přes scoop | Vite 8 vyžaduje `^20.19.0 \|\| >=22.12.0`, systémový Node 20.11.1 nestačí. scoop nevyžaduje admin a nemaže stávající instalaci. Odsouhlaseno autorem. |
 | 2026-08-14 | Vite 8, TypeScript 6, ESLint 10, Vitest 4 | Aktuální verze v době scaffoldingu. Zadání T0 fixuje major verzi jen u `pixi.js@^8`. Vzájemná kompatibilita ověřena přes peerDependencies. |
@@ -3106,12 +3110,6 @@ Mimo zadání fází, otevřené k rozhodnutí:
 
 ## Známé problémy / technický dluh
 
-- **Katalog katastrof si u blackoutu odporuje.** Vzorec `max(0; 0,25 −
-  rezerva) × 24` říká, že blackout je na stropu rizika už při rezervě pod
-  ~21 %. Próza vedle něj tvrdí mírnější náběh („15 % → 1,24"), což odpovídá
-  koeficientu ~2,4; žádný koeficient nedá zároveň obě čísla z prózy. Kód se
-  řídí **vzorcem**, protože ten je normativní. Rozhodnutí patří autorovi — je
-  to jedno číslo v `balance.json`.
 - **Past na jméno souboru `locale.py`.** Pomocný skript v adresáři, ze kterého
   se pouští Python, může zastínit modul ze standardní knihovny — Python dává
   adresář skriptu na začátek cesty k modulům. Konkrétně `locale.py` se

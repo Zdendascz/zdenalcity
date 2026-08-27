@@ -372,7 +372,13 @@ export function growthBlocker(
       skipFlatCheck: true,
     });
     if (result.ok) return null;
-    first ??= result.reason;
+    // `error.wrongZone` by hráče poslal špatným směrem: zónu vyznačil správně,
+    // jen je **mělčí, než co se do ní vejde**. Kontrola dostala `requireZone`
+    // z téhle dlaždice, takže neshoda může být jedině na některé další dlaždici
+    // půdorysu. Nahlásil to autor — `industrial_small` má 2×2 a v jednořadé
+    // zóně nevyroste nikdy nic, přičemž hra o tom mlčela.
+    first ??=
+      result.reason === 'error.wrongZone' ? 'ui.parcel.blocked.zoneTooSmall' : result.reason;
   }
   return first;
 }

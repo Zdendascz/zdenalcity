@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { placeBuilding } from '@/sim/buildings';
+import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, zoneArea } from '@/sim/commands';
 import { coarseIndex } from '@/sim/coarse';
 import {
@@ -186,6 +187,39 @@ describe('proč tu nic neroste', () => {
     expect(growthBlocker(world, content, content.getBalance(), 25, 31)).toBeNull();
   });
 
+  it('mělká zóna se hlásí jako mělká, ne jako špatná', async () => {
+    // `checkFootprint` vrací `error.wrongZone`, což hráče pošle špatným směrem:
+    // zónu vyznačil správně, jen je mělčí, než co se do ní vejde.
+    //
+    // Ve vanilla obsahu to dnes nenastane — nejmenší budova každé kategorie je
+    // 1×1, takže i jednořadá zóna vyroste. (Původní hlášení mluvilo o
+    // `industrial_small` s půdorysem 2×2; ten se od té doby zmenšil.) Katalog
+    // je ale obsah, ne kód (P5), takže mod s většími budovami na to narazí —
+    // proto se tu katalog podstrčí.
+    const content = await vanilla();
+    const world = createWorld(1, content.getBalance().economy);
+    for (let x = 20; x <= 30; x++) buildRoad(world, x, 30);
+    zoneArea(world, 21, 31, 8, 1, ZONE.industrial);
+    world.demand.industrial = content.getBalance().demand.limit;
+    assumeWatered(world);
+
+    expect(growthBlocker(world, bigSeeds(content), content.getBalance(), 25, 31)).toBe(
+      'ui.parcel.blocked.zoneTooSmall',
+    );
+  });
+
+  it('dost hluboká zóna už nic nehlásí', async () => {
+    // Protiklad: tentýž katalog, jen zóna o řadu hlubší.
+    const content = await vanilla();
+    const world = createWorld(1, content.getBalance().economy);
+    for (let x = 20; x <= 30; x++) buildRoad(world, x, 30);
+    zoneArea(world, 21, 31, 8, 2, ZONE.industrial);
+    world.demand.industrial = content.getBalance().demand.limit;
+    assumeWatered(world);
+
+    expect(growthBlocker(world, bigSeeds(content), content.getBalance(), 25, 31)).toBeNull();
+  });
+
   it('chybějící voda taky', async () => {
     const { world, content } = await parcel();
     world.waterSupply.fill(0);
@@ -244,3 +278,22 @@ describe('která překážka se hlásí', () => {
     expect(worstBlocker([])).toBeNull();
   });
 });
+
+/**
+ * Katalog, ve kterém je nejmenší průmyslová budova 2×2.
+ *
+ * Vanilla má dnes všude 1×1, takže mělkou zónu nejde vyzkoušet na ní. Obsah je
+ * ale data (P5) a mod s většími budovami je legitimní — tenhle katalog ho
+ * zastupuje.
+ */
+function bigSeeds(content: ContentRegistry): BuildingCatalogue {
+  const wide = content
+    .byCategory('industrial')
+    .filter((definition) => definition.level === 1)
+    .map((definition) => ({ ...definition, footprint: [2, 2] as [number, number] }));
+
+  return {
+    get: (id) => content.get(id),
+    byCategory: (category) => (category === 'industrial' ? wide : content.byCategory(category)),
+  };
+}
