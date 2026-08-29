@@ -3166,10 +3166,31 @@ se nekontroloval, takže o tom nikdo nevěděl: komentář v testu tvrdí „ele
 hned nad zónou, u téže silnice" a ve světě žádná není. Těch 61 budov a 192
 obyvatel tedy vyrostlo **bez proudu**.
 
-Neopraveno schválně: posunout elektrárnu k silnici změní hashe, počet budov
-i obyvatel, protože proud pouští úrovně budov výš. To už není úklid, ale jiné
-referenční město — a na tenhle údaj se PROGRESS na několika místech odvolává.
-Rozhodnutí pro autora.
+**Opraveno (rozhodl autor).** U hlavní ulice pro elektrárnu místo není: má
+16 dlaždic, tedy 32 sousedů po stranách, a **všech 32 je zónovaných**; volné
+jsou jen oba konce a hned za nimi stojí les a voda. Vede k ní proto **odbočka**
+po `site.x - 1` — volná tráva od ulice až nad elektrárnu. Výsledky `buildRoad`
+i `placeDefinition` se nově kontrolují, aby se totéž nemohlo zopakovat.
+
+Posunulo se skoro všechno: **61 budov → 59, práce 114 → 98, kasa 18 552 →
+22 831**, obyvatel zůstalo 192.
+
+Čekal jsem, že proud pustí úrovně budov výš. **Nepovýšila ani jedna** —
+všechny zůstaly na první úrovni. Změnil se průmysl: **6 provozů na 3**, a to
+je zlepšení, ne úbytek. Bez proudu byla průmyslová poptávka −18, tedy hluboká
+nadvýroba: zóna se zaplnila provozy, které nikoho nezaměstnaly, jen čadily.
+S proudem je −2, tedy skoro v rovnováze. Znečištění v průmyslové zóně kleslo
+z 65 na 27 a cena půdy tam vyskočila z nuly na 24.
+
+Že přibyla uhelná elektrárna a znečištění přesto kleslo, není překlep: měří se
+**v průmyslové zóně**, kde rozhodují místní provozy, a elektrárna stojí o deset
+dlaždic dál.
+
+**Referenční město tedy do teď stálo v degenerovaném stavu** — bez proudu, bez
+ceny půdy, s přebujelým průmyslem. Starší zápisy v tomhle dokumentu, které
+mluví o „61 budovách a 192 obyvatelích" (T61, T66, rozbor zónování na svahu),
+popisují právě ten stav; jejich závěry o tom, co která změna udělala, platí,
+jen se od T41 měří proti jinému městu.
 
 **Text mimo locale: čisto.** V `src/sim/` není po odečtení importů ani jeden
 řetězcový literál, který by nebyl klíč nebo identifikátor. Pro `ui/` a `render/`

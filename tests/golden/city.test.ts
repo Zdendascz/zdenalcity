@@ -76,8 +76,29 @@ function buildCity(content: ContentRegistry): WorldState {
     expect(zoned, JSON.stringify(zoned)).toEqual({ ok: true });
   }
 
-  // Elektrárna hned nad zónou, u téže silnice.
-  placeDefinition(world, content, 'vanilla:coal_power_plant', site.x, site.y - 5, balance);
+  // Elektrárna nad zónou, napojená **odbočkou**.
+  //
+  // Do T41 se stavěla bez odbočky a **nepostavila se ani jednou**: mezi ní
+  // a ulicí leží obytná zóna, takže příkaz padal na `error.needsRoad`. Výsledek
+  // se nekontroloval, takže golden město sedm fází rostlo bez proudu, přestože
+  // tenhle komentář tvrdil opak.
+  //
+  // U hlavní ulice pro ni místo není — všech 32 jejích sousedů je zónovaných
+  // a na koncích stojí les a voda. Odbočka po `site.x - 1` je volná tráva od
+  // ulice až nad elektrárnu a dotkne se jí bokem.
+  for (let y = site.y - 5; y <= roadY; y++) {
+    expect(buildRoad(world, site.x - 1, y, ROAD.street, balance).ok, `odbočka ${y}`).toBe(true);
+  }
+
+  const plant = placeDefinition(
+    world,
+    content,
+    'vanilla:coal_power_plant',
+    site.x,
+    site.y - 5,
+    balance,
+  );
+  expect(plant, JSON.stringify(plant)).toEqual({ ok: true });
   return world;
 }
 
@@ -123,6 +144,25 @@ function findSite(world: WorldState): { x: number; y: number } {
  * zónovalo bez balancu, takže mu srovnání parcel běželo zadarmo a bez stropu.
  * Teď platí 712 jako každý hráč. Hashe terénu, počet budov, obyvatel i práce
  * zůstaly na chlup stejné — srovnání se dělo i předtím, jen se za ně nevybíralo.
+ */
+/*
+ * V T41 se město **poprvé napojilo na proud** a posunulo se skoro všechno:
+ * 61 budov → 59, práce 114 → 98, kasa 18 552 → 22 831. Obyvatel zůstalo 192.
+ *
+ * Nepovýšila přitom ani jedna budova — všechny jsou dál na první úrovni.
+ * Změnil se **průmysl: 6 provozů na 3**, a to je zlepšení, ne úbytek. Bez
+ * proudu byla průmyslová poptávka −18, tedy hluboká nadvýroba: zóna se
+ * zaplnila provozy, které nikoho nezaměstnaly, jen čadily. S proudem je
+ * poptávka −2, tedy skoro v rovnováze.
+ *
+ * Znečištění v průmyslové zóně kleslo z 65 na 27 a cena půdy tam vyskočila
+ * z nuly na 24. Že přibyla uhelná elektrárna a znečištění přesto kleslo, není
+ * překlep: měří se **v průmyslové zóně**, kde rozhodují místní provozy, a
+ * elektrárna stojí o deset dlaždic dál.
+ *
+ * Referenční město tedy do teď stálo v degenerovaném stavu — bez proudu, bez
+ * ceny půdy, s přebujelým průmyslem. Starší zápisy v tomhle dokumentu, které
+ * mluví o „61 budovách a 192 obyvatelích", popisují právě ten stav.
  */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
