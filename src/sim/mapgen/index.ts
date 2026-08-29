@@ -37,10 +37,14 @@ import { createNoiseField, fbm } from './noise';
  * pak hra pracuje, se vzorkují zvlášť **v rozích** — viz `buildCornerHeights`.
  */
 
-/** Měřítko šumu v dlaždicích. Menší číslo = drobnější členitost. */
-const HEIGHT_SCALE = 28;
-const FOREST_SCALE = 14;
-/** Velikost mřížky náhodných hodnot, ze které se interpoluje. */
+/**
+ * Velikost mřížky náhodných hodnot, ze které se interpoluje.
+ *
+ * **Zůstává v kódu, na rozdíl od měřítek šumu.** Není to ladicí knoflík, ale
+ * rozlišení zdroje náhody: mřížka se opakuje, takže příliš malá by mapu
+ * vydláždila kopiemi téhož kopce. Měřítko říká, jak velké mají útvary být;
+ * tohle jen kolik čísel se na ně natáhne.
+ */
 const FIELD_SIZE = 64;
 
 export interface GeneratedMap {
@@ -57,7 +61,16 @@ export function generateTerrain(
   size: number = DEFAULT_MAP_SIZE,
 ): GeneratedMap {
   const rng = new Rng(seed);
-  const { rockLevel, beachWidth, forestDensity, marshThreshold, octaves, roughness } = balance.map;
+  const {
+    rockLevel,
+    beachWidth,
+    forestDensity,
+    marshThreshold,
+    octaves,
+    roughness,
+    heightScale,
+    forestScale,
+  } = balance.map;
 
   const heightField = createNoiseField(rng, FIELD_SIZE);
   const forestField = createNoiseField(rng, FIELD_SIZE);
@@ -74,7 +87,7 @@ export function generateTerrain(
         y,
         octaves,
         roughness,
-        HEIGHT_SCALE,
+        heightScale,
       );
     }
   }
@@ -106,7 +119,7 @@ export function generateTerrain(
     for (let x = 0; x < size; x++) {
       const tile = index(x, y, size);
       if (terrain[tile] !== TERRAIN.grass) continue;
-      forestNoise[tile] = fbm(forestField, x, y, octaves, roughness, FOREST_SCALE);
+      forestNoise[tile] = fbm(forestField, x, y, octaves, roughness, forestScale);
       grassTiles.push(tile);
     }
   }
@@ -156,7 +169,7 @@ function buildCornerHeights(
   sorted: Float32Array,
   balance: Balance,
 ): Uint8Array {
-  const { maxHeight, heightCurve, octaves, roughness } = balance.map;
+  const { maxHeight, heightCurve, octaves, roughness, heightScale } = balance.map;
   const size = sizeOfLayer(terrain);
   const side = cornerSizeOf(size);
   const heights = createCornerHeights(size);
@@ -169,7 +182,7 @@ function buildCornerHeights(
 
   for (let y = 0; y < side; y++) {
     for (let x = 0; x < side; x++) {
-      const value = fbm(heightField, x, y, octaves, roughness, HEIGHT_SCALE);
+      const value = fbm(heightField, x, y, octaves, roughness, heightScale);
       const above = Math.max(0, Math.min(1, (value - seaHeight) / span));
       heights[cornerIndex(x, y, side)] = Math.round(
         Math.pow(above, heightCurve) * maxHeight,
@@ -225,25 +238,25 @@ function carveRivers(rng: Rng, terrain: Uint8Array, heights: Uint8Array, balance
   // Koryto umí odříznout pár dlaždic od zbytku pevniny. Most se na takový
   // ostrůvek nevyplatí a hráč o něm ani neví, takže se zaplaví — stejně jako
   // ostrovy při tvorbě pobřeží. Větší kusy zůstanou: přes řeku vede most.
-  drownScraps(terrain, heights);
+  drownScraps(terrain, heights, balance.map.scrapIslandTiles);
   relaxHeights(heights);
 }
 
 /**
- * Zaplaví ostrůvky menší než `SCRAP_TILES`, které vznikly korytem řeky.
+ * Zaplaví ostrůvky menší než `map.scrapIslandTiles`, které vznikly korytem řeky.
  *
  * Nepočítá se největší komponenta, ale **velikost**: řeka může rozdělit mapu
  * na dvě velké části a to je v pořádku — přes koryto se dá postavit most.
  * Odříznutá trojice dlaždic uprostřed vody most nikdy neuvidí.
  */
-function drownScraps(terrain: Uint8Array, heights: Uint8Array): void {
+function drownScraps(terrain: Uint8Array, heights: Uint8Array, scrapIslandTiles: number): void {
   const size = sizeOfLayer(terrain);
   const side = cornerSizeOf(size);
   const { componentOf, sizes } = landComponents(terrain);
   for (let tile = 0; tile < terrain.length; tile++) {
     const id = componentOf[tile];
     if (id === undefined || id < 0) continue;
-    if ((sizes[id] ?? 0) >= SCRAP_TILES) continue;
+    if ((sizes[id] ?? 0) >= scrapIslandTiles) continue;
 
     terrain[tile] = TERRAIN.water;
     // Zaplavená dlaždice musí klesnout na hladinu, jinak by voda zůstala
@@ -255,9 +268,6 @@ function drownScraps(terrain: Uint8Array, heights: Uint8Array): void {
     }
   }
 }
-
-/** Pod tolik dlaždic je ostrůvek k ničemu a zaplaví se. */
-const SCRAP_TILES = 24;
 
 /** Jedna řeka od pramene dolů. Vrací délku koryta v dlaždicích. */
 function carveOne(rng: Rng, terrain: Uint8Array, heights: Uint8Array, start: number): number {

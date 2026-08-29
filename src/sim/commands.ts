@@ -454,7 +454,13 @@ export function zoneArea(
   // Bez peněz se **nezónuje vůbec** (rozhodnutí autora, T68) — stejně jako se
   // bez peněz nepostaví silnice. Rušení zóny je mazání značky, ne stavba, a
   // neplatí se za ně nic.
-  const changes = zone === ZONE.none ? new Map<number, number>() : planZoneLevelling(world, x, y, w, h);
+  // Bez balancu **neplatí strop**, ne „strop nula". Nula by srovnávání tiše
+  // vypnula a volající bez pravidel by dostal jinou hru, ne levnější; totéž
+  // pravidlo jako u ceny, kde chybějící balanc znamená zadarmo, ne zdarma nic.
+  const changes =
+    zone === ZONE.none
+      ? new Map<number, number>()
+      : planZoneLevelling(world, x, y, w, h, balance?.map.maxLevelledZoneTiles ?? Infinity);
   const cost = changes.size * (balance?.map.terraformCost ?? 0);
   if (world.economy.funds < cost) {
     return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
@@ -471,9 +477,6 @@ export function zoneArea(
 
   return OK;
 }
-
-/** Nad tolik dlaždic se zóna už nesrovnává. Viz `planZoneLevelling`. */
-const MAX_LEVELLED_ZONE = 64;
 
 /**
  * Co je potřeba srovnat pod právě vyznačenou zónou (T66). Nic nemění.
@@ -504,10 +507,11 @@ export function planZoneLevelling(
   y: number,
   w: number,
   h: number,
+  maxTiles: number,
 ): Map<number, number> {
   const working = Uint8Array.from(world.cornerHeight);
   const changes = new Map<number, number>();
-  collectZoneLevelling(world, working, changes, x, y, w, h);
+  collectZoneLevelling(world, working, changes, x, y, w, h, maxTiles);
   return changes;
 }
 
@@ -519,8 +523,9 @@ function collectZoneLevelling(
   y: number,
   w: number,
   h: number,
+  maxTiles: number,
 ): void {
-  if (w < 1 || h < 1 || w * h > MAX_LEVELLED_ZONE) return;
+  if (w < 1 || h < 1 || w * h > maxTiles) return;
 
   const step = planLevelArea(working, x, y, w, h);
   if (step.size === 0) return;
@@ -536,12 +541,12 @@ function collectZoneLevelling(
   if (w === 1 && h === 1) return;
   if (w >= h) {
     const half = Math.floor(w / 2);
-    collectZoneLevelling(world, working, changes, x, y, half, h);
-    collectZoneLevelling(world, working, changes, x + half, y, w - half, h);
+    collectZoneLevelling(world, working, changes, x, y, half, h, maxTiles);
+    collectZoneLevelling(world, working, changes, x + half, y, w - half, h, maxTiles);
   } else {
     const half = Math.floor(h / 2);
-    collectZoneLevelling(world, working, changes, x, y, w, half);
-    collectZoneLevelling(world, working, changes, x, y + half, w, h - half);
+    collectZoneLevelling(world, working, changes, x, y, w, half, maxTiles);
+    collectZoneLevelling(world, working, changes, x, y + half, w, h - half, maxTiles);
   }
 }
 
@@ -559,7 +564,10 @@ export function estimateZoning(
   h: number,
   balance?: Balance,
 ): number {
-  return planZoneLevelling(world, x, y, w, h).size * (balance?.map.terraformCost ?? 0);
+  return (
+    planZoneLevelling(world, x, y, w, h, balance?.map.maxLevelledZoneTiles ?? Infinity).size *
+    (balance?.map.terraformCost ?? 0)
+  );
 }
 
 /**

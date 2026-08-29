@@ -3070,6 +3070,138 @@ visel dál, přestože evidence tvrdí „splaceno 60 z 60").
 
 1102 testů.
 
+## T41 — vyhodnocení fáze 3
+
+Stejný tvar jako T60: projít 22 akceptačních kritérií a 4 průřezová, doplnit
+tvrzení, která žádný test nedržel, a udělat audit.
+
+Šestnáct kritérií drží sady jednotlivých úkolů — 1, 2, 3, 6, 7, 9, 10, 11, 12,
+13, 14, 15, 17, 19, 20, 21, 22. Kritérium 21 hlídá `happiness.test.ts` pod
+jménem „nespokojené město roste pomaleji"; tvrdí obojí, co kritérium chce,
+včetně „ale pořád roste".
+
+### Co žádný test nedržel
+
+Tři kritéria stála **mezi dvěma úkoly** a spojku nikdo netestoval. Vznikla pro
+ně `tests/phase3.test.ts`.
+
+**Kritérium 4 — vykácení lesa srazí cenu půdy.** Půlka „les prodraží silnici"
+test měla, půlka „a co to udělá s cenou půdy" ne, přestože `landValue.weights`
+nese `forest: 18`. Sada teď tvrdí obojí i kontrolní půlku, že les cenu vůbec
+zvedá — bez ní by pokles mohl přijít odkudkoli.
+
+**Kritérium 5 — vylepšení ulice na třídu sníží kolony.** Existovalo „širší
+silnice snese stejnou zátěž s menším vytížením" (o vzorci) a „vylepšení na
+místě přepíše typ" (o příkazu). Že vylepšení opravdu uleví **danému úseku**,
+netvrdil nikdo.
+
+První pokus měřil zátěž na jedné dlaždici a byl k ničemu: doprava se vzorkuje,
+takže hodnota mezi tiky skáče 0–4 a jediný odečet neříká nic. Druhý pokus měřil
+tutéž mapu před a po — jenže RNG mezitím běží dál a měření nejsou srovnatelná.
+Platí až **součet přes 200 tiků ze dvou samostatných světů**: vytížení klesne
+z 13,67 na 6,83, zátěž zůstane přesně 4100 v obou.
+
+Ta druhá půlka je vlastní tvrzení: **ubyde vytížení, ne aut.** Kdyby vylepšení
+ubíralo zátěž, byla by to sleva na dopravě místo investice do kapacity — na
+overlayi to vypadá stejně, v modelu ne. Třetí test je kontrolní: dálnice ubere
+víc než třída.
+
+**Kritérium 18 — podzemní pohled ukáže síť a pokrytí.** Testem bylo jen „povrch
+a podzemí jsou pohledy, ne vrstvy". Že se pod zemí opravdu kreslí potrubí,
+rozdíl suché a zavodněné trubky a dosah sítě, netvrdil nikdo — a je to přesně
+to, kvůli čemu ten pohled existuje.
+
+Jde to testovat bez GPU: `ChunkRenderer` peče do `Graphics`, a ten si pamatuje
+seznam výplní i s barvami. Renderer se pustí nad malou mapou a testy koukají,
+jaké barvy do chunku zapsal.
+
+**Dva z těch tří testů byly napoprvé k ničemu a odhalil to až mutační test.**
+Oba porovnávaly „mokrá mapa má barvu, kterou suchá nemá" — jenže zavodnění mění
+dvě věci naráz, barvu trubky i výplň pokrytí, takže každý test procházel díky
+tomu druhému mechanismu. Zabít pokrytí i rozdíl barev šlo bez jediného
+červeného testu. Přepsané tvrdí: barva **suché** trubky ze zavodněné mapy
+zmizí, a pokrytí se měří na mapě **bez jediné trubky**.
+
+### Co audit našel
+
+**Průřezové kritérium „žádná konstanta balancu v kódu" neplatilo v generátoru.**
+T22 předepisoval „parametry v `balance.json`", ale `HEIGHT_SCALE = 28`,
+`FOREST_SCALE = 14` a `SCRAP_TILES = 24` zůstaly v kódu — vedle `octaves`
+a `roughness`, které jdou do **téhož volání `fbm`** a v datech byly. Rozdělený
+mozek: dva parametry šumu z dat, tři z kódu.
+
+Přesunuty jako `map.heightScale`, `map.forestScale` a `map.scrapIslandTiles`.
+Se stejnými hodnotami, takže se **žádná mapa nezměnila** — golden hash
+generátoru prošel beze změny.
+
+`FIELD_SIZE = 64` zůstal v kódu schválně a je to v něm napsané: není to ladicí
+knoflík, ale rozlišení zdroje náhody. Mřížka se opakuje, takže malá hodnota
+mapu vydláždí kopiemi téhož kopce. Měřítko říká, jak velké mají útvary být;
+tohle jen kolik čísel se na ně natáhne.
+
+**Druhá konstanta téhož druhu: `MAX_LEVELLED_ZONE = 64`** v `commands.ts`, tedy
+kolik dlaždic zóny se ještě srovná. Vznikla v T66, tedy po vyhodnocení fáze 4,
+takže ji zatím žádný audit nepotkal. Teď je to `map.maxLevelledZoneTiles`.
+
+Přesun vytáhl na světlo něco, co v repu leželo tiše: **golden město zónuje bez
+balancu.** `zoneArea` má balanc nepovinný a golden ho nepředává, přestože ho má
+o řádek výš pro silnice. Do teď to znamenalo „srovnávej podle konstanty z kódu
+a zadarmo". Fallback na nulu by srovnávání tiše vypnul a golden město by se
+změnilo, takže je fallback **`Infinity`** — bez pravidel neplatí strop, ne
+„strop nula". Je to totéž pravidlo jako u ceny, kde chybějící balanc znamená
+zadarmo, ne zdarma nic. Golden hash tím zůstal beze změny; zóny v něm jsou
+16 × 3 a 8 × 3, tedy pod stropem tak jako tak.
+
+_Zůstává otevřené pro autora:_ golden město by mělo zónovat **s balancem** —
+jinak jeho terén vzniká podle pravidel, podle kterých se nehraje. Náprava ale
+změní golden hash i kasu (srovnání se začne účtovat), a to je posun referenčního
+bodu, ne úklid.
+
+**Text mimo locale: čisto.** V `src/sim/` není po odečtení importů ani jeden
+řetězcový literál, který by nebyl klíč nebo identifikátor. Pro `ui/` a `render/`
+přibyl v T69 test, že každý doslovně psaný klíč `ui.*` a `error.*` v tabulce je.
+
+### Kritérium 8 — splněné a pak schválně zrušené
+
+„Zastávka MHD v obytné čtvrti sníží zátěž na okolních silnicích" **dnes
+neplatí**, a je to rozhodnutí, ne regrese. Fáze 3 dodávala jen zastávky a ty
+zátěž braly samy. T56 to obrátil: rozhoduje, **kolik lidí linka opravdu
+odveze**, a zastávka bez linky nikoho nikam nedopraví. Smysl je, aby hráč
+neuklidil kolony tím, že poseje město zastávkami. Test to říká jménem —
+„linka sníží zátěž na okolních silnicích, samotná zastávka ne".
+
+### Kritérium 16 — 60 FPS na členitém terénu
+
+Měřeno stejnou metodou jako kritérium 2 fáze 4: prohlížečový panel
+nekompozituje, takže se **snímková frekvence číst nedá**. Číst jde cena pečení,
+a ta je na členitosti závislá — svah má víc geometrie i stínování než rovina.
+
+Mapa 128 × 128, plné oddálení (zoom 0,25), 54 chunků v záběru, 39 % dlaždic na
+svahu. Táž mapa změřená znovu se `cornerHeight` vynulovaným na rovinu:
+
+| | nejhorší snímek | snímků | pečení celkem |
+|---|---|---|---|
+| členitý, bez rozpočtu | 38,5 ms | 7 | 46,1 ms |
+| **členitý, rozpočet 2 ms** | **6,8 ms** | 15 | 45,1 ms |
+| rovina, bez rozpočtu | 20,4 ms | 7 | 23,8 ms |
+| rovina, rozpočet 2 ms | 5,3 ms | 11 | 25,5 ms |
+
+**Členitost stojí zhruba dvojnásobek** — 46,1 proti 23,8 ms na tytéž chunky.
+Rozpočet z T44 to ale pobere: nejhorší snímek 6,8 ms se do 16,7 ms vejde.
+
+A hlavně to nastane jen při **úplném zneplatnění** (načtení města, přepnutí
+vrstvy). V ustáleném stavu stojí `cull` 0 ms a po postavení silnice 0,7 ms
+mediánově, nejhůř 2,8 ms.
+
+Co se změřit nedá: nahrání na GPU a kreslení. Podle měření z fáze 4 je nahrání
+zhruba dvojnásobek pečení, takže nejhorší snímek při přepnutí vrstvy může být
+u hranice. Chce to jeden ruční pohled, stejně jako u kritéria 2.
+
+Mutační test 10 z 10 — ve dvou kolech, protože první odhalilo ty dva neúčinné
+testy podzemního pohledu.
+
+1114 testů.
+
 
 ## Rozpracované
 
@@ -3082,8 +3214,8 @@ Akceptační kritérium 2 (512×512 při 60 FPS) je **ověřené** — viz měř
 `src/platform/` i **rozhraní pro 4c** jsou hotové, viz výš. Půjčky, dluhopisy,
 linky MHD i přepínač katastrof mají tlačítko.
 
-_(T41 — vyhodnocení fáze 3 — zůstává otevřené. Je to rozhodovací bod pro
-autora, ne technický úkol.)_
+**T41 je vyhodnocené**, viz výš. Otevřené zůstává jedno rozhodnutí pro autora:
+golden město zónuje bez balancu a náprava posune golden hash.
 
 ## Backlog
 

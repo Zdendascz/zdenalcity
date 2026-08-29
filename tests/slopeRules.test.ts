@@ -448,11 +448,14 @@ describe('zóna se při vyznačení srovná (T66)', () => {
 
   it('velká plocha se nesrovnává', () => {
     // Kdo táhne zónu přes celé údolí, nechce náhorní plošinu.
+    //
+    // Balanc se sem **musí** předat: strop je od T41 v datech
+    // (`map.maxLevelledZoneTiles`) a bez pravidel žádný neplatí.
     const w = world();
     raise(w, 30, 30, 4);
     const before = Uint8Array.from(w.cornerHeight);
 
-    zoneArea(w, 20, 20, 20, 20, ZONE.residential);
+    zoneArea(w, 20, 20, 20, 20, ZONE.residential, VANILLA_BALANCE);
 
     expect([...w.cornerHeight]).toEqual([...before]);
   });
@@ -503,7 +506,7 @@ describe('srovnání zóny se účtuje (T67)', () => {
   it('účtuje se po rozích, ne paušálem', () => {
     const w = world();
     raise(w, 12, 12, 3);
-    const changes = planZoneLevelling(w, 8, 8, 6, 6);
+    const changes = planZoneLevelling(w, 8, 8, 6, 6, VANILLA_BALANCE.map.maxLevelledZoneTiles);
     const before = w.economy.funds;
 
     zoneArea(w, 8, 8, 6, 6, ZONE.residential, VANILLA_BALANCE);

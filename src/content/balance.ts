@@ -534,10 +534,27 @@ export interface Balance {
     marshThreshold: number;
     octaves: number;
     roughness: number;
+    /**
+     * Měřítko výškového šumu v dlaždicích. Menší číslo = drobnější členitost,
+     * větší = rozlehlé pevniny s mírnými přechody.
+     */
+    heightScale: number;
+    /** Totéž pro les. Menší číslo dělá roztroušené háje, větší souvislé bory. */
+    forestScale: number;
+    /**
+     * Pod tolik dlaždic je ostrůvek k ničemu a zaplaví se. Vzniká, když koryto
+     * řeky ukrojí kus břehu — hráč by na něj neměl jak.
+     */
+    scrapIslandTiles: number;
     /** Jaky podil znecisteni pohlti buňka plna lesa, 0-1. */
     forestAbsorption: number;
     /** Cena za vykaceni jedne dlazdice lesa. */
     clearForestCost: number;
+    /**
+     * Nad kolik dlaždic se vyznačená zóna už automaticky nesrovnává. Kdo táhne
+     * zónu přes celé údolí, nechce náhorní plošinu.
+     */
+    maxLevelledZoneTiles: number;
     /**
      * Nejmensi podil souse, ktery musi zustat v jednom kuse. Kdyz se to
      * nepovede, generator ubere vodu a zkusi to znovu (R7).
@@ -1067,8 +1084,19 @@ export function validateBalance(raw: unknown): {
       marshThreshold: num(issues, map, 'marshThreshold', 'map.marshThreshold', 0, 1),
       octaves: num(issues, map, 'octaves', 'map.octaves', 1, 8),
       roughness: num(issues, map, 'roughness', 'map.roughness', 0, 1),
+      heightScale: num(issues, map, 'heightScale', 'map.heightScale', 1, 256),
+      forestScale: num(issues, map, 'forestScale', 'map.forestScale', 1, 256),
+      scrapIslandTiles: num(issues, map, 'scrapIslandTiles', 'map.scrapIslandTiles', 0, 4096),
       forestAbsorption: num(issues, map, 'forestAbsorption', 'map.forestAbsorption', 0, 1),
       clearForestCost: num(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
+      maxLevelledZoneTiles: num(
+        issues,
+        map,
+        'maxLevelledZoneTiles',
+        'map.maxLevelledZoneTiles',
+        0,
+        100000,
+      ),
       minLandShare: num(issues, map, 'minLandShare', 'map.minLandShare', 0, 1),
       maxHeight: num(issues, map, 'maxHeight', 'map.maxHeight', 0, MAX_HEIGHT),
       heightCurve: num(issues, map, 'heightCurve', 'map.heightCurve', 0.1, 8),
