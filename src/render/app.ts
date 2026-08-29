@@ -14,6 +14,7 @@ import { explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
+import type { CommandResult } from '@/sim/result';
 import { cornerIndex, tileCorners } from '@/sim/heights';
 import { index, ZONE } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
@@ -44,6 +45,8 @@ import { coarseCellsOf } from '@/sim/coarse';
 import { createWorld, NEUTRAL_HAPPINESS } from '@/sim/world';
 import { BudgetPanel } from '@/ui/budgetPanel';
 import { BuildingInfo } from '@/ui/buildingInfo';
+import { FinancePanel } from '@/ui/financePanel';
+import { TransitPanel } from '@/ui/transitPanel';
 import { CostPopup } from '@/ui/costPopup';
 import { PriceTag } from '@/ui/priceTag';
 import { Notifications } from '@/ui/notifications';
@@ -551,6 +554,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const notifications = new Notifications(mount);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
   const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance());
+  const financePanel = new FinancePanel(mount, i18n, dispatch);
+  const transitPanel = new TransitPanel(mount, i18n, dispatch, {
+    onPickStop: (lineId) => {
+      message = { key: 'ui.transit.pickHint', params: { id: lineId } };
+    },
+    onCancelPick: () => {
+      message = null;
+    },
+  });
   const alert = new DisasterAlert(mount, i18n, {
     onIgnore: () => setSpeed(DEFAULT_SPEED_INDEX),
     onShow: (x, y) => {
@@ -564,9 +576,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * Hra nesmí mlčet. Odmítnutý příkaz i spadlý kód se musí objevit na obrazovce —
    * ve vývoji obzvlášť, protože jinak se chyba pozná až po hodině hraní.
    */
-  function dispatch(cmd: Command): void {
+  function dispatch(cmd: Command): CommandResult {
     const result = host.dispatch(cmd);
     if (!result.ok) notifications.show(i18n.t(result.reason, result.params));
+    return result;
   }
 
   function reportCrash(message: string): void {
@@ -916,6 +929,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onToggleLayer: toggleLayer,
     onSetView: setView,
     onToggleBudget: () => budgetPanel.toggle(),
+    onToggleFinance: () => financePanel.toggle(),
+    onToggleTransit: () => transitPanel.toggle(),
+    onToggleDisasters: () => {
+      simWorld.disasters.enabled = !simWorld.disasters.enabled;
+      message = {
+        key: simWorld.disasters.enabled ? 'ui.disaster.turnedOn' : 'ui.disaster.turnedOff',
+      };
+    },
     onToggleGhost: () => {
       ghostBuildings = !ghostBuildings;
       applyViewAndLayer();
@@ -1128,6 +1149,27 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     return true;
   }
 
+  /**
+   * Klik do mapy, když panel MHD čeká na zastávku. `true` = klik se spotřeboval.
+   *
+   * Musí to být **dřív než nástroje**: hráč, který sbírá zastávky, má
+   * v paletě pořád zapnutou silnici, a bez tohohle by si místo přidání
+   * zastávky přestavěl město.
+   *
+   * Vedle nemá nikdo trpělivost: netrefený klik nabídku **nezhasne**. Zhasne
+   * ji až přidaná zastávka nebo druhé kliknutí na tlačítko. Co je špatně
+   * (prázdná dlaždice, jiný mód, už je na lince) rozsoudí příkaz, ne rozhraní —
+   * jinak by rozhraní hlídalo pravidla podruhé a jinak.
+   */
+  function pickTransitStop(tile: { x: number; y: number }): boolean {
+    const lineId = transitPanel.pickingLine();
+    if (lineId === null) return false;
+
+    const buildingId = simWorld.layers.buildingId[index(tile.x, tile.y, world.size)] ?? 0;
+    if (dispatch({ type: 'add_stop', lineId, buildingId }).ok) transitPanel.stopPicked();
+    return true;
+  }
+
   function applyTool(tile: { x: number; y: number }, viewX: number, viewY: number): void {
     const action = activeTool.action;
     const fundsBefore = world.economy.funds;
@@ -1202,6 +1244,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
 
     if (triggerArmedDisaster(tile)) return;
+    if (pickTransitStop(tile)) return;
 
     paintButton = event.button;
     lastPaintedTile = tile.y * world.size + tile.x;
@@ -1621,6 +1664,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       layer: layerMode,
       view: viewMode,
       budgetVisible: budgetPanel.isVisible(),
+      financeVisible: financePanel.isVisible(),
+      transitVisible: transitPanel.isVisible(),
+      disastersEnabled: simWorld.disasters.enabled,
       ghost: ghostBuildings,
       poweredBuildings,
       funding: simWorld.serviceFunding,
@@ -1631,6 +1677,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (budgetPanel.isVisible()) {
       budgetPanel.update(computeBudget(simWorld, content, content.getBalance()), simWorld.economy.funds);
     }
+    financePanel.update(simWorld, content.getBalance());
+    transitPanel.update(simWorld, content, content.getBalance());
 
     // Ladicí výpis je vývojářský nástroj, ne herní UI — proto nejde přes i18n.
     debug.update([

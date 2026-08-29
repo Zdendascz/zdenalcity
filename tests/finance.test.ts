@@ -11,6 +11,7 @@ import {
   loanCap,
   loanProblems,
   loanRate,
+  loanTerms,
   monthlyPayments,
   payLoans,
   takeLoan,
@@ -605,6 +606,28 @@ describe('validace financí', () => {
     const result = validateBalance(raw);
     expect(result.balance).toBeNull();
     expect(result.issues.map((issue) => issue.field)).toContain('finance');
+  });
+});
+
+describe('podmínky půjčky', () => {
+  it('slíbená doba půjčku opravdu splatí', () => {
+    // Splátka se zaokrouhluje **nahoru**. Kdyby dolů, součet splátek by byl
+    // menší než dluh, poslední měsíc by nic nedoplatil a půjčka by městu
+    // visela dál — přestože panel i evidence tvrdí „splaceno 60 z 60".
+    for (const amount of [1000, 12_345, 100_000, 999_999]) {
+      for (const rate of [0, 4, 7.5, 12]) {
+        for (const term of [12, 36, 60, 120]) {
+          const terms = loanTerms(amount, rate, term);
+          expect(terms.payment * term, `${amount} / ${rate} % / ${term} m`).toBeGreaterThanOrEqual(
+            terms.total,
+          );
+        }
+      }
+    }
+  });
+
+  it('bezúročná půjčka vrátí přesně jistinu', () => {
+    expect(loanTerms(60_000, 0, 60)).toEqual({ total: 60_000, payment: 1000 });
   });
 });
 

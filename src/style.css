@@ -164,7 +164,110 @@ body {
   transition: height 120ms linear;
 }
 
-.demand__bar.is-negative {
+.demand__bar/* --- panely financí a MHD ----------------------------------------------- */
+
+/*
+ * Obojí je formulář, ne tabulka: hráč do něj píše a mačká, takže se řádky
+ * skládají pod sebe a čísla nejsou v mřížce. Šířka je pevná — panel, který
+ * roste s obsahem, by hráči poskakoval pod rukama, jak přibývají linky.
+ */
+.sheet--finance,
+.sheet--transit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(400px, 92vw);
+}
+
+.finance__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.finance__heading,
+.transit__name {
+  margin: 0;
+  font-size: 12px;
+}
+
+.finance__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.finance__input {
+  width: 96px;
+  padding: 3px 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: rgb(255 255 255 / 6%);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.finance__row {
+  margin: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.finance__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.transit__line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.transit__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.transit__name {
+  flex: 1;
+}
+
+.transit__state {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* Zastávky se zalomí do řádků — dvanáct jich je víc, než kolik se vejde vedle sebe. */
+.transit__stops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.chip--stop {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Zamčené tlačítko musí být poznat, jinak hráč mačká a diví se, že se nic neděje. */
+.chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.chip:disabled:hover {
+  background: rgb(255 255 255 / 6%);
+}
+
+.is-negative {
   opacity: 0.35;
 }
 

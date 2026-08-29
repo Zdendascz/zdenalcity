@@ -25,6 +25,10 @@ export interface HudCallbacks {
   /** Pohled se nastavuje: povrch a podzemí jsou dva stavy, ne přepínač. */
   onSetView(id: string): void;
   onToggleBudget(): void;
+  /** Půjčky a dluhopisy (§8 fáze 4). */
+  onToggleFinance(): void;
+  /** Linky MHD (§7 fáze 4). */
+  onToggleTransit(): void;
   /** Zprůhlednit budovy, aby šlo vidět a klikat na to pod nimi. */
   onToggleGhost(): void;
   onFundingChange(serviceClass: string, funding: number): void;
@@ -36,6 +40,14 @@ export interface HudCallbacks {
    * způsob, jak katastrofy ladit.
    */
   onArmDisaster(kind: string): void;
+  /**
+   * Zapnout či vypnout náhodné katastrofy **za běhu**.
+   *
+   * Do T69 to šlo jen při zakládání města, přestože save si stav poctivě nese
+   * (T59) — hráč, kterého pohromy přestaly bavit uprostřed města, neměl co
+   * dělat. Ruční spuštění z nabídky přepínač neřeší, to je věc ladění.
+   */
+  onToggleDisasters(): void;
 }
 
 /** Položka nabídky pohledů nebo vrstev. Popisek je lokalizační klíč. */
@@ -52,6 +64,10 @@ export interface HudState {
   /** `'surface'` nebo `'underground'`. */
   view: string;
   budgetVisible: boolean;
+  financeVisible: boolean;
+  transitVisible: boolean;
+  /** Spouští hra náhodné katastrofy? */
+  disastersEnabled: boolean;
   /** Jsou budovy průhledné? */
   ghost: boolean;
   poweredBuildings: number;
@@ -104,6 +120,11 @@ export class Hud {
   private readonly viewButtons = new Map<string, HTMLButtonElement>();
   private layerMenu: Menu | null = null;
   private budgetButton: HTMLButtonElement | null = null;
+  private financeButton: HTMLButtonElement | null = null;
+  private transitButton: HTMLButtonElement | null = null;
+  private disasterMenu: Menu | null = null;
+  /** Se kterým stavem je nabídka katastrof postavená. `null` = ještě s žádným. */
+  private disastersShown: boolean | null = null;
   private ghostButton: HTMLButtonElement | null = null;
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
@@ -118,6 +139,9 @@ export class Hud {
     layer: 'none',
     view: 'surface',
     budgetVisible: false,
+    financeVisible: false,
+    transitVisible: false,
+    disastersEnabled: true,
     ghost: false,
     poweredBuildings: 0,
     powerProduced: 0,
@@ -226,7 +250,15 @@ export class Hud {
     }
     this.layerMenu?.setSelected(state.layer);
     this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
+    this.financeButton?.classList.toggle('is-active', state.financeVisible);
+    this.transitButton?.classList.toggle('is-active', state.transitVisible);
     this.ghostButton?.classList.toggle('is-active', state.ghost);
+
+    // Text přepínače závisí na stavu, který HUD sám nedrží — přijde ve `state`.
+    if (state.disastersEnabled !== this.disastersShown) {
+      this.disastersShown = state.disastersEnabled;
+      this.setDisasterItems(state.disastersEnabled);
+    }
 
     if (this.messageNode) {
       this.messageNode.textContent = state.message;
@@ -411,15 +443,33 @@ export class Hud {
       lockIcon: true,
       className: 'popover--alarm',
     });
-    menu.setItems(
-      this.disasters.map((kind) => ({
+    this.disasterMenu = menu;
+    this.setDisasterItems(this.lastState.disastersEnabled);
+    this.controls.appendChild(menu.root);
+  }
+
+  /**
+   * Položky nabídky katastrof: nahoře přepínač, pod ním ruční spuštění.
+   *
+   * Přepínač je **první**, protože je to jediná položka, kterou hráč zmáčkne
+   * kvůli hraní — zbytek je ladicí nářadí. Text se mění podle stavu, takže se
+   * seznam při přepnutí staví znovu; položek je patnáct, ne patnáct set.
+   */
+  private setDisasterItems(enabled: boolean): void {
+    this.disasterMenu?.setItems([
+      {
+        id: 'toggle',
+        label: this.i18n.t(enabled ? 'ui.disaster.turnOff' : 'ui.disaster.turnOn'),
+        icon: 'disasters-toggle',
+        onSelect: () => this.callbacks.onToggleDisasters(),
+      },
+      ...this.disasters.map((kind) => ({
         id: kind,
         label: this.i18n.t(`ui.disaster.${kind}`),
         icon: kind,
         onSelect: () => this.callbacks.onArmDisaster(kind),
       })),
-    );
-    this.controls.appendChild(menu.root);
+    ]);
   }
 
   private buildTaxes(): void {
@@ -484,13 +534,26 @@ export class Hud {
   }
 
   private buildBudget(): void {
-    const label = this.i18n.t('ui.budget.toggle');
-    const node = button('toolbar__button', () => this.callbacks.onToggleBudget());
-    node.appendChild(iconSvg('budget'));
+    this.budgetButton = this.panelButton('budget', 'ui.budget.toggle', () =>
+      this.callbacks.onToggleBudget(),
+    );
+    this.financeButton = this.panelButton('loan-take', 'ui.finance.toggle', () =>
+      this.callbacks.onToggleFinance(),
+    );
+    this.transitButton = this.panelButton('transit_stop', 'ui.transit.toggle', () =>
+      this.callbacks.onToggleTransit(),
+    );
+  }
+
+  /** Tlačítko, které jen otevírá a zavírá panel. */
+  private panelButton(icon: string, labelKey: string, onClick: () => void): HTMLButtonElement {
+    const label = this.i18n.t(labelKey);
+    const node = button('toolbar__button', onClick);
+    node.appendChild(iconSvg(icon));
     node.title = label;
     node.setAttribute('aria-label', label);
-    this.budgetButton = node;
     this.controls.appendChild(node);
+    return node;
   }
 
   private buildSave(): void {

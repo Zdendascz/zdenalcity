@@ -2470,6 +2470,9 @@ Celkem 972 testů.
 
 ### Co fáze 4 nedodělala v rozhraní
 
+_(Vyřešeno — viz „Rozhraní pro 4c" výš. Popis stavu, jaký byl při vyhodnocení
+T60:)_
+
 Sedm příkazů z 4c nemá **žádné tlačítko** a jde k nim jen přes `dispatch`:
 `take_loan`, `issue_bond`, `create_line`, `delete_line`, `add_stop`,
 `remove_stop`, `set_vehicles`, `set_fare`. Rozpočtový panel přitom řádky
@@ -3011,6 +3014,62 @@ serializuje, ale neuloží) — tam se test bez Pixi nedostane, ověřeno ručn�
 
 1077 testů.
 
+## Rozhraní pro 4c — rozhodnutí autora
+
+Osm příkazů z 4c nemělo tlačítko. Rozpočtový panel řádky *dluh*, *dluhopisy*
+a *MHD* zobrazoval, takže hráč viděl čísla, která neměl jak ovlivnit.
+
+Vznikly dva panely a jeden přepínač:
+
+**`ui/financePanel.ts`** — půjčky a dluhopisy. Ukazuje strop, sazbu, náhled
+splátky a odhad úpisu; tlačítko je zamčené, dokud zadání neprojde, a pod ním
+stojí **proč**.
+
+Nic se v něm nepočítá znovu. Kvůli tomu se z `takeLoan` vyčlenilo `loanTerms`:
+panel a příkaz teď počítají splátku toutéž funkcí. Panel, který si vzorec
+opíše, začne dřív nebo později nabízet jinou splátku, než jakou město zaplatí —
+a poznalo by se to až po letech hry.
+
+Formulář se **nepřestavuje při každém snímku**, jen se v něm obnovují čísla.
+Hráč do něj píše částku a znovupostavené `<input>` by mu ji sebralo i s kurzorem.
+
+**`ui/transitPanel.ts`** — linky MHD. Zakládání podle módu **z katalogu, ne
+z výčtu v kódu** (P5), zastávky, vozidla, jízdné, co linka veze a co jí chybí.
+
+**Zastávka se vybírá klikem do mapy**, ne ze seznamu. Trasa se sice nekreslí,
+ale která zastávka to je, hráč pozná podle toho, kde stojí — ne podle
+pořadového čísla budovy. Netrefený klik nabídku nezhasne; co je špatně,
+rozsoudí příkaz, ne rozhraní, aby se pravidla nehlídala podruhé a jinak.
+
+Panel se přestavuje jen při **změně otisku** (linky, statistiky, kasa). Tlačítko
+stavěné znovu každý snímek by hráči mizelo pod kurzorem.
+
+**Přepínač katastrof za běhu.** Do teď se dal nastavit jen při zakládání města,
+přestože save si stav poctivě nese (T59) — hráč, kterého pohromy přestaly bavit
+uprostřed města, neměl co dělat. Sedí nahoře v nabídce katastrof, protože je to
+jediná její položka kvůli hraní; zbytek je ladicí nářadí.
+
+Ikony byly v repu od T60: `loan-take`, `bond-issue`, `line-create`,
+`line-delete`, `stop-add`, `stop-remove`, `vehicles`, `fare`,
+`disasters-toggle`. Archy je nesly, jen k nim nebylo tlačítko.
+
+Přibyl test, že **každý doslovně psaný klíč `ui.*` a `error.*` v `ui/` a
+`render/` je v tabulce**. Chybějící překlad hru neshodí, vypíše syrový klíč —
+a právě proto by si toho nikdo nevšiml. Skládané klíče (`` `ui.disaster.${kind}` ``)
+se staticky přečíst nedají a mají vlastní testy u svých registrů.
+
+Ověřeno v běžícím městě: půjčka 100 000 na 60 měsíců — panel slíbil „měsíčně
+2 000, celkem se vrátí 120 000" a sjednalo se přesně to. Emise 150 000 při
+kupónu 7 % odhadla úpis 53 %, upsalo se 79 647. Autobusová linka přes dvě
+zastávky vybrané klikem veze 18 z 20 lidí.
+
+Mutační test 11 z 11. Dva přeživší si vyžádali testy, ne smazání stráže:
+zamčené tlačítko na plné lince a to, že **slíbená doba půjčku opravdu splatí**
+(splátka se zaokrouhluje nahoru — dolů by poslední měsíc nedoplatil a dluh by
+visel dál, přestože evidence tvrdí „splaceno 60 z 60").
+
+1102 testů.
+
 
 ## Rozpracované
 
@@ -3020,10 +3079,8 @@ save v8.
 
 Akceptační kritérium 2 (512×512 při 60 FPS) je **ověřené** — viz měření níž.
 
-Mimo kritéria zůstává **bez rozhraní celá 4c** — půjčky, dluhopisy a linky MHD
-jdou jen přes `dispatch`. Viz vyhodnocení T60. To je další práce v pořadí.
-
-`src/platform/` je hotová, viz výš.
+`src/platform/` i **rozhraní pro 4c** jsou hotové, viz výš. Půjčky, dluhopisy,
+linky MHD i přepínač katastrof mají tlačítko.
 
 _(T41 — vyhodnocení fáze 3 — zůstává otevřené. Je to rozhodovací bod pro
 autora, ne technický úkol.)_

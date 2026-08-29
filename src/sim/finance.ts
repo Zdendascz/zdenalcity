@@ -82,13 +82,27 @@ export function loanProblems(
 }
 
 /**
- * Sjedná půjčku. Peníze přijdou hned, splácí se od příštího měsíce.
+ * Kolik se celkem vrátí a kolik dělá měsíční splátka.
  *
  * Úrok je **jednoduchý, ne složený**: celkem se vrátí `jistina × (1 + sazba ×
  * roky)`, rozdělené na stejné splátky. Anuita by byla přesnější, ale hráč by
  * z ní neuměl v hlavě odhadnout, kolik ho to bude stát — a tohle je hra, ne
  * hypoteční kalkulačka.
+ *
+ * Vyčleněné z `takeLoan`, aby si rozhraní mohlo spočítat totéž **dřív, než
+ * hráč klikne**. Kdyby si panel vzorec opsal, rozešel by se s ním při první
+ * změně pravidel a nabízel by jinou splátku, než jakou by pak město platilo.
  */
+export function loanTerms(
+  amount: number,
+  rate: number,
+  termMonths: number,
+): { total: number; payment: number } {
+  const total = amount * (1 + (rate / 100) * (termMonths / 12));
+  return { total: Math.round(total), payment: Math.ceil(total / termMonths) };
+}
+
+/** Sjedná půjčku. Peníze přijdou hned, splácí se od příštího měsíce. */
 export function takeLoan(
   world: WorldState,
   balance: Balance,
@@ -98,13 +112,13 @@ export function takeLoan(
   if (loanProblems(world, balance, amount, termMonths).length > 0) return null;
 
   const rate = loanRate(world, balance);
-  const total = amount * (1 + (rate / 100) * (termMonths / 12));
+  const terms = loanTerms(amount, rate, termMonths);
   const loan: Loan = {
     id: world.nextLoanId++,
     principal: amount,
-    remaining: Math.round(total),
+    remaining: terms.total,
     rate,
-    payment: Math.ceil(total / termMonths),
+    payment: terms.payment,
     termMonths,
     paidMonths: 0,
   };

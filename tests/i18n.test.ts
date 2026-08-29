@@ -84,6 +84,37 @@ describe('locale soubory vanilla obsahu', () => {
     expect(cs).toEqual(en);
   });
 
+  it('každý klíč, na který se rozhraní ptá, v tabulce je', async () => {
+    // Chybějící překlad hru neshodí — vypíše syrový klíč a hráč si přečte
+    // `ui.finance.loanPreview`. Právě proto by si toho nikdo nevšiml.
+    //
+    // Hlídají se jen klíče psané v kódu doslova. Skládané (``ui.disaster.${kind}``)
+    // se staticky přečíst nedají a mají vlastní testy u svých registrů.
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+    const cs = content.getLocaleTable('cs');
+
+    const sources = import.meta.glob('../src/{ui,render}/*.ts', {
+      eager: true,
+      query: '?raw',
+      import: 'default',
+    }) as Record<string, string>;
+
+    const missing: string[] = [];
+    const seen = new Set<string>();
+    for (const [path, code] of Object.entries(sources)) {
+      for (const [, key] of code.matchAll(/'((?:ui|error)\.[A-Za-z0-9_.]+)'/g)) {
+        if (key === undefined) continue;
+        seen.add(key);
+        if (!(key in cs)) missing.push(`${path}: ${key}`);
+      }
+    }
+
+    expect(missing).toEqual([]);
+    // Rozbitý glob nebo regulární výraz by nenašel nic a test by prošel vždycky.
+    expect(seen.size).toBeGreaterThan(100);
+  });
+
   it('žádný text není prázdný', async () => {
     const content = new ContentRegistry();
     await content.load(createVanillaSource());
