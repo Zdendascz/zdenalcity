@@ -1,0 +1,33 @@
+{
+  "formatVersion": 1,
+  "scale": 4,
+  "sprites": [
+    {
+      "building": "vanilla:fire_station",
+      "variant": "a",
+      "file": "fire_station__a.png",
+      "anchor": [
+        263,
+        354
+      ]
+    },
+    {
+      "building": "vanilla:hospital",
+      "variant": "a",
+      "file": "hospital__a.png",
+      "anchor": [
+        396,
+        527
+      ]
+    },
+    {
+      "building": "vanilla:school",
+      "variant": "a",
+      "file": "school__a.png",
+      "anchor": [
+        420,
+        548
+      ]
+    }
+  ]
+}

@@ -52,8 +52,8 @@ výška celkem   = 32 · n + 16 · heightLevels
 
 Hra umí přiblížit až **4×**, takže se kreslí ve **čtyřnásobku** a zmenšuje se.
 Všechny budovy mimo zóny mají **čtvercový půdorys**, takže spodní vrchol
-podstavy leží přesně uprostřed šířky — kotva spritu je tedy **střed spodní
-hrany**.
+podstavy má ležet uprostřed šířky. *Má* — skutečnou polohu skript změří, viz
+níž.
 
 | půdorys | pater | šířka | výška |
 |---|---|---|---|
@@ -97,19 +97,63 @@ Lighting is fixed: sunlight from the left. The left-facing wall is clearly
 brighter than the right-facing wall; the roof is the brightest surface. Shadows
 fall to the right and stay inside the plot.
 
-Flat magenta background (#FF00FF), no terrain, no grass or road outside the
-plot, no people, no vehicles unless named, no text, no signage lettering, no
+Transparent background, no terrain, no grass or road outside the plot, no
+people, no vehicles unless named, no text of any kind, no signage lettering, no
 logos, no watermark. Clean hard edges, no blur, no depth of field, no vignette.
 
 Square canvas, 1024 × 1024.
 ```
 
-Proč magenta: obrázek se pak dá **odklíčovat** i od generátoru, který
-průhlednost neumí. Kdyby budova magentu obsahovala, klíčování ji sní — proto ta
-barva v žádné variantě není.
+**Průhledné pozadí je lepší než klíčované** a ChatGPT ho umí. Ověřeno na tvých
+prvních třech obrázcích: rohy na nule, půlka plátna průhledná, skript to pozná
+sám. Sklo a měkké hrany tím zůstanou celé.
+
+Když generátor průhlednost neumí, poslední řádek se nahradí za:
+
+```
+Flat magenta background (#FF00FF).
+```
+
+Skript to odklíčuje a otře fialový lem. Pozná to podle **rohů**, ne podle
+podílu průhledných pixelů — budova s prosklenou halou by jinak vypadala jako
+už odklíčovaná, i když kolem sebe má plnou magentu. Proto se ta barva nesmí
+objevit v žádné variantě.
 
 Proč „rohy podstavy se dotýkají okrajů": skript zmenšuje podle **šířky
 ořezu**. Když budova plátno nevyplní, vyjde v mapě příliš velká.
+
+### Projekci neřeš, skript ji srovná
+
+ChatGPT kreslí klasickou izometrii kolem **1,6 : 1**, hra jede **2 : 1**.
+Naměřeno na prvních třech obrázcích: 1,57, 1,60 a 1,60.
+
+Nevadí to. Obě projekce jsou paralelní promítání se stejným otočením kolem
+svislé osy a liší se jen sklonem pohledu — a ten je na obrazovce prosté svislé
+zmáčknutí. Skript podstavu **změří** a srovná; po opravě vyšly 2,00, 2,00
+a 2,07. Není to deformace, ale převod mezi projekcemi.
+
+Do promptu se proto 2:1 psát nemusí a lepší je nepsat: generátor by se o to
+pokoušel a rozházel by proporce budovy.
+
+### Kotva se měří, ne předpokládá
+
+U čtvercového půdorysu má spodní vrchol podstavy ležet uprostřed šířky.
+Generátor ale kreslí podstavu často mírně zkosenou — u tvé školy je vrchol
+**36 px vedle středu**. Skript ho proto změří a zapíše do `index.json`; kdyby
+se počítal ze středu, seděla by budova na dlaždici vedle.
+
+### Na co si dát pozor
+
+**Nápisy.** Prompt zakazuje text, ale generátor ho stejně občas dodá — tvoje
+škola má na štítě anglické „SCHOOL". Hra je česká a lokalizovaná, takže
+natvrdo vypsaný anglický nápis v ní je cizí těleso. Buď přegenerovat, nebo
+vzít jako součást stylu; jen ať je to rozhodnutí.
+
+**Výška.** Skript hlásí, o kolik je stavba vyšší, než čeká `heightLevels`
+z definice. Škola vyšla o 22 % vyšší než jedno patro. Není to chyba obrázku —
+je to informace, že sedmnáct pixelů, které si o ní myslí simulace, neodpovídá
+tomu, jak vypadá. Buď se upraví `heightLevels` v definici, nebo se to nechá
+být; kvádrová záloha pak bude nižší než sprite.
 
 ---
 

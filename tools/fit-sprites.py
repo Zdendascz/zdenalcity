@@ -75,21 +75,21 @@ def load_definitions() -> dict[str, dict]:
     return out
 
 
+def corners(layer: np.ndarray) -> np.ndarray:
+    """Čtyři rohové výřezy slepené do jednoho pole. Odsud se pozná pozadí."""
+    h, w = layer.shape[:2]
+    p = 8
+    parts = [layer[:p, :p], layer[:p, w - p:], layer[h - p:, :p], layer[h - p:, w - p:]]
+    return np.concatenate([part.reshape(-1, *layer.shape[2:]) for part in parts])
+
+
 def background_colour(rgb: np.ndarray) -> np.ndarray:
     """Barva pozadí z rohů obrázku.
 
     Bere se **medián čtyř rohů**, ne jeden: generátor občas nechá v rohu
     artefakt a jediný vzorek by pak klíčoval podle něj.
     """
-    h, w, _ = rgb.shape
-    patch = 8
-    corners = [
-        rgb[:patch, :patch],
-        rgb[:patch, w - patch:],
-        rgb[h - patch:, :patch],
-        rgb[h - patch:, w - patch:],
-    ]
-    return np.median(np.concatenate([c.reshape(-1, 3) for c in corners]), axis=0)
+    return np.median(corners(rgb), axis=0)
 
 
 def key_out(image: Image.Image) -> Image.Image:
@@ -99,7 +99,11 @@ def key_out(image: Image.Image) -> Image.Image:
 
     # Obrázek, který průhlednost už má, se nechá být — generátor ji dodal a
     # klíčovat přes ni by sežralo skla a stíny.
-    if (alpha < 250).mean() > 0.02:
+    #
+    # Ptáme se **rohů**, ne podílu průhledných pixelů v celém obrázku. Podíl
+    # je vratký: budova s prosklenou halou má poloprůhledných pixelů dost na
+    # to, aby vypadala jako odklíčovaná, i když kolem sebe má plnou magentu.
+    if np.median(corners(alpha)) < 32:
         return image.convert('RGBA')
 
     back = background_colour(rgb)
@@ -118,6 +122,60 @@ def key_out(image: Image.Image) -> Image.Image:
     return Image.fromarray(out, 'RGBA')
 
 
+def base_diamond(image: Image.Image) -> tuple[float, int] | None:
+    """Poměr stran podstavy a x spodního vrcholu. `None`, když to nejde změřit.
+
+    Podstava je nejspodnější a nejširší útvar v obrázku, takže její vrcholy
+    leží na krajích ořezu: **levý** vrchol je nejnižší pixel v prvním sloupci,
+    **pravý** v posledním a **spodní** uprostřed posledního řádku.
+
+    Poměr `šířka / plná výška` je u projekce 2:1 rovný dvěma. Cokoli jiného
+    znamená, že obrázek je v jiné izometrii — a to se dá spravit, viz
+    `to_two_to_one`.
+    """
+    alpha = np.asarray(image)[:, :, 3] > 40
+    cols = np.where(alpha.any(axis=0))[0]
+    rows = np.where(alpha.any(axis=1))[0]
+    if cols.size < 8 or rows.size < 8:
+        return None
+
+    left_y = np.where(alpha[:, cols[0]])[0][-1]
+    right_y = np.where(alpha[:, cols[-1]])[0][-1]
+    bottom_y = rows[-1]
+    bottom_x = int(np.where(alpha[bottom_y])[0].mean())
+
+    half = bottom_y - (left_y + right_y) / 2
+    if half <= 1:
+        return None
+    return (cols[-1] - cols[0]) / (2 * half), bottom_x
+
+
+# Mimo tyhle meze se naměřenému poměru nevěří: to už není jiná izometrie, ale
+# rozbitý obrázek — strom přes okraj, uříznutá podstava, stín mimo pozemek.
+RATIO_MIN, RATIO_MAX = 1.2, 2.6
+# Pod tímhle rozdílem se neopravuje. Zmenšit o procento nemá cenu a jen by to
+# rozmazalo hrany.
+RATIO_TOLERANCE = 0.04
+
+
+def to_two_to_one(image: Image.Image, ratio: float) -> tuple[Image.Image, str]:
+    """Převede obrázek do projekce 2:1 svislým zmáčknutím.
+
+    Není to deformace, ale **změna projekce**. Obě izometrie jsou paralelní
+    promítání se stejným otočením kolem svislé osy; liší se jen sklonem
+    pohledu, a ten se na obrazovce projeví právě měřítkem v ose Y. Budova se
+    tím sníží přesně tak, jak by ji hra nakreslila sama.
+    """
+    if not (RATIO_MIN <= ratio <= RATIO_MAX):
+        return image, f'  ← poměr podstavy {ratio:.2f} je mimo meze, neopravuji'
+    if abs(ratio - 2.0) <= RATIO_TOLERANCE:
+        return image, ''
+
+    factor = ratio / 2.0
+    height = max(1, round(image.height * factor))
+    return image.resize((image.width, height), Image.LANCZOS), f'  ← projekce {ratio:.2f}:1 → 2:1'
+
+
 def trim(image: Image.Image) -> Image.Image | None:
     """Ořízne na neprůhledné pixely. `None`, když nezbylo nic."""
     alpha = np.asarray(image)[:, :, 3]
@@ -128,6 +186,10 @@ def trim(image: Image.Image) -> Image.Image | None:
     if rows.size == 0 or cols.size == 0:
         return None
     return image.crop((int(cols[0]), int(rows[0]), int(cols[-1]) + 1, int(rows[-1]) + 1))
+
+
+# Naměřené kotvy, aby je šlo zapsat do manifestu. Sbírá je `process`.
+ANCHORS: dict[str, list[int]] = {}
 
 
 def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str, bool]:
@@ -147,26 +209,46 @@ def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str,
     if cropped is None:
         return f'{path.name}: po odklíčování nezbylo nic — jiné pozadí?', False
 
+    notes: list[str] = []
+    measured = base_diamond(cropped)
+    if measured is None:
+        notes.append('  ← podstavu nejde změřit, projekci neopravuji')
+    else:
+        cropped, note = to_two_to_one(cropped, measured[0])
+        if note:
+            notes.append(note)
+        # Po zmáčknutí se ořez posune, protože se hýbalo celým obrázkem.
+        cropped = trim(cropped) or cropped
+
     target_w = spec['width']
-    ratio = target_w / cropped.width
-    target_h = max(1, round(cropped.height * ratio))
+    scale = target_w / cropped.width
+    target_h = max(1, round(cropped.height * scale))
     resized = cropped.resize((target_w, target_h), Image.LANCZOS)
+
+    # Kotva se **měří, ne předpokládá.** Spodní vrchol podstavy má u čtvercového
+    # půdorysu ležet uprostřed, jenže generátor kreslí podstavu často mírně
+    # zkosenou — a budova by pak na dlaždici seděla vedle.
+    final = base_diamond(resized)
+    anchor_x = final[1] if final else target_w // 2
+    if abs(anchor_x - target_w / 2) > target_w * 0.03:
+        notes.append(f'  ← podstava zkosená, kotva {anchor_x - target_w // 2:+d} px od středu')
 
     expected_h = spec['height']
     drift = (target_h - expected_h) / expected_h
-    note = ''
     if abs(drift) > HEIGHT_TOLERANCE:
         smer = 'vyšší' if drift > 0 else 'nižší'
-        note = f'  ← o {abs(drift) * 100:.0f} % {smer}, než čeká {spec["levels"]} pater'
+        notes.append(f'  ← o {abs(drift) * 100:.0f} % {smer}, než čeká {spec["levels"]} pater')
 
     if write:
         OUT.mkdir(parents=True, exist_ok=True)
         resized.save(OUT / f'{building}__{variant}.png')
+        ANCHORS[f'{building}__{variant}'] = [anchor_x, target_h]
 
     return (
-        f'{building}__{variant}  {cropped.width}×{cropped.height} → {target_w}×{target_h}{note}',
+        f'{building}__{variant}  →  {target_w}×{target_h}' + ''.join(notes),
         True,
     )
+
 
 
 def main() -> int:
@@ -214,11 +296,13 @@ def main() -> int:
                     'building': f'vanilla:{p.stem.rsplit("__", 1)[0]}',
                     'variant': p.stem.rsplit('__', 1)[1],
                     'file': f'{p.stem}.png',
-                    # Kotva je střed spodní hrany — u čtvercového půdorysu tam
-                    # leží přední vrchol podstavy, tedy `gridToScreen(x+n, y+n)`.
-                    'anchor': 'bottom-center',
+                    # Bod spritu, který sedne na přední vrchol půdorysu, tedy
+                    # na `gridToScreen(x+n, y+n)`. **Naměřený**, ne dopočítaný
+                    # ze středu: podstava bývá mírně zkosená.
+                    'anchor': ANCHORS.get(p.stem, [0, 0]),
                 }
                 for p in sorted(OUT.glob('*.png'))
+                if p.stem in ANCHORS
             ],
         }
         (OUT / 'index.json').write_text(
