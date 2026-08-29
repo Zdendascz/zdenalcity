@@ -274,9 +274,19 @@ Terén se renderuje do `RenderTexture` po chuncích **16×16 dlaždic**. Změna 
 
 Žádné sprity, žádné textury, žádný Blender. Vše kreslené procedurálně přes `Pixi.Graphics`:
 
-> Od T60 platí jen pro **svět**. Ikony v rozhraní jsou obrázky, které dodává
-> obsah (`content/vanilla/icons/`) — jde to přes `ContentSource`, aby je mod
-> mohl přidat i přepsat. Na mapě se nic nezměnilo.
+> **Tohle přestalo platit ve dvou krocích, oba rozhodl autor.**
+>
+> Od T60 mají obrázky **ikony v rozhraní** (`content/vanilla/icons/`).
+> Od T70 je dostávají i **budovy na mapě**, každá ve třech variantách, ze
+> kterých se při stavbě jedna vylosuje a zůstane — viz `06-SPRITY-SLUZEB.md`.
+>
+> **Terén a silnice zůstávají procedurální**, a to je pořád záměr: kreslí se
+> po chuncích do `RenderTexture` a sprity by z toho udělaly atlas, který se
+> na svazích stejně neskládá.
+>
+> Obojí jde přes `ContentSource`, aby to mod směl přidat i přepsat (P5), a
+> obojí má **zálohu** — chybějící obrázek vykreslí polygon, respektive kvádr.
+> Mod, který obrázky nedodá, hru nezastaví.
 
 
 - Terén: izometrický diamant vyplněný barvou podle `terrain`

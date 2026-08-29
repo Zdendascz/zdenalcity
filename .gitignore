@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Syrové obrázky budov: velké a znovu vygenerovatelné z promptů.
+# Do repa jde až to, co z nich udělá tools/fit-sprites.py.
+art/sprites/raw/*.png

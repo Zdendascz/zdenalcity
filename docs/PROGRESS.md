@@ -3238,6 +3238,54 @@ testy podzemního pohledu.
 1114 testů.
 
 
+## Sprity budov — zadání (T70, rozhodnutí autora)
+
+**Mění se pravidlo, které platilo od začátku.** Architektura §6 i `CLAUDE.md`
+říkaly „žádné sprity ve světě". Od T60 to neplatilo pro ikony rozhraní, teď to
+neplatí ani pro **budovy na mapě**. Terén a silnice procedurální zůstávají.
+
+Vzniklo zadání `docs/06-SPRITY-SLUZEB.md`: **28 budov mimo zóny** — 24 služeb
+a 4 inženýrské stavby — každá ve **třech variantách**, tedy 84 obrázků.
+Zástavba v zónách přijde samostatně.
+
+Rozměry se **odvodily z rendereru, ne odhadly**. Projekce je 2:1, dlaždice
+64 × 32, patro 16 px, takže pro čtvercový půdorys `n × n` vychází šířka 64 n
+a výška 32 n + 16 · pater. Hra přiblíží až 4×, proto se kreslí ve
+čtyřnásobku. Všech 28 budov má **čtvercový půdorys**, takže spodní vrchol
+podstavy leží přesně uprostřed šířky — kotva spritu je střed spodní hrany.
+
+Do promptu rozměry nejdou: generátory je netrefí a čtvercové plátno umí líp.
+Kreslí se 1024 × 1024 a zbytek dopočítá `tools/fit-sprites.py`.
+
+Prompt nese **pevné světlo zleva**, protože renderer stínuje stěny natvrdo —
+levá 0,7, pravá 0,5, střecha 1,0. Obrázek, který to poruší, se od silnic
+a terénu kolem odlepí.
+
+Pozadí je **magenta**, aby šlo odklíčovat i od generátoru, který průhlednost
+neumí; proto se ta barva v žádné variantě nesmí objevit. A prompt trvá na tom,
+aby se rohy podstavy dotýkaly okrajů plátna: skript zmenšuje podle **šířky
+ořezu**, takže budova, která plátno nevyplní, vyjde v mapě příliš velká.
+
+`tools/fit-sprites.py` odklíčuje pozadí, otře fialový lem, ořízne, zmenší na
+šířku podle půdorysu a napíše, co udělal. Půdorysy si bere **z definic budov**,
+ne z tabulky v sobě (P5). Výšku **jen hlásí a nepřekresluje**: natáhnout obrázek
+na očekávanou výšku by ze štíhlé věže udělalo zavalitou, a to je zpráva
+o stavbě, ne chyba k opravě.
+
+Ověřeno na uměle vyrobeném vzorku 1024 × 1024: vyšlo 768 px podle půdorysu,
+rohy průhledné, **nula fialových pixelů** na hranách a spodní vrchol na 383,5
+proti středu 384,0.
+
+### Co tím na sebe bere simulace
+
+Varianta se losuje jednou a zůstává, takže se **musí uložit do savu**:
+z `world.rng`, ne z `Math.random` (P2), jako **jméno** `a`/`b`/`c`, ne index
+do pole (P6), a se **save v9 a migrací** (P7). Kolik variant budova má, říká
+obsah — tři jsou dnešní rozhodnutí, ne konstanta v kódu (P5).
+
+Nic z toho není hotové. Tahle dávka je zadání pro obrázky.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

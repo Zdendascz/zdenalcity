@@ -15,11 +15,17 @@ Plná specifikace: `docs/01-ARCHITEKTURA.md`. Aktuální stav: `docs/PROGRESS.md
 `npm run check` musí projít.
 
 ## Nedělat
-Electron, Steam, sprity ve světě, převýšení terénu, React, state manager, monorepo, Web Worker.
+Electron, Steam, React, state manager, monorepo, Web Worker.
 
-Ikony rozhraní jsou od T60 kreslené obrázky v `content/vanilla/icons/` (rozhodnutí
-autora). Týká se to **jen tlačítek** — terén, silnice ani budovy na mapě sprity
-nedostávají, ty zůstávají procedurální.
+Sprity **budou** — rozhodnutí autora se dvakrát změnilo, tak pozor na pořadí:
+
+- **T60:** ikony rozhraní jsou obrázky v `content/vanilla/icons/`. Jen tlačítka.
+- **T70:** obrázky dostávají i **budovy na mapě**, každá ve třech variantách.
+  Zadání a prompty jsou v `docs/06-SPRITY-SLUZEB.md`.
+- **Terén a silnice zůstávají procedurální.** Tady se nic nezměnilo.
+
+Vše jde přes `ContentSource`, aby to mod směl přidat i přepsat (P5). Chybějící
+obrázek nesmí hru zastavit — kreslí se kvádr jako dřív.
 Nové závislosti jen po odsouhlasení autorem.
 
 ## Prostředí
