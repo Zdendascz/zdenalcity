@@ -3152,10 +3152,24 @@ změnilo, takže je fallback **`Infinity`** — bez pravidel neplatí strop, ne
 zadarmo, ne zdarma nic. Golden hash tím zůstal beze změny; zóny v něm jsou
 16 × 3 a 8 × 3, tedy pod stropem tak jako tak.
 
-_Zůstává otevřené pro autora:_ golden město by mělo zónovat **s balancem** —
-jinak jeho terén vzniká podle pravidel, podle kterých se nehraje. Náprava ale
-změní golden hash i kasu (srovnání se začne účtovat), a to je posun referenčního
-bodu, ne úklid.
+**Opraveno (rozhodl autor):** golden město teď zónuje s balancem. Posunula se
+**jediná hodnota, kasa** — 19 264 → 18 552, tedy přesně těch 712 za srovnání
+parcel. Hashe terénu, počet budov, obyvatel i práce zůstaly na chlup stejné:
+srovnání se dělo i předtím, jen se za ně nevybíralo. Výsledky `zoneArea` se
+nově kontrolují, protože od T68 se bez peněz nezónuje vůbec a neúspěšný příkaz
+by tiše udělal jiné město.
+
+**Při tom vyšlo najevo, že golden město nemá elektrárnu.** `placeDefinition` ji
+staví na `site.y - 5`, jenže ulice vede na `site.y + 3` a půdorys je 4 × 4 —
+mezi nimi jsou čtyři dlaždice, takže příkaz padá na `error.needsRoad`. Výsledek
+se nekontroloval, takže o tom nikdo nevěděl: komentář v testu tvrdí „elektrárna
+hned nad zónou, u téže silnice" a ve světě žádná není. Těch 61 budov a 192
+obyvatel tedy vyrostlo **bez proudu**.
+
+Neopraveno schválně: posunout elektrárnu k silnici změní hashe, počet budov
+i obyvatel, protože proud pouští úrovně budov výš. To už není úklid, ale jiné
+referenční město — a na tenhle údaj se PROGRESS na několika místech odvolává.
+Rozhodnutí pro autora.
 
 **Text mimo locale: čisto.** V `src/sim/` není po odečtení importů ani jeden
 řetězcový literál, který by nebyl klíč nebo identifikátor. Pro `ui/` a `render/`

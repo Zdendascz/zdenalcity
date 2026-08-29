@@ -61,9 +61,20 @@ function buildCity(content: ContentRegistry): WorldState {
   const roadY = site.y + 3;
   for (let x = site.x; x < site.x + SITE_W; x++) buildRoad(world, x, roadY, ROAD.street, balance);
 
-  zoneArea(world, site.x, site.y, SITE_W, 3, ZONE.residential);
-  zoneArea(world, site.x, roadY + 1, SITE_W / 2, 3, ZONE.commercial);
-  zoneArea(world, site.x + SITE_W / 2, roadY + 1, SITE_W / 2, 3, ZONE.industrial);
+  // Zónuje se **s balancem**, jako v hře. Bez něj se srovnání parcely
+  // neúčtovalo a neplatil pro ně strop — golden město tedy vznikalo podle
+  // pravidel, podle kterých se nehraje (T41).
+  //
+  // Výsledek se kontroluje: od T68 se bez peněz nezónuje vůbec, takže
+  // neúspěšný příkaz by tiše udělal jiné město a hash by se změnil bez
+  // zjevného důvodu.
+  for (const zoned of [
+    zoneArea(world, site.x, site.y, SITE_W, 3, ZONE.residential, balance),
+    zoneArea(world, site.x, roadY + 1, SITE_W / 2, 3, ZONE.commercial, balance),
+    zoneArea(world, site.x + SITE_W / 2, roadY + 1, SITE_W / 2, 3, ZONE.industrial, balance),
+  ]) {
+    expect(zoned, JSON.stringify(zoned)).toEqual({ ok: true });
+  }
 
   // Elektrárna hned nad zónou, u téže silnice.
   placeDefinition(world, content, 'vanilla:coal_power_plant', site.x, site.y - 5, balance);
@@ -106,6 +117,12 @@ function findSite(world: WorldState): { x: number; y: number } {
  * (viz `levelZonedArea`), takže domy stojí na rovině místo na podezdívce.
  * Počet budov, obyvatel i práce zůstal na chlup stejný — právě proto, že
  * srovnání není podmínkou růstu, jen vzhledem.
+ */
+/*
+ * V T41 se posunula **jediná hodnota, kasa**: 19 264 → 18 552. Golden město
+ * zónovalo bez balancu, takže mu srovnání parcel běželo zadarmo a bez stropu.
+ * Teď platí 712 jako každý hráč. Hashe terénu, počet budov, obyvatel i práce
+ * zůstaly na chlup stejné — srovnání se dělo i předtím, jen se za ně nevybíralo.
  */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
