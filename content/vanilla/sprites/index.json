@@ -69,6 +69,204 @@
       ]
     },
     {
+      "building": "vanilla:coal_power_plant",
+      "variant": "a",
+      "file": "coal_power_plant__a.png",
+      "width": 1024,
+      "height": 751,
+      "anchor": [
+        523,
+        751
+      ]
+    },
+    {
+      "building": "vanilla:coal_power_plant",
+      "variant": "b",
+      "file": "coal_power_plant__b.png",
+      "width": 1024,
+      "height": 826,
+      "anchor": [
+        507,
+        826
+      ]
+    },
+    {
+      "building": "vanilla:coal_power_plant",
+      "variant": "c",
+      "file": "coal_power_plant__c.png",
+      "width": 1024,
+      "height": 681,
+      "anchor": [
+        484,
+        681
+      ]
+    },
+    {
+      "building": "vanilla:community_centre",
+      "variant": "a",
+      "file": "community_centre__a.png",
+      "width": 512,
+      "height": 258,
+      "anchor": [
+        255,
+        258
+      ]
+    },
+    {
+      "building": "vanilla:community_centre",
+      "variant": "b",
+      "file": "community_centre__b.png",
+      "width": 512,
+      "height": 357,
+      "anchor": [
+        243,
+        357
+      ]
+    },
+    {
+      "building": "vanilla:community_centre",
+      "variant": "c",
+      "file": "community_centre__c.png",
+      "width": 512,
+      "height": 307,
+      "anchor": [
+        259,
+        307
+      ]
+    },
+    {
+      "building": "vanilla:fire_station",
+      "variant": "a",
+      "file": "fire_station__a.png",
+      "width": 512,
+      "height": 331,
+      "anchor": [
+        252,
+        331
+      ]
+    },
+    {
+      "building": "vanilla:fire_station",
+      "variant": "b",
+      "file": "fire_station__b.png",
+      "width": 512,
+      "height": 413,
+      "anchor": [
+        255,
+        413
+      ]
+    },
+    {
+      "building": "vanilla:fire_station",
+      "variant": "c",
+      "file": "fire_station__c.png",
+      "width": 512,
+      "height": 319,
+      "anchor": [
+        254,
+        319
+      ]
+    },
+    {
+      "building": "vanilla:fire_station_large",
+      "variant": "a",
+      "file": "fire_station_large__a.png",
+      "width": 512,
+      "height": 271,
+      "anchor": [
+        251,
+        271
+      ]
+    },
+    {
+      "building": "vanilla:fire_station_large",
+      "variant": "b",
+      "file": "fire_station_large__b.png",
+      "width": 512,
+      "height": 278,
+      "anchor": [
+        255,
+        278
+      ]
+    },
+    {
+      "building": "vanilla:fire_station_large",
+      "variant": "c",
+      "file": "fire_station_large__c.png",
+      "width": 512,
+      "height": 311,
+      "anchor": [
+        255,
+        311
+      ]
+    },
+    {
+      "building": "vanilla:gallery",
+      "variant": "a",
+      "file": "gallery__a.png",
+      "width": 256,
+      "height": 162,
+      "anchor": [
+        127,
+        162
+      ]
+    },
+    {
+      "building": "vanilla:gallery",
+      "variant": "b",
+      "file": "gallery__b.png",
+      "width": 256,
+      "height": 157,
+      "anchor": [
+        133,
+        157
+      ]
+    },
+    {
+      "building": "vanilla:gallery",
+      "variant": "c",
+      "file": "gallery__c.png",
+      "width": 256,
+      "height": 163,
+      "anchor": [
+        125,
+        163
+      ]
+    },
+    {
+      "building": "vanilla:high_school",
+      "variant": "a",
+      "file": "high_school__a.png",
+      "width": 512,
+      "height": 300,
+      "anchor": [
+        279,
+        300
+      ]
+    },
+    {
+      "building": "vanilla:high_school",
+      "variant": "b",
+      "file": "high_school__b.png",
+      "width": 512,
+      "height": 317,
+      "anchor": [
+        257,
+        317
+      ]
+    },
+    {
+      "building": "vanilla:high_school",
+      "variant": "c",
+      "file": "high_school__c.png",
+      "width": 512,
+      "height": 276,
+      "anchor": [
+        255,
+        276
+      ]
+    },
+    {
       "building": "vanilla:hospital",
       "variant": "a",
       "file": "hospital__a.png",
@@ -99,6 +297,204 @@
       "anchor": [
         384,
         568
+      ]
+    },
+    {
+      "building": "vanilla:incinerator",
+      "variant": "a",
+      "file": "incinerator__a.png",
+      "width": 768,
+      "height": 601,
+      "anchor": [
+        376,
+        601
+      ]
+    },
+    {
+      "building": "vanilla:incinerator",
+      "variant": "b",
+      "file": "incinerator__b.png",
+      "width": 768,
+      "height": 688,
+      "anchor": [
+        360,
+        688
+      ]
+    },
+    {
+      "building": "vanilla:incinerator",
+      "variant": "c",
+      "file": "incinerator__c.png",
+      "width": 768,
+      "height": 527,
+      "anchor": [
+        385,
+        527
+      ]
+    },
+    {
+      "building": "vanilla:landfill",
+      "variant": "a",
+      "file": "landfill__a.png",
+      "width": 768,
+      "height": 375,
+      "anchor": [
+        384,
+        375
+      ]
+    },
+    {
+      "building": "vanilla:landfill",
+      "variant": "b",
+      "file": "landfill__b.png",
+      "width": 768,
+      "height": 413,
+      "anchor": [
+        376,
+        413
+      ]
+    },
+    {
+      "building": "vanilla:landfill",
+      "variant": "c",
+      "file": "landfill__c.png",
+      "width": 768,
+      "height": 375,
+      "anchor": [
+        382,
+        375
+      ]
+    },
+    {
+      "building": "vanilla:metro_station",
+      "variant": "a",
+      "file": "metro_station__a.png",
+      "width": 512,
+      "height": 333,
+      "anchor": [
+        255,
+        333
+      ]
+    },
+    {
+      "building": "vanilla:metro_station",
+      "variant": "b",
+      "file": "metro_station__b.png",
+      "width": 512,
+      "height": 295,
+      "anchor": [
+        242,
+        295
+      ]
+    },
+    {
+      "building": "vanilla:metro_station",
+      "variant": "c",
+      "file": "metro_station__c.png",
+      "width": 512,
+      "height": 298,
+      "anchor": [
+        253,
+        298
+      ]
+    },
+    {
+      "building": "vanilla:museum",
+      "variant": "a",
+      "file": "museum__a.png",
+      "width": 768,
+      "height": 501,
+      "anchor": [
+        381,
+        501
+      ]
+    },
+    {
+      "building": "vanilla:museum",
+      "variant": "b",
+      "file": "museum__b.png",
+      "width": 768,
+      "height": 465,
+      "anchor": [
+        384,
+        465
+      ]
+    },
+    {
+      "building": "vanilla:museum",
+      "variant": "c",
+      "file": "museum__c.png",
+      "width": 768,
+      "height": 478,
+      "anchor": [
+        385,
+        478
+      ]
+    },
+    {
+      "building": "vanilla:park_large",
+      "variant": "a",
+      "file": "park_large__a.png",
+      "width": 512,
+      "height": 333,
+      "anchor": [
+        258,
+        333
+      ]
+    },
+    {
+      "building": "vanilla:park_large",
+      "variant": "b",
+      "file": "park_large__b.png",
+      "width": 512,
+      "height": 270,
+      "anchor": [
+        248,
+        270
+      ]
+    },
+    {
+      "building": "vanilla:park_large",
+      "variant": "c",
+      "file": "park_large__c.png",
+      "width": 512,
+      "height": 265,
+      "anchor": [
+        247,
+        265
+      ]
+    },
+    {
+      "building": "vanilla:park_small",
+      "variant": "a",
+      "file": "park_small__a.png",
+      "width": 256,
+      "height": 195,
+      "anchor": [
+        127,
+        195
+      ]
+    },
+    {
+      "building": "vanilla:park_small",
+      "variant": "b",
+      "file": "park_small__b.png",
+      "width": 256,
+      "height": 149,
+      "anchor": [
+        128,
+        149
+      ]
+    },
+    {
+      "building": "vanilla:park_small",
+      "variant": "c",
+      "file": "park_small__c.png",
+      "width": 256,
+      "height": 135,
+      "anchor": [
+        128,
+        135
       ]
     },
     {
@@ -165,6 +561,501 @@
       "anchor": [
         263,
         295
+      ]
+    },
+    {
+      "building": "vanilla:prison",
+      "variant": "a",
+      "file": "prison__a.png",
+      "width": 768,
+      "height": 463,
+      "anchor": [
+        385,
+        463
+      ]
+    },
+    {
+      "building": "vanilla:prison",
+      "variant": "b",
+      "file": "prison__b.png",
+      "width": 768,
+      "height": 441,
+      "anchor": [
+        383,
+        441
+      ]
+    },
+    {
+      "building": "vanilla:prison",
+      "variant": "c",
+      "file": "prison__c.png",
+      "width": 768,
+      "height": 383,
+      "anchor": [
+        369,
+        383
+      ]
+    },
+    {
+      "building": "vanilla:pump_station",
+      "variant": "a",
+      "file": "pump_station__a.png",
+      "width": 256,
+      "height": 159,
+      "anchor": [
+        125,
+        159
+      ]
+    },
+    {
+      "building": "vanilla:pump_station",
+      "variant": "b",
+      "file": "pump_station__b.png",
+      "width": 256,
+      "height": 180,
+      "anchor": [
+        124,
+        180
+      ]
+    },
+    {
+      "building": "vanilla:pump_station",
+      "variant": "c",
+      "file": "pump_station__c.png",
+      "width": 256,
+      "height": 162,
+      "anchor": [
+        127,
+        162
+      ]
+    },
+    {
+      "building": "vanilla:retirement_home",
+      "variant": "a",
+      "file": "retirement_home__a.png",
+      "width": 768,
+      "height": 501,
+      "anchor": [
+        411,
+        501
+      ]
+    },
+    {
+      "building": "vanilla:retirement_home",
+      "variant": "b",
+      "file": "retirement_home__b.png",
+      "width": 768,
+      "height": 454,
+      "anchor": [
+        382,
+        454
+      ]
+    },
+    {
+      "building": "vanilla:retirement_home",
+      "variant": "c",
+      "file": "retirement_home__c.png",
+      "width": 768,
+      "height": 422,
+      "anchor": [
+        383,
+        422
+      ]
+    },
+    {
+      "building": "ruin_1x1",
+      "variant": "a",
+      "file": "ruin_1x1__a.png",
+      "width": 256,
+      "height": 138,
+      "anchor": [
+        127,
+        138
+      ]
+    },
+    {
+      "building": "ruin_1x1",
+      "variant": "b",
+      "file": "ruin_1x1__b.png",
+      "width": 256,
+      "height": 163,
+      "anchor": [
+        125,
+        163
+      ]
+    },
+    {
+      "building": "ruin_1x1",
+      "variant": "c",
+      "file": "ruin_1x1__c.png",
+      "width": 256,
+      "height": 135,
+      "anchor": [
+        127,
+        135
+      ]
+    },
+    {
+      "building": "ruin_2x2",
+      "variant": "a",
+      "file": "ruin_2x2__a.png",
+      "width": 512,
+      "height": 290,
+      "anchor": [
+        253,
+        290
+      ]
+    },
+    {
+      "building": "ruin_2x2",
+      "variant": "b",
+      "file": "ruin_2x2__b.png",
+      "width": 512,
+      "height": 246,
+      "anchor": [
+        250,
+        246
+      ]
+    },
+    {
+      "building": "ruin_2x2",
+      "variant": "c",
+      "file": "ruin_2x2__c.png",
+      "width": 512,
+      "height": 252,
+      "anchor": [
+        259,
+        252
+      ]
+    },
+    {
+      "building": "ruin_3x3",
+      "variant": "a",
+      "file": "ruin_3x3__a.png",
+      "width": 768,
+      "height": 545,
+      "anchor": [
+        383,
+        545
+      ]
+    },
+    {
+      "building": "ruin_3x3",
+      "variant": "b",
+      "file": "ruin_3x3__b.png",
+      "width": 768,
+      "height": 427,
+      "anchor": [
+        378,
+        427
+      ]
+    },
+    {
+      "building": "ruin_3x3",
+      "variant": "c",
+      "file": "ruin_3x3__c.png",
+      "width": 768,
+      "height": 389,
+      "anchor": [
+        383,
+        389
+      ]
+    },
+    {
+      "building": "ruin_4x4",
+      "variant": "a",
+      "file": "ruin_4x4__a.png",
+      "width": 1024,
+      "height": 541,
+      "anchor": [
+        508,
+        541
+      ]
+    },
+    {
+      "building": "ruin_4x4",
+      "variant": "b",
+      "file": "ruin_4x4__b.png",
+      "width": 1024,
+      "height": 723,
+      "anchor": [
+        512,
+        723
+      ]
+    },
+    {
+      "building": "ruin_4x4",
+      "variant": "c",
+      "file": "ruin_4x4__c.png",
+      "width": 1024,
+      "height": 523,
+      "anchor": [
+        508,
+        523
+      ]
+    },
+    {
+      "building": "vanilla:school",
+      "variant": "a",
+      "file": "school__a.png",
+      "width": 768,
+      "height": 470,
+      "anchor": [
+        360,
+        470
+      ]
+    },
+    {
+      "building": "vanilla:school",
+      "variant": "b",
+      "file": "school__b.png",
+      "width": 768,
+      "height": 393,
+      "anchor": [
+        420,
+        393
+      ]
+    },
+    {
+      "building": "vanilla:school",
+      "variant": "c",
+      "file": "school__c.png",
+      "width": 768,
+      "height": 388,
+      "anchor": [
+        382,
+        388
+      ]
+    },
+    {
+      "building": "vanilla:theatre",
+      "variant": "a",
+      "file": "theatre__a.png",
+      "width": 512,
+      "height": 403,
+      "anchor": [
+        258,
+        403
+      ]
+    },
+    {
+      "building": "vanilla:theatre",
+      "variant": "b",
+      "file": "theatre__b.png",
+      "width": 512,
+      "height": 512,
+      "anchor": [
+        256,
+        512
+      ]
+    },
+    {
+      "building": "vanilla:theatre",
+      "variant": "c",
+      "file": "theatre__c.png",
+      "width": 512,
+      "height": 353,
+      "anchor": [
+        254,
+        353
+      ]
+    },
+    {
+      "building": "vanilla:tram_stop",
+      "variant": "a",
+      "file": "tram_stop__a.png",
+      "width": 256,
+      "height": 198,
+      "anchor": [
+        145,
+        198
+      ]
+    },
+    {
+      "building": "vanilla:tram_stop",
+      "variant": "b",
+      "file": "tram_stop__b.png",
+      "width": 256,
+      "height": 181,
+      "anchor": [
+        130,
+        181
+      ]
+    },
+    {
+      "building": "vanilla:tram_stop",
+      "variant": "c",
+      "file": "tram_stop__c.png",
+      "width": 256,
+      "height": 141,
+      "anchor": [
+        122,
+        141
+      ]
+    },
+    {
+      "building": "vanilla:transit_depot",
+      "variant": "a",
+      "file": "transit_depot__a.png",
+      "width": 768,
+      "height": 414,
+      "anchor": [
+        383,
+        414
+      ]
+    },
+    {
+      "building": "vanilla:transit_depot",
+      "variant": "b",
+      "file": "transit_depot__b.png",
+      "width": 768,
+      "height": 406,
+      "anchor": [
+        382,
+        406
+      ]
+    },
+    {
+      "building": "vanilla:transit_depot",
+      "variant": "c",
+      "file": "transit_depot__c.png",
+      "width": 768,
+      "height": 427,
+      "anchor": [
+        370,
+        427
+      ]
+    },
+    {
+      "building": "vanilla:transit_stop",
+      "variant": "a",
+      "file": "transit_stop__a.png",
+      "width": 256,
+      "height": 169,
+      "anchor": [
+        130,
+        169
+      ]
+    },
+    {
+      "building": "vanilla:transit_stop",
+      "variant": "b",
+      "file": "transit_stop__b.png",
+      "width": 256,
+      "height": 192,
+      "anchor": [
+        128,
+        192
+      ]
+    },
+    {
+      "building": "vanilla:transit_stop",
+      "variant": "c",
+      "file": "transit_stop__c.png",
+      "width": 256,
+      "height": 193,
+      "anchor": [
+        131,
+        193
+      ]
+    },
+    {
+      "building": "vanilla:university",
+      "variant": "a",
+      "file": "university__a.png",
+      "width": 768,
+      "height": 637,
+      "anchor": [
+        375,
+        637
+      ]
+    },
+    {
+      "building": "vanilla:university",
+      "variant": "b",
+      "file": "university__b.png",
+      "width": 768,
+      "height": 441,
+      "anchor": [
+        371,
+        441
+      ]
+    },
+    {
+      "building": "vanilla:university",
+      "variant": "c",
+      "file": "university__c.png",
+      "width": 768,
+      "height": 547,
+      "anchor": [
+        381,
+        547
+      ]
+    },
+    {
+      "building": "vanilla:water_treatment",
+      "variant": "a",
+      "file": "water_treatment__a.png",
+      "width": 768,
+      "height": 392,
+      "anchor": [
+        374,
+        392
+      ]
+    },
+    {
+      "building": "vanilla:water_treatment",
+      "variant": "b",
+      "file": "water_treatment__b.png",
+      "width": 768,
+      "height": 359,
+      "anchor": [
+        374,
+        359
+      ]
+    },
+    {
+      "building": "vanilla:water_treatment",
+      "variant": "c",
+      "file": "water_treatment__c.png",
+      "width": 768,
+      "height": 370,
+      "anchor": [
+        379,
+        370
+      ]
+    },
+    {
+      "building": "vanilla:water_works",
+      "variant": "a",
+      "file": "water_works__a.png",
+      "width": 768,
+      "height": 429,
+      "anchor": [
+        378,
+        429
+      ]
+    },
+    {
+      "building": "vanilla:water_works",
+      "variant": "b",
+      "file": "water_works__b.png",
+      "width": 768,
+      "height": 681,
+      "anchor": [
+        380,
+        681
+      ]
+    },
+    {
+      "building": "vanilla:water_works",
+      "variant": "c",
+      "file": "water_works__c.png",
+      "width": 768,
+      "height": 460,
+      "anchor": [
+        399,
+        460
       ]
     }
   ]
