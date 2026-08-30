@@ -5,6 +5,9 @@
     python tools/generate-sprites.py                     # tři obrázky (výchozí)
     python tools/generate-sprites.py --all               # zbytek, co chybí
 
+Model je `gpt-image-2`. `gpt-image-1` byl první odhad a měřitelně horší; přepsat
+jde přes `--model=`.
+
 Prompty čte **ze zadání** `docs/06-SPRITY-SLUZEB.md`, ne z tabulky v sobě:
 kdyby si je opsal, rozešly by se s dokumentem při první úpravě a nikdo by si
 toho nevšiml. Hlavička i varianty jsou tam, kde je čte i člověk.
@@ -234,13 +237,17 @@ def main() -> int:
         print('Není co generovat — všechno už v raw/ leží.')
         return 0
 
-    # `--no-reference` je na porovnání. Reference měla styl držet, jenže přes
-    # `images/edits` ho spíš stahuje k tmavému polorealistickému renderu —
-    # naměřeno na kině. Styl proto nese hlavička promptu a reference je volba.
-    use_reference = '--no-reference' not in argv
-    reference = REFERENCE.read_bytes() if (use_reference and REFERENCE.exists()) else None
+    # Reference je **vypnutá, dokud se o ni neřekne**. Měla styl držet, jenže
+    # přes `images/edits` ho stahuje k tmavému polorealistickému renderu —
+    # naměřeno na kině: podstava šla změřit u jednoho obrázku ze tří a výšky
+    # utíkaly o 35–40 %. Bez ní vyšly 3 ze 3 a výšky na jednotky přesně.
+    #
+    # Styl proto nese **hlavička promptu**, ne přiložený obrázek. Kdyby byla
+    # reference výchozí, stačilo by na ni při dávce zapomenout a osmdesát
+    # obrázků by vyšlo špatně — což se málem stalo.
+    reference = REFERENCE.read_bytes() if ('--reference' in argv and REFERENCE.exists()) else None
     print(f'Chybí {len(todo)} z 96.')
-    print(f'Reference: {"ano, " + REFERENCE.name if reference else "ŽÁDNÁ — sada se rozejde ve stylu"}')
+    print(f'Reference: {"ano, " + REFERENCE.name + " (--reference)" if reference else "ne, styl nese prompt"}')
 
     batch = todo if (everything or wanted) else todo[:DEFAULT_BATCH]
     if len(batch) < len(todo):
