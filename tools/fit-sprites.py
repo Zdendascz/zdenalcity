@@ -58,20 +58,31 @@ KEY_SOFT = 110.0
 HEIGHT_TOLERANCE = 0.18
 
 
+def spec_for(w: int, d: int, levels: int) -> dict:
+    """Rozměry spritu pro daný půdorys a výšku."""
+    return {
+        'footprint': [w, d],
+        'levels': levels,
+        'width': (w + d) * (TILE_W // 2) * SCALE,
+        'height': ((w + d) * (TILE_H // 2) + levels * LEVEL_H) * SCALE,
+    }
+
+
+# Ruiny nemají definici budovy, takže si půdorys nemají kde vzít a dostávají
+# vlastní tabulku. **Jedno patro u všech**: suť má být plochá, aby přes ni
+# hráč viděl, co je za ní.
+RUINS = {f'ruin_{n}x{n}': (n, n, 1) for n in (1, 2, 3, 4)}
+
+
 def load_definitions() -> dict[str, dict]:
-    """Půdorysy a patra budov mimo zóny, klíčem holé id bez namespace."""
-    out: dict[str, dict] = {}
+    """Půdorysy a patra budov mimo zóny a ruin, klíčem holé id bez namespace."""
+    out: dict[str, dict] = {name: spec_for(*size) for name, size in RUINS.items()}
     for path in sorted(DEFS.glob('*.json')):
         data = json.loads(path.read_text(encoding='utf-8'))
         if data.get('category') not in ('service', 'utility'):
             continue
         w, d = data['footprint']
-        out[data['id'].split(':', 1)[1]] = {
-            'footprint': [w, d],
-            'levels': data['graphics']['heightLevels'],
-            'width': (w + d) * (TILE_W // 2) * SCALE,
-            'height': ((w + d) * (TILE_H // 2) + data['graphics']['heightLevels'] * LEVEL_H) * SCALE,
-        }
+        out[data['id'].split(':', 1)[1]] = spec_for(w, d, data['graphics']['heightLevels'])
     return out
 
 
@@ -188,6 +199,11 @@ def trim(image: Image.Image) -> Image.Image | None:
     return image.crop((int(cols[0]), int(rows[0]), int(cols[-1]) + 1, int(rows[-1]) + 1))
 
 
+def spriteKey(name: str) -> str:
+    """Klíč do manifestu. Ruiny nejsou budovy, takže nedostávají jejich jmenný prostor."""
+    return name if name in RUINS else f'vanilla:{name}'
+
+
 # Naměřené kotvy, aby je šlo zapsat do manifestu. Sbírá je `process`.
 ANCHORS: dict[str, dict] = {}
 
@@ -297,7 +313,7 @@ def main() -> int:
             'scale': SCALE,
             'sprites': [
                 {
-                    'building': f'vanilla:{p.stem.rsplit("__", 1)[0]}',
+                    'building': spriteKey(p.stem.rsplit('__', 1)[0]),
                     'variant': p.stem.rsplit('__', 1)[1],
                     'file': f'{p.stem}.png',
                     # Rozměry jsou v manifestu schválně, i když je nese i PNG:

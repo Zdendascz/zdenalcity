@@ -3245,8 +3245,44 @@ testy podzemního pohledu.
 neplatí ani pro **budovy na mapě**. Terén a silnice procedurální zůstávají.
 
 Vzniklo zadání `docs/06-SPRITY-SLUZEB.md`: **28 budov mimo zóny** — 24 služeb
-a 4 inženýrské stavby — každá ve **třech variantách**, tedy 84 obrázků.
-Zástavba v zónách přijde samostatně.
+a 4 inženýrské stavby — každá ve **třech variantách**, plus **dvanáct ruin**
+(tři na každý rozměr půdorysu). Celkem 96 obrázků. Zástavba v zónách přijde
+samostatně.
+
+### Rozhodnutí autora ke stylu
+
+**Výchozí sada je Československo osmdesátých let.** Jedno město v jedné době;
+tři varianty jedné budovy jsou **tři různí architekti téže doby**, ne tři různé
+epochy. Aby všechny nemocnice nevypadaly stejně, ne aby město vypadalo jako
+skanzen. Liší se hmotou, materiálem a pláštěm — panelová typovka, zděná stavba,
+atypika s mozaikou.
+
+_(První verze zadání stála na třech epochách. **To jsem si vymyslel**; autor
+žádal tři varianty, nic o obdobích. Opraveno.)_
+
+**Tvary dobově, barvy o stupeň sytější, než jaká realita byla.** Skutečná
+paleta té doby je tlumená, jenže ve hře se na budovu díváš přes dva centimetry
+a musíš poznat hasiče od polikliniky. Každá třída služeb si nese barevný akcent
+— dnes ho nese procedurální kvádr a se sprity by se ztratil.
+
+**V obrázcích nejsou žádná písmena.** Cedule ano, nápis ne. Text zapečený v PNG
+je text mimo locale soubory (§10) a lokalizovat by šel jen celou sadou obrázků
+na jazyk. Zákaz je v promptu na vlastním řádku verzálkami — generátor poslední
+větu odstavce přeskakuje častěji než samostatný pokyn, což ukázala první škola
+s nápisem „SCHOOL".
+
+**Skiny se udělají, na lokalizaci se nepoužijí.** Mechanismus je hotový:
+registr klíčuje obrázky jako `vanilla:hospital|a` a pozdější zdroj dřívější
+přepíše, takže skin je `ContentSource` bez definic. Chybí načítání za běhu
+(fáze 5) a přepínač. **Varianta je smlouva, ne jméno** — do savu jde jméno
+varianty, skin ne, takže každý skin musí vyplnit všechny tři sloty, jinak
+načtené město o obrázky přijde.
+
+**Ruiny: tři varianty na rozměr, ne jedna univerzální.** Dvanáct obrázků místo
+dvaceti osmi (a se zónami přes sedmdesát). Liší se **tím, jak to spadlo, ne
+mírou zkázy** — simulace stupně poškození nezná, takže „jen ohořelá" varianta
+by lhala o stavu, který v datech není. Identitu nese `rubbleOf` a symbol služby
+dokreslený navrch, ne detail trosek.
 
 Rozměry se **odvodily z rendereru, ne odhadly**. Projekce je 2:1, dlaždice
 64 × 32, patro 16 px, takže pro čtvercový půdorys `n × n` vychází šířka 64 n

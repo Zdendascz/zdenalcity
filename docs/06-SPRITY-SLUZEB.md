@@ -3,8 +3,13 @@
 **Status:** zadání pro tvorbu obrázků. Rozhodl autor.
 
 Tenhle dokument popisuje **28 budov mimo zóny** — služby a inženýrské stavby —
-každou ve **třech variantách**. Zástavba v zónách (obytná, obchodní,
-průmyslová) přijde samostatně, tady není.
+každou ve **třech variantách**, plus **dvanáct ruin** (tři na každý rozměr
+půdorysu). Zástavba v zónách přijde samostatně, tady není.
+
+Výchozí sada je **Československo osmdesátých let** (rozhodnutí autora). Tři
+varianty jedné budovy jsou **tři různí architekti téže doby**, ne tři různé
+epochy — aby všechny nemocnice nevypadaly stejně, ne aby město vypadalo jako
+skanzen.
 
 ---
 
@@ -29,8 +34,27 @@ Varianta se losuje jednou při vzniku budovy a **musí se uložit do savu**:
   dnešní rozhodnutí, ne konstanta v kódu; budova s jedinou variantou musí
   fungovat stejně jako budova s pěti.
 
+Totéž platí pro **variantu ruiny** — losuje se při vzniku suti a musí přežít
+uložení, jinak by se trosky s každým načtením přeskládaly.
+
 Chybějící obrázek **nesmí hru zastavit** — vykreslí se procedurální kvádr jako
 dosud, stejně jako to dělá `iconSvg` u ikon.
+
+### Skiny
+
+Registr klíčuje obrázky jako `vanilla:hospital|a` a **pozdější zdroj dřívější
+přepíše**, takže skin je prostě `ContentSource`, který nenese definice, jen
+obrázky. Mechanismus je hotový a otestovaný; chybí k němu načítání zdroje za
+běhu (fáze 5) a přepínač.
+
+**Varianta `a`/`b`/`c` je smlouva, ne jméno.** Do savu jde jméno varianty, skin
+ne — takže když jiný skin pojmenuje varianty jinak, načtené město o obrázky
+přijde a spadne na kvádry. Každý skin má vyplnit všechny tři sloty.
+
+**Skin není nástroj na lokalizaci** (rozhodnutí autora). Text zapečený v PNG je
+text mimo locale soubory, což §10 zakazuje, a lokalizovat by šlo jen celou
+sadou obrázků na jazyk. Proto v obrázcích **nejsou žádná písmena** — cedule
+ano, nápis ne.
 
 *Nic z toho není v téhle dávce hotové. Tenhle dokument je zadání pro obrázky.*
 
@@ -79,15 +103,75 @@ obrázek poruší, budova se od silnic a terénu kolem odlepí.
 
 ---
 
-## 3. Společná hlavička promptu
+## 3. Styl: Československo, osmdesátá léta
+
+**Rozhodnutí autora.** Výchozí sada je jedno město v jedné době. Ne přehlídka
+epoch — to by z města udělalo skanzen.
+
+### Co se mezi variantami liší
+
+Tři varianty jedné budovy jsou **tři různí architekti, ne tři různé doby**.
+Liší se tím, čím se lišily doopravdy:
+
+| | čím se liší |
+|---|---|
+| **hmota** | monoblok · pavilony spojené krčkem · atypika s vystupujícím objemem |
+| **materiál** | panelová soustava · zděná cihla s omítkou · monolitický beton |
+| **plášť** | břízolit · keramický obklad · boletické panely · sklobeton |
+| **střecha** | plochá s atikou (většina) · sedlová (drobné stavby) · pilová (haly) |
+
+Nemocnice tedy nesmí být třikrát tatáž nemocnice s jinou barvou. Má to být
+monoblok, pavilonový areál a atypika — všechny tři z osmdesátých let.
+
+### Co zůstává stejné
+
+Doba, paleta a stavební slovník. Ploché střechy s atikou, ocelové rámy oken,
+betonové květináče, terasová dlažba, stožáry bez vlajek, mozaika nebo reliéf na
+slepé stěně. Auta jen když je budova potřebuje: Škoda 105, Avia, Karosa, Tatra
+613 u úřadu, tramvaj T3.
+
+### Barvy: dobové tvary, sytější odstíny
+
+Skutečná paleta té doby je tlumená — panelová šeď, okr, břízolitová béž.
+Ve hře se ale na budovu díváš přes dva centimetry a musíš na první pohled
+poznat hasiče od polikliniky.
+
+Držíme proto **tvary dobově a barvy o stupeň sytější, než jaká realita byla**
+(rozhodnutí autora). Každá třída služeb si nese svůj akcent — ten dnes nese
+procedurální kvádr a se sprity by se ztratil:
+
+| třída | akcent |
+|---|---|
+| zdravotnictví | bílá a světle modrá |
+| bezpečnost | tmavě modrá a šedá |
+| hasiči | červená |
+| vzdělání | okr a cihlová |
+| kultura | vínová, měď, mozaika |
+| sociální | teplá béžová a zelená |
+| parky | zeleň |
+| odpady | šedá a rez |
+| doprava | modrá a krémová |
+| energie a voda | ocelová šedá a cihla |
+
+**Politickou symboliku obrázky nenesou.** Rudá hvězda, srp a kladivo ani hesla
+na fasádě — to je rozhodnutí o vyznění hry a nemá vzniknout tím, že to
+generátor přidá sám. Stožáry bez vlajek ano.
+
+---
+
+## 4. Společná hlavička promptu
 
 Tuhle část **připoj ke každé variantě**. K tomu vždycky přilož svůj referenční
 design — ten nese styl, text nese obsah.
 
 ```
-Isometric city-builder building asset, true 2:1 isometric projection seen from
-the south-east, matching the attached reference in style, palette and line
-weight.
+Isometric city-builder building asset, seen from the south-east, matching the
+attached reference in style, palette and line weight.
+
+Subject period and place: Czechoslovakia in the 1980s. Late-socialist public
+architecture — flat roofs with parapets, steel window frames, panel or
+rendered facades, concrete planters, terrazzo paving. Colours are slightly
+more saturated than reality, but the forms stay period-correct.
 
 The building stands on its own square plot. The plot is a perfect isometric
 diamond and its four corners touch the edges of the image — nothing except the
@@ -98,15 +182,30 @@ brighter than the right-facing wall; the roof is the brightest surface. Shadows
 fall to the right and stay inside the plot.
 
 Transparent background, no terrain, no grass or road outside the plot, no
-people, no vehicles unless named, no text of any kind, no signage lettering, no
-logos, no watermark. Clean hard edges, no blur, no depth of field, no vignette.
+people, no political symbols, no flags, no logos, no watermark.
+
+NO TEXT ANYWHERE. Signs, boards and panels must be blank — a sign that reads
+as a sign without any lettering on it.
+
+Clean hard edges, no blur, no depth of field, no vignette.
 
 Square canvas, 1024 × 1024.
 ```
 
-**Průhledné pozadí je lepší než klíčované** a ChatGPT ho umí. Ověřeno na tvých
-prvních třech obrázcích: rohy na nule, půlka plátna průhledná, skript to pozná
-sám. Sklo a měkké hrany tím zůstanou celé.
+### Proč „žádný text"
+
+Nápis zapečený v obrázku je **text mimo locale soubory**, což §10 zakazuje —
+a lokalizovat ho by znamenalo celou sadu obrázků na každý jazyk. Prázdná
+tabule nad vchodem se čte jako cedule a nemluví žádným jazykem.
+
+Generátor to porušuje i tak: tvoje první škola má na štítě „SCHOOL". Proto je
+ten zákaz v promptu **na vlastním řádku a verzálkami** — modely poslední větu
+odstavce přeskakují častěji než samostatný pokyn.
+
+### Průhledné pozadí je lepší než klíčované
+
+ChatGPT ho umí a skript to pozná sám: ověřeno na prvních obrázcích, rohy na
+nule, půlka plátna průhledná. Sklo a měkké hrany tím zůstanou celé.
 
 Když generátor průhlednost neumí, poslední řádek se nahradí za:
 
@@ -138,26 +237,20 @@ pokoušel a rozházel by proporce budovy.
 ### Kotva se měří, ne předpokládá
 
 U čtvercového půdorysu má spodní vrchol podstavy ležet uprostřed šířky.
-Generátor ale kreslí podstavu často mírně zkosenou — u tvé školy je vrchol
+Generátor ale kreslí podstavu často mírně zkosenou — u první školy byl vrchol
 **36 px vedle středu**. Skript ho proto změří a zapíše do `index.json`; kdyby
 se počítal ze středu, seděla by budova na dlaždici vedle.
 
-### Na co si dát pozor
+### Výška
 
-**Nápisy.** Prompt zakazuje text, ale generátor ho stejně občas dodá — tvoje
-škola má na štítě anglické „SCHOOL". Hra je česká a lokalizovaná, takže
-natvrdo vypsaný anglický nápis v ní je cizí těleso. Buď přegenerovat, nebo
-vzít jako součást stylu; jen ať je to rozhodnutí.
-
-**Výška.** Skript hlásí, o kolik je stavba vyšší, než čeká `heightLevels`
-z definice. Škola vyšla o 22 % vyšší než jedno patro. Není to chyba obrázku —
-je to informace, že sedmnáct pixelů, které si o ní myslí simulace, neodpovídá
-tomu, jak vypadá. Buď se upraví `heightLevels` v definici, nebo se to nechá
-být; kvádrová záloha pak bude nižší než sprite.
+Skript hlásí, o kolik je stavba vyšší, než čeká `heightLevels` z definice.
+Není to chyba obrázku — je to informace, že se představa simulace rozchází
+s tím, jak stavba vypadá. Buď se `heightLevels` upraví, nebo se to nechá být
+a kvádrová záloha bude nižší než sprite.
 
 ---
 
-## 4. Kam obrázky nahrávat
+## 5. Kam obrázky nahrávat
 
 ```
 art/sprites/raw/<id>__<varianta>.png
@@ -168,8 +261,7 @@ podtržítka jednoduchá.
 
 ```
 art/sprites/raw/hospital__a.png
-art/sprites/raw/hospital__b.png
-art/sprites/raw/coal_power_plant__c.png
+art/sprites/raw/ruin_3x3__b.png
 ```
 
 Naladění:
@@ -178,10 +270,10 @@ Naladění:
 python tools/fit-sprites.py
 ```
 
-Skript vezme, co v `raw/` najde, odklíčuje pozadí, ořízne, zmenší na správnou
-šířku a uloží do `content/vanilla/sprites/`. Rozměry si bere **z definic
-budov**, ne z tabulky v sobě — když se půdorys změní, sprity se přepočítají
-samy. Vypíše, co udělal, a upozorní, kde se výška rozchází s očekáváním.
+Skript vezme, co v `raw/` najde, odklíčuje pozadí, srovná projekci, ořízne,
+zmenší na správnou šířku a uloží do `content/vanilla/sprites/`. Rozměry si
+bere **z definic budov**, ne z tabulky v sobě — když se půdorys změní, sprity
+se přepočítají samy. Vypíše, co udělal, a co ještě chybí.
 
 Kontrola bez zápisu:
 
@@ -191,24 +283,24 @@ python tools/fit-sprites.py --check
 
 ---
 
-## 5. Budovy
+## 6. Budovy
 
-Sloupec **rozměr** je půdorys a počet pater z definice. Kurzívou je role
-budovy ve hře — to, co má být na obrázku poznat na první pohled.
+Kurzívou je role budovy ve hře — to, co má být na obrázku poznat na první
+pohled. Prompt varianty se **připojuje k hlavičce** ze sekce 4.
 
 ---
 
 ### Zdravotnictví
 
-#### `clinic` — Klinika · 2 × 2, 1 patro
+#### `clinic` — Poliklinika · 2 × 2, 1 patro
 
 *Malá péče pro čtvrť. Nízká, přívětivá, ne nemocniční.*
 
 | | prompt |
 |---|---|
-| **a** | A small interwar villa converted into a neighbourhood clinic: cream stucco walls, a bay window, a low hipped tile roof, a modest canopy over the entrance, a short paved path and two benches on the plot. |
-| **b** | A single-storey socialist-era polyclinic: pale prefabricated panels, a horizontal band of glass-block windows, a flat gravel roof with a small vent, a concrete ramp to the double door. |
-| **c** | A contemporary low clinic pavilion: warm timber cladding, floor-to-ceiling glazing on the entrance side, a flat green roof with sedum, a bicycle rack beside the door. |
+| **a** | A small single-storey district polyclinic, standard prefab design: pale grey concrete panels with a horizontal band of steel-framed windows, flat gravel roof with a low parapet, a concrete canopy on two thin columns over the double door, a wheelchair ramp and two concrete planters. |
+| **b** | A brick-built neighbourhood health centre with rough ochre render: tall narrow windows in a regular rhythm, a shallow flat roof, a recessed entrance with a terrazzo step, a glass-block panel lighting the stair, low clipped hedge along the plot. |
+| **c** | An individually designed clinic pavilion in exposed concrete: two staggered low volumes, one clad in pale blue opaque glazed panels, a small abstract ceramic mosaic on the blank end wall, a covered walkway linking the volumes. |
 
 #### `hospital` — Nemocnice · 3 × 3, 3 patra
 
@@ -216,33 +308,33 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A 1930s brick pavilion hospital: three connected wings, tall multi-pane windows, a small clock turret over the main entrance, a covered walkway between wings, mature shrubs along the plot edge. |
-| **b** | A 1970s hospital monoblock: a wide slab with continuous ribbon windows, pale concrete panels, a helipad marked H on the flat roof, a covered ambulance bay at the base. |
-| **c** | A contemporary hospital: white aluminium cladding with deep window reveals, a fully glazed atrium at the corner, a rooftop plant enclosure, a marked ambulance bay under a projecting canopy. |
+| **a** | A late-socialist hospital monoblock: a wide slab of white and pale blue prefab panels, continuous ribbon windows on every floor, a flat roof with a rooftop plant enclosure, a projecting single-storey entrance wing with a wide canopy, an ambulance bay marked on the paving. |
+| **b** | A pavilion hospital complex: three low brick wings with rendered ochre walls and pitched tile roofs, joined by glazed covered walkways, mature trees between the wings, a separate boiler house with a red-and-white banded chimney. |
+| **c** | An individually designed hospital: a monolithic concrete slab raised on a recessed glazed ground floor, a projecting cylindrical stair tower clad in glass blocks, deep window reveals casting hard shadows, a large abstract relief across the blank gable. |
 
 ---
 
 ### Bezpečnost
 
-#### `police_small` — Policejní stanice · 2 × 2, 1 patro
+#### `police_small` — Oddělení VB · 2 × 2, 1 patro
 
 *Základní stanice. Srozumitelná, ne reprezentativní.*
 
 | | prompt |
 |---|---|
-| **a** | A corner police post in an old brick building: two storeys of the corner cut away for the entrance, a blue lamp over the door, arched ground-floor windows, a small paved forecourt. |
-| **b** | A socialist-era police station: grey concrete panels, barred ground-floor windows, a heavy concrete canopy over the entrance, a flagpole, a fenced parking bay on the plot. |
-| **c** | A contemporary low police station: dark glazing in a pale rendered frame, a projecting entrance box, two marked parking bays, a slim mast with an antenna. |
+| **a** | A small district police station in a standard prefab block: grey panels, barred ground-floor windows, a flat roof, a plain concrete canopy over the door, a single blue lamp beside it, a fenced parking bay with a small period sedan. |
+| **b** | A police post in a rendered brick corner building: mustard-ochre render, a rusticated concrete plinth, steel-framed windows with bars, a flagpole without a flag, a paved forecourt with concrete bollards. |
+| **c** | A purpose-built police station in exposed concrete: a low horizontal volume with a deep recessed entrance, dark blue opaque glazed panels between windows, a slim antenna mast on the roof, a covered vehicle bay. |
 
-#### `police_large` — Policejní ředitelství · 2 × 2, 2 patra
+#### `police_large` — Krajská správa VB · 2 × 2, 2 patra
 
 *Nadřazený úřad. Musí být poznat, že je to víc než stanice.*
 
 | | prompt |
 |---|---|
-| **a** | A historicist administrative headquarters: rusticated stone base, four engaged columns framing a tall portal, a cornice and a low balustrade, wide stone steps to the door. |
-| **b** | A 1970s administrative block: a repeating grid of square windows in pale stone facing, a projecting entrance slab, three flagpoles, a paved forecourt. |
-| **c** | A contemporary police headquarters: dark stone base with glazed upper floors, a cantilevered entrance canopy, a rooftop communications mast with dishes, bollards along the plot edge. |
+| **a** | An administrative headquarters in prefab panels: two storeys of regular square windows in pale stone-faced panels, a projecting entrance slab on columns, three flagpoles without flags, a wide paved forecourt with concrete planters. |
+| **b** | A brick administrative building with ochre render and a stone plinth: tall windows in a strict grid, a heavy cornice, wide stone steps to a double door, a lamp on each side, a low wall enclosing the plot. |
+| **c** | An individually designed headquarters: a monolithic concrete frame with dark blue opaque glazed infill panels, a cantilevered entrance canopy, a rooftop communications mast with dishes, a sunken forecourt with steps. |
 
 #### `prison` — Věznice · 3 × 3, 2 patra
 
@@ -250,33 +342,33 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | An Austro-Hungarian fortress prison: heavy stone walls with small barred openings, two corner watchtowers with conical roofs, a massive gate with iron doors, a bare gravel yard inside the wall. |
-| **b** | A concrete prison block: long slab with narrow slit windows, a double perimeter fence with razor wire, floodlight masts at the corners, an empty exercise yard. |
-| **c** | A contemporary prison: low pale pavilions around a courtyard, a smooth continuous perimeter wall with no handholds, camera poles at intervals, a single vehicle sally port. |
+| **a** | A prefab prison block: a long slab of grey panels with narrow slit windows, a flat roof, a double perimeter fence with barbed wire, floodlight masts at the corners, an empty concrete exercise yard. |
+| **b** | An older brick prison with rendered walls: a heavy masonry perimeter wall, two square corner watchtowers with flat caps, a massive steel vehicle gate, a bare gravel yard visible over the wall. |
+| **c** | A purpose-built prison in exposed concrete: low staggered wings around an inner yard, a smooth continuous perimeter wall with no handholds, camera poles at intervals, a single vehicle sally port with a striped barrier. |
 
 ---
 
 ### Hasiči
 
-#### `fire_station` — Hasičská zbrojnice · 2 × 2, 1 patro
+#### `fire_station` — Požární zbrojnice · 2 × 2, 1 patro
 
 *Základní zbrojnice. Vrata a věž jsou poznávací znamení.*
 
 | | prompt |
 |---|---|
-| **a** | A brick village fire station: two red-painted timber engine doors, a tall narrow hose-drying tower with a pointed cap, a small gable with a bell, a paved apron in front of the doors. |
-| **b** | A 1970s sheet-metal fire garage: corrugated cladding, two large red roller doors, a flat roof, a concrete apron with painted lines, a short hose tower at the back. |
-| **c** | A modern fire station: three glazed roller doors in a pale rendered frame, a slim training tower with an antenna, a red band along the parapet, a clean concrete apron. |
+| **a** | A standard-design fire station: a rendered single-storey hall with two red steel folding doors, a flat roof, a slender square hose-drying tower with open window slots, a concrete apron with painted lines, a red fire engine of the period. |
+| **b** | A brick village fire station with ochre render: two timber engine doors painted red, a pitched tile roof with a small gable, a taller hose tower with a pointed cap, a bell under the gable, a paved apron. |
+| **c** | An individually designed fire station in exposed concrete: three red doors under one continuous cantilevered canopy, a glass-block stair tower, a red band along the parapet, a clean apron with a drainage channel. |
 
-#### `fire_station_large` — Velká hasičská zbrojnice · 2 × 2, 2 patra
+#### `fire_station_large` — Velká požární zbrojnice · 2 × 2, 2 patra
 
 *Dosáhne tam, kam malá ne. Větší a členitější než `fire_station`.*
 
 | | prompt |
 |---|---|
-| **a** | A large brick fire station with a courtyard: four arched engine doors, a tall square hose-drying tower with a clock, a two-storey crew wing with tall windows, a paved courtyard behind. |
-| **b** | A concrete fire station: four red roller doors under a continuous canopy, a two-storey crew block with ribbon windows, a separate square training tower with open window openings. |
-| **c** | A contemporary fire station: a fully glazed apparatus bay showing the trucks inside, a two-storey crew wing in dark cladding, a ladder and a training tower on the roof, solar panels. |
+| **a** | A large prefab fire station: four red doors along a wide apparatus hall, a two-storey crew block above in pale panels with ribbon windows, a separate square training tower, a large marked apron with two fire engines. |
+| **b** | A brick fire station with a courtyard: four arched engine openings with red doors, a two-storey crew wing with tall windows and ochre render, a tall hose-drying tower with a clock face, a paved courtyard behind. |
+| **c** | An individually designed fire station: a fully glazed apparatus bay with steel mullions showing the trucks inside, a cantilevered crew wing clad in red opaque panels, a training tower with open floors and a ladder. |
 
 ---
 
@@ -288,19 +380,19 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | An interwar single-storey brick school: a symmetrical facade with a central entrance and stone surround, tall multi-pane classroom windows, a low hipped roof, a fenced playground on the plot. |
-| **b** | A socialist-era pavilion school: two low linked pavilions with flat roofs, pale panels with orange window frames, a covered walkway between them, an asphalt yard with painted court lines. |
-| **c** | A contemporary low school: timber and glass classroom wings around a small courtyard, a flat roof with skylights, colourful shading fins, a soft-surface play area. |
+| **a** | A standard-design pavilion school: two low prefab classroom pavilions with flat roofs and continuous window bands, joined by a covered walkway, pale panels with ochre window frames, an asphalt yard with painted court lines and a climbing frame. |
+| **b** | A brick school with ochre render: a symmetrical single-storey range with tall multi-pane classroom windows, a shallow hipped tile roof, a central entrance with a stone surround and a blank sign board above it, a fenced playground with mature trees. |
+| **c** | An individually designed school in exposed concrete: three staggered low wings around a small courtyard, glass-block panels lighting the corridors, a large abstract sgraffito panel on the blank end wall, a sunken play area with concrete steps. |
 
-#### `high_school` — Střední škola · 2 × 2, 2 patra
+#### `high_school` — Střední průmyslová škola · 2 × 2, 2 patra
 
 *Vyšší vzdělání. Reprezentativnější než základní škola.*
 
 | | prompt |
 |---|---|
-| **a** | A neo-renaissance grammar school: a two-storey facade with a pediment over the central bays, pilasters between tall windows, a stone plinth, wide steps to a double door. |
-| **b** | A 1960s technical secondary school: two storeys of ribbon windows, a large abstract mosaic panel on the blank end wall, a projecting flat entrance canopy, a bicycle shelter. |
-| **c** | A contemporary secondary school: two storeys with coloured panel infill between windows, a double-height glazed entrance hall, an outdoor stair to a roof terrace. |
+| **a** | A standard-design secondary school: two storeys of prefab panels with continuous ribbon windows, a flat roof with a parapet, a projecting flat entrance canopy, a bicycle shelter, concrete planters along the front. |
+| **b** | A brick secondary school with ochre render and a stone plinth: two storeys of tall steel-framed windows in a strict rhythm, a shallow cornice, a broad stepped entrance, a blank sign board over the door, clipped hedges. |
+| **c** | An individually designed technical school: an exposed concrete frame with dark green opaque glazed infill panels, a double-height glazed entrance hall, a large abstract mosaic across the blank gable, an external concrete stair. |
 
 #### `university` — Vysoká škola · 3 × 3, 3 patra
 
@@ -308,9 +400,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A baroque university college: a three-storey range around a courtyard, a domed corner tower, arched ground-floor arcade, ornamented window surrounds, a stone portal with a coat-of-arms shape (no lettering). |
-| **b** | A brutalist university faculty: board-marked concrete, two cantilevered lecture-hall volumes projecting from the main slab, deep-set windows, an open concrete stair. |
-| **c** | A contemporary university campus building: a glazed library volume with visible floor slabs, a taller teaching block in pale panels, a planted terrace linking them. |
+| **a** | A university faculty in prefab panels: a tall slab with continuous ribbon windows, a flat roof with a plant enclosure, a lower glazed lecture wing at the base, a wide paved forecourt with concrete planters and flagpoles without flags. |
+| **b** | A brick university building with rendered ochre walls: a three-storey range around a courtyard, tall arched ground-floor openings, a stone plinth and cornice, a low tower over the entrance, mature trees in the courtyard. |
+| **c** | An individually designed faculty in brutalist exposed concrete: two cantilevered lecture-hall volumes projecting from the main slab, board-marked concrete surfaces, deep-set windows, an open concrete stair, a raised plaza. |
 
 ---
 
@@ -322,9 +414,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A small classicist garden pavilion used as a gallery: four slender columns carrying a shallow pediment, a glazed door between them, a stone step, two clipped shrubs. |
-| **b** | A small white cube gallery: one fully glazed wall, a flat roof with a raised skylight lantern, a plain concrete step, a blank poster board beside the door. |
-| **c** | A small timber-clad gallery cube: vertical dark timber boards, one large window, a flat roof, a freestanding poster column on the plot. |
+| **a** | A tiny standard-design exhibition pavilion: a low rendered box with one large steel-framed display window, a flat roof with a raised roof light, a blank poster board beside the door, a concrete step. |
+| **b** | A small brick gallery with ochre render: a shallow pitched tile roof, one tall arched window, a modest stone surround to the door, a freestanding cylindrical poster column on the plot. |
+| **c** | A small individually designed gallery in exposed concrete: an angular volume with one fully glazed wall, a small abstract ceramic mosaic beside the entrance, a flat roof with a north-facing roof light. |
 
 #### `cinema` — Kino · 2 × 2, 1 patro
 
@@ -332,9 +424,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | An art-deco cinema: a stepped facade with vertical fluting, a projecting marquee canopy with bare bulbs underneath, a neon frame around the entrance (no lettering), glazed doors. |
-| **b** | A 1970s cinema: a windowless concrete box with a textured relief panel on the front, a wide flat canopy, three glass display cases for posters beside the doors. |
-| **c** | A contemporary multiplex: a glazed foyer wrapping the corner, a blank dark LED panel above the entrance (no lettering), a cantilevered canopy, a paved forecourt. |
+| **a** | A standard-design district cinema: a windowless rendered box with a wide flat canopy over the entrance, three empty glass poster cases beside the doors, a flat roof, an unlit neon frame with no lettering above the canopy. |
+| **b** | A brick cinema with ochre render and a stone plinth: a tall blank front wall, a projecting canopy on slim steel columns, tall narrow foyer windows either side, a paved forecourt with a cylindrical poster column. |
+| **c** | An individually designed cinema in exposed concrete: a sculpted angular entrance canopy, a fully glazed foyer wrapping one corner, a large abstract relief across the blank auditorium wall, terrazzo paving. |
 
 #### `theatre` — Divadlo · 2 × 2, 1 patro
 
@@ -342,9 +434,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A neo-renaissance theatre: an arcaded ground floor, a balcony over the entrance, statues on the roofline parapet, a shallow dome over the auditorium, ornate window surrounds. |
-| **b** | A 1960s theatre house: a marble-faced front with a full-height glazed foyer, a projecting flat canopy, a windowless fly tower rising behind, a paved forecourt. |
-| **c** | A contemporary theatre: a matt black auditorium box with a glazed foyer wrapped around one corner, exposed steel columns, a taller fly tower with vertical cladding. |
+| **a** | A standard-design theatre: a low foyer block in pale panels with a full-height glazed front, a projecting flat canopy, a taller windowless fly tower behind clad in grey panels, a paved forecourt with concrete planters. |
+| **b** | A brick theatre with rendered walls: an arcaded ground floor, a balcony over the entrance, a moulded cornice, tall foyer windows, a plain fly tower behind, wide steps to the doors. |
+| **c** | An individually designed theatre in exposed concrete: a faceted foyer volume fully glazed with dark mullions, a copper-clad fly tower, a large abstract metal relief on the blank side wall, a raised terrazzo terrace. |
 
 #### `museum` — Muzeum · 3 × 3, 2 patra
 
@@ -352,37 +444,40 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A neoclassical museum: a wide flight of steps to a six-column portico with a pediment, a rusticated base, a long facade with tall arched windows, a low dome behind the portico. |
-| **b** | A modernist museum pavilion: a raised stone-clad box on a recessed glazed base, a deep roof overhang, a sculpture plinth on the forecourt, a shallow reflecting pool. |
-| **c** | A contemporary museum: a folded metal facade with irregular angled panels, a glazed slot entrance cutting into the mass, a small planted forecourt. |
+| **a** | A standard-design museum: a two-storey slab in pale stone-faced panels with a regular grid of deep window openings, a flat roof, a recessed glazed entrance under a projecting slab, a broad paved forecourt with flagpoles without flags. |
+| **b** | A brick museum with rendered ochre walls: a symmetrical range with a stone plinth, tall arched windows, a shallow cornice, a wide flight of steps to a columned entrance, mature trees at the plot edge. |
+| **c** | An individually designed museum in exposed concrete: an overhanging upper volume on a recessed glazed base, board-marked concrete, a full-height glass-block stair tower, a large abstract mosaic on the blank end wall, a shallow reflecting pool. |
 
 ---
 
 ### Sociální služby
 
-#### `community_centre` — Společenské centrum · 2 × 2, 1 patro
+#### `community_centre` — Kulturní dům · 2 × 2, 1 patro
 
 *Místo, kde se čtvrť potká. Neformální, přívětivé.*
 
 | | prompt |
 |---|---|
-| **a** | A Sokol-style community hall: red brick with rendered bands, a large gabled hall with round-arched windows, a timber porch, a small paved forecourt with a flagpole. |
-| **b** | A socialist-era house of culture: a low flat-roofed hall, a mosaic panel across the entrance wall, a concrete canopy on thin columns, wide glazed doors, a paved terrace. |
-| **c** | A contemporary community centre: a timber-framed hall with large windows, a covered outdoor terrace with benches, a sloping green roof, planters along the edge. |
+| **a** | A standard-design house of culture: a low prefab hall with a flat roof, a full-width glazed foyer, a concrete canopy on thin columns, a blank sign board above the doors, a paved terrace with concrete planters. |
+| **b** | A brick community hall with ochre render: a large gabled hall with round-arched windows, a timber porch, a small bell gable, a gravel forecourt with a flagpole and two benches. |
+| **c** | An individually designed community centre in exposed concrete: a hexagonal hall volume with a folded roof, glass-block panels between concrete ribs, a large abstract sgraffito on the blank wall, a sunken terrace. |
 
-#### `retirement_home` — Domov pro seniory · 3 × 3, 2 patra
+#### `retirement_home` — Domov důchodců · 3 × 3, 2 patra
 
 *Péče o ty, kteří město postavili. Klidné, zelené, ne nemocniční.*
 
 | | prompt |
 |---|---|
-| **a** | A small converted manor house used as a retirement home: a rendered two-storey block with a mansard roof, a central entrance with a canopy, mature trees and a gravel path on the plot. |
-| **b** | A 1970s pavilion retirement home: two low wings with continuous loggias and balcony rails, pale panels, a flat roof, a paved courtyard with benches between the wings. |
-| **c** | A contemporary retirement home: three low wings around a planted inner garden, warm render and timber balconies, a sheltered entrance, raised planting beds. |
+| **a** | A standard-design retirement home: two low prefab wings with continuous loggias and painted balcony rails, flat roofs, joined by a glazed link, a paved courtyard with benches and concrete planters. |
+| **b** | A brick retirement home with warm ochre render: a two-storey range with a mansard tile roof, regular windows with shutters, a central entrance canopy, mature trees and a gravel path around the plot. |
+| **c** | An individually designed retirement home in exposed concrete: three staggered low wings around a planted inner garden, timber balcony fronts, a glazed day room projecting toward the garden, raised planting beds. |
 
 ---
 
 ### Parky
+
+Parky nejsou architektura, takže se varianty liší **náplní**, ne rukopisem —
+ale i tak z osmdesátých let: betonové obruby, kovové prolézačky, mlatové cesty.
 
 #### `park_small` — Park · 1 × 1, 1 patro
 
@@ -390,9 +485,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A small square of lawn with one mature broadleaf tree, a wooden bench beneath it, a short gravel path, low hedge along one edge. |
-| **b** | A small paved pocket square: stone paving in a simple pattern, a low circular fountain in the middle, two benches, four clipped trees in a row. |
-| **c** | A small playground: a climbing frame with a slide, a sandpit, a bench, soft rubber surfacing in a bright colour, a low fence. |
+| **a** | A small square of lawn with one mature broadleaf tree, a slatted wooden bench on cast-iron legs beneath it, a short gravel path, a low hooped metal railing along one edge. |
+| **b** | A small paved pocket square: concrete slab paving in a simple pattern, a low circular concrete fountain basin in the middle, two benches, four clipped trees, a cylindrical poster column. |
+| **c** | A small playground: a painted steel climbing frame and a metal slide, a rectangular concrete sandpit, a spring rocker, a bench, compacted sand surfacing, a low fence. |
 
 #### `park_large` — Velký park · 2 × 2, 1 patro
 
@@ -400,9 +495,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A city park: curving gravel paths through lawn, several mature trees, an ornamental bandstand pavilion, benches and a lamp post, a flower bed. |
-| **b** | A sports park: a fenced multi-use hard court with goals, a running track loop around lawn, an outdoor exercise frame, benches and two trees. |
-| **c** | A naturalistic park: an irregular pond with reeds, a small timber footbridge, meadow planting and a few birches, a winding path. |
+| **a** | A city park: curving compacted-gravel paths through lawn, several mature trees, an open hexagonal bandstand pavilion with a shallow roof, benches, a flower bed edged with concrete kerbs. |
+| **b** | A sports park: a fenced hard court with steel goals, a compacted running loop around lawn, a painted steel exercise frame, a small changing hut, benches and two trees. |
+| **c** | A landscaped park: an irregular pond with a concrete edge and reeds, a small steel footbridge, birch groups and meadow planting, a winding path, a sculpture plinth with an abstract concrete form. |
 
 ---
 
@@ -414,9 +509,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A raw landfill: mounds of covered earth and rubbish, tyre tracks in mud, a yellow bulldozer pushing a heap, a simple wire fence, a muddy access apron. |
-| **b** | A fenced tipping site: sorted heaps of waste, a weighbridge hut at the entrance, wind-blown litter caught in tall netting screens, gulls circling above the mounds. |
-| **c** | A managed landfill: a graded and partly grassed cell, gas vent pipes rising from the surface, a leachate tank, a compactor vehicle, a gated fence. |
+| **a** | A raw tipping site: mounds of covered earth and refuse, tyre tracks in mud, a period bulldozer pushing a heap, a sagging wire fence, a muddy access apron. |
+| **b** | A fenced landfill with a gatehouse: sorted heaps of waste, a weighbridge with a small rendered hut, wind-blown litter caught in tall netting screens, gulls over the mounds, a rusting skip. |
+| **c** | A managed landfill cell: a graded and partly grassed slope, steel gas vent pipes rising from the surface, a leachate tank, a compactor vehicle, a gated chain-link fence. |
 
 #### `incinerator` — Spalovna · 3 × 3, 2 patra
 
@@ -424,9 +519,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | An old brick incinerator: a tall round brick chimney, a pitched-roof boiler hall with tall industrial windows, a tipping ramp on one side, soot-darkened brickwork. |
-| **b** | A technical incinerator block: a grey steel-clad hall with external ducting, two cylindrical steel silos, a square steel chimney with guy wires, a covered tipping bay. |
-| **c** | A modern waste-to-energy plant: a clean white and glass hall with a curved roof, one slender white chimney, a glazed control wing, a covered lorry entrance. |
+| **a** | A standard-design incinerator: a grey steel-clad boiler hall with external ducting, two cylindrical steel silos, a square steel chimney with guy wires and a red aircraft-warning band, a covered tipping bay. |
+| **b** | A brick incinerator with a tall round brick chimney: a pitched-roof boiler hall with tall industrial windows, a tipping ramp on one side, soot-darkened brickwork, a coal-black apron. |
+| **c** | An individually designed waste plant in exposed concrete: a monolithic hall with a saw-tooth roof, a slender concrete chimney with a red-and-white band, a glazed control wing, a covered lorry entrance. |
 
 ---
 
@@ -438,9 +533,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A simple bus shelter: a painted steel frame with a glass back panel, a curved metal roof, a bench inside, a stop pole with a blank round sign, a short paved platform. |
-| **b** | A concrete bus shelter: a heavy precast canopy on two square legs, a timetable case on the back wall, a plain bench, a rusted stop pole, cracked paving. |
-| **c** | A modern bus stop: a fully glazed shelter with a flat roof, a leaning bench, a slim pole with a blank digital display panel, tactile paving strip along the kerb. |
+| **a** | A standard bus shelter: a painted steel frame with wired-glass back panel, a shallow curved metal roof, a slatted bench inside, a stop pole with a blank round sign, a short concrete platform. |
+| **b** | A precast concrete bus shelter: a heavy canopy on two square legs, an empty timetable case on the back wall, a plain concrete bench, a rusted stop pole, cracked slab paving. |
+| **c** | An individually designed stop: a glazed shelter with a folded-plate roof, a leaning rail instead of a bench, a slim pole with a blank sign, a small abstract mosaic panel on the back wall. |
 
 #### `tram_stop` — Tramvajová zastávka · 1 × 1, 1 patro
 
@@ -448,9 +543,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A tram boarding island: a raised stone kerb platform with iron railings along the back, a pair of rails set in cobbles along one edge, an overhead wire on a slender mast, a stop pole. |
-| **b** | A concrete tram platform: a plain raised platform with a small metal shelter, rails in asphalt along the edge, a catenary mast with a bracket arm, a timetable case. |
-| **c** | A modern low-floor tram stop: a long low platform with a tactile edge strip, a glazed shelter with a flat roof, rails in a grassed track bed, a slim catenary pole. |
+| **a** | A tram boarding island: a raised concrete kerb platform with a hooped steel railing along the back, a pair of rails set in cobbles along one edge, an overhead wire on a slender lattice mast, a stop pole with a blank sign. |
+| **b** | A concrete tram platform with a small precast shelter: rails set in asphalt along the edge, a catenary mast with a bracket arm, an empty timetable case, worn slab paving. |
+| **c** | A longer tram stop: a low platform with a painted edge strip, a glazed shelter with a flat roof, rails in a grassed track bed, a slim catenary pole, a period tram approaching at the edge of the plot. |
 
 #### `metro_station` — Stanice metra · 2 × 2, 1 patro
 
@@ -458,9 +553,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A stone metro entrance vestibule: a low granite-clad pavilion with a wide opening, a broad stair descending into shadow, brass handrails, a lamp on each side. |
-| **b** | A concrete metro vestibule: a square hall with a glazed clerestory, a coloured ceramic mosaic band around the entrance, a shallow canopy, wide steps down. |
-| **c** | A contemporary metro vestibule: a glass box with a thin flat roof, escalators visible descending inside, brushed steel frame, a tactile paving strip at the doors. |
+| **a** | A standard metro vestibule: a low rectangular pavilion clad in anodised aluminium panels, a broad stair descending into shadow, steel handrails, a flat roof with a shallow overhang, a blank sign panel above the opening. |
+| **b** | A granite-clad metro entrance: a squat stone pavilion with a wide opening, terrazzo steps down, a moulded stone surround, two globe lamps, a paved forecourt. |
+| **c** | An individually designed vestibule in exposed concrete: a faceted glazed hall with dark mullions, escalators visible descending inside, a large abstract anodised-metal relief on the blank wall. |
 
 #### `transit_depot` — Vozovna MHD · 3 × 3, 2 patra
 
@@ -468,9 +563,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A brick tram depot: a long hall with four tall arched gate openings, a shallow pitched roof with ventilation lanterns, rails fanning out onto the paved apron, brick pilasters between gates. |
-| **b** | A sheet-metal bus depot: a wide corrugated hall with three roller doors, a large open parking apron with painted bays, a fuel point with a small canopy, a chain-link fence. |
-| **c** | A modern depot: a saw-tooth roof with north-facing glazing, solar panels on the south slopes, a glazed workshop end, a clean marked apron with charging posts. |
+| **a** | A standard bus depot: a wide steel-clad hall with three roller doors, a large open parking apron with painted bays and period buses, a fuel point under a small canopy, a chain-link fence. |
+| **b** | A brick tram depot: a long hall with four tall arched gate openings, a shallow pitched roof with ventilation lanterns, rails fanning out onto the cobbled apron, brick pilasters between the gates. |
+| **c** | An individually designed depot in exposed concrete: a saw-tooth roof with north-facing glazing, a glazed workshop end, an inspection pit visible in the open bay, a clean marked apron. |
 
 ---
 
@@ -482,9 +577,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | An old coal power station: a tall brick boiler hall with a row of tall industrial windows, two slender round brick chimneys, a coal yard with a conveyor bridge, soot staining. |
-| **b** | A coal plant with two hyperbolic cooling towers, a steel-clad turbine hall between them, a coal stockpile with a bucket-wheel loader, a lattice switchyard with pylons. |
-| **c** | A modernised coal plant: one tall banded chimney with red and white stripes, a boxy flue-gas desulphurisation unit with round absorbers, a clean steel turbine hall, a covered coal store. |
+| **a** | A standard coal power station: a steel-clad turbine hall, two tall banded chimneys in red and white, a coal yard with a conveyor bridge and a bucket-wheel loader, a lattice switchyard with pylons. |
+| **b** | An older brick coal plant: a tall brick boiler hall with rows of tall industrial windows, one massive round brick chimney, a coal yard with a rail siding and hoppers, soot-stained masonry. |
+| **c** | A coal plant with two hyperbolic concrete cooling towers, a monolithic concrete turbine hall between them, a covered coal store, a single tall banded chimney, a fenced switchyard. |
 
 #### `water_works` — Vodárna · 3 × 3, 2 patra
 
@@ -492,9 +587,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A brick water tower works: a round brick tower with a corbelled tank at the top and a conical roof, a low brick pump house beside it, arched windows, an iron door. |
-| **b** | A concrete waterworks: a rectangular technical building with narrow windows, two large circular concrete storage tanks beside it, exposed pipework and valves, a service ladder. |
-| **c** | A modern water treatment works: two low pale halls with a glazed control room, one slim cylindrical tower, stainless pipework running between them, a fenced compound. |
+| **a** | A standard waterworks: a rectangular rendered technical building with narrow windows, two large circular concrete storage tanks beside it, exposed pipework and valves, a service ladder, a fenced compound. |
+| **b** | A brick water tower works: a round brick tower with a corbelled tank and a conical roof, a low brick pump house beside it with arched windows, an iron door, a gravel yard. |
+| **c** | An individually designed waterworks in exposed concrete: two low halls with a glazed control room between them, one slender cylindrical tower with a ribbed concrete shaft, stainless pipework, a fenced compound. |
 
 #### `water_treatment` — Čistírna odpadních vod · 3 × 3, 1 patro
 
@@ -502,9 +597,9 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A sewage works with circular clarifiers: two large open round concrete tanks with rotating bridge arms, a small brick control house, pipework and walkways between tanks. |
-| **b** | A rectangular sewage works: long open concrete basins in a row with steel handrails, a low technical building, aeration pipes and a small blower house. |
-| **c** | A modern covered treatment plant: enclosed tanks under low domed covers, a compact operations building with a glazed corner, stainless pipework, a fenced perimeter. |
+| **a** | A sewage works with circular clarifiers: two large open round concrete tanks with rotating bridge arms, a small rendered control house, pipework and steel walkways between the tanks. |
+| **b** | A rectangular sewage works: long open concrete basins in a row with steel handrails, a low brick technical building, aeration pipes and a small blower house, a gravel access track. |
+| **c** | An individually designed treatment plant: enclosed tanks under low concrete domes, a compact operations building with a glazed corner and a mosaic panel, stainless pipework, a fenced perimeter. |
 
 #### `pump_station` — Čerpací stanice · 1 × 1, 1 patro
 
@@ -512,13 +607,96 @@ budovy ve hře — to, co má být na obrázku poznat na první pohled.
 
 | | prompt |
 |---|---|
-| **a** | A small brick pump house: a single-room brick hut with a pitched tile roof, one small barred window, an iron door, exposed valves and a pipe emerging from the ground beside it. |
-| **b** | A concrete pump kiosk: a plain flat-roofed concrete box, a steel door, a ventilation grille, thick pipes running out of the wall and into the ground, a small bollard. |
-| **c** | A modern pump kiosk: a compact stainless-steel clad box with a slightly sloped roof, a louvred panel, colour-coded pipework and valves outside on a concrete pad. |
+| **a** | A small precast pump kiosk: a plain flat-roofed concrete box, a steel door, a ventilation grille, thick pipes running out of the wall into the ground, a concrete bollard. |
+| **b** | A small brick pump house: a single-room hut with a pitched tile roof, one barred window, an iron door, exposed valves and a pipe emerging from the ground beside it. |
+| **c** | A small individually designed pump kiosk: an angular concrete box with a folded roof, a louvred steel panel, colour-coded pipework and valves outside on a concrete pad. |
 
 ---
 
-## 6. Co po nahrání zbývá dodělat
+## 7. Ruiny
+
+**Rozhodnutí autora:** ne jedna univerzální ruina, ale **tři varianty na každý
+rozměr půdorysu**. Při vzniku suti se jedna vylosuje a zůstane.
+
+Čtyři rozměry × tři varianty = **dvanáct obrázků**. Kdyby měla ruinu každá
+budova zvlášť, bylo by jich dvacet osm jen pro služby a se zónami přes sedmdesát
+— a nic by to nepřineslo. **Ruina má být čitelná, ne detailní.** Při zoomu, ve
+kterém se hraje, potřebuješ vidět „tady je zkáza", a identitu nese něco jiného:
+simulace si v `rubbleOf` pamatuje, co kde stálo, a symbol služby se kreslí
+navrch procedurálně. Ten zůstane.
+
+### Čím se varianty liší
+
+**Ne mírou zkázy.** Simulace stupně poškození nezná — budova buď stojí, nebo je
+z ní suť. Kdyby jedna varianta vypadala „jen ohořele" a druhá „srovnaná se
+zemí", rozhraní by lhalo o stavu, který v datech není.
+
+Liší se tím, **jak to spadlo**: kam padly panely, kde zůstal kus stěny, kudy se
+sesypal strop. Stejná míra, jiné trosky.
+
+### Co platí pro všechny
+
+- **Suť vyplní celý pozemek** — stejnou podstavu jako budova, kterou nahradila.
+  Menší ruina by vypadala, že se pozemek scvrkl.
+- **Nízká.** Zbytek stěny může vyčnívat, ale silueta má být plochá; hráč musí
+  přes ruinu vidět, co je za ní.
+- **Odbarvená.** Šeď, saze, rez, prach. Proti barevnému okolí se to pozná dřív
+  než z tvaru.
+- **Bez ohně a bez vody.** Požár i povodeň kreslí hra sama do dlaždic a
+  přikreslený plamen by s ní blikal proti sobě.
+- **Bez těl, bez krve, bez záchranářů.** Je to hospodářská hra.
+- Uprostřed zůstane **volné místo pro symbol služby**, který hra dokreslí.
+
+### Prompty
+
+Stejná hlavička jako u budov (sekce 4). Období je pořád osmdesátá léta —
+panely, cihla, ocelová okna, jen na zemi.
+
+#### `ruin_1x1` — jedna dlaždice
+
+| | prompt |
+|---|---|
+| **a** | Ruins of a small collapsed building filling the plot: a low heap of broken grey concrete slabs and ochre render fragments, one short stub of standing wall with an empty steel window frame, dust-grey and soot-stained, weeds at the edge. |
+| **b** | Ruins of a small burnt-out building: blackened brick rubble spread evenly across the plot, charred timber beams lying across it, a scorched stub of chimney, everything desaturated grey and soot. |
+| **c** | Ruins of a small building pushed flat: an even bed of crushed masonry and twisted steel reinforcement across the whole plot, a single tilted concrete slab leaning on the heap, broken paving at the edge. |
+
+#### `ruin_2x2` — dva krát dva
+
+| | prompt |
+|---|---|
+| **a** | Ruins of a collapsed two-storey building filling the plot: prefab panels fallen outward in a fan, one corner of the facade still standing with empty window openings, heaps of grey rubble between, dust and soot, a bent steel railing. |
+| **b** | Ruins of a burnt-out building: a rectangle of blackened rubble with the floor slab still readable underneath, charred roof beams collapsed inward, two stubs of brick wall standing at opposite corners, ash and soot. |
+| **c** | Ruins pushed flat: an even field of crushed concrete and broken render across the whole plot, exposed reinforcement bars curling upward, one toppled slab lying diagonally, a shattered concrete step at the entrance side. |
+
+#### `ruin_3x3` — tři krát tři
+
+| | prompt |
+|---|---|
+| **a** | Ruins of a large collapsed building filling the plot: several prefab wall panels fallen outward like cards, an inner core of broken slabs and rubble, one tall fragment of wall still standing with empty window bands, dust-grey and soot-stained. |
+| **b** | Ruins of a large burnt-out complex: blackened rubble covering the plot with the outline of the former wings still readable, charred beams and collapsed roof sheets, two brick chimney stubs standing, ash drifts against the debris. |
+| **c** | Ruins of a large building pushed flat: an even spread of crushed masonry and twisted reinforcement, one long concrete slab tilted against the heap, a broken staircase leading up into nothing, cracked paving around the edge. |
+
+#### `ruin_4x4` — čtyři krát čtyři
+
+*Jediná budova téhle velikosti je uhelná elektrárna, takže ruina má nést
+industriální trosky, ne bytové panely.*
+
+| | prompt |
+|---|---|
+| **a** | Ruins of a collapsed industrial hall filling the plot: buckled steel roof trusses fallen across the floor, torn corrugated cladding, a broken chimney stub, heaps of grey rubble, rusted pipework sticking out of the debris. |
+| **b** | Ruins of a burnt-out power plant: a blackened steel frame still partly standing with no cladding left, collapsed boiler drums, charred conveyor structure lying across the plot, soot and ash everywhere. |
+| **c** | Ruins pushed flat: a wide field of crushed concrete, twisted reinforcement and shattered steel sections, a toppled chimney lying broken across the plot, rusted tanks split open, cracked concrete apron at the edge. |
+
+### Co k tomu bude potřeba v kódu
+
+Ruiny nemají definici budovy, takže si skript **nemá kde vzít půdorys** —
+dostane vlastní tabulku rozměrů `1x1` až `4x4`. Losování varianty pak podléhá
+témuž, co u budov: z `world.rng` (P2), jako jméno (P6), do savu (P7).
+
+
+---
+
+## 8. Co po nahrání zbývá dodělat
 
 Tenhle dokument a skript řeší **obrázky**. Aby se objevily ve hře, bude ještě
 potřeba:
