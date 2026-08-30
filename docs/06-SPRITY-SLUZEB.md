@@ -121,11 +121,16 @@ Liší se tím, čím se lišily doopravdy:
 | **střecha** | plochá s atikou (většina) · sedlová (drobné stavby) · pilová (haly) |
 
 Nemocnice tedy nesmí být třikrát tatáž nemocnice s jinou barvou. Má to být
-monoblok, pavilonový areál a atypika — všechny tři z osmdesátých let.
+monoblok, pavilonový areál a atypika.
+
+**Osmdesátá léta jsou doba, kdy se hraje, ne rok, kdy se stavělo.** Město roku
+1989 je plné budov z roku 1912 — pavilonová nemocnice, secesní škola, cihlová
+vodárna. Starší stavby do sady patří; co tam nepatří, je stavba **novější**,
+tedy prosklené fasády, zámková dlažba a fotovoltaika.
 
 ### Co zůstává stejné
 
-Doba, paleta a stavební slovník. Ploché střechy s atikou, ocelové rámy oken,
+Paleta a stavební slovník. Ploché střechy s atikou, ocelové rámy oken,
 betonové květináče, terasová dlažba, stožáry bez vlajek, mozaika nebo reliéf na
 slepé stěně. Auta jen když je budova potřebuje: Škoda 105, Avia, Karosa, Tatra
 613 u úřadu, tramvaj T3.
