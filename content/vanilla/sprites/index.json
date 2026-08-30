@@ -67,6 +67,39 @@
         384,
         568
       ]
+    },
+    {
+      "building": "vanilla:police_small",
+      "variant": "a",
+      "file": "police_small__a.png",
+      "width": 512,
+      "height": 330,
+      "anchor": [
+        261,
+        330
+      ]
+    },
+    {
+      "building": "vanilla:police_small",
+      "variant": "b",
+      "file": "police_small__b.png",
+      "width": 512,
+      "height": 338,
+      "anchor": [
+        252,
+        338
+      ]
+    },
+    {
+      "building": "vanilla:police_small",
+      "variant": "c",
+      "file": "police_small__c.png",
+      "width": 512,
+      "height": 295,
+      "anchor": [
+        263,
+        295
+      ]
     }
   ]
 }
