@@ -47,7 +47,15 @@ SPEC = ROOT / 'docs' / '06-SPRITY-SLUZEB.md'
 REFERENCE = ROOT / 'art' / 'sprites' / 'reference.png'
 
 API = 'https://api.openai.com/v1/images'
-MODEL = 'gpt-image-1'
+
+# `gpt-image-1` byl první odhad a měřitelně horší: podstavu z něj šlo změřit
+# u jednoho obrázku ze tří a výšky utíkaly o 35–40 % (376/433/448 tam, kde se
+# čeká 320). `gpt-image-2` dá 3 ze 3 a výšky 315/313/332.
+#
+# `chatgpt-image-latest` — nejspíš to, co jede v aplikaci — chce ověřenou
+# organizaci a účet ji zatím nemá. Až bude, stojí za pokus: aplikace dělá
+# světlejší obrázky (jas 151 proti 134).
+MODEL = 'gpt-image-2'
 SIZE = '1024x1024'
 
 # Bez `--all` se udělá jen tahle hrstka. Utrácí se cizí peníze, takže výchozí

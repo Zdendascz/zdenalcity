@@ -7,10 +7,10 @@
       "variant": "a",
       "file": "cinema__a.png",
       "width": 512,
-      "height": 456,
+      "height": 315,
       "anchor": [
-        256,
-        456
+        245,
+        315
       ]
     },
     {
@@ -18,10 +18,10 @@
       "variant": "b",
       "file": "cinema__b.png",
       "width": 512,
-      "height": 433,
+      "height": 313,
       "anchor": [
-        256,
-        433
+        257,
+        313
       ]
     },
     {
@@ -29,10 +29,10 @@
       "variant": "c",
       "file": "cinema__c.png",
       "width": 512,
-      "height": 360,
+      "height": 332,
       "anchor": [
-        261,
-        360
+        237,
+        332
       ]
     },
     {
