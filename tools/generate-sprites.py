@@ -46,7 +46,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / 'art' / 'sprites' / 'raw'
-SPEC = ROOT / 'docs' / '06-SPRITY-SLUZEB.md'
+# Hlavička je jen v prvním; ostatní přispívají prompty. Zástavba v zónách má
+# vlastní dokument, protože se řídí týmž stylem, ale jinou logikou úrovní.
+SPECS = (
+    ROOT / 'docs' / '06-SPRITY-SLUZEB.md',
+    ROOT / 'docs' / '07-SPRITY-ZONY.md',
+)
 REFERENCE = ROOT / 'art' / 'sprites' / 'reference.png'
 
 API = 'https://api.openai.com/v1/images'
@@ -59,6 +64,13 @@ API = 'https://api.openai.com/v1/images'
 # organizaci a účet ji zatím nemá. Až bude, stojí za pokus: aplikace dělá
 # světlejší obrázky (jas 151 proti 134).
 MODEL = 'gpt-image-2'
+
+# Vzory, kterymi se cte zadani. Nadpis budovy je ### nebo ####.
+# Vzory, kterými se čte zadání. Nadpis budovy je ### nebo ####; oddíly
+# hlavičky jsou oplocené trojicí zpětných apostrofů.
+FENCE = r'```(.*?)```'
+SUBJECT = r'^#{3,4} `([a-z0-9_]+)`.*?$(.*?)(?=^#{3,4} |^## |\Z)'
+VARIANT = r'^\| \*\*([abc])\*\* \| (.+?) \|\s*$'
 SIZE = '1024x1024'
 
 # Bez `--all` se udělá jen tahle hrstka. Utrácí se cizí peníze, takže výchozí
@@ -96,28 +108,65 @@ def tls_context() -> ssl.SSLContext:
     return ssl.create_default_context(cafile=certifi.where())
 
 
+def load_footprints() -> dict[str, tuple[int, int]]:
+    """Půdorysy budov z definic. Klíč je holé id bez jmenného prostoru."""
+    out: dict[str, tuple[int, int]] = {}
+    for path in sorted((ROOT / 'content' / 'vanilla' / 'buildings').glob('*.json')):
+        data = json.loads(path.read_text(encoding='utf-8'))
+        if data.get('type') != 'building':
+            continue
+        w, d = data['footprint']
+        out[data['id'].split(':', 1)[1]] = (w, d)
+    for n in (1, 2, 3, 4):
+        out[f'ruin_{n}x{n}'] = (n, n)
+    return out
+
+
 def read_spec() -> tuple[str, dict[str, dict[str, str]]]:
-    """Hlavička a prompty variant ze zadání.
+    """Hlavicka a prompty variant ze zadani.
 
-    Formát je daný dokumentem: hlavička je první blok kódu za sekcí o ní,
-    varianty jsou řádky tabulky `| **a** | text |` pod nadpisem `#### \\`id\\``.
+    Format je dany dokumentem: hlavicka je prvni blok kodu za sekci o ni,
+    varianty jsou radky tabulky pod nadpisem se jmenem budovy. Zadani je
+    vic -- hlavicka je jen v prvnim, prompty prispivaji vsechna. Zastavba
+    v zonach ma vlastni dokument, protoze se ridi tymz stylem, ale jinou
+    logikou urovni.
     """
-    text = SPEC.read_text(encoding='utf-8')
-
-    start = text.index('## 4. Společná hlavička promptu')
-    header = re.search(r'```\n(.*?)```', text[start:], re.S)
+    first = SPECS[0].read_text(encoding='utf-8')
+    start = first.index('## 4. Společná hlavička promptu')
+    header = re.search(FENCE, first[start:], re.S)
     if header is None:
         raise SystemExit('v zadání chybí blok se společnou hlavičkou promptu')
 
     prompts: dict[str, dict[str, str]] = {}
-    for name, body in re.findall(
-        r'^#### `([a-z0-9_]+)`.*?$(.*?)(?=^#### |^## |\Z)', text, re.S | re.M
-    ):
-        found = dict(re.findall(r'^\| \*\*([abc])\*\* \| (.+?) \|\s*$', body, re.M))
-        if found:
-            prompts[name] = found
+    for spec in SPECS:
+        if not spec.exists():
+            continue
+        text = spec.read_text(encoding='utf-8')
+        for name, body in re.findall(SUBJECT, text, re.S | re.M):
+            found = dict(re.findall(VARIANT, body, re.M))
+            if found:
+                prompts[name] = found
 
     return header.group(1).strip(), prompts
+
+def plot_sentence(name: str, shapes: dict[str, tuple[int, int]]) -> str:
+    """Věta o tvaru pozemku, odvozená z půdorysu v datech.
+
+    Do promptu se **nepíše ručně**. U čtvercové budovy je pozemek pravidelný
+    diamant, u obdélníkové protažený — a kdyby to prompt neřekl, generátor
+    nakreslí čtverec a budova bude mít špatné proporce. Odvozeno z definice,
+    aby se to nemohlo rozejít se hrou (P5).
+    """
+    size = shapes.get(name)
+    if size is None:
+        return ''
+    w, d = size
+    if w == d:
+        return f'The plot is a square of {w} by {d} city tiles.'
+    return (
+        f'The plot is a RECTANGLE of {w} by {d} city tiles, not a square — '
+        f'in this projection its diamond is clearly elongated along one axis.'
+    )
 
 
 def multipart(fields: dict[str, str], files: dict[str, tuple[str, bytes]]) -> tuple[bytes, str]:
@@ -217,6 +266,7 @@ def main() -> int:
         only = argv[at + 1] if at + 1 < len(argv) else None
 
     header, prompts = read_spec()
+    shapes = load_footprints()
     wanted = set(only.split(',')) if only else None
     if wanted:
         unknown = wanted - set(prompts)

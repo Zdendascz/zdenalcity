@@ -75,11 +75,14 @@ RUINS = {f'ruin_{n}x{n}': (n, n, 1) for n in (1, 2, 3, 4)}
 
 
 def load_definitions() -> dict[str, dict]:
-    """Půdorysy a patra budov mimo zóny a ruin, klíčem holé id bez namespace."""
+    """Půdorysy a patra všech budov a ruin, klíčem holé id bez namespace."""
     out: dict[str, dict] = {name: spec_for(*size) for name, size in RUINS.items()}
     for path in sorted(DEFS.glob('*.json')):
         data = json.loads(path.read_text(encoding='utf-8'))
-        if data.get('category') not in ('service', 'utility'):
+        # Všechny budovy, ne jen služby: zástavba v zónách má sprity taky
+        # a její půdorysy **nejsou čtvercové** (2×1, 3×2). Kotva se měří, ne
+        # dopočítává ze středu, takže to projde stejnou cestou.
+        if data.get('type') != 'building':
             continue
         w, d = data['footprint']
         out[data['id'].split(':', 1)[1]] = spec_for(w, d, data['graphics']['heightLevels'])
