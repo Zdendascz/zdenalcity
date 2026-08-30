@@ -7,10 +7,10 @@
       "variant": "a",
       "file": "clinic__a.png",
       "width": 512,
-      "height": 301,
+      "height": 300,
       "anchor": [
-        254,
-        301
+        255,
+        300
       ]
     },
     {
@@ -18,10 +18,10 @@
       "variant": "b",
       "file": "clinic__b.png",
       "width": 512,
-      "height": 294,
+      "height": 293,
       "anchor": [
-        257,
-        294
+        259,
+        293
       ]
     },
     {
@@ -29,21 +29,10 @@
       "variant": "c",
       "file": "clinic__c.png",
       "width": 512,
-      "height": 277,
+      "height": 274,
       "anchor": [
-        271,
-        277
-      ]
-    },
-    {
-      "building": "vanilla:fire_station",
-      "variant": "a",
-      "file": "fire_station__a.png",
-      "width": 512,
-      "height": 354,
-      "anchor": [
-        263,
-        354
+        274,
+        274
       ]
     },
     {
@@ -51,21 +40,32 @@
       "variant": "a",
       "file": "hospital__a.png",
       "width": 768,
-      "height": 527,
+      "height": 480,
       "anchor": [
-        396,
-        527
+        381,
+        480
       ]
     },
     {
-      "building": "vanilla:school",
-      "variant": "a",
-      "file": "school__a.png",
+      "building": "vanilla:hospital",
+      "variant": "b",
+      "file": "hospital__b.png",
       "width": 768,
-      "height": 548,
+      "height": 414,
       "anchor": [
-        420,
-        548
+        370,
+        414
+      ]
+    },
+    {
+      "building": "vanilla:hospital",
+      "variant": "c",
+      "file": "hospital__c.png",
+      "width": 768,
+      "height": 568,
+      "anchor": [
+        384,
+        568
       ]
     }
   ]

@@ -136,34 +136,76 @@ def key_out(image: Image.Image) -> Image.Image:
 def base_diamond(image: Image.Image) -> tuple[float, int] | None:
     """Poměr stran podstavy a x spodního vrcholu. `None`, když to nejde změřit.
 
-    Podstava je nejspodnější a nejširší útvar v obrázku, takže její vrcholy
-    leží na krajích ořezu: **levý** vrchol je nejnižší pixel v prvním sloupci,
-    **pravý** v posledním a **spodní** uprostřed posledního řádku.
+    Podstava je nejspodnější útvar v obrázku, takže její obrys je **spodní
+    silueta**: dvě přímé hrany, které se sbíhají do vrcholu. Obě se proloží
+    přímkou a vrcholy se dopočítají z nich.
 
-    Poměr `šířka / plná výška` je u projekce 2:1 rovný dvěma. Cokoli jiného
-    znamená, že obrázek je v jiné izometrii — a to se dá spravit, viz
-    `to_two_to_one`.
+    **Neměří se z krajních pixelů**, ačkoli by to bylo jednodušší. Na kraji
+    stojí strom, lampa nebo plot, který přečnívá přes roh podstavy — a jediný
+    takový pixel posune měření natolik, že se poměr splete o desetiny. Dlouhá
+    rovná hrana proti tomu odolá.
+
+    Když silueta zdola dvě přímé hrany nemá, vrátí se `None` a projekce se
+    neopravuje. To je ten skutečný důvod, proč měření zamítnout — ne to, že by
+    úhel vyšel neobvyklý. Generátor kreslí od 1,19 : 1 po 1,60 : 1 a všechno
+    z toho jsou poctivé projekce.
     """
     alpha = np.asarray(image)[:, :, 3] > 40
     cols = np.where(alpha.any(axis=0))[0]
-    rows = np.where(alpha.any(axis=1))[0]
-    if cols.size < 8 or rows.size < 8:
+    if cols.size < 64:
         return None
 
-    left_y = np.where(alpha[:, cols[0]])[0][-1]
-    right_y = np.where(alpha[:, cols[-1]])[0][-1]
-    bottom_y = rows[-1]
-    bottom_x = int(np.where(alpha[bottom_y])[0].mean())
+    x0, x1 = int(cols[0]), int(cols[-1])
+    xs = np.arange(x0, x1 + 1)
+    bottom = np.array([np.where(alpha[:, x])[0][-1] for x in xs], dtype=float)
 
-    half = bottom_y - (left_y + right_y) / 2
+    apex = int(np.argmax(bottom))
+    # Vrchol musí být uvnitř, ne na kraji — jinak to není „V" a podstavu
+    # nejspíš něco ořízlo.
+    if apex < 8 or apex > len(xs) - 9:
+        return None
+
+    def fit(a: int, b: int) -> tuple[float, float] | None:
+        """Přímka spodní hranou v rozsahu sloupců. `None`, když se nedrží."""
+        if b - a < 16:
+            return None
+        # Krajní desetina se vynechá: přesně tam trčí stromy a lampy.
+        trim_px = max(2, (b - a) // 10)
+        piece = slice(a + trim_px, b - trim_px)
+        px, py = xs[piece], bottom[piece]
+        slope, intercept = np.polyfit(px, py, 1)
+        # Hrana musí být opravdu přímá. Odchylka se poměřuje k výšce hrany,
+        # ne k pevnému počtu pixelů — jinak by prošla i klikatina na velkém
+        # obrázku a rovná hrana na malém by neprošla.
+        span = max(1.0, abs(slope) * (px[-1] - px[0]))
+        if np.median(np.abs(py - (slope * px + intercept))) > span * 0.02:
+            return None
+        return float(slope), float(intercept)
+
+    left = fit(0, apex)
+    right = fit(apex, len(xs) - 1)
+    if left is None or right is None:
+        return None
+
+    # Vrcholy z proložených přímek, ne z pixelů.
+    y_left = left[0] * x0 + left[1]
+    y_right = right[0] * x1 + right[1]
+    if abs(left[0] - -right[0]) > max(abs(left[0]), abs(right[0])) * 0.35:
+        return None  # hrany nejsou souměrné, podstava to nebude
+
+    bottom_x = (right[1] - left[1]) / (left[0] - right[0])
+    bottom_y = left[0] * bottom_x + left[1]
+
+    half = bottom_y - (y_left + y_right) / 2
     if half <= 1:
         return None
-    return (cols[-1] - cols[0]) / (2 * half), bottom_x
+    return (x1 - x0) / (2 * half), int(round(bottom_x))
 
 
-# Mimo tyhle meze se naměřenému poměru nevěří: to už není jiná izometrie, ale
-# rozbitý obrázek — strom přes okraj, uříznutá podstava, stín mimo pozemek.
-RATIO_MIN, RATIO_MAX = 1.2, 2.6
+# Poslední pojistka. Že je úhel neobvyklý, **není** důvod k zamítnutí —
+# generátor kreslí od 1,19 : 1 po 1,60 : 1 a všechno z toho jsou poctivé
+# projekce. Tvar podstavy hlídá `base_diamond`; tohle chytá jen nesmysl.
+RATIO_MIN, RATIO_MAX = 0.7, 3.0
 # Pod tímhle rozdílem se neopravuje. Zmenšit o procento nemá cenu a jen by to
 # rozmazalo hrany.
 RATIO_TOLERANCE = 0.04
