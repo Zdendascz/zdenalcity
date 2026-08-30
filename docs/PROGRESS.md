@@ -3283,7 +3283,37 @@ z `world.rng`, ne z `Math.random` (P2), jako **jméno** `a`/`b`/`c`, ne index
 do pole (P6), a se **save v9 a migrací** (P7). Kolik variant budova má, říká
 obsah — tři jsou dnešní rozhodnutí, ne konstanta v kódu (P5).
 
-Nic z toho není hotové. Tahle dávka je zadání pro obrázky.
+### Cvičně zapojeno do hry
+
+Aby šlo vidět, jestli to sedí, prošly první tři obrázky celou cestou od obsahu
+k rendereru. **Varianta je zatím natvrdo první**, save se nemění a nic se
+nelosuje — to přijde, až se varianta začne ukládat.
+
+Sprity jdou **touž cestou jako ikony**: přes `ContentSource`, ne přímým
+sáhnutím rendereru do `content/` (P5). `sprites/index.json` nese rozměry
+a kotvu, aby si renderer uměl kotvu spočítat **dřív, než se textura stáhne** —
+jinak by budova na jeden snímek skočila do rohu obrazovky.
+
+`BuildingRenderer` drží podle budovy buď `Graphics`, nebo `Sprite`, a při
+změně uzel vymění. Nastane to reálně: **ruina si obrázek nebere** — vyhořelý
+dům nemá vypadat jako nová škola, takže se u ní vzhled zahodí a kreslí se
+šedý kvádr. Ověřeno, že přechod tam i zpátky uzel opravdu přehodí.
+
+Změřeno v běžící hře, ne odhadnuto: kotva všech tří budov sedí **na pixel**
+(odchylka 0,0 proti `gridToScreen(x+w, y+d)`) a šířky vyšly přesně 192, 192
+a 128 světových jednotek, jak mřížka čeká.
+
+První měření bylo špatně a stojí za zápis proč: porovnávalo `getBounds()`
+s výsledkem `gridToScreen`. To první je v souřadnicích **obrazovky**, to druhé
+**světa**, takže z toho vyšly odchylky přes osm set pixelů a vypadalo to jako
+rozbitá kotva. Srovnávat se musí `sprite.position` s předním rohem půdorysu.
+
+Mutační test 7 ze 7 — dva mutanti si vyžádali, aby se `buildSprites`
+z loaderu dala volat zvlášť. Do té doby nešlo otestovat, co se stane
+s manifestem, který ukazuje na smazaný obrázek: budova by dostala sprite
+s `url: undefined` a renderer by se ho pokusil stáhnout.
+
+Nic dalšího z toho není hotové. Tahle dávka je zadání pro obrázky.
 
 
 ## Rozpracované

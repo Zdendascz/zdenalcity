@@ -6,6 +6,8 @@
       "building": "vanilla:fire_station",
       "variant": "a",
       "file": "fire_station__a.png",
+      "width": 512,
+      "height": 354,
       "anchor": [
         263,
         354
@@ -15,6 +17,8 @@
       "building": "vanilla:hospital",
       "variant": "a",
       "file": "hospital__a.png",
+      "width": 768,
+      "height": 527,
       "anchor": [
         396,
         527
@@ -24,6 +28,8 @@
       "building": "vanilla:school",
       "variant": "a",
       "file": "school__a.png",
+      "width": 768,
+      "height": 548,
       "anchor": [
         420,
         548

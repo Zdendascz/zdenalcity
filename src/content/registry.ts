@@ -30,10 +30,33 @@ export interface ContentSource {
    */
   readonly icons?: Readonly<Record<string, string>>;
   /**
+   * Obrázky budov. Klíč = `<id budovy>|<varianta>`, tedy `vanilla:hospital|a`.
+   *
+   * Stejně jako ikony: zdroj je mít nemusí a hra pak kreslí kvádry jako dřív.
+   */
+  readonly sprites?: Readonly<Record<string, SpriteImage>>;
+  /**
    * Balanc. Zdroj ho mít nemusí; když ho má, musí být úplný a přepíše ten
    * dosavadní — tak mod přeladí hru bez zásahu do definic.
    */
   readonly balance?: unknown;
+}
+
+/**
+ * Jeden obrázek budovy i s tím, kam ho posadit.
+ *
+ * `anchor` je bod **v pixelech obrázku**, který sedne na přední roh půdorysu.
+ * Neleží nutně uprostřed spodní hrany — generátor kreslí podstavu často mírně
+ * zkosenou, takže se poloha měří a zapisuje, místo aby se dopočítala.
+ *
+ * `scale` říká, kolikrát je obrázek větší než při zoomu 1.
+ */
+export interface SpriteImage {
+  readonly url: string;
+  readonly width: number;
+  readonly height: number;
+  readonly anchor: readonly [number, number];
+  readonly scale: number;
 }
 
 export interface SourceInfo {
@@ -65,6 +88,7 @@ export class ContentRegistry {
   private readonly locales = new Map<string, Map<string, string>>();
   /** jméno ikony → URL obrázku, slito přes všechny zdroje. */
   private readonly icons = new Map<string, string>();
+  private readonly sprites = new Map<string, SpriteImage>();
   private balance: Balance | null = null;
 
   /**
@@ -145,6 +169,12 @@ export class ContentRegistry {
       this.icons.set(name, url);
     }
 
+    // Sprity taky: mod smí cizí budově vyměnit obrázek i přidat další variantu,
+    // aniž by sahal na její definici.
+    for (const [key, sprite] of Object.entries(source.sprites ?? {})) {
+      this.sprites.set(key, sprite);
+    }
+
     // Pozdější zdroj smí text přepsat — tak se překládají nebo přejmenovávají
     // cizí budovy, aniž by se sahalo na jejich definici.
     for (const [language, table] of incomingLocales) {
@@ -178,6 +208,27 @@ export class ContentRegistry {
    */
   getIcons(): Record<string, string> {
     return Object.fromEntries(this.icons);
+  }
+
+  /**
+   * Obrázek budovy, nebo `undefined`. Bez něj renderer kreslí kvádr jako dřív —
+   * chybějící obrázek je vzhled, ne podmínka běhu.
+   */
+  getSprite(definitionId: string, variant: string): SpriteImage | undefined {
+    return this.sprites.get(`${definitionId}|${variant}`);
+  }
+
+  /**
+   * Varianty, ke kterým budova obrázek má. Seřazené, ať je pořadí stabilní —
+   * losovat se z nich bude přes `world.rng` a nesmí to záviset na pořadí,
+   * v jakém glob vrátil soubory (P2).
+   */
+  getSpriteVariants(definitionId: string): string[] {
+    const prefix = `${definitionId}|`;
+    return [...this.sprites.keys()]
+      .filter((key) => key.startsWith(prefix))
+      .map((key) => key.slice(prefix.length))
+      .sort();
   }
 
   getLocaleTable(language: string): Record<string, string> {

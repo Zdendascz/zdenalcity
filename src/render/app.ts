@@ -126,12 +126,20 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
     const definition = content.get(definitionId);
     if (!definition) return undefined;
     const icon = definition.graphics.icon;
+
+    // Zatím **natvrdo první varianta** (T70). Losovat se bude z `world.rng`,
+    // až se varianta začne ukládat do savu — bez toho by si každé načtení hry
+    // vybralo jinou a město by se pod rukama převlékalo.
+    const variant = content.getSpriteVariants(definitionId)[0];
+    const sprite = variant === undefined ? undefined : content.getSprite(definitionId, variant);
+
     return {
       color: Number.parseInt(definition.graphics.color.slice(1), 16),
       heightLevels: definition.graphics.heightLevels,
       footprint: definition.footprint,
       consumesPower: (definition.power?.consumption ?? 0) > 0,
       ...(icon === undefined ? {} : { icon }),
+      ...(sprite === undefined ? {} : { sprite }),
     };
   };
 }

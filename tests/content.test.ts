@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createVanillaSource } from '@/content/loader';
+import { buildSprites, createVanillaSource } from '@/content/loader';
 import { ContentRegistry, ContentValidationError } from '@/content/registry';
 import type { ContentSource } from '@/content/registry';
 import { validateDefinition } from '@/content/schema';
@@ -281,5 +281,140 @@ describe('validace', () => {
   it('odmítne rozbitý manifest a nesahá přitom na definice', async () => {
     const error = await loadExpectingError(source({ manifest: { ...MANIFEST, version: '1.0' } }));
     expect(error.problems.join('\n')).toContain('manifest.json: version');
+  });
+});
+
+/**
+ * Obrázky budov (T70).
+ *
+ * Jdou touž cestou jako ikony — přes `ContentSource`, ne přímým sáhnutím
+ * rendereru do `content/` — aby je mod směl přidat i přepsat (P5). Testuje se
+ * to, co jde rozbít potichu: chybějící obrázek nesmí hru zastavit a pořadí
+ * variant nesmí záviset na tom, v jakém pořadí je vrátil glob (P2).
+ */
+describe('obrázky budov', () => {
+  const sprite = (url: string) => ({
+    url,
+    width: 768,
+    height: 448,
+    anchor: [384, 448] as const,
+    scale: 4,
+  });
+
+  it('registr je vydá podle budovy a varianty', async () => {
+    const registry = new ContentRegistry();
+    await registry.load(source({ sprites: { 'test:thing|a': sprite('/a.png') } }));
+
+    expect(registry.getSprite('test:thing', 'a')?.url).toBe('/a.png');
+  });
+
+  it('budova bez obrázku vrátí undefined, ne výjimku', async () => {
+    // Renderer si pak nakreslí kvádr jako dřív. Chybějící obrázek je vzhled,
+    // ne podmínka běhu — mod, který žádný nedodá, nesmí hru zastavit.
+    const registry = new ContentRegistry();
+    await registry.load(source());
+
+    expect(registry.getSprite('test:thing', 'a')).toBeUndefined();
+    expect(registry.getSpriteVariants('test:thing')).toEqual([]);
+  });
+
+  it('varianty přijdou seřazené', async () => {
+    // Losovat se z nich bude přes `world.rng`. Kdyby pořadí záviselo na tom,
+    // jak glob vrátil soubory, dva běhy téhož seedu by daly jiné město (P2).
+    const registry = new ContentRegistry();
+    await registry.load(
+      source({
+        sprites: {
+          'test:thing|c': sprite('/c.png'),
+          'test:thing|a': sprite('/a.png'),
+          'test:thing|b': sprite('/b.png'),
+        },
+      }),
+    );
+
+    expect(registry.getSpriteVariants('test:thing')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('pozdější zdroj smí obrázek přepsat i přidat variantu', async () => {
+    const registry = new ContentRegistry();
+    await registry.load(source({ sprites: { 'test:thing|a': sprite('/vanilla.png') } }));
+    await registry.load({
+      label: 'mod',
+      manifest: { ...MANIFEST, id: 'mod', name: 'Mod' },
+      definitions: [],
+      locales: {},
+      sprites: { 'test:thing|a': sprite('/mod.png'), 'test:thing|b': sprite('/novy.png') },
+    });
+
+    expect(registry.getSprite('test:thing', 'a')?.url).toBe('/mod.png');
+    expect(registry.getSpriteVariants('test:thing')).toEqual(['a', 'b']);
+  });
+
+  it('varianty jedné budovy nepřetečou do jiné', async () => {
+    // Klíč je `id|varianta` a hledá se podle předpony. Kdyby se předpona
+    // nekončila svislítkem, `test:thing` by si přivlastnilo i `test:thing2`.
+    const registry = new ContentRegistry();
+    await registry.load(
+      source({
+        sprites: {
+          'test:thing|a': sprite('/a.png'),
+          'test:thing2|a': sprite('/jina.png'),
+        },
+      }),
+    );
+
+    expect(registry.getSpriteVariants('test:thing')).toEqual(['a']);
+    expect(registry.getSprite('test:thing', 'a')?.url).toBe('/a.png');
+  });
+});
+
+/**
+ * Párování manifestu spritů se soubory.
+ *
+ * `sprites/index.json` vyrábí `tools/fit-sprites.py` ze složky, takže se
+ * rozejít může jen tak, že někdo obrázek smaže a skript nepustí. To nemá být
+ * důvod, proč hra nenaběhne — vadný záznam se zahodí a budova dostane kvádr.
+ */
+describe('manifest spritů', () => {
+  const zaznam = (over: Record<string, unknown> = {}) => ({
+    building: 'test:thing',
+    variant: 'a',
+    file: 'thing__a.png',
+    width: 768,
+    height: 448,
+    anchor: [384, 448],
+    ...over,
+  });
+
+  it('spáruje záznam s obrázkem', () => {
+    const out = buildSprites({ scale: 4, sprites: [zaznam()] }, { thing__a: '/url.png' });
+
+    expect(out['test:thing|a']).toEqual({
+      url: '/url.png',
+      width: 768,
+      height: 448,
+      anchor: [384, 448],
+      scale: 4,
+    });
+  });
+
+  it('záznam bez obrázku zahodí', () => {
+    // Jinak by budova dostala sprite s `url: undefined` a renderer by se ho
+    // pokusil stáhnout. Kvádr je lepší než rozbitý obrázek.
+    expect(buildSprites({ scale: 4, sprites: [zaznam()] }, {})).toEqual({});
+  });
+
+  it('zahodí i záznam bez rozměrů nebo bez kotvy', () => {
+    // Rozměry nesou kotvu, dokud se textura nestáhne. Bez nich by budova
+    // skočila do rohu obrazovky, jakmile se obrázek načte.
+    const urls = { thing__a: '/url.png' };
+    expect(buildSprites({ scale: 4, sprites: [zaznam({ width: undefined })] }, urls)).toEqual({});
+    expect(buildSprites({ scale: 4, sprites: [zaznam({ anchor: [1] })] }, urls)).toEqual({});
+  });
+
+  it('nesmyslný manifest vrátí prázdno, ne výjimku', () => {
+    expect(buildSprites(null, {})).toEqual({});
+    expect(buildSprites({ scale: 0, sprites: [] }, {})).toEqual({});
+    expect(buildSprites({ scale: 4, sprites: 'ne' }, {})).toEqual({});
   });
 });

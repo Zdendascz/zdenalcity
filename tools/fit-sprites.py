@@ -189,7 +189,7 @@ def trim(image: Image.Image) -> Image.Image | None:
 
 
 # Naměřené kotvy, aby je šlo zapsat do manifestu. Sbírá je `process`.
-ANCHORS: dict[str, list[int]] = {}
+ANCHORS: dict[str, dict] = {}
 
 
 def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str, bool]:
@@ -242,7 +242,11 @@ def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str,
     if write:
         OUT.mkdir(parents=True, exist_ok=True)
         resized.save(OUT / f'{building}__{variant}.png')
-        ANCHORS[f'{building}__{variant}'] = [anchor_x, target_h]
+        ANCHORS[f'{building}__{variant}'] = {
+            'width': target_w,
+            'height': target_h,
+            'anchor': [anchor_x, target_h],
+        }
 
     return (
         f'{building}__{variant}  →  {target_w}×{target_h}' + ''.join(notes),
@@ -296,10 +300,15 @@ def main() -> int:
                     'building': f'vanilla:{p.stem.rsplit("__", 1)[0]}',
                     'variant': p.stem.rsplit('__', 1)[1],
                     'file': f'{p.stem}.png',
+                    # Rozměry jsou v manifestu schválně, i když je nese i PNG:
+                    # renderer díky tomu umí kotvu spočítat dřív, než se
+                    # textura stáhne, a sprite mu při načtení nepodskočí.
+                    'width': ANCHORS[p.stem]['width'],
+                    'height': ANCHORS[p.stem]['height'],
                     # Bod spritu, který sedne na přední vrchol půdorysu, tedy
                     # na `gridToScreen(x+n, y+n)`. **Naměřený**, ne dopočítaný
                     # ze středu: podstava bývá mírně zkosená.
-                    'anchor': ANCHORS.get(p.stem, [0, 0]),
+                    'anchor': ANCHORS[p.stem]['anchor'],
                 }
                 for p in sorted(OUT.glob('*.png'))
                 if p.stem in ANCHORS

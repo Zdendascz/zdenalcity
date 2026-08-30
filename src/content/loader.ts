@@ -1,4 +1,4 @@
-import type { ContentSource, RawFile } from './registry';
+import type { ContentSource, RawFile, SpriteImage } from './registry';
 
 /**
  * Složí `ContentSource` z vanilla obsahu v repozitáři.
@@ -36,7 +36,22 @@ export function createVanillaSource(): ContentSource {
     icons[name] = iconFiles[absolute] as string;
   }
 
+  // Totéž pro sprity budov. Rozměry a kotvy k nim nese `sprites/index.json`,
+  // který vyrábí `tools/fit-sprites.py` — bez něj jsou obrázky jen soubory
+  // a renderer by nevěděl, kam je posadit.
+  const spriteFiles = import.meta.glob('../../content/vanilla/sprites/*.png', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  });
+  const spriteUrls: Record<string, string> = {};
+  for (const absolute of Object.keys(spriteFiles).sort()) {
+    const name = relativePath(absolute).slice('sprites/'.length).replace(/\.png$/, '');
+    spriteUrls[name] = spriteFiles[absolute] as string;
+  }
+
   let manifest: unknown = undefined;
+  let spriteIndex: unknown = undefined;
   let balance: unknown = undefined;
   const definitions: RawFile[] = [];
   const locales: Record<string, unknown> = {};
@@ -48,6 +63,8 @@ export function createVanillaSource(): ContentSource {
 
     if (path === 'manifest.json') {
       manifest = data;
+    } else if (path === 'sprites/index.json') {
+      spriteIndex = data;
     } else if (path === 'balance.json') {
       balance = data;
     } else if (path.startsWith('buildings/') || path.startsWith('grants/')) {
@@ -57,5 +74,55 @@ export function createVanillaSource(): ContentSource {
     }
   }
 
-  return { label: SOURCE_ROOT.replace(/\/$/, ''), manifest, balance, definitions, locales, icons };
+  return {
+    label: SOURCE_ROOT.replace(/\/$/, ''),
+    manifest,
+    balance,
+    definitions,
+    locales,
+    icons,
+    sprites: buildSprites(spriteIndex, spriteUrls),
+  };
+}
+
+/**
+ * Spáruje záznamy z manifestu s URL obrázků.
+ *
+ * Záznam bez obrázku se **zahodí potichu**: manifest se generuje ze složky,
+ * takže rozejít se může jen tak, že někdo obrázek smazal a skript nepustil —
+ * a to nemá být důvod, proč hra nenaběhne.
+ */
+export function buildSprites(
+  index: unknown,
+  urls: Record<string, string>,
+): Record<string, SpriteImage> {
+  const out: Record<string, SpriteImage> = {};
+  if (typeof index !== 'object' || index === null) return out;
+
+  const { scale, sprites } = index as { scale?: unknown; sprites?: unknown };
+  if (!Array.isArray(sprites) || typeof scale !== 'number' || scale <= 0) return out;
+
+  for (const raw of sprites) {
+    const entry = raw as Record<string, unknown>;
+    const file = entry['file'];
+    const building = entry['building'];
+    const variant = entry['variant'];
+    const anchor = entry['anchor'];
+    if (typeof file !== 'string' || typeof building !== 'string' || typeof variant !== 'string') {
+      continue;
+    }
+    const url = urls[file.replace(/\.png$/, '')];
+    if (url === undefined) continue;
+    if (!Array.isArray(anchor) || anchor.length !== 2) continue;
+    if (typeof entry['width'] !== 'number' || typeof entry['height'] !== 'number') continue;
+
+    out[`${building}|${variant}`] = {
+      url,
+      width: entry['width'],
+      height: entry['height'],
+      anchor: [Number(anchor[0]), Number(anchor[1])],
+      scale,
+    };
+  }
+  return out;
 }

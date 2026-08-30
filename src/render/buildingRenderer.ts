@@ -1,4 +1,4 @@
-import { Container, Graphics } from 'pixi.js';
+import { Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import { iconShape } from './icons';
@@ -31,6 +31,20 @@ export interface BuildingAppearance {
   iconColor?: number;
   /** Bere budova proud? Bez něj se kreslí jako odstavená. */
   consumesPower?: boolean;
+  /**
+   * Obrázek budovy, když ho obsah dodal (T70).
+   *
+   * Bez něj se kreslí kvádr jako dřív. **Ruina si obrázek nebere**: vyhořelý
+   * dům nemá vypadat jako nová škola, takže se u ní vzhled zahodí ještě dřív,
+   * než se sem dostane.
+   */
+  sprite?: {
+    readonly url: string;
+    readonly width: number;
+    readonly height: number;
+    readonly anchor: readonly [number, number];
+    readonly scale: number;
+  };
 }
 
 export type AppearanceLookup = (definitionId: string) => BuildingAppearance | undefined;
@@ -55,7 +69,7 @@ export class BuildingRenderer {
   private readonly world: ReadonlyWorldView;
   private readonly container: Container;
   private readonly appearance: AppearanceLookup;
-  private readonly views = new Map<number, Graphics>();
+  private readonly views = new Map<number, Graphics | Sprite>();
 
   constructor(world: ReadonlyWorldView, parent: Container, appearance: AppearanceLookup) {
     this.world = world;
@@ -131,14 +145,25 @@ export class BuildingRenderer {
           }
         : found;
 
+    const [width, depth] = appearance.footprint;
+
+    if (appearance.sprite) {
+      this.drawSprite(id, building.x, building.y, width, depth, appearance.sprite);
+      return;
+    }
+
     let view = this.views.get(id);
+    if (view instanceof Sprite) {
+      // Budova přišla o obrázek — třeba tím, že zchátrala. Uzel se musí
+      // vyměnit, `Sprite` polygony kreslit neumí.
+      this.remove(id);
+      view = undefined;
+    }
     if (!view) {
       view = new Graphics();
       this.container.addChild(view);
       this.views.set(id, view);
     }
-
-    const [width, depth] = appearance.footprint;
     // Výšku určuje **definice**, ne úroveň entity. Násobit obojím by od T16
     // znamenalo patnáctipatrový věžák, protože vyšší úroveň už má vyšší
     // `heightLevels` sama.
@@ -209,6 +234,59 @@ export class BuildingRenderer {
     // překrývají a ta výš stojící je dál od pozorovatele, takže patří dozadu.
     view.zIndex =
       (building.x + width + building.y + depth) * (MAX_HEIGHT + 1) + (MAX_HEIGHT - min);
+  }
+
+  /**
+   * Budova jako obrázek (T70).
+   *
+   * Kotva obrázku sedne na **přední roh půdorysu** — `gridToScreen(x+w, y+d)` —
+   * ve výšce nejvyššího rohu, tedy tam, kde by stála horní plocha kvádru.
+   * Podezdívka se nekreslí: obrázek si svůj pozemek nese sám.
+   *
+   * Řadí se **stejným výrazem jako kvádr**, jinak by se sprity s kvádry
+   * navzájem prokládaly ve špatném pořadí, dokud nejsou nakreslené všechny.
+   */
+  private drawSprite(
+    id: number,
+    x: number,
+    y: number,
+    width: number,
+    depth: number,
+    image: NonNullable<BuildingAppearance['sprite']>,
+  ): void {
+    let view = this.views.get(id);
+    if (view instanceof Graphics) {
+      this.remove(id);
+      view = undefined;
+    }
+
+    let sprite = view as Sprite | undefined;
+    if (!sprite) {
+      // Textura se dotahuje na pozadí. Do té doby je sprite prázdný, ne chybný:
+      // prázdné místo na jeden snímek je lepší než kvádr, který by pak zmizel.
+      sprite = new Sprite(Texture.EMPTY);
+      this.container.addChild(sprite);
+      this.views.set(id, sprite);
+    }
+
+    // Rozměry jdou z manifestu, ne z textury: ta nemusí být načtená a kotva
+    // spočítaná z nuly by budovu posadila do rohu obrazovky.
+    sprite.anchor.set(image.anchor[0] / image.width, image.anchor[1] / image.height);
+    sprite.scale.set(1 / image.scale);
+
+    const { min, max } = areaHeightRange(this.world.cornerHeight, x, y, width, depth);
+    const front = gridToScreen(x + width, y + depth, max);
+    sprite.position.set(front.x, front.y);
+    sprite.zIndex = (x + width + y + depth) * (MAX_HEIGHT + 1) + (MAX_HEIGHT - min);
+
+    const texture = sprite.texture;
+    if (texture === Texture.EMPTY || texture.label !== image.url) {
+      void Assets.load(image.url).then((loaded: Texture) => {
+        // Než se textura donačte, mohla budova zmizet nebo dostat jiný obrázek.
+        if (this.views.get(id) !== sprite) return;
+        sprite.texture = loaded;
+      });
+    }
   }
 
   /**
