@@ -3,6 +3,39 @@
   "scale": 4,
   "sprites": [
     {
+      "building": "vanilla:clinic",
+      "variant": "a",
+      "file": "clinic__a.png",
+      "width": 512,
+      "height": 301,
+      "anchor": [
+        254,
+        301
+      ]
+    },
+    {
+      "building": "vanilla:clinic",
+      "variant": "b",
+      "file": "clinic__b.png",
+      "width": 512,
+      "height": 294,
+      "anchor": [
+        257,
+        294
+      ]
+    },
+    {
+      "building": "vanilla:clinic",
+      "variant": "c",
+      "file": "clinic__c.png",
+      "width": 512,
+      "height": 277,
+      "anchor": [
+        271,
+        277
+      ]
+    },
+    {
       "building": "vanilla:fire_station",
       "variant": "a",
       "file": "fire_station__a.png",
