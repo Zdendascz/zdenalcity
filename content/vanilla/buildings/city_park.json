@@ -1,0 +1,40 @@
+{
+  "id": "vanilla:city_park",
+  "type": "building",
+  "category": "service",
+  "menu": "parks",
+  "name": "building.city_park.name",
+  "description": "building.city_park.desc",
+  "footprint": [
+    3,
+    3
+  ],
+  "construction": {
+    "cost": 1300,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 150
+  },
+  "jobs": {
+    "capacity": 8
+  },
+  "service": {
+    "class": "parks",
+    "radius": 18,
+    "strength": 165
+  },
+  "power": {
+    "consumption": 120
+  },
+  "graphics": {
+    "color": "#4f8f56",
+    "heightLevels": 1,
+    "icon": "tree"
+  }
+}

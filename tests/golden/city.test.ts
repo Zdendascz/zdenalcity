@@ -164,6 +164,12 @@ function findSite(world: WorldState): { x: number; y: number } {
  * ceny půdy, s přebujelým průmyslem. Starší zápisy v tomhle dokumentu, které
  * mluví o „61 budovách a 192 obyvatelích", popisují právě ten stav.
  */
+/*
+ * Posun po zvětšení uhelné elektrárny na 5 × 5 a čtyři patra: kasa 22 831 →
+ * 21 049 (dražší stavba) a hash vrstev (větší půdorys zabere víc dlaždic).
+ * Budov, obyvatel i práce beze změny — výroba, znečištění ani zaměstnanost
+ * se **nehýbaly**, jen velikost.
+ */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
     const content = await vanilla();

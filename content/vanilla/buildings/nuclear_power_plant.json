@@ -1,38 +1,39 @@
 {
-  "id": "vanilla:coal_power_plant",
+  "id": "vanilla:nuclear_power_plant",
   "type": "building",
   "category": "utility",
   "menu": "power",
-  "name": "building.coal_power_plant.name",
-  "description": "building.coal_power_plant.desc",
+  "name": "building.nuclear_power_plant.name",
+  "description": "building.nuclear_power_plant.desc",
   "footprint": [
-    5,
-    5
+    6,
+    6
   ],
   "construction": {
-    "cost": 8000,
+    "cost": 48000,
     "requiresRoad": true,
     "requiresPower": false,
+    "nearWater": true,
     "allowedTerrain": [
       0,
       2
     ]
   },
   "economy": {
-    "upkeep": 240
+    "upkeep": 1500
   },
   "jobs": {
-    "capacity": 20
+    "capacity": 60
   },
   "power": {
-    "production": 24000
+    "production": 120000
   },
   "environment": {
-    "pollution": 10
+    "pollution": 2
   },
   "graphics": {
-    "color": "#5a5a62",
-    "heightLevels": 4,
+    "color": "#8f9aa2",
+    "heightLevels": 3,
     "icon": "bolt"
   }
 }

@@ -1,0 +1,32 @@
+{
+  "id": "vanilla:wind_turbine",
+  "type": "building",
+  "category": "utility",
+  "menu": "power",
+  "name": "building.wind_turbine.name",
+  "description": "building.wind_turbine.desc",
+  "footprint": [
+    1,
+    1
+  ],
+  "construction": {
+    "cost": 900,
+    "requiresRoad": false,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 30
+  },
+  "power": {
+    "production": 700
+  },
+  "graphics": {
+    "color": "#e4e8ec",
+    "heightLevels": 7,
+    "icon": "bolt"
+  }
+}

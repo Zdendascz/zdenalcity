@@ -163,7 +163,7 @@ describe('ničení dlaždice', () => {
     world.economy.funds = 1000000;
     for (let x = 19; x <= 24; x++) buildRoad(world, x, 24, ROAD.street, content.getBalance());
     expect(
-      placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 20, content.getBalance()).ok,
+      placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 19, content.getBalance()).ok,
     ).toBe(true);
 
     const losses = noLosses();

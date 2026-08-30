@@ -454,5 +454,15 @@
   "ui.disaster.turnOn": "Zapnout katastrofy",
   "ui.disaster.turnOff": "Vypnout katastrofy",
   "ui.disaster.turnedOn": "Katastrofy zapnuty.",
-  "ui.disaster.turnedOff": "Katastrofy vypnuty. Ručně spustit jdou dál."
+  "ui.disaster.turnedOff": "Katastrofy vypnuty. Ručně spustit jdou dál.",
+  "building.gas_power_plant.name": "Plynová elektrárna",
+  "building.gas_power_plant.desc": "Levnější na postavení, dražší na provoz. Čadí míň než uhlí.",
+  "building.nuclear_power_plant.name": "Jaderná elektrárna",
+  "building.nuclear_power_plant.desc": "Uživí celé město a skoro neznečišťuje. Musí stát u vody kvůli chlazení.",
+  "building.wind_turbine.name": "Větrná elektrárna",
+  "building.wind_turbine.desc": "Jedna dlaždice, málo proudu, žádný komín. Postaví se i mimo silnici.",
+  "building.plaza.name": "Náměstíčko",
+  "building.plaza.desc": "Dlážděná plocha s lavičkami. Nejlevnější, co zvedne cenu půdy.",
+  "building.city_park.name": "Městský park",
+  "building.city_park.desc": "Největší park ve městě. Zvedá cenu půdy v širokém okolí."
 }

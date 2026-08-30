@@ -529,6 +529,16 @@ ale i tak z osmdesátých let: betonové obruby, kovové prolézačky, mlatové 
 | **b** | A small paved pocket square: concrete slab paving in a simple pattern, a low circular concrete fountain basin in the middle, two benches, four clipped trees, a cylindrical poster column. |
 | **c** | A small playground: a painted steel climbing frame and a metal slide, a rectangular concrete sandpit, a spring rocker, a bench, compacted sand surfacing, a low fence. |
 
+#### `plaza` — Náměstíčko · 1 × 1, 1 patro
+
+*Nejlevnější, co zvedne cenu půdy. Dlažba, ne zeleň.*
+
+| | prompt |
+|---|---|
+| **a** | A small paved square: concrete slab paving in a simple two-tone pattern, two slatted benches on cast-iron legs, a cylindrical poster column, a single lamp post, a low kerb. |
+| **b** | A small square with a raised concrete planter in the middle holding a clipped tree, paving all around, one bench, a drinking fountain, a waste bin. |
+| **c** | A small paved square with a shallow circular concrete fountain basin, four benches facing it, terrazzo paving, two lamp posts. |
+
 #### `park_large` — Velký park · 2 × 2, 1 patro
 
 *Zvedá cenu půdy v širokém okolí a nestojí skoro nic.*
@@ -538,6 +548,16 @@ ale i tak z osmdesátých let: betonové obruby, kovové prolézačky, mlatové 
 | **a** | A city park: curving compacted-gravel paths through lawn, several mature trees, an open hexagonal bandstand pavilion with a shallow roof, benches, a flower bed edged with concrete kerbs. |
 | **b** | A sports park: a fenced hard court with steel goals, a compacted running loop around lawn, a painted steel exercise frame, a small changing hut, benches and two trees. |
 | **c** | A landscaped park: an irregular pond with a concrete edge and reeds, a small steel footbridge, birch groups and meadow planting, a winding path, a sculpture plinth with an abstract concrete form. |
+
+#### `city_park` — Městský park · 3 × 3, 1 patro
+
+*Největší park ve městě. Zvedá cenu půdy v širokém okolí.*
+
+| | prompt |
+|---|---|
+| **a** | A large city park: compacted gravel paths curving through lawn, mature broadleaf trees, an open hexagonal bandstand with a shallow roof, flower beds edged with concrete kerbs, benches and lamp posts. |
+| **b** | A large park with a pond: an irregular water basin with a concrete edge and reeds, a small steel footbridge, birch groups and meadow planting, a winding path, a few benches. |
+| **c** | A large park with a play and sports area: a painted steel climbing frame, a fenced hard court with goals, a compacted running loop around lawn, mature trees along the edge, benches. |
 
 ---
 
@@ -611,15 +631,45 @@ ale i tak z osmdesátých let: betonové obruby, kovové prolézačky, mlatové 
 
 ### Energie a voda
 
-#### `coal_power_plant` — Uhelná elektrárna · 4 × 4, 2 patra
+#### `coal_power_plant` — Uhelná elektrárna · 5 × 5, 4 patra
 
-*Největší stavba ve hře. Zabírá šestnáct dlaždic.*
+*Páteřní zdroj. Levný provoz, hodně špíny, zabírá dvacet pět dlaždic.*
 
 | | prompt |
 |---|---|
 | **a** | A standard coal power station: a steel-clad turbine hall, two tall banded chimneys in red and white, a coal yard with a conveyor bridge and a bucket-wheel loader, a lattice switchyard with pylons. |
 | **b** | An older brick coal plant: a tall brick boiler hall with rows of tall industrial windows, one massive round brick chimney, a coal yard with a rail siding and hoppers, soot-stained masonry. |
 | **c** | A coal plant with two hyperbolic concrete cooling towers, a monolithic concrete turbine hall between them, a covered coal store, a single tall banded chimney, a fenced switchyard. |
+
+#### `gas_power_plant` — Plynová elektrárna · 3 × 3, 3 patra
+
+*Kompaktní a čistší než uhlí, zato drahá na provoz.*
+
+| | prompt |
+|---|---|
+| **a** | A compact gas-fired power station: a steel-clad turbine hall, two horizontal cylindrical gas tanks on concrete cradles beside it, a slender steel stack with a red band, exposed pipework and valve gear, a fenced compound. |
+| **b** | A brick gas plant: a pitched-roof engine hall with tall industrial windows, one round brick chimney, a spherical gas holder on a steel frame, a gravel yard with pipe runs. |
+| **c** | An individually designed gas plant in exposed concrete: a low monolithic hall with a glazed control room, a vertical stack integrated into the concrete mass, stainless pipework, a transformer bay behind a mesh fence. |
+
+#### `nuclear_power_plant` — Jaderná elektrárna · 6 × 6, 3 patra
+
+*Největší stavba ve hře. Uživí město, skoro nečadí, musí stát u vody.*
+
+| | prompt |
+|---|---|
+| **a** | A nuclear power station: two hemispherical concrete reactor containment domes, a long steel-clad turbine hall between them, a lattice switchyard with pylons, a water intake channel at the plot edge, a fenced perimeter. |
+| **b** | A nuclear plant with two tall hyperbolic concrete cooling towers venting white steam, a monolithic reactor block with a flat roof, a covered pipe bridge to the water, a guarded gatehouse. |
+| **c** | An individually designed nuclear plant: one squat cylindrical containment building clad in ribbed concrete, a wide low turbine hall with a saw-tooth roof, banks of transformers, a canal along one edge of the plot. |
+
+#### `wind_turbine` — Větrná elektrárna · 1 × 1, 7 pater
+
+*Jedna dlaždice, ale vysoká. Drobek proudu bez komína a bez silnice.*
+
+| | prompt |
+|---|---|
+| **a** | A single tall wind turbine on a small grassed plot: a slender white tapered tower on a square concrete foundation, a nacelle and three long blades, a low mesh fence, a gravel service path. |
+| **b** | A lattice-mast wind turbine: an open steel truss tower with guy wires, a boxy nacelle and three blades, a small grey equipment cabinet at the base, a compacted gravel pad. |
+| **c** | A concrete-tower wind turbine: a thick tapered concrete shaft with a service door, three blades, a transformer kiosk beside the base, mown grass and a low kerb around the pad. |
 
 #### `water_works` — Vodárna · 3 × 3, 2 patra
 

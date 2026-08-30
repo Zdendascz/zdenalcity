@@ -1,0 +1,40 @@
+{
+  "id": "vanilla:plaza",
+  "type": "building",
+  "category": "service",
+  "menu": "parks",
+  "name": "building.plaza.name",
+  "description": "building.plaza.desc",
+  "footprint": [
+    1,
+    1
+  ],
+  "construction": {
+    "cost": 220,
+    "requiresRoad": true,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2
+    ]
+  },
+  "economy": {
+    "upkeep": 25
+  },
+  "jobs": {
+    "capacity": 1
+  },
+  "service": {
+    "class": "parks",
+    "radius": 8,
+    "strength": 70
+  },
+  "power": {
+    "consumption": 40
+  },
+  "graphics": {
+    "color": "#a8a294",
+    "heightLevels": 1,
+    "icon": "tree"
+  }
+}

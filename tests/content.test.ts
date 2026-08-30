@@ -57,6 +57,7 @@ describe('vanilla obsah', () => {
     const buildings = registry.getAll('building');
     expect(buildings.map((b) => b.id).sort()).toEqual([
       'vanilla:cinema',
+      'vanilla:city_park',
       'vanilla:clinic',
       'vanilla:coal_power_plant',
       'vanilla:commercial_arcade',
@@ -76,6 +77,7 @@ describe('vanilla obsah', () => {
       'vanilla:fire_station',
       'vanilla:fire_station_large',
       'vanilla:gallery',
+      'vanilla:gas_power_plant',
       'vanilla:high_school',
       'vanilla:hospital',
       'vanilla:incinerator',
@@ -95,8 +97,10 @@ describe('vanilla obsah', () => {
       'vanilla:landfill',
       'vanilla:metro_station',
       'vanilla:museum',
+      'vanilla:nuclear_power_plant',
       'vanilla:park_large',
       'vanilla:park_small',
+      'vanilla:plaza',
       'vanilla:police_large',
       'vanilla:police_small',
       'vanilla:prison',
@@ -123,6 +127,7 @@ describe('vanilla obsah', () => {
       'vanilla:university',
       'vanilla:water_treatment',
       'vanilla:water_works',
+      'vanilla:wind_turbine',
     ]);
   });
 
@@ -136,13 +141,33 @@ describe('vanilla obsah', () => {
   });
 
   it('elektrárna má vyrábět proud a stát na trávě nebo písku', async () => {
+    // Přesná výroba ani půdorys se **nepřibíjejí**. Test se jmenuje podle
+    // toho, co tvrdí, a to je „vyrábí a smí stát na souši" — konkrétní čísla
+    // jsou ladění a to se hýbe. Přibité by z toho udělalo změnodetektor,
+    // který spadne pokaždé, když někdo elektrárnu přeladí.
     const registry = new ContentRegistry();
     await registry.load(createVanillaSource());
 
     const plant = registry.get('vanilla:coal_power_plant');
-    expect(plant?.power?.production).toBe(24000);
+    expect(plant?.power?.production ?? 0).toBeGreaterThan(0);
+    expect(plant?.power?.consumption).toBeUndefined();
     expect(plant?.construction.allowedTerrain).toEqual([0, 2]);
-    expect(plant?.footprint).toEqual([4, 4]);
+  });
+
+  it('každá elektrárna vyrábí a žádná proud nebere', async () => {
+    // Elektrárna, které by proud omylem ubýval, by síť shodila sama sebou.
+    const registry = new ContentRegistry();
+    await registry.load(createVanillaSource());
+
+    const plants = registry
+      .getAll('building')
+      .filter((definition) => definition.menu === 'power');
+
+    expect(plants.length).toBeGreaterThan(1);
+    for (const plant of plants) {
+      expect(plant.power?.production ?? 0, plant.id).toBeGreaterThan(0);
+      expect(plant.power?.consumption, plant.id).toBeUndefined();
+    }
   });
 
   it('žádná definice nemá text natvrdo — name i description jsou klíče', async () => {

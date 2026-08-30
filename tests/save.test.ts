@@ -65,7 +65,9 @@ async function builtCity(seed = 483928492): Promise<{ world: WorldState; content
   for (let x = 22; x <= 40; x++) zoneArea(world, x, 41, 1, 1, ZONE.residential);
   zoneArea(world, 22, 37, 12, 2, ZONE.industrial);
   for (let x = 22; x <= 40; x++) buildRoad(world, x, 39);
-  placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 41);
+  // Vlevo od zóny: elektrárna je 5×5 a na (20, 41) by ukrojila tři zónované
+  // dlaždice, takže by testovací město záviselo na jejím půdorysu.
+  placeDefinition(world, content, 'vanilla:coal_power_plant', 15, 41);
   setTaxRate(world, ZONE.residential, 9);
   // Potrubí pod celou hlavní ulicí. Od verze 5 je vrstva `pipe` v savu, takže
   // ji testovací město musí mít doopravdy položenou, ne jen předstíranou.

@@ -454,5 +454,15 @@
   "ui.disaster.turnOn": "Turn disasters on",
   "ui.disaster.turnOff": "Turn disasters off",
   "ui.disaster.turnedOn": "Disasters on.",
-  "ui.disaster.turnedOff": "Disasters off. Triggering them by hand still works."
+  "ui.disaster.turnedOff": "Disasters off. Triggering them by hand still works.",
+  "building.gas_power_plant.name": "Gas power plant",
+  "building.gas_power_plant.desc": "Cheaper to build, dearer to run. Smokes less than coal.",
+  "building.nuclear_power_plant.name": "Nuclear power plant",
+  "building.nuclear_power_plant.desc": "Feeds the whole city and barely pollutes. Must stand by water for cooling.",
+  "building.wind_turbine.name": "Wind turbine",
+  "building.wind_turbine.desc": "One tile, little power, no chimney. Needs no road.",
+  "building.plaza.name": "Paved square",
+  "building.plaza.desc": "Paving and benches. The cheapest thing that lifts land value.",
+  "building.city_park.name": "City park",
+  "building.city_park.desc": "The largest park in town. Lifts land value over a wide area."
 }

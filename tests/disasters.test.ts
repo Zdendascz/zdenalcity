@@ -572,7 +572,7 @@ describe('společné operace', () => {
     // Elektrárna je 4×4 a chce silnici u půdorysu: ten sahá 20–23, ulice pod ním.
     for (let x = 19; x <= 24; x++) buildRoad(world, x, 24, ROAD.street, content.getBalance());
     expect(
-      placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 20, content.getBalance()).ok,
+      placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 19, content.getBalance()).ok,
     ).toBe(true);
     expect(world.buildings.size).toBe(1);
 
@@ -586,7 +586,7 @@ describe('společné operace', () => {
     const world = createWorld(1, content.getBalance().economy);
     world.economy.funds = 1000000;
     for (let x = 19; x <= 24; x++) buildRoad(world, x, 24, ROAD.street, content.getBalance());
-    placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 20, content.getBalance());
+    placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 19, content.getBalance());
     const building = [...world.buildings.values()][0];
     if (!building) throw new Error('budova nevznikla');
     building.population = 100;

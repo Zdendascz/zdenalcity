@@ -512,10 +512,10 @@ describe('zaplavená dlaždice nefunguje', () => {
     const wet = createWorld(1, balance.economy);
     for (const world of [dry, wet]) {
       world.economy.funds = 1000000;
-      // Elektrárna je 4×4 (20–23); ulice vede pod ní a slouží jako vedení.
+      // Elektrárna je 5×5 (19–23); ulice vede pod ní a slouží jako vedení.
       for (let x = 10; x < 30; x++) buildRoad(world, x, 24, ROAD.street, balance);
       expect(
-        placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 20, balance).ok,
+        placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 19, balance).ok,
       ).toBe(true);
       world.powerNetworkDirty = true;
     }

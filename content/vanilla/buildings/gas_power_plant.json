@@ -1,16 +1,16 @@
 {
-  "id": "vanilla:coal_power_plant",
+  "id": "vanilla:gas_power_plant",
   "type": "building",
   "category": "utility",
   "menu": "power",
-  "name": "building.coal_power_plant.name",
-  "description": "building.coal_power_plant.desc",
+  "name": "building.gas_power_plant.name",
+  "description": "building.gas_power_plant.desc",
   "footprint": [
-    5,
-    5
+    3,
+    3
   ],
   "construction": {
-    "cost": 8000,
+    "cost": 4500,
     "requiresRoad": true,
     "requiresPower": false,
     "allowedTerrain": [
@@ -19,20 +19,20 @@
     ]
   },
   "economy": {
-    "upkeep": 240
+    "upkeep": 420
   },
   "jobs": {
-    "capacity": 20
+    "capacity": 12
   },
   "power": {
-    "production": 24000
+    "production": 13000
   },
   "environment": {
-    "pollution": 10
+    "pollution": 4
   },
   "graphics": {
-    "color": "#5a5a62",
-    "heightLevels": 4,
+    "color": "#7a8a94",
+    "heightLevels": 3,
     "icon": "bolt"
   }
 }

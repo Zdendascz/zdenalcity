@@ -225,6 +225,7 @@ def main() -> int:
             return 1
 
     RAW.mkdir(parents=True, exist_ok=True)
+    celkem = sum(len(v) for name, v in prompts.items() if wanted is None or name in wanted)
     todo = [
         (name, variant, prompt)
         for name in sorted(prompts)
@@ -246,7 +247,7 @@ def main() -> int:
     # reference výchozí, stačilo by na ni při dávce zapomenout a osmdesát
     # obrázků by vyšlo špatně — což se málem stalo.
     reference = REFERENCE.read_bytes() if ('--reference' in argv and REFERENCE.exists()) else None
-    print(f'Chybí {len(todo)} z 96.')
+    print(f'Chybí {len(todo)} z {celkem}.')
     print(f'Reference: {"ano, " + REFERENCE.name + " (--reference)" if reference else "ne, styl nese prompt"}')
 
     batch = todo if (everything or wanted) else todo[:DEFAULT_BATCH]

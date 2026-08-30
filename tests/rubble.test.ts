@@ -331,7 +331,7 @@ describe('oheň a trosky', () => {
     const balance = content.getBalance();
 
     for (let x = 19; x <= 24; x++) buildRoad(world, x, 24, ROAD.street, balance);
-    expect(placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 20, balance).ok).toBe(
+    expect(placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 19, balance).ok).toBe(
       true,
     );
 
