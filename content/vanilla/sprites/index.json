@@ -3,6 +3,39 @@
   "scale": 4,
   "sprites": [
     {
+      "building": "vanilla:cinema",
+      "variant": "a",
+      "file": "cinema__a.png",
+      "width": 512,
+      "height": 456,
+      "anchor": [
+        256,
+        456
+      ]
+    },
+    {
+      "building": "vanilla:cinema",
+      "variant": "b",
+      "file": "cinema__b.png",
+      "width": 512,
+      "height": 433,
+      "anchor": [
+        256,
+        433
+      ]
+    },
+    {
+      "building": "vanilla:cinema",
+      "variant": "c",
+      "file": "cinema__c.png",
+      "width": 512,
+      "height": 360,
+      "anchor": [
+        261,
+        360
+      ]
+    },
+    {
       "building": "vanilla:clinic",
       "variant": "a",
       "file": "clinic__a.png",

@@ -33,6 +33,7 @@ import base64
 import json
 import os
 import re
+import ssl
 import sys
 import time
 import urllib.error
@@ -57,6 +58,31 @@ DEFAULT_BATCH = 3
 # dvojnásobně, protože limity se uvolňují po vteřinách, ne po milisekundách.
 RETRIES = 4
 BACKOFF = 8.0
+
+
+def tls_context() -> ssl.SSLContext:
+    """Kontext pro HTTPS.
+
+    Na tomhle stroji má windowsové úložiště certifikátů vadný záznam a Python
+    na něm při načítání spadne (`ASN1 nested asn1 error`). Bere se proto seznam
+    z `certifi`, když je k dispozici.
+
+    **Ověřování se nevypíná.** Přes tohle spojení jde API klíč; neověřené
+    spojení by ho vystavilo komukoli po cestě. Když certifikáty nejsou,
+    skript radši skončí, než by posílal klíč naslepo.
+    """
+    try:
+        return ssl.create_default_context()
+    except ssl.SSLError:
+        pass
+    try:
+        import certifi
+    except ImportError:
+        raise SystemExit(
+            'Úložiště certifikátů je poškozené a `certifi` chybí. '
+            'Nainstaluj ho: pip install certifi'
+        )
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 def read_spec() -> tuple[str, dict[str, dict[str, str]]]:
@@ -146,7 +172,7 @@ def request(key: str, prompt: str, model: str, reference: bytes | None) -> bytes
     delay = BACKOFF
     for attempt in range(RETRIES):
         try:
-            with urllib.request.urlopen(req, timeout=300) as response:
+            with urllib.request.urlopen(req, timeout=300, context=TLS) as response:
                 payload = json.loads(response.read())
             return base64.b64decode(payload['data'][0]['b64_json'])
         except urllib.error.HTTPError as error:
@@ -159,6 +185,11 @@ def request(key: str, prompt: str, model: str, reference: bytes | None) -> bytes
             time.sleep(delay)
             delay *= 2
     raise SystemExit('nepodařilo se ani po opakování')
+
+
+# Jednou za běh, ne při každém požadavku — načítání seznamu certifikátů není
+# zadarmo a mezi obrázky se nemění.
+TLS = tls_context()
 
 
 def main() -> int:
@@ -195,7 +226,11 @@ def main() -> int:
         print('Není co generovat — všechno už v raw/ leží.')
         return 0
 
-    reference = REFERENCE.read_bytes() if REFERENCE.exists() else None
+    # `--no-reference` je na porovnání. Reference měla styl držet, jenže přes
+    # `images/edits` ho spíš stahuje k tmavému polorealistickému renderu —
+    # naměřeno na kině. Styl proto nese hlavička promptu a reference je volba.
+    use_reference = '--no-reference' not in argv
+    reference = REFERENCE.read_bytes() if (use_reference and REFERENCE.exists()) else None
     print(f'Chybí {len(todo)} z 96.')
     print(f'Reference: {"ano, " + REFERENCE.name if reference else "ŽÁDNÁ — sada se rozejde ve stylu"}')
 

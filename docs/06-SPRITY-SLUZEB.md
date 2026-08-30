@@ -170,8 +170,20 @@ Tuhle část **připoj ke každé variantě**. K tomu vždycky přilož svůj re
 design — ten nese styl, text nese obsah.
 
 ```
-Isometric city-builder building asset, seen from the south-east, matching the
-attached reference in style, palette and line weight.
+Isometric city-builder building asset, seen from the south-east.
+
+Rendering style: a soft-shaded 3D render, not a drawing. Believable materials
+— rough render, brick, concrete, painted steel, glass with a faint warm
+interior glow. Smooth gradients across surfaces and gentle ambient occlusion
+where forms meet. Bright, warm, even daylight.
+
+NOT cartoon, NOT cel-shaded, NOT toon-shaded. No dark outline or contour line
+around any object or edge. No flat single-colour fills, no posterisation, no
+comic look. Equally, no photorealism, no film grain, no vignette, no colour
+grading, no lens effects, no bloom.
+
+The plot is populated, not bare: low hedges and shrubs in concrete planters,
+a bench, handrails at the steps, a lamp, paving laid in a visible pattern.
 
 Subject period and place: Czechoslovakia in the 1980s. Late-socialist public
 architecture — flat roofs with parapets, steel window frames, panel or
@@ -179,12 +191,16 @@ rendered facades, concrete planters, terrazzo paving. Colours are slightly
 more saturated than reality, but the forms stay period-correct.
 
 The building stands on its own square plot. The plot is a perfect isometric
-diamond and its four corners touch the edges of the image — nothing except the
-roof may stick out past it, and nothing may be cut off.
+diamond with four SHARP corners — not rounded, not a square, not a rectangle —
+and those four corners touch the edges of the image. Nothing except the roof
+may stick out past it, and nothing may be cut off.
 
 Lighting is fixed: sunlight from the left. The left-facing wall is clearly
-brighter than the right-facing wall; the roof is the brightest surface. Shadows
-fall to the right and stay inside the plot.
+brighter than the right-facing wall; the roof is the brightest surface.
+
+Shadows are short and soft. NO CAST SHADOW MAY CROSS THE EDGE OF THE PLOT —
+the area outside the diamond is completely empty. No shadow from masts, poles
+or trees reaching past the paving.
 
 Transparent background, no terrain, no grass or road outside the plot, no
 people, no political symbols, no flags, no logos, no watermark.
