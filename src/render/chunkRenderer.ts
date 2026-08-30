@@ -28,6 +28,7 @@ import {
   ROAD_WIDTHS,
   shade,
   TERRAIN_COLORS,
+  TERRAIN_VARIATION,
   TILE_EDGE_SHADE,
   UNDERGROUND_BUILDING_ALPHA,
   UNDERGROUND_BUILDING_COLOR,
@@ -40,7 +41,15 @@ import {
   ZONE_COLOR_BY_VALUE,
   ZONE_OVERLAY_ALPHA,
 } from './palette';
-import { gridToScreen, LEVEL_H, slopeLight, TILE_H, TILE_W, tileQuad } from './projection';
+import {
+  gridToScreen,
+  LEVEL_H,
+  slopeLight,
+  TILE_H,
+  TILE_W,
+  tileQuad,
+  tileVariation,
+} from './projection';
 import { iconShape } from './icons';
 import { isRubbleMarkOrigin } from '@/sim/disasters/rubble';
 import { roadMask, roadPolygons } from './roads';
@@ -345,7 +354,9 @@ export class ChunkRenderer {
     const flat = TERRAIN_COLORS[terrain] ?? TERRAIN_COLORS[0];
     // Sklon se promítne do jasu, jinak by svah vypadal jako rovina (§7).
     // V podzemním pohledu se terén ztlumí, ať nepřekřičí potrubí (§8).
-    const lit = shade(flat, slopeLight(corners));
+    // Sklon i variace jdou do jednoho násobku, aby se barva počítala jednou.
+    const variation = tileVariation(x, y, TERRAIN_VARIATION[terrain] ?? 0);
+    const lit = shade(flat, slopeLight(corners) * variation);
     const color = underground ? shade(lit, UNDERGROUND_TERRAIN_SHADE) : lit;
 
     // Vše ostatní na dlaždici — vozovka i překryvy — se kreslí do téhle plochy,

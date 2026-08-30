@@ -24,6 +24,7 @@ import {
   tileQuad,
   TILE_H,
   TILE_W,
+  tileVariation,
 } from '@/render/projection';
 import {
   HAPPINESS_CLEAN_AT,
@@ -659,5 +660,71 @@ describe('podezdívka kopíruje terén', () => {
     const flat = skirtFaces(0.12, 0.12, 0.76, 0.76, 3, () => 3);
     expect(faces.left.slice(0, 4)).toEqual(flat.left.slice(0, 4));
     expect(faces.right.slice(0, 4)).toEqual(flat.right.slice(0, 4));
+  });
+});
+
+/**
+ * Variace dlaždic (A z rozvahy o terénu).
+ *
+ * Terén je šest plných barev a na velké louce vypadá jako plast. Variace mu
+ * dá zrno bez jediného obrázku. Testuje se to, co jde rozbít potichu:
+ * nedeterminismus (terén by se při každém zapečení chunku přebarvil) a
+ * příliš velká amplituda (z trávy by byl šum).
+ */
+describe('variace dlaždic', () => {
+  it('je deterministická — stejná dlaždice dá vždy totéž', () => {
+    // Kdyby ne, přebarvil by se terén při každém přepečení chunku a mapa by
+    // se pod rukama míhala. Chunky se pečou i při pouhém přepnutí vrstvy.
+    for (const [x, y] of [[0, 0], [7, 13], [63, 64], [127, 1]] as const) {
+      expect(tileVariation(x, y, 0.08)).toBe(tileVariation(x, y, 0.08));
+    }
+  });
+
+  it('drží se v zadané amplitudě', () => {
+    let low = 1;
+    let high = 1;
+    for (let y = 0; y < 128; y++) {
+      for (let x = 0; x < 128; x++) {
+        const value = tileVariation(x, y, 0.08);
+        low = Math.min(low, value);
+        high = Math.max(high, value);
+      }
+    }
+    expect(low).toBeGreaterThanOrEqual(1 - 0.08);
+    expect(high).toBeLessThanOrEqual(1 + 0.08);
+  });
+
+  it('nulová amplituda znamená žádnou změnu', () => {
+    // Voda i skála mají amplitudu skoro nulovou; přesná nula musí vracet
+    // přesnou jedničku, aby se barva nepohnula ani o jednotku.
+    expect(tileVariation(5, 9, 0)).toBe(1);
+  });
+
+  it('sousední dlaždice se liší, ale ne o celou amplitudu', () => {
+    // Sůl a pepř by při oddálení splynuly v šum. Hrubá oktáva drží sousedy
+    // blízko sebe, takže vznikají skvrny přes několik dlaždic.
+    const rozdily: number[] = [];
+    for (let y = 10; y < 40; y++) {
+      for (let x = 10; x < 40; x++) {
+        rozdily.push(Math.abs(tileVariation(x, y, 0.08) - tileVariation(x + 1, y, 0.08)));
+      }
+    }
+    const prumer = rozdily.reduce((a, b) => a + b, 0) / rozdily.length;
+    expect(prumer).toBeGreaterThan(0);
+    expect(prumer).toBeLessThan(0.08);
+  });
+
+  it('rozprostře se kolem jedničky, ne k jednomu kraji', () => {
+    // Kdyby hash táhl k jedné straně, celá mapa by ztmavla nebo zesvětlala
+    // proti barvě z palety — a to už není variace, ale jiná barva.
+    let sum = 0;
+    let count = 0;
+    for (let y = 0; y < 128; y++) {
+      for (let x = 0; x < 128; x++) {
+        sum += tileVariation(x, y, 0.08);
+        count++;
+      }
+    }
+    expect(Math.abs(sum / count - 1)).toBeLessThan(0.006);
   });
 });

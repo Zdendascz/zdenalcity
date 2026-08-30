@@ -36,6 +36,39 @@
       ]
     },
     {
+      "building": "vanilla:city_park",
+      "variant": "a",
+      "file": "city_park__a.png",
+      "width": 768,
+      "height": 452,
+      "anchor": [
+        377,
+        452
+      ]
+    },
+    {
+      "building": "vanilla:city_park",
+      "variant": "b",
+      "file": "city_park__b.png",
+      "width": 768,
+      "height": 441,
+      "anchor": [
+        381,
+        441
+      ]
+    },
+    {
+      "building": "vanilla:city_park",
+      "variant": "c",
+      "file": "city_park__c.png",
+      "width": 768,
+      "height": 416,
+      "anchor": [
+        383,
+        416
+      ]
+    },
+    {
       "building": "vanilla:clinic",
       "variant": "a",
       "file": "clinic__a.png",
@@ -72,33 +105,33 @@
       "building": "vanilla:coal_power_plant",
       "variant": "a",
       "file": "coal_power_plant__a.png",
-      "width": 1024,
-      "height": 751,
+      "width": 1280,
+      "height": 808,
       "anchor": [
-        523,
-        751
+        594,
+        808
       ]
     },
     {
       "building": "vanilla:coal_power_plant",
       "variant": "b",
       "file": "coal_power_plant__b.png",
-      "width": 1024,
-      "height": 826,
+      "width": 1280,
+      "height": 900,
       "anchor": [
-        507,
-        826
+        617,
+        900
       ]
     },
     {
       "building": "vanilla:coal_power_plant",
       "variant": "c",
       "file": "coal_power_plant__c.png",
-      "width": 1024,
-      "height": 681,
+      "width": 1280,
+      "height": 708,
       "anchor": [
-        484,
-        681
+        603,
+        708
       ]
     },
     {
@@ -231,6 +264,39 @@
       "anchor": [
         125,
         163
+      ]
+    },
+    {
+      "building": "vanilla:gas_power_plant",
+      "variant": "a",
+      "file": "gas_power_plant__a.png",
+      "width": 768,
+      "height": 511,
+      "anchor": [
+        384,
+        511
+      ]
+    },
+    {
+      "building": "vanilla:gas_power_plant",
+      "variant": "b",
+      "file": "gas_power_plant__b.png",
+      "width": 768,
+      "height": 469,
+      "anchor": [
+        378,
+        469
+      ]
+    },
+    {
+      "building": "vanilla:gas_power_plant",
+      "variant": "c",
+      "file": "gas_power_plant__c.png",
+      "width": 768,
+      "height": 549,
+      "anchor": [
+        375,
+        549
       ]
     },
     {
@@ -432,6 +498,39 @@
       ]
     },
     {
+      "building": "vanilla:nuclear_power_plant",
+      "variant": "a",
+      "file": "nuclear_power_plant__a.png",
+      "width": 1536,
+      "height": 1003,
+      "anchor": [
+        753,
+        1003
+      ]
+    },
+    {
+      "building": "vanilla:nuclear_power_plant",
+      "variant": "b",
+      "file": "nuclear_power_plant__b.png",
+      "width": 1536,
+      "height": 995,
+      "anchor": [
+        773,
+        995
+      ]
+    },
+    {
+      "building": "vanilla:nuclear_power_plant",
+      "variant": "c",
+      "file": "nuclear_power_plant__c.png",
+      "width": 1536,
+      "height": 812,
+      "anchor": [
+        767,
+        812
+      ]
+    },
+    {
       "building": "vanilla:park_large",
       "variant": "a",
       "file": "park_large__a.png",
@@ -495,6 +594,39 @@
       "anchor": [
         128,
         135
+      ]
+    },
+    {
+      "building": "vanilla:plaza",
+      "variant": "a",
+      "file": "plaza__a.png",
+      "width": 256,
+      "height": 143,
+      "anchor": [
+        128,
+        143
+      ]
+    },
+    {
+      "building": "vanilla:plaza",
+      "variant": "b",
+      "file": "plaza__b.png",
+      "width": 256,
+      "height": 131,
+      "anchor": [
+        124,
+        131
+      ]
+    },
+    {
+      "building": "vanilla:plaza",
+      "variant": "c",
+      "file": "plaza__c.png",
+      "width": 256,
+      "height": 129,
+      "anchor": [
+        128,
+        129
       ]
     },
     {
@@ -1056,6 +1188,39 @@
       "anchor": [
         399,
         460
+      ]
+    },
+    {
+      "building": "vanilla:wind_turbine",
+      "variant": "a",
+      "file": "wind_turbine__a.png",
+      "width": 256,
+      "height": 243,
+      "anchor": [
+        127,
+        243
+      ]
+    },
+    {
+      "building": "vanilla:wind_turbine",
+      "variant": "b",
+      "file": "wind_turbine__b.png",
+      "width": 256,
+      "height": 252,
+      "anchor": [
+        128,
+        252
+      ]
+    },
+    {
+      "building": "vanilla:wind_turbine",
+      "variant": "c",
+      "file": "wind_turbine__c.png",
+      "width": 256,
+      "height": 248,
+      "anchor": [
+        129,
+        248
       ]
     }
   ]

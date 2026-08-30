@@ -12,6 +12,25 @@ export const TERRAIN_COLORS = [
   0x6b9b4a, 0x3a6ea5, 0xd6c48a, 0x8a8a8a, 0x3f6b34, 0x6d7a55,
 ] as const;
 
+/**
+ * Jak silně se dlaždice odchýlí od barvy svého typu, podle typu.
+ *
+ * Není to jedno číslo pro všechno: **voda a skála skoro nevariují**, protože
+ * na hladině vypadá zrno jako šum a skála má být hluchá plocha. Tráva, les
+ * a mokřad snesou víc — a taky ho nejvíc potřebují, protože jich je na mapě
+ * nejvíc a nejdřív se u nich pozná, že je to jedna barva.
+ *
+ * Hodnoty jsou **naměřené okem, ne odhadnuté**: první pokus měl trávu na
+ * 0,075 a nebylo to na obrazovce vůbec poznat — sklon terénu sám dělá rozptyl
+ * dvojnásobný, takže se v něm slabší variace ztratí. Teprve kolem dvou desetin
+ * vzniknou skvrny, které vypadají jako louka a ne jako plast.
+ *
+ * Index = hodnota vrstvy `terrain`.
+ */
+export const TERRAIN_VARIATION = [
+  0.18, 0.03, 0.12, 0.09, 0.2, 0.16,
+] as const;
+
 export const ZONE_COLORS = {
   residential: 0x4a90d9,
   commercial: 0x4ac97e,

@@ -82,6 +82,68 @@ export function slopeLight(corners: readonly [number, number, number, number], s
 }
 
 /**
+ * Drobná odchylka jasu dlaždice, aby plocha nebyla jednolitá.
+ *
+ * Terén je šest plných barev a na velké louce to vypadá jako plast. Tohle mu
+ * dá zrno, aniž by přibyl jediný obrázek: hodnota se počítá **ze souřadnic**,
+ * takže je stejná při každém vykreslení, po načtení savu i mezi běhy. Do savu
+ * nic nepřibývá a se simulací to nemá co dělat — je to čistě vzhled.
+ *
+ * Dvě oktávy schválně. Sama jemná by dala sůl a pepř, který při oddálení
+ * splyne v šum; hrubá dělá **skvrny přes několik dlaždic**, tedy to, co na
+ * louce nebo v lese doopravdy vidíš. Jemná je pak jen dolaďuje.
+ *
+ * Hrubá se **prokládá, ne schodí**. První verze brala hodnotu konstantní na
+ * blok 4×4 (`x >> 2`) a na mapě z toho byly viditelné kostky — dlaždice uvnitř
+ * bloku měly tutéž odchylku a na jeho hranici skočila. Bilineární proložení
+ * mezi rohy bloku dá plynulé skvrny.
+ *
+ * Vrací násobek kolem jedničky, který se dá rovnou předat do `shade`.
+ */
+export function tileVariation(x: number, y: number, amount: number): number {
+  if (amount <= 0) return 1;
+  return 1 + (patchNoise(x, y, PATCH_TILES) * 0.72 + noiseAt(x, y) * 0.28) * amount;
+}
+
+/** Přes kolik dlaždic se skvrna rozprostře. */
+const PATCH_TILES = 5;
+
+/** Vyhlazení 3t² − 2t³ — bez něj jsou na hranicích bloků vidět hrany. */
+function ease(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
+/** Bilineárně proložený šum: hodnoty v rozích bloku, mezi nimi plynulý přechod. */
+function patchNoise(x: number, y: number, cell: number): number {
+  const fx = x / cell;
+  const fy = y / cell;
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const tx = ease(fx - x0);
+  const ty = ease(fy - y0);
+
+  const top = noiseAt(x0, y0) * (1 - tx) + noiseAt(x0 + 1, y0) * tx;
+  const bottom = noiseAt(x0, y0 + 1) * (1 - tx) + noiseAt(x0 + 1, y0 + 1) * tx;
+  return top * (1 - ty) + bottom * ty;
+}
+
+/**
+ * Pseudonáhodná hodnota −1 až 1 ze dvou souřadnic.
+ *
+ * Celočíselný hash, ne `Math.random`: musí vyjít pokaždé stejně, jinak by se
+ * terén při každém zapečení chunku přebarvil. Konstanty jsou běžná směšovací
+ * čísla; jde o rozprostření bitů, ne o kryptografii.
+ */
+function noiseAt(x: number, y: number): number {
+  let h = (x | 0) * 0x1f1f1f1f;
+  h = (h ^ ((y | 0) * 0x8da6b343)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0;
+  return (h / 0xffffffff) * 2 - 1;
+}
+
+/**
  * Obdélníková oblast mřížky `w × h` od `(x, y)` jako čtyřúhelník na zemi.
  * Pro 1×1 vyjde přesně diamant dlaždice.
  */
