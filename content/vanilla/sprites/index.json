@@ -102,6 +102,39 @@
       ]
     },
     {
+      "building": "vanilla:police_large",
+      "variant": "a",
+      "file": "police_large__a.png",
+      "width": 512,
+      "height": 285,
+      "anchor": [
+        257,
+        285
+      ]
+    },
+    {
+      "building": "vanilla:police_large",
+      "variant": "b",
+      "file": "police_large__b.png",
+      "width": 512,
+      "height": 357,
+      "anchor": [
+        260,
+        357
+      ]
+    },
+    {
+      "building": "vanilla:police_large",
+      "variant": "c",
+      "file": "police_large__c.png",
+      "width": 512,
+      "height": 388,
+      "anchor": [
+        259,
+        388
+      ]
+    },
+    {
       "building": "vanilla:police_small",
       "variant": "a",
       "file": "police_small__a.png",
