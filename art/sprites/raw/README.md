@@ -1,20 +1,17 @@
 # Sem patří vygenerované obrázky budov
 
-Pojmenování: `<id>__<varianta>.png`, varianta je `a`, `b` nebo `c`.
+Pracuje se **po jedné budově**: nahrň sem tři varianty tak, jak je vrátil
+generátor, a pusť
 
 ```
-hospital__a.png
-hospital__b.png
-coal_power_plant__c.png
-```
-
-Zadání i prompty jsou v `docs/06-SPRITY-SLUZEB.md`.
-
-Naladění:
-
-```
+python tools/name-sprites.py hospital
 python tools/fit-sprites.py
 ```
+
+První je pojmenuje podle času vzniku na `hospital__a/b/c.png`, druhý naladí na
+rozměry, které renderer čeká.
+
+Zadání i prompty jsou v `docs/06-SPRITY-SLUZEB.md`.
 
 Tyhle syrové obrázky se **necommitují** — jsou velké a dají se vygenerovat
 znovu z promptů. Do repa jde až to, co z nich udělá skript, tedy

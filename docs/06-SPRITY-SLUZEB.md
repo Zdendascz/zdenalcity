@@ -250,21 +250,29 @@ a kvádrová záloha bude nižší než sprite.
 
 ---
 
-## 5. Kam obrázky nahrávat
+## 5. Postup
 
-```
-art/sprites/raw/<id>__<varianta>.png
+**Pracuje se po budovách** (rozhodnutí autora). Vygeneruješ tři varianty jedné
+budovy, nahrneš je do `art/sprites/raw/` tak, jak je vrátil generátor, a řekneš
+která to je. Není to jen pohodlí: `police_small` od `police_large` ani `cinema`
+od `theatre` nikdo z obrázku nepozná, a hádat by znamenalo tichou záměnu.
+
+### 1. Pojmenovat
+
+```bash
+python tools/name-sprites.py hospital
 ```
 
-Varianta je `a`, `b` nebo `c`. Dvojité podtržítko schválně — v `id` jsou
-podtržítka jednoduchá.
+Skript vezme soubory, které ještě jméno nemají, **seřadí je podle času vzniku**
+a přiřadí `a`, `b`, `c`. Řadí se podle času, ne podle abecedy — generátor dává
+do jména české datum (`ChatGPT Image 30. 8. 2026 00_00_20.png`) a abecedně by
+`30. 8.` předběhlo `3. 9.`.
 
-```
-art/sprites/raw/hospital__a.png
-art/sprites/raw/ruin_3x3__b.png
-```
+Nesouhlasí-li počet, **neudělá nic** a vypíše, co našel: přejmenovat první tři
+ze čtyř by tiše složilo špatnou sadu. Existující soubor nepřepíše. `--check`
+ukáže plán, aniž by na něco sáhl.
 
-Naladění:
+### 2. Naladit
 
 ```bash
 python tools/fit-sprites.py
@@ -275,11 +283,22 @@ zmenší na správnou šířku a uloží do `content/vanilla/sprites/`. Rozměry
 bere **z definic budov**, ne z tabulky v sobě — když se půdorys změní, sprity
 se přepočítají samy. Vypíše, co udělal, a co ještě chybí.
 
-Kontrola bez zápisu:
+Odklíčuje pozadí, srovná projekci, ořízne, zmenší na správnou šířku a uloží do
+`content/vanilla/sprites/`. Rozměry si bere **z definic budov**, ne z tabulky
+v sobě. Vypíše, co udělal, a co ještě chybí.
 
 ```bash
 python tools/fit-sprites.py --check
 ```
+
+### Jména
+
+```
+art/sprites/raw/hospital__a.png
+art/sprites/raw/ruin_3x3__b.png
+```
+
+Dvojité podtržítko schválně — v `id` jsou podtržítka jednoduchá.
 
 ---
 
