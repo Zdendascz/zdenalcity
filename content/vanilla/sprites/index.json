@@ -139,10 +139,10 @@
       "variant": "a",
       "file": "commercial_arcade__a.png",
       "width": 384,
-      "height": 253,
+      "height": 266,
       "anchor": [
-        193,
-        253
+        241,
+        266
       ]
     },
     {
@@ -150,10 +150,10 @@
       "variant": "b",
       "file": "commercial_arcade__b.png",
       "width": 384,
-      "height": 265,
+      "height": 251,
       "anchor": [
-        191,
-        265
+        227,
+        251
       ]
     },
     {
@@ -161,10 +161,10 @@
       "variant": "c",
       "file": "commercial_arcade__c.png",
       "width": 384,
-      "height": 234,
+      "height": 218,
       "anchor": [
-        195,
-        234
+        253,
+        218
       ]
     },
     {
@@ -238,10 +238,10 @@
       "variant": "a",
       "file": "commercial_gallery__a.png",
       "width": 640,
-      "height": 392,
+      "height": 363,
       "anchor": [
-        348,
-        392
+        414,
+        363
       ]
     },
     {
@@ -249,10 +249,10 @@
       "variant": "b",
       "file": "commercial_gallery__b.png",
       "width": 640,
-      "height": 401,
+      "height": 387,
       "anchor": [
-        317,
-        401
+        344,
+        387
       ]
     },
     {
@@ -260,10 +260,10 @@
       "variant": "c",
       "file": "commercial_gallery__c.png",
       "width": 640,
-      "height": 398,
+      "height": 736,
       "anchor": [
-        330,
-        398
+        320,
+        736
       ]
     },
     {
@@ -469,10 +469,10 @@
       "variant": "a",
       "file": "commercial_row__a.png",
       "width": 384,
-      "height": 226,
+      "height": 221,
       "anchor": [
-        163,
-        226
+        243,
+        221
       ]
     },
     {
@@ -480,10 +480,10 @@
       "variant": "b",
       "file": "commercial_row__b.png",
       "width": 384,
-      "height": 207,
+      "height": 239,
       "anchor": [
-        191,
-        207
+        113,
+        239
       ]
     },
     {
@@ -491,10 +491,10 @@
       "variant": "c",
       "file": "commercial_row__c.png",
       "width": 384,
-      "height": 203,
+      "height": 207,
       "anchor": [
-        188,
-        203
+        227,
+        207
       ]
     },
     {
@@ -931,10 +931,10 @@
       "variant": "a",
       "file": "industrial_hall__a.png",
       "width": 640,
-      "height": 331,
+      "height": 309,
       "anchor": [
-        312,
-        331
+        299,
+        309
       ]
     },
     {
@@ -942,10 +942,10 @@
       "variant": "b",
       "file": "industrial_hall__b.png",
       "width": 640,
-      "height": 331,
+      "height": 398,
       "anchor": [
-        322,
-        331
+        318,
+        398
       ]
     },
     {
@@ -953,10 +953,10 @@
       "variant": "c",
       "file": "industrial_hall__c.png",
       "width": 640,
-      "height": 386,
+      "height": 329,
       "anchor": [
-        295,
-        386
+        396,
+        329
       ]
     },
     {
@@ -1096,10 +1096,10 @@
       "variant": "a",
       "file": "industrial_row__a.png",
       "width": 384,
-      "height": 225,
+      "height": 206,
       "anchor": [
-        190,
-        225
+        233,
+        206
       ]
     },
     {
@@ -1107,10 +1107,10 @@
       "variant": "b",
       "file": "industrial_row__b.png",
       "width": 384,
-      "height": 228,
+      "height": 254,
       "anchor": [
-        188,
-        228
+        226,
+        254
       ]
     },
     {
@@ -1118,10 +1118,10 @@
       "variant": "c",
       "file": "industrial_row__c.png",
       "width": 384,
-      "height": 205,
+      "height": 220,
       "anchor": [
-        192,
-        205
+        221,
+        220
       ]
     },
     {
@@ -1228,10 +1228,10 @@
       "variant": "a",
       "file": "industrial_yard__a.png",
       "width": 384,
-      "height": 222,
+      "height": 203,
       "anchor": [
-        198,
-        222
+        184,
+        203
       ]
     },
     {
@@ -1239,10 +1239,10 @@
       "variant": "b",
       "file": "industrial_yard__b.png",
       "width": 384,
-      "height": 230,
+      "height": 465,
       "anchor": [
-        190,
-        230
+        192,
+        465
       ]
     },
     {
@@ -1250,10 +1250,10 @@
       "variant": "c",
       "file": "industrial_yard__c.png",
       "width": 384,
-      "height": 231,
+      "height": 333,
       "anchor": [
-        190,
-        231
+        192,
+        333
       ]
     },
     {
@@ -1822,10 +1822,10 @@
       "variant": "a",
       "file": "residential_row__a.png",
       "width": 384,
-      "height": 207,
+      "height": 242,
       "anchor": [
-        171,
-        207
+        262,
+        242
       ]
     },
     {
@@ -1833,10 +1833,10 @@
       "variant": "b",
       "file": "residential_row__b.png",
       "width": 384,
-      "height": 259,
+      "height": 256,
       "anchor": [
-        222,
-        259
+        248,
+        256
       ]
     },
     {
@@ -1844,10 +1844,10 @@
       "variant": "c",
       "file": "residential_row__c.png",
       "width": 384,
-      "height": 209,
+      "height": 218,
       "anchor": [
-        164,
-        209
+        249,
+        218
       ]
     },
     {
@@ -1954,10 +1954,10 @@
       "variant": "a",
       "file": "residential_terrace__a.png",
       "width": 384,
-      "height": 226,
+      "height": 211,
       "anchor": [
-        173,
-        226
+        259,
+        211
       ]
     },
     {
@@ -1965,10 +1965,10 @@
       "variant": "b",
       "file": "residential_terrace__b.png",
       "width": 384,
-      "height": 225,
+      "height": 267,
       "anchor": [
-        205,
-        225
+        232,
+        267
       ]
     },
     {
@@ -1976,10 +1976,10 @@
       "variant": "c",
       "file": "residential_terrace__c.png",
       "width": 384,
-      "height": 245,
+      "height": 217,
       "anchor": [
-        214,
-        245
+        244,
+        217
       ]
     },
     {
@@ -1987,10 +1987,10 @@
       "variant": "a",
       "file": "residential_terraces__a.png",
       "width": 640,
-      "height": 426,
+      "height": 396,
       "anchor": [
-        388,
-        426
+        394,
+        396
       ]
     },
     {
@@ -1998,10 +1998,10 @@
       "variant": "b",
       "file": "residential_terraces__b.png",
       "width": 640,
-      "height": 618,
+      "height": 408,
       "anchor": [
-        320,
-        618
+        386,
+        408
       ]
     },
     {
@@ -2009,10 +2009,10 @@
       "variant": "c",
       "file": "residential_terraces__c.png",
       "width": 640,
-      "height": 476,
+      "height": 534,
       "anchor": [
-        312,
-        476
+        317,
+        534
       ]
     },
     {
@@ -2482,10 +2482,10 @@
       "variant": "a",
       "file": "wind_turbine__a.png",
       "width": 256,
-      "height": 243,
+      "height": 290,
       "anchor": [
         127,
-        243
+        290
       ]
     },
     {
@@ -2493,10 +2493,10 @@
       "variant": "b",
       "file": "wind_turbine__b.png",
       "width": 256,
-      "height": 252,
+      "height": 293,
       "anchor": [
         128,
-        252
+        293
       ]
     },
     {
@@ -2504,10 +2504,10 @@
       "variant": "c",
       "file": "wind_turbine__c.png",
       "width": 256,
-      "height": 248,
+      "height": 308,
       "anchor": [
-        129,
-        248
+        127,
+        308
       ]
     }
   ]

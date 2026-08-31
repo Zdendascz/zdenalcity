@@ -3352,6 +3352,73 @@ s `url: undefined` a renderer by se ho pokusil stáhnout.
 Nic dalšího z toho není hotové. Tahle dávka je zadání pro obrázky.
 
 
+## Sprity: celá sada, varianty a variace terénu (T71)
+
+### Varianta obrázku se odvozuje z id entity
+
+Zadání slibovalo los z `world.rng` a save v9 s migrací. Při psaní se ukázalo,
+že obojí je zbytečné a obojí něco stojí:
+
+- **Do savu nic nepřibývá.** Id entity se ukládá odjakživa, takže varianta
+  přežije uložení sama od sebe. Žádná verze 9, žádná migrace, staré savy se
+  načtou rovnou s variantami.
+- **Nesahá se na `world.rng`.** Los při stavbě by posunul celý proud náhody
+  a s ním každý golden test i každé rozehrané město — a to jen kvůli vzhledu.
+
+Pořád je to „náhodně a navždy": id je jedinečné a po zbourání a znovupostavení
+vyjde jiné. Kolik variant budova má, říká obsah (P5).
+
+**Test rozložení chytil skutečnou chybu.** `^` vrací znaménkové číslo, takže
+u části id vyšel záporný zbytek, `variants[-2]` je `undefined` a budova by se
+místo obrázku nakreslila jako kvádr.
+
+### Variace terénu bez jediného obrázku
+
+Ke každé dlaždici se ze souřadnic spočítá drobná odchylka jasu. Dvě oktávy:
+hrubá dělá skvrny přes několik dlaždic, jemná zrno. Hrubá se **prokládá
+bilineárně** — první verze brala hodnotu konstantní na blok 4×4 a byly z toho
+na mapě vidět kostky.
+
+Amplituda je naměřená, ne odhadnutá. První pokus měl trávu na 0,075 a nebylo
+to poznat: **sklon terénu sám dělá rozptyl zeleného kanálu 44 jednotek, variace
+22**, takže se v něm ztratila. Teprve kolem dvou desetin vzniknou skvrny, které
+vypadají jako louka.
+
+Cena 1,4 ms na celou mapu 128 × 128, tedy asi **dvě procenta** zapékání.
+
+_Poznámka k metodě:_ hodinu jsem to měřil špatně. Přepínal jsem variaci
+mutací pole `TERRAIN_VARIATION` z konzole, jenže dynamický import dal **jinou
+instanci modulu**, než jakou používá renderer — mutace nikam nedoléhaly
+a „nulové zdražení" bylo měření ničeho. Poznalo se to až tím, že jsem si
+přečetl skutečné barvy z chunku: vypnutá variace **8 odstínů**, zapnutá **132**.
+
+### 228 obrázků
+
+Služby, inženýrské stavby, ruiny a nově celá zástavba v zónách
+(`docs/07-SPRITY-ZONY.md`, 39 budov po třech variantách).
+
+Projekce změřena u 224, čtyři skript odmítl a nechal být. Rozptyl **0,99 až
+2,06 : 1** s mediánem 1,43 — automatická oprava je nutnost, ne přepych.
+Podstava zkosená u 25; měřená kotva to řeší.
+
+### Dvě chyby, které stojí za zápis
+
+**Věta o tvaru pozemku se neposílala.** Náhrada volání se nikdy neaplikovala,
+takže všech 117 obrázků zástavby vzniklo bez ní a devět nečtvercových budov
+(2 × 1, 3 × 2) dostalo čtvercový pozemek. Prošlo to dvakrát, protože jsem po
+úpravě souboru odklepl „ok" bez ověření, že se náhrada povedla.
+
+**Čtvercové plátno má strop na výšku budovy.** Podstava má vyplnit šířku
+a v projekci 2:1 je dvakrát širší než vyšší, takže ve čtverci o straně `W`
+zabere pás `W × W/2` uprostřed a nad ní zbývá `W/4`. Tělo potřebuje
+`W · pater / (2(w+d))`, takže se do čtverce vejde, dokud `pater ≤ (w+d)/2`.
+
+Naměřeno: **129 z 228 budov vyšlo nižších**, než čeká `heightLevels`, medián
+o 32 %. Vyšších je sedm. Pravidlo to trefuje — z 34 budov s propadem nad 30 %
+jich **30 padne právě do množiny**, kterou by generátor nově kreslil na plátno
+1024 × 1536.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c
