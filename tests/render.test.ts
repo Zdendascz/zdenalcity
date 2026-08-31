@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { compareDepth, isBehind } from '@/render/depth';
 import {
   clampZoom,
   createCamera,
@@ -726,5 +727,63 @@ describe('variace dlaždic', () => {
       }
     }
     expect(Math.abs(sum / count - 1)).toBeLessThan(0.006);
+  });
+});
+
+/**
+ * Pořadí kreslení budov (nahlásil autor: „některé domy předkreslují ty, co
+ * jsou za nimi").
+ *
+ * Dokud měly všechny budovy stejný půdorys, stačilo řadit podle `x + y`.
+ * S obdélníky různých velikostí to přestane platit a **nejde to zachránit
+ * jiným skalárem** — protipříklady si odporují. Proto se porovnává po dvojicích.
+ */
+describe('hloubka budov', () => {
+  const box = (x: number, y: number, width: number, depth: number, base = 0) =>
+    ({ x, y, width, depth, base });
+
+  it('velká budova se kreslí dřív než malá před ní', () => {
+    // Přesně nahlášený případ. Domek hned za pravým okrajem sídliště je
+    // blíž pozorovateli, takže sídliště nesmí být nakreslené po něm.
+    const sidliste = box(62, 62, 3, 3);
+    const domek = box(65, 62, 1, 1);
+
+    expect(compareDepth(sidliste, domek)).toBeLessThan(0);
+    expect(compareDepth(domek, sidliste)).toBeGreaterThan(0);
+  });
+
+  it('to platí i v druhé ose', () => {
+    expect(compareDepth(box(62, 62, 3, 3), box(62, 65, 1, 1))).toBeLessThan(0);
+  });
+
+  it('žádné jediné číslo to nezvládne — dva protichůdné případy', () => {
+    // Kdyby se řadilo podle x, jeden z těch dvou by vyšel obráceně.
+    // Továrna 2×2 a obchod za ní: obchod má VĚTŠÍ x a kreslí se dřív.
+    expect(compareDepth(box(11, 9, 1, 1), box(10, 10, 2, 2))).toBeLessThan(0);
+    // Dva domky vedle sebe: první má MENŠÍ x a kreslí se dřív.
+    expect(compareDepth(box(10, 11, 1, 1), box(11, 10, 1, 1))).toBeLessThan(0);
+  });
+
+  it('ve stejné hloubce je výš položená budova dál', () => {
+    // Dvě budovy vedle sebe, jedna na kopci: v izometrii se překrývají a ta
+    // výš stojící je od pozorovatele dál (§7 fáze 3).
+    const nahore = box(20, 20, 1, 1, 5);
+    const dole = box(20, 20, 1, 1, 0);
+
+    expect(compareDepth(nahore, dole)).toBeLessThan(0);
+  });
+
+  it('řada domů se seřadí od zadního k přednímu', () => {
+    const rada = [box(14, 10, 1, 1), box(10, 10, 1, 1), box(12, 10, 1, 1)];
+    const serazeno = [...rada].sort(compareDepth).map((b) => b.x);
+
+    expect(serazeno).toEqual([10, 12, 14]);
+  });
+
+  it('sousedící budovy se považují za zaň sebou, ne za překrývající', () => {
+    // Dotýkají se hranou: `A.x + A.width === B.x`. Musí se to počítat jako
+    // „za sebou", jinak by o jejich pořadí rozhodovala až výška.
+    expect(isBehind(box(10, 10, 2, 2), box(12, 10, 2, 2))).toBe(true);
+    expect(isBehind(box(12, 10, 2, 2), box(10, 10, 2, 2))).toBe(false);
   });
 });

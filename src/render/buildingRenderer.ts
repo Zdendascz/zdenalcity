@@ -14,7 +14,9 @@ import {
   WALL_RIGHT_SHADE,
   FOUNDATION_COLOR,
 } from './palette';
-import { areaHeightRange, groundHeightAt, MAX_HEIGHT } from '@/sim/heights';
+import { areaHeightRange, groundHeightAt } from '@/sim/heights';
+import { compareDepth } from './depth';
+import type { DepthBox } from './depth';
 import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
 
 /**
@@ -77,6 +79,15 @@ export class BuildingRenderer {
   private readonly container: Container;
   private readonly appearance: AppearanceLookup;
   private readonly views = new Map<number, Graphics | Sprite>();
+  /**
+   * Podezdívky spritů. Sprite polygony kreslit neumí, takže terénní úprava pod
+   * obrázkem musí být vlastní uzel — a `Graphics` je jediný, kdo ji nakreslí.
+   *
+   * Kvádrová cesta si podezdívku kreslí do sebe, takže tady nemá záznam.
+   */
+  private readonly skirts = new Map<number, Graphics>();
+  /** Půdorysy pro řazení. Klíč je id budovy. */
+  private readonly boxes = new Map<number, DepthBox>();
 
   constructor(world: ReadonlyWorldView, parent: Container, appearance: AppearanceLookup) {
     this.world = world;
@@ -109,6 +120,32 @@ export class BuildingRenderer {
   }
 
   update(dirty: DirtySet): void {
+    this.refreshAll(dirty);
+    this.reorder();
+  }
+
+  /**
+   * Přiřadí pořadí kreslení. Volá se **po** každé změně sady budov.
+   *
+   * Řadí se celá sada, ne jen to, co se změnilo: nová budova může přesunout
+   * dozadu i tu, které se nikdo nedotkl. Při tisícovce budov je to řádově
+   * deset tisíc porovnání a děje se to jen při změně, ne každý snímek.
+   *
+   * Podezdívka jde **o krok před svou budovu**, aby ji obrázek překryl —
+   * jinak by přes fasádu vedl pruh kamene.
+   */
+  private reorder(): void {
+    const order = [...this.boxes.entries()].sort((a, b) => compareDepth(a[1], b[1]));
+    for (let i = 0; i < order.length; i++) {
+      const id = order[i]![0];
+      const view = this.views.get(id);
+      if (view) view.zIndex = i * 2 + 1;
+      const skirt = this.skirts.get(id);
+      if (skirt) skirt.zIndex = i * 2;
+    }
+  }
+
+  private refreshAll(dirty: DirtySet): void {
     if (dirty.fullRedraw) {
       for (const id of [...this.views.keys()]) {
         this.remove(id);
@@ -232,15 +269,10 @@ export class BuildingRenderer {
       base: max,
     });
 
-    // Hloubka se řídí **předním rohem** půdorysu, ne počátkem. Kdyby se řadilo
-    // podle `x + y`, dvoudlaždicová továrna by se schovala za jednodlaždicový
-    // obchod, který stojí za ní — právě tak vypadala nahlášená chyba.
-    //
-    // Při shodě rozhoduje **výška základny sestupně** (§7 fáze 3): dvě budovy
-    // ve stejné hloubce, jedna na kopci a druhá pod ním, se v izometrii
-    // překrývají a ta výš stojící je dál od pozorovatele, takže patří dozadu.
-    view.zIndex =
-      (building.x + width + building.y + depth) * (MAX_HEIGHT + 1) + (MAX_HEIGHT - min);
+    // zIndex se **nepočítá tady**. Hloubka se v izometrii nedá vyjádřit jedním
+    // číslem na budovu, jakmile mají různé půdorysy — viz `depth.ts`. Přiřadí
+    // ji `reorder()` porovnáním po dvojicích.
+    this.boxes.set(id, { x: building.x, y: building.y, width, depth, base: min });
   }
 
   /**
@@ -284,7 +316,16 @@ export class BuildingRenderer {
     const { min, max } = areaHeightRange(this.world.cornerHeight, x, y, width, depth);
     const front = gridToScreen(x + width, y + depth, max);
     sprite.position.set(front.x, front.y);
-    sprite.zIndex = (x + width + y + depth) * (MAX_HEIGHT + 1) + (MAX_HEIGHT - min);
+    this.boxes.set(id, { x, y, width, depth, base: min });
+
+    // Podezdívka. Obrázek si nese **rovný** pozemek, jenže terén pod ním rovný
+    // není — bez ní budova na svahu visí rohem ve vzduchu. Přesně to nahlásil
+    // autor a je to chyba, kterou jsem sem zanesl s kvádrem: kvádrová cesta ji
+    // kreslí od začátku, sprite ji zapomněl.
+    //
+    // Kreslí se **o krok dřív** než sprite, aby ji obrázek překryl. Sprite by
+    // ji jinak nepřekryl a byl by vidět pruh kamene přes fasádu.
+    this.drawSkirt(id, x, y, width, depth, min, max);
 
     const texture = sprite.texture;
     if (texture === Texture.EMPTY || texture.label !== image.url) {
@@ -294,6 +335,52 @@ export class BuildingRenderer {
         sprite.texture = loaded;
       });
     }
+  }
+
+  /**
+   * Kámen mezi rovným pozemkem obrázku a nerovným terénem pod ním.
+   *
+   * Spodní hrana **kopíruje terén**, ne rovný diamant: rovná čára od rohu
+   * k rohu by na svahu terén protínala a hráč by nepoznal, na které dlaždici
+   * budova stojí. Totéž pravidlo jako u kvádru.
+   *
+   * Kreslí se na **plný půdorys**, bez odsazení. Kvádr je proti své parcele
+   * zmenšený, aby se sousední domy neslily, ale obrázek svůj pozemek vyplňuje
+   * celý — odsazená podezdívka by pod ním nechala mezeru.
+   */
+  private drawSkirt(
+    id: number,
+    x: number,
+    y: number,
+    width: number,
+    depth: number,
+    min: number,
+    max: number,
+  ): void {
+    if (max <= min) {
+      // Rovná parcela podezdívku nepotřebuje. Uzel se zahodí, ať se nedrží
+      // prázdný `Graphics` pro každou budovu ve městě.
+      this.skirts.get(id)?.destroy();
+      this.skirts.delete(id);
+      return;
+    }
+
+    let skirt = this.skirts.get(id);
+    if (!skirt) {
+      skirt = new Graphics();
+      this.container.addChild(skirt);
+      this.skirts.set(id, skirt);
+    }
+
+    const faces = skirtFaces(x, y, width, depth, max, (fx, fy) =>
+      groundHeightAt(this.world.cornerHeight, fx, fy),
+    );
+    skirt.clear();
+    skirt
+      .poly(faces.right)
+      .fill({ color: shade(FOUNDATION_COLOR, WALL_RIGHT_SHADE) })
+      .poly(faces.left)
+      .fill({ color: shade(FOUNDATION_COLOR, WALL_LEFT_SHADE) });
   }
 
   /**
@@ -332,6 +419,9 @@ export class BuildingRenderer {
   }
 
   private remove(id: number): void {
+    this.skirts.get(id)?.destroy();
+    this.skirts.delete(id);
+    this.boxes.delete(id);
     const view = this.views.get(id);
     if (!view) return;
     view.destroy();
