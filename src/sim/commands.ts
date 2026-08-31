@@ -5,16 +5,15 @@ import {
   cornerInBounds,
   cornerIndex,
   cornerSideOf,
-  isTwistedTile,
   MAX_HEIGHT,
   planCornerHeight,
   planFillArea,
   planLevelArea,
-  planUntwist,
 } from './heights';
 import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
+import { planRoadGradeAround } from './roads';
 import { checkRequirements, presentDefinitions } from './requirements';
 import {
   bondCap,
@@ -160,16 +159,24 @@ export function buildRoad(
   // dlaždici zvlášť; trasa přes remízek tak byla dvacet kliků místo jednoho.
   const clearing = !overWater && needsClearing(terrain) ? clearingCost(balance, terrain) : 0;
 
-  // Rovnoměrný svah vozovka snese, sedlo ne: zkroucenou dlaždici nejde přejet
-  // po rovině ani nakreslit jako vozovku (§7). Místo odmítnutí se **srovná
-  // roh** a připočte terraforming, jak to dělá Transport Tycoon.
-  let untwist: ReadonlyMap<number, number> | null = null;
-  if (!overWater && isTwistedTile(world.cornerHeight, x, y)) {
-    untwist = planUntwist(world.cornerHeight, x, y);
-    // Odmítnout to smí jen `checkTerraform` — a to kvůli budově nebo vodě
-    // v cestě, ne kvůli tvaru terénu. Dozdít jde každé sedlo.
-    const allowed = checkTerraform(world, untwist);
-    if (!allowed.ok) return allowed;
+  // Vozovka smí stoupat, ale **nesmí se klopit do strany**. Silnice vedená
+  // napříč svahem jede rovně a přitom je nakloněná bokem — nahlásil to autor
+  // slovy „silnice nemůže být šejdrem ve svahu".
+  //
+  // Srovnává se **automaticky při stavbě** (rozhodnutí autora) a připočte se
+  // terraforming, jak to dělá Transport Tycoon. Rovná dlaždice z toho nevzejde
+  // a ani nemůže: sousední dlaždice sdílejí rohy, takže dvě sousední rovné
+  // musí být ve stejné výšce a celá síť by ležela v jedné rovině. Ruší se
+  // proto jen **příčný spád** — viz `planRoadGrade`.
+  let grade: ReadonlyMap<number, number> | null = null;
+  if (!overWater) {
+    grade = planRoadGradeAround(world, x, y);
+    // **Budova v cestě silnici nezastaví** (rozhodnutí autora): domy nad
+    // silnicí se mají podezdít, ne bránit stavbě. Podezdívku jim renderer
+    // dokreslí sám, protože kopíruje terén.
+    //
+    // Voda pořád ano — tam by se zvednutím rohu vytvořila souš pod hladinou.
+    if (reshapeBlocker(world, grade) === 'water') return reject('error.terraformWater');
   }
 
   const current = world.layers.road[tile] ?? ROAD.none;
@@ -178,7 +185,7 @@ export function buildRoad(
   // a postaví — jinak by se dala třída „prodat" za rozdíl cen.
   if (current > type) return reject('error.roadDowngrade');
 
-  const levelling = (untwist?.size ?? 0) * (balance?.map.terraformCost ?? 0);
+  const levelling = (grade?.size ?? 0) * (balance?.map.terraformCost ?? 0);
   const cost =
     (overWater
       ? (balance?.traffic.bridgeCost ?? 0)
@@ -192,7 +199,7 @@ export function buildRoad(
 
   // Nejdřív srovnat, pak vyklidit, pak položit. Obráceně by vozovka na chvíli
   // ležela na sedle a renderer by ji tak i nakreslil.
-  if (untwist) applyHeightChanges(world, untwist);
+  if (grade && grade.size > 0) applyHeightChanges(world, grade);
   if (clearing > 0) {
     world.layers.terrain[tile] = TERRAIN.grass;
     markTerrainChanged(world);
@@ -223,7 +230,11 @@ function clearingCost(balance: Balance | undefined, terrain: number): number {
  */
 export interface RoadCostView {
   readonly size: number;
-  readonly layers: { readonly terrain: Readonly<Uint8Array> };
+  readonly layers: {
+    readonly terrain: Readonly<Uint8Array>;
+    /** Rovnání potřebuje vědět, kudy silnice vede — bez sousedů nezná směr. */
+    readonly road: Readonly<Uint8Array>;
+  };
   readonly cornerHeight: Readonly<Uint8Array>;
 }
 
@@ -245,9 +256,11 @@ export interface RoadEstimate {
  * na sedle dražší než sazba za vozovku, a cenovka, která by ukazovala jen tu
  * sazbu, by hráči lhala — zaplatil by devadesát tam, kde viděl deset.
  *
- * U tažení přes víc dlaždic je to **odhad**: srovnání jedné dlaždice hne rohem,
- * o který se dělí se sousedy, takže po jejím postavení může sousední sedlo
- * zmizet samo. Skutečná cena tažení proto bývá stejná nebo nižší, nikdy vyšší.
+ * U tažení přes víc dlaždic je to **odhad**, a to na obě strany. Srovnání jedné
+ * dlaždice hne rohem, o který se dělí se sousedy, takže sousední dlaždice pak
+ * může vyjít levněji. Naopak dlaždice, ze které se během tažení teprve stane
+ * křižovatka, se odhaduje jako přímý úsek a ve skutečnosti se srovná celá.
+ * Přesně sedí jednotlivá dlaždice — a ta se hráči ukazuje při kladení po jedné.
  */
 export function estimateRoad(
   world: RoadCostView,
@@ -269,11 +282,9 @@ export function estimateRoad(
 
   const clearing = !overWater && needsClearing(terrain) ? clearingCost(balance, terrain) : 0;
 
-  let levelling = 0;
-  if (!overWater && isTwistedTile(world.cornerHeight, x, y)) {
-    const plan = planUntwist(world.cornerHeight, x, y);
-    levelling = (plan?.size ?? 0) * (balance?.map.terraformCost ?? 0);
-  }
+  const levelling = overWater
+    ? 0
+    : planRoadGradeAround(world, x, y).size * (balance?.map.terraformCost ?? 0);
 
   return { road, clearing, levelling, total: road + clearing + levelling };
 }

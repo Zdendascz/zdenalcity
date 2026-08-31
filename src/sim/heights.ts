@@ -386,6 +386,94 @@ export function planFillArea(
 }
 
 /**
+ * Jak srovnat dlaždici pod vozovkou, aby silnice nebyla nakloněná do strany.
+ *
+ * **Vozovka smí stoupat, ale ne se klopit.** Silnice vedená napříč svahem
+ * vypadá šejdrem — jede rovně, ale je nakloněná bokem — a přesně na to si
+ * autor stěžoval.
+ *
+ * Rovnou dlaždici z toho udělat **nejde a nikdy nepůjde**: sousední dlaždice
+ * sdílejí rohy, takže dvě sousední rovné dlaždice musí být ve stejné výšce.
+ * Kdyby byla rovná každá silniční dlaždice, ležela by celá síť v jedné rovině.
+ * Jde ale zrušit **příčný spád** — sklon kolmý na směr jízdy:
+ *
+ * - silnice sever–jih: srovnají se západní roh s východním, zvlášť nahoře
+ *   a zvlášť dole, takže vozovka stoupá podél sebe a neklopí se,
+ * - silnice východ–západ: totéž otočené,
+ * - zatáčka a křižovatka: rovná celá, protože „směr jízdy" tam žádný není.
+ *
+ * Rovná se **nahoru**, ne na průměr, ze stejného důvodu jako u sedla: hráč
+ * staví násep, ne výkop, a snížený roh by z dlaždice udělal důlek mezi sousedy.
+ *
+ * `mask` je bitmaska sousedních silnic (N=1, E=2, S=4, W=8) — táž, kterou
+ * kreslí renderer, aby se vozovka a terén nerozešly.
+ */
+export function planRoadGrade(
+  heights: Readonly<Uint8Array>,
+  x: number,
+  y: number,
+  mask: number,
+): Map<number, number> {
+  const side = cornerSideOf(heights);
+  const at = (cx: number, cy: number) => cornerIndex(cx, cy, side);
+  const [nw, ne, sw, se] = tileCorners(heights, x, y);
+
+  const northSouth = (mask & 0b0101) !== 0;
+  const eastWest = (mask & 0b1010) !== 0;
+
+  /** Dvojice rohů, které musí být stejně vysoko. */
+  let pairs: [number, number, number][];
+  if (northSouth && !eastWest) {
+    // Jede se podél y, klopí se podél x — srovnat západ s východem.
+    pairs = [
+      [at(x, y), at(x + 1, y), Math.max(nw, ne)],
+      [at(x, y + 1), at(x + 1, y + 1), Math.max(sw, se)],
+    ];
+  } else if (eastWest && !northSouth) {
+    pairs = [
+      [at(x, y), at(x, y + 1), Math.max(nw, sw)],
+      [at(x + 1, y), at(x + 1, y + 1), Math.max(ne, se)],
+    ];
+  } else if (mask === 0) {
+    // Osamocená dlaždice nemá směr jízdy, takže se nemá podle čeho rovnat.
+    // Rovnat ji celou by bylo nejhorší možné: každý tah silnice začíná jednou
+    // osamocenou dlaždicí, takže by se na začátku každé cesty udělal hrbol.
+    // Až přibude soused, dostane dlaždice směr a srovná se pořádně.
+    //
+    // Jedno se pohlídat musí i teď: **sedlo**. Zkroucenou dlaždici nejde
+    // nakreslit jako vozovku ani po ní jet po rovině, takže ta se rozkroutí
+    // vždycky. Rovnané dlaždice sedlem být nemůžou — mají dvojice rohů stejně
+    // vysoko, takže `nw + se` a `ne + sw` vyjde nastejno samo od sebe.
+    return planUntwist(heights, x, y);
+  } else {
+    // Zatáčka nebo křižovatka: příčný směr je tu každý, takže celá na nejvyšší
+    // roh. Jinak by se vozovka klopila aspoň v jednom z ramen.
+    const top = Math.max(nw, ne, sw, se);
+    pairs = [
+      [at(x, y), at(x + 1, y), top],
+      [at(x, y + 1), at(x + 1, y + 1), top],
+    ];
+  }
+
+  const working = Uint8Array.from(heights);
+  const changes = new Map<number, number>();
+  for (const [a, b, target] of pairs) {
+    for (const corner of [a, b]) {
+      const cx = corner % side;
+      const cy = (corner - cx) / side;
+      const step = planCornerHeight(working, cx, cy, target);
+      applyCornerChanges(working, step);
+      for (const [k, v] of step) changes.set(k, v);
+    }
+  }
+
+  for (const [k, v] of [...changes]) {
+    if ((heights[k] ?? 0) === v) changes.delete(k);
+  }
+  return changes;
+}
+
+/**
  * Jak srovnat zkroucenou dlaždici, aby po ní šla vést vozovka.
  *
  * Zkroucená dlaždice je sedlo: `nw + se ≠ ne + sw`. Vozovka po ní nejde přejet

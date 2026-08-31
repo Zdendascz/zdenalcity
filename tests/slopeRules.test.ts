@@ -20,6 +20,7 @@ import {
   MAX_HEIGHT,
   planCornerHeight,
   planUntwist,
+  tileCorners,
 } from '@/sim/heights';
 import { index, ROAD, TERRAIN, ZONE } from '@/sim/layers';
 import { createTrafficSystem } from '@/sim/systems';
@@ -218,6 +219,14 @@ describe('silnice na svahu', () => {
         w.cornerHeight[cornerIndex(34, 34, CORNER_SIZE)] = 1;
         return w;
       }],
+      // Dlaždice se sousedem, tedy se směrem jízdy: tady se rovná příčný spád
+      // a náhled musí projít stejnou cestou jako příkaz, ne jinou.
+      [36, 35, () => {
+        const w = world();
+        hill(w, 37, 34, 3);
+        expect(buildRoad(w, 35, 35, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+        return w;
+      }],
     ];
 
     for (const [x, y, make] of cases) {
@@ -308,9 +317,9 @@ describe('silnice na svahu', () => {
     expect(before - w.economy.funds).toBe(STREET_COST);
   });
 
-  it('budova u sedla srovnání zastaví', () => {
-    // Srovnání hne rohem, o který se dělí čtyři dlaždice. Kdyby na jedné
-    // stála budova, spadla by hráči do svahu, aniž by o to řekl.
+  it('budova srovnání nezastaví, terén se hne i pod ní', () => {
+    // Autorovo rozhodnutí: „smí sáhnout i na postavené". Dům nad silnicí se má
+    // podezdít, ne bránit stavbě — podezdívku mu renderer dokreslí sám.
     const w = world();
     w.cornerHeight[cornerIndex(20, 20, CORNER_SIZE)] = 1;
     w.cornerHeight[cornerIndex(21, 21, CORNER_SIZE)] = 1;
@@ -322,10 +331,120 @@ describe('silnice na svahu', () => {
       w.layers.buildingId[index(bx, by, MAP_SIZE)] = 7;
     }
 
-    const result = buildRoad(w, 20, 20, ROAD.street, VANILLA_BALANCE);
+    expect(buildRoad(w, 20, 20, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+  });
+
+  it('voda srovnání zastaví', () => {
+    // Zvednutý roh u hladiny by udělal souš pod vodou. Tohle jediné pořád platí.
+    const w = world();
+    for (let y = 0; y < w.size; y++) w.layers.terrain[index(41, y, MAP_SIZE)] = TERRAIN.water;
+    w.cornerHeight[cornerIndex(40, 20, CORNER_SIZE)] = 2;
+
+    const result = buildRoad(w, 40, 20, ROAD.street, VANILLA_BALANCE);
 
     expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toBe('error.terraformBuilding');
+    expect(result.ok === false && result.reason).toBe('error.terraformWater');
+  });
+
+  /**
+   * Kopec postavený **přes `planCornerHeight`**, ne ručním zápisem do pole.
+   *
+   * Ruční zápis umí vyrobit terén, jaký ve hře nevznikne: sousední rohy se smí
+   * lišit nejvýš o patro a nasázený blok výšek vedle roviny tohle pravidlo
+   * poruší. Plánovač pak takový sráz nesrovnává, ale **strhává dolů**, a test
+   * by měřil chování, do kterého se hráč nikdy nedostane.
+   */
+  function hill(w: WorldState, cx: number, cy: number, top: number): void {
+    applyCornerChanges(w.cornerHeight, planCornerHeight(w.cornerHeight, cx, cy, top));
+  }
+
+  it('silnice napříč svahem ztratí příčný sklon, ale smí dál stoupat', () => {
+    // Přesně autorova stížnost z obr. 1: „silnice nemůže být šejdrem ve svahu."
+    // Kopec je severně od trasy, takže vozovka jede po jeho boku: ve směru
+    // jízdy stoupá a klesá — to je v pořádku — a zároveň se klopí k jihu.
+    const w = world();
+    hill(w, 52, 29, 3);
+
+    const předtím = Uint8Array.from(w.cornerHeight);
+    const klopených = [50, 51, 52, 53, 54].filter((x) => {
+      const [nw, ne, sw, se] = tileCorners(předtím, x, 31);
+      return nw !== sw || ne !== se;
+    });
+    // Kdyby se trasa svahu vyhnula, test by neměřil nic.
+    expect(klopených.length).toBeGreaterThan(0);
+
+    for (let x = 50; x <= 54; x++) {
+      expect(buildRoad(w, x, 31, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    }
+
+    for (let x = 50; x <= 54; x++) {
+      const [nw, ne, sw, se] = tileCorners(w.cornerHeight, x, 31);
+      expect(nw).toBe(sw);
+      expect(ne).toBe(se);
+    }
+
+    // Stoupání ve směru jízdy zůstalo — jinak by se srovnal celý kopec.
+    const profil = [50, 51, 52, 53, 54].map((x) => tileCorners(w.cornerHeight, x, 31)[0]);
+    expect(new Set(profil).size).toBeGreaterThan(1);
+
+    // A terén se jen dosypává, nikdy neodkopává: podezdívka ano, jáma ne.
+    for (let i = 0; i < w.cornerHeight.length; i++) {
+      expect(w.cornerHeight[i]).toBeGreaterThanOrEqual(předtím[i] ?? 0);
+    }
+  });
+
+  it('severojižní silnice se rovná stejně jako východozápadní', () => {
+    // Druhá osa má v plánovači vlastní větev, takže potřebuje vlastní test.
+    // Bez něj projde i „srovnávat na nejnižší roh", tedy odkopat místo dosypat.
+    const w = world();
+    hill(w, 84, 62, 3);
+
+    const předtím = Uint8Array.from(w.cornerHeight);
+    for (let y = 60; y <= 64; y++) {
+      expect(buildRoad(w, 82, y, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    }
+
+    for (let y = 60; y <= 64; y++) {
+      const [nw, ne, sw, se] = tileCorners(w.cornerHeight, 82, y);
+      // Jede se podél y, takže se ruší sklon podél x: západ musí sedět na východ.
+      expect(nw).toBe(ne);
+      expect(sw).toBe(se);
+    }
+
+    for (let i = 0; i < w.cornerHeight.length; i++) {
+      expect(w.cornerHeight[i]).toBeGreaterThanOrEqual(předtím[i] ?? 0);
+    }
+    // A opravdu se něco hnulo, jinak by test nehlídal nic.
+    expect([...w.cornerHeight].some((v, i) => v !== předtím[i])).toBe(true);
+  });
+
+  it('odbočka srovná i dlaždici, ze které se stala zatáčka', () => {
+    // Sousedy je nutné přepočítat: rovné silnici, ke které přibude odbočka,
+    // se změní maska. Bez toho by vozovka byla šejdrem právě na křižovatkách.
+    const w = world();
+    hill(w, 62, 39, 3);
+
+    expect(buildRoad(w, 60, 41, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    expect(buildRoad(w, 61, 41, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    // Odbočka na jih z (61,41) — z přímého úseku se stala zatáčka.
+    expect(buildRoad(w, 61, 42, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+
+    // Zatáčka nemá směr jízdy, po kterém by směla stoupat: musí být rovná.
+    expect(new Set(tileCorners(w.cornerHeight, 61, 41)).size).toBe(1);
+  });
+
+  it('srovnání se účtuje jako terraforming', () => {
+    const w = world();
+    hill(w, 71, 50, 3);
+    const před = w.economy.funds;
+
+    // Dvě dlaždice, ne jedna: osamocená se nerovná, protože nemá směr jízdy.
+    expect(buildRoad(w, 70, 51, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    expect(buildRoad(w, 71, 51, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+
+    const zaplaceno = před - w.economy.funds;
+    expect(zaplaceno).toBeGreaterThan(2 * STREET_COST);
+    expect((zaplaceno - 2 * STREET_COST) % VANILLA_BALANCE.map.terraformCost).toBe(0);
   });
 });
 

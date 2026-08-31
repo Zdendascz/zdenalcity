@@ -170,6 +170,24 @@ function findSite(world: WorldState): { x: number; y: number } {
  * Budov, obyvatel i práce beze změny — výroba, znečištění ani zaměstnanost
  * se **nehýbaly**, jen velikost.
  */
+/*
+ * Posun po automatickém srovnání příčného spádu silnic (obr. 1 od autora):
+ * budov 59 → 29, obyvatel 192 → 52, práce 98 → 50, kasa 21 049 → 7 834.
+ *
+ * Je to velký propad a **není to cena za srovnávání**. Terén se hnul o čtrnáct
+ * rohů — všechny u odbočky k elektrárně, `x` 88–91 — a stálo to 152 kreditů.
+ * Hlavní ulice si nesáhla ani na jeden roh: staví se na nejrovnějším okně mapy,
+ * které `findSite` schválně hledá.
+ *
+ * Že těch čtrnáct rohů opravdu stačí, je změřené, ne odhadnuté: když se stejné
+ * hodnoty nasadí ručně a srovnávání se **vypne**, vyjde stejných 29 budov
+ * a stejná mapa dlaždici po dlaždici. Referenční město je tedy na změnu terénu
+ * u kraje zóny takhle citlivé samo o sobě — to je vlastnost simulace, ne
+ * tohohle příkazu.
+ *
+ * Roli hraje i pořadí ve scénáři: odbočka se staví **až po zónování**, takže
+ * srovná terén pod hotovou zónou. Hráč silnice normálně klade dřív, než zónuje.
+ */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
     const content = await vanilla();

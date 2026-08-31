@@ -3419,6 +3419,74 @@ jich **30 padne právě do množiny**, kterou by generátor nově kreslil na pl�
 1024 × 1536.
 
 
+## Silnice se nekloní do strany (obr. 1 od autora)
+
+Autor poslal snímek se stížností: „silnice nemůže být šejdrem ve svahu.
+V tomto případě se musí baráky nad silnici podezdít a dlaždice zarovnat.
+Druhá varianta by byla podezdít silnici. Možné musí být obojí."
+
+### Co z toho jde a co ne
+
+„Srovnat dlaždici" nemůže znamenat „udělat ji vodorovnou". Sousední dlaždice
+**sdílejí rohy**, takže dvě sousední vodorovné musí ležet ve stejné výšce —
+kdyby se rovnala každá dlaždice vozovky, ležela by celá silniční síť v jedné
+rovině a s ní i celé město. Ani „podezdít silnici" jako násep nejde nakreslit:
+násep je svislá stěna mezi dvěma výškami téhož rohu, a roh má jednu výšku.
+
+Co jde a co je ve skutečnosti obsah té stížnosti: **zrušit příčný sklon**.
+Vozovka smí stoupat ve směru jízdy, ale nesmí být nakloněná do strany.
+
+### Jak se to počítá
+
+`planRoadGrade` v `src/sim/heights.ts` podle masky sousedů:
+
+| Tvar | Co se srovná |
+|---|---|
+| sever–jih | západní roh na východní, zvlášť pro severní a jižní hranu |
+| východ–západ | severní roh na jižní, zvlášť pro západní a východní hranu |
+| zatáčka, křižovatka | všechny čtyři rohy na nejvyšší — příčný směr je tu každý |
+| osamocená dlaždice | nic; jen se rozkroutí sedlo |
+
+Osamocená dlaždice se schválně nerovná: **každý tah silnice začíná jednou**,
+takže by se na začátku každé cesty udělal hrbol. Jakmile přibude soused, dostane
+směr a srovná se — proto se přepočítávají i **sousední dlaždice**, ne jen ta
+stavěná. Bez toho by vozovka zůstala šejdrem přesně na křižovatkách.
+
+Rovná se **dosypáním**, nikdy odkopáním, a smí to sáhnout **i pod hotové
+budovy** (rozhodnutí autora: „automaticky při stavbě, a ano, smí sáhnout
+i na postavené"). Podezdívku si budova dokreslí sama, protože renderer kopíruje
+terén. Zastaví to jedině voda — zvednutý roh u hladiny by udělal souš pod vodou.
+Účtuje se po rozích jako terraforming, stejně jako dřív rozkroucení sedla.
+
+Maska sousedů se kvůli tomu přestěhovala z `render/roads.ts` do `sim/roads.ts`.
+Renderer si ji odtud bere; kdyby si každý počítal svou, mohla by se vozovka
+kreslit jinak, než jak se srovnal terén pod ní. P3 to neporušuje — je to
+počítání nad mřížkou, ne nad izometrií.
+
+### Golden město spadlo na polovinu, a není to cenou
+
+Budov 59 → 29, obyvatel 192 → 52, kasa 21 049 → 7 834. Terén se přitom hnul
+**o čtrnáct rohů** a stálo to **152 kreditů**. Hlavní ulice si nesáhla ani na
+jeden roh — staví se na nejrovnějším okně mapy. Všech čtrnáct je u odbočky
+k elektrárně, a ta se ve scénáři staví **až po zónování**.
+
+Že těch čtrnáct rohů opravdu stačí, je změřené: nasadit stejné hodnoty ručně
+a srovnávání **vypnout** dá stejných 29 budov a stejnou mapu dlaždici po
+dlaždici. Referenční město je na změnu terénu u kraje zóny takhle citlivé samo
+o sobě.
+
+### Měření a mutace
+
+Na generovaném terénu stojí srovnání 80 dlaždic silnice **19 rohů**, tedy 152
+kreditů; medián na dlaždici je nula, maximum tři.
+
+Mutační test: prohozené osy zachyceny, vynechaný přepočet sousedů zachycen,
+srovnání zdarma zachyceno. Jedna mutace **přežila** — `Math.max` → `Math.min`
+na jedné z dvojic. Není to díra v testech: dvojice sousedních dlaždic se
+překrývají, takže druhá dlaždice roh vrátí zpátky. Mutace obou dvojic naráz
+zachycena je.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

@@ -1,24 +1,16 @@
 /**
- * Auto-tiling silnic. Bitmask sousedů se počítá **v rendereru** — simulace zná
- * jen `road: 0|1` a o tvaru napojení nic neví (P3).
+ * Auto-tiling silnic.
+ *
+ * Bitmaska sousedů se **počítá v `sim/`** a renderer si ji odsud jen bere:
+ * od chvíle, kdy si silnice srovnává příčný spád, ji potřebuje i simulace,
+ * a dvě kopie by se mohly rozejít.
  *
  * N je `(x, y-1)`, tedy směr „nahoru vpravo" po projekci do izometrie.
  */
-export const ROAD_N = 1;
-export const ROAD_E = 2;
-export const ROAD_S = 4;
-export const ROAD_W = 8;
+import { ROAD_E, ROAD_N, ROAD_S, ROAD_W } from '@/sim/roads';
 
-export type IsRoad = (x: number, y: number) => boolean;
-
-export function roadMask(isRoad: IsRoad, x: number, y: number): number {
-  let mask = 0;
-  if (isRoad(x, y - 1)) mask |= ROAD_N;
-  if (isRoad(x + 1, y)) mask |= ROAD_E;
-  if (isRoad(x, y + 1)) mask |= ROAD_S;
-  if (isRoad(x - 1, y)) mask |= ROAD_W;
-  return mask;
-}
+export { ROAD_N, ROAD_E, ROAD_S, ROAD_W, roadMask } from '@/sim/roads';
+export type { IsRoad } from '@/sim/roads';
 
 /**
  * Jak velká část dlaždice připadá na středový kus vozovky.
