@@ -208,6 +208,11 @@ def base_diamond(image: Image.Image) -> tuple[float, int] | None:
 # Poslední pojistka. Že je úhel neobvyklý, **není** důvod k zamítnutí —
 # generátor kreslí od 1,19 : 1 po 1,60 : 1 a všechno z toho jsou poctivé
 # projekce. Tvar podstavy hlídá `base_diamond`; tohle chytá jen nesmysl.
+# Jak daleko smí změřená kotva utéct od geometrie, než se měření zahodí.
+# Podíl šířky spritu. Šest procent je zhruba desetina dlaždice — na to, aby to
+# pobralo převis stromů a balkonů, ale ne špatně poznanou podstavu.
+ANCHOR_TOLERANCE = 0.06
+
 RATIO_MIN, RATIO_MAX = 0.7, 3.0
 # Pod tímhle rozdílem se neopravuje. Zmenšit o procento nemá cenu a jen by to
 # rozmazalo hrany.
@@ -286,13 +291,33 @@ def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str,
     target_h = max(1, round(cropped.height * scale))
     resized = cropped.resize((target_w, target_h), Image.LANCZOS)
 
-    # Kotva se **měří, ne předpokládá.** Spodní vrchol podstavy má u čtvercového
-    # půdorysu ležet uprostřed, jenže generátor kreslí podstavu často mírně
-    # zkosenou — a budova by pak na dlaždici seděla vedle.
+    # Kotva se **měří, ne předpokládá** — generátor kreslí podstavu často mírně
+    # zkosenou a budova by pak na dlaždici seděla vedle. Měření se ale porovnává
+    # s geometrií, protože samo občas selže.
+    #
+    # **Střed obrázku platí jen pro čtvercový půdorys.** Spodní vrchol podstavy
+    # leží v `w / (w + d)` šířky: diamant sahá `32·d` doleva a `32·w` doprava od
+    # zadního rohu. U 2 × 1 jsou to dvě třetiny, ne polovina. Záloha tu do T72
+    # brala střed, takže tři sprity 2 × 1 a 3 × 2 skončily posunuté skoro o půl
+    # dlaždice a lezly do sousedů — autor to nahlásil jako „špatné překrytí".
+    footprint_w, footprint_d = spec['footprint']
+    expected_x = round(target_w * footprint_w / (footprint_w + footprint_d))
+
     final = base_diamond(resized)
-    anchor_x = final[1] if final else target_w // 2
-    if abs(anchor_x - target_w / 2) > target_w * 0.03:
-        notes.append(f'  ← podstava zkosená, kotva {anchor_x - target_w // 2:+d} px od středu')
+    measured_x = final[1] if final else None
+    tolerance = target_w * ANCHOR_TOLERANCE
+
+    if measured_x is None:
+        anchor_x = expected_x
+        notes.append('  ← podstavu nejde změřit, kotva dopočítaná z půdorysu')
+    elif abs(measured_x - expected_x) > tolerance:
+        anchor_x = expected_x
+        notes.append(
+            f'  ← změřená kotva je {measured_x - expected_x:+d} px od geometrie, '
+            f'to je moc — beru geometrii'
+        )
+    else:
+        anchor_x = measured_x
 
     expected_h = spec['height']
     drift = (target_h - expected_h) / expected_h

@@ -3584,6 +3584,37 @@ by v nich neměřil nic. Mutační test: plošně zapnutý `allowsSlope` zachyce
 vynechaná výjimka v odhadu ceny zachycena, vypuštěná kontrola vody zachycena.
 
 
+## Šestnáct spritů sedělo vedle svého pozemku
+
+Autor: *„spíš je ale vybrán špatný typ budovy a taky špatné překrytí"*. Typ byl
+vybraný správně — obrázek jen seděl vedle.
+
+Sprite se sází za **spodní vrchol podstavy**, a ten leží v `w / (w + d)` šířky:
+diamant sahá `32·d` doleva a `32·w` doprava od zadního rohu. U čtvercového
+půdorysu je to půlka, u 2 × 1 dvě třetiny.
+
+`fit-sprites.py` kotvu **měří**, protože generátor kreslí podstavu často
+zkosenou. Když měření selhalo, bral se **střed obrázku** — a ten je
+u nečtvercového půdorysu špatně o `32·(w − d)/2 · SCALE`, tedy u 2 × 1
+o 64 px. K tomu se přidaly mizerně poznané podstavy, kde měření sice něco
+vrátilo, ale nesmysl.
+
+Naměřeno: **16 spritů z 216** mělo kotvu jinde, než kam patří. Nejhorší
+`commercial_row__b` o **143 px = 36 herních px**, tedy víc než půl dlaždice —
+budova lezla do sousedova pozemku. Skoro všechny jsou 2 × 1 a 3 × 2, tedy
+právě ty dlouhé provozovny, které autor na snímcích ukazoval.
+
+Opraveno v `fit-sprites.py`: záloha se dopočítá z půdorysu, a když se změřená
+kotva liší od geometrie o víc než `ANCHOR_TOLERANCE` (6 % šířky, zhruba desetina
+dlaždice), měření se zahodí a napíše se to. Obrázky samotné se **nezměnily**,
+vyšly bajt po bajtu stejné; přepsal se jen rejstřík.
+
+Hlídá to nový test v `content.test.ts` nad **vanilla obsahem**, ne nad
+vymyšlenými daty: šířka musí sedět na půdorys, kotva x ležet u `w / (w + d)`
+a kotva y na spodní hraně. Ověřeno mutací dat — vrácení staré kotvy
+`commercial_row__b` test shodí.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

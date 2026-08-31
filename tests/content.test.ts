@@ -443,3 +443,54 @@ describe('manifest spritů', () => {
     expect(buildSprites({ scale: 4, sprites: 'ne' }, {})).toEqual({});
   });
 });
+
+/**
+ * Rejstřík spritů proti geometrii půdorysu.
+ *
+ * Obrázek se na dlaždici sází za **spodní vrchol podstavy**, a ten leží
+ * v `w / (w + d)` šířky: diamant sahá `32·d` doleva a `32·w` doprava od zadního
+ * rohu. U čtvercového půdorysu je to půlka, u 2 × 1 dvě třetiny.
+ *
+ * `fit-sprites.py` kotvu **měří**, protože generátor kreslí podstavu často
+ * zkosenou. Když měření selhalo, bral se do T72 střed obrázku — a ten je
+ * u nečtvercového půdorysu špatně. Šestnáct spritů kvůli tomu sedělo vedle,
+ * `commercial_row__b` o 143 px, tedy víc než půl dlaždice, a lezly do sousedů.
+ * Autor to nahlásil jako „špatné překrytí" a „spíš je vybrán špatný typ budovy".
+ */
+describe('sprity sedí na svém půdorysu', () => {
+  /** Kolik smí kotva utéct od geometrie. Stejná mez jako ve `fit-sprites.py`. */
+  const TOLERANCE = 0.06;
+
+  it('šířka odpovídá půdorysu a kotva leží tam, kam vrchol podstavy patří', async () => {
+    const registry = new ContentRegistry();
+    await registry.load(createVanillaSource());
+
+    const problems: string[] = [];
+    for (const definition of registry.getAll('building')) {
+      const [w, d] = definition.footprint;
+      for (const variant of registry.getSpriteVariants(definition.id)) {
+        const sprite = registry.getSprite(definition.id, variant);
+        if (!sprite) continue;
+
+        // Podstava je široká `(w + d)` půldlaždic; `scale` je nadvzorkování.
+        const expectedWidth = (w + d) * 32 * sprite.scale;
+        if (sprite.width !== expectedWidth) {
+          problems.push(`${definition.id}|${variant}: šířka ${sprite.width}, čekám ${expectedWidth}`);
+        }
+
+        const expectedX = (sprite.width * w) / (w + d);
+        if (Math.abs(sprite.anchor[0] - expectedX) > sprite.width * TOLERANCE) {
+          problems.push(
+            `${definition.id}|${variant}: kotva x ${sprite.anchor[0]}, čekám kolem ${Math.round(expectedX)}`,
+          );
+        }
+        // Svisle sedí budova spodní hranou obrázku — tam je vrchol podstavy.
+        if (sprite.anchor[1] !== sprite.height) {
+          problems.push(`${definition.id}|${variant}: kotva y ${sprite.anchor[1]} není spodní hrana`);
+        }
+      }
+    }
+
+    expect(problems, problems.join('\n')).toEqual([]);
+  });
+});
