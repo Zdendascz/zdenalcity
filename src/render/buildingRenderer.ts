@@ -15,7 +15,7 @@ import {
   FOUNDATION_COLOR,
 } from './palette';
 import { areaHeightRange, groundHeightAt } from '@/sim/heights';
-import { compareDepth } from './depth';
+import { depthOrder } from './depth';
 import type { DepthBox } from './depth';
 import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
 
@@ -135,9 +135,9 @@ export class BuildingRenderer {
    * jinak by přes fasádu vedl pruh kamene.
    */
   private reorder(): void {
-    const order = [...this.boxes.entries()].sort((a, b) => compareDepth(a[1], b[1]));
+    const order = depthOrder(this.boxes);
     for (let i = 0; i < order.length; i++) {
-      const id = order[i]![0];
+      const id = order[i]!;
       const view = this.views.get(id);
       if (view) view.zIndex = i * 2 + 1;
       const skirt = this.skirts.get(id);
@@ -213,13 +213,18 @@ export class BuildingRenderer {
     // `heightLevels` sama.
     const height = appearance.heightLevels * LEVEL_H;
 
-    // Budova ze zóny smí stát i na svahu (rozhodnutí autora, T41). Stojí proto
-    // horní plochou na **nejvyšším** rohu půdorysu a chybějící kus ke dnu
-    // vyplní podezdívka — jinak by na kopci visela rohem ve vzduchu.
+    // Budova ze zóny smí stát i na svahu (rozhodnutí autora, T41). Podlaha leží
+    // v **průměrné** výšce rohů půdorysu a chybějící kus ke dnu vyplní
+    // podezdívka — jinak by na kopci visela rohem ve vzduchu.
+    //
+    // Průměr, ne nejvyšší roh: na nejvyšším musí podezdívka sáhnout až
+    // k nejnižšímu, takže dům stojí celou parcelou na soklu. Autor to nahlásil
+    // slovy „dům pořád visí". Na průměru se zařízne do svahu a dozdívá se jen
+    // dolní půlka, jak se na kopci opravdu staví.
     //
     // Ruční stavby si parcelu srovnají, takže u nich vyjde rozdíl nula a
     // podezdívka se nekreslí. Kód je jeden pro obojí.
-    const { min, max } = areaHeightRange(
+    const { min, pad } = areaHeightRange(
       this.world.cornerHeight,
       building.x,
       building.y,
@@ -233,18 +238,18 @@ export class BuildingRenderer {
     const insetW = width - BUILDING_INSET * 2;
     const insetD = depth - BUILDING_INSET * 2;
 
-    const faces = cuboidFaces(insetX, insetY, insetW, insetD, height, max);
+    const faces = cuboidFaces(insetX, insetY, insetW, insetD, height, pad);
 
     view.clear();
 
-    if (max > min) {
+    if (pad > min) {
       // Podezdívka je **kámen, ne barva domu**: má být vidět, že je to terénní
       // úprava pod stavbou, a ne že dům na svahu povyrostl o dvě patra.
       //
       // Spodní hrana **kopíruje terén**. Rovný kvádr od nejnižšího rohu
       // k nejvyššímu se svahem protínal a hráč pak nepoznal, na které dlaždici
       // budova stojí — nahlásil to autor.
-      const foundation = skirtFaces(insetX, insetY, insetW, insetD, max, (fx, fy) =>
+      const foundation = skirtFaces(insetX, insetY, insetW, insetD, pad, (fx, fy) =>
         groundHeightAt(this.world.cornerHeight, fx, fy),
       );
       view
@@ -266,7 +271,7 @@ export class BuildingRenderer {
       width: width - BUILDING_INSET * 2,
       depth: depth - BUILDING_INSET * 2,
       height,
-      base: max,
+      base: pad,
     });
 
     // zIndex se **nepočítá tady**. Hloubka se v izometrii nedá vyjádřit jedním
@@ -313,8 +318,8 @@ export class BuildingRenderer {
     sprite.anchor.set(image.anchor[0] / image.width, image.anchor[1] / image.height);
     sprite.scale.set(1 / image.scale);
 
-    const { min, max } = areaHeightRange(this.world.cornerHeight, x, y, width, depth);
-    const front = gridToScreen(x + width, y + depth, max);
+    const { min, pad } = areaHeightRange(this.world.cornerHeight, x, y, width, depth);
+    const front = gridToScreen(x + width, y + depth, pad);
     sprite.position.set(front.x, front.y);
     this.boxes.set(id, { x, y, width, depth, base: min });
 
@@ -325,7 +330,7 @@ export class BuildingRenderer {
     //
     // Kreslí se **o krok dřív** než sprite, aby ji obrázek překryl. Sprite by
     // ji jinak nepřekryl a byl by vidět pruh kamene přes fasádu.
-    this.drawSkirt(id, x, y, width, depth, min, max);
+    this.drawSkirt(id, x, y, width, depth, min, pad);
 
     const texture = sprite.texture;
     if (texture === Texture.EMPTY || texture.label !== image.url) {

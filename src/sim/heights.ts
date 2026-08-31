@@ -158,10 +158,12 @@ export function areaHeightRange(
   y: number,
   w: number,
   h: number,
-): { min: number; max: number } {
+): { min: number; max: number; pad: number } {
   const side = cornerSideOf(heights);
   let min = MAX_HEIGHT;
   let max = 0;
+  let sum = 0;
+  let count = 0;
 
   for (let cy = y; cy <= y + h; cy++) {
     for (let cx = x; cx <= x + w; cx++) {
@@ -169,10 +171,22 @@ export function areaHeightRange(
       const value = heights[cornerIndex(cx, cy, side)] ?? 0;
       if (value < min) min = value;
       if (value > max) max = value;
+      sum += value;
+      count++;
     }
   }
 
-  return min > max ? { min: 0, max: 0 } : { min, max };
+  if (min > max) return { min: 0, max: 0, pad: 0 };
+  // Výška, ve které leží podlaha. **Průměr rohů, ne nejvyšší z nich**: na
+  // nejvyšším by dům stál celou parcelou na betonovém podstavci, protože
+  // podezdívka by musela dosáhnout až k tomu nejnižšímu. Na průměru se zařízne
+  // do svahu a dozdívá se jen dolní půlka — přesně jako se na kopci staví,
+  // půl odkopat, půl dosypat.
+  // Ořezávat do `[min, max]` není potřeba: průměr celých čísel leží mezi nimi
+  // a zaokrouhlením z toho intervalu nevypadne. Zkoušel jsem ořez přidat
+  // a mutační test ho označil za mrtvý kód, protože ho nešlo zabít.
+  const pad = Math.round(sum / count);
+  return { min, max, pad };
 }
 
 /**

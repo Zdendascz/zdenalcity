@@ -65,6 +65,12 @@ export class BuildingInfo {
     definition: Definition | undefined,
     /** Proč se na parcele nestaví — lokalizační klíč, nebo `null`. */
     blocker: string | null = null,
+    /**
+     * Soubor obrázku, kterým se budova zrovna kreslí. **Dočasné** — autor si
+     * podle něj kontroluje vygenerované sprity ručně, protože se v terénu
+     * chovají různě a od pohledu nejde poznat, která varianta padla.
+     */
+    spriteFile: string | null = null,
   ): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
@@ -105,6 +111,8 @@ export class BuildingInfo {
       ['ui.info.built', t('ui.hud.date', dateParts(building.builtAtTick))],
       ['ui.info.cost', formatNumber(definition.construction.cost)],
     ];
+
+    if (spriteFile !== null) rows.push(['ui.info.spriteFile', spriteFile]);
 
     if (building.population > 0) rows.push(['ui.hud.population', formatNumber(building.population)]);
     if (building.jobs > 0) rows.push(['ui.hud.jobs', formatNumber(building.jobs)]);

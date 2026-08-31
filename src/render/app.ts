@@ -896,12 +896,24 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       tile.y,
     );
 
+    // Jméno souboru obrázku je **dočasné** — autor podle něj kontroluje
+    // vygenerované varianty ručně. Počítá se stejnou cestou jako v rendereru,
+    // aby ukazovalo opravdu ten obrázek, který je na mapě vidět.
+    const spriteVariant = building
+      ? variantFor(content.getSpriteVariants(building.definitionId), building.id)
+      : undefined;
+    const spriteFile =
+      building && spriteVariant !== undefined
+        ? (content.getSprite(building.definitionId, spriteVariant)?.url ?? null)
+        : null;
+
     buildingInfo.show(
       simWorld,
       parcel,
       building,
       building ? content.get(building.definitionId) : undefined,
       growthBlocker(simWorld, content, content.getBalance(), tile.x, tile.y),
+      spriteFile,
     );
   }
 

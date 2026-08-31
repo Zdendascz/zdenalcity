@@ -3487,6 +3487,65 @@ překrývají, takže druhá dlaždice roh vrátí zpátky. Mutace obou dvojic n
 zachycena je.
 
 
+## Pořadí kreslení a visící domy (obr. 2–4 od autora)
+
+Autor: „dost špatně se teď vykreslují budovy přes sebe… v kopci není místo,
+kde by to bylo správně" a „dům pořád visí".
+
+### Pořadí kreslení bylo rozbité, a dalo se to spočítat
+
+V `depth.ts` byl komparátor pro `Array.sort`. Jenže `isBehind` **není
+uspořádání**: dva domky na úhlopříčce, třeba (10, 11) a (11, 10), jsou každý
+za tím druhým — první v ose x, druhý v ose y. Komparátor pak tvrdil `a < b`
+i `b < a` a `Array.sort` z toho udělal libovolné pořadí.
+
+Změřeno v autorově savu, 700 budov: dvojic, které se na obrazovce překrývají
+a u kterých je jasné, která je vpředu, je **2 130**. Z nich bylo nakresleno
+obráceně **754**, tedy 35 %.
+
+Opraveno topologickým řazením. Po opravě je špatných dvojic **nula**.
+Skalár to zachránit nešlo — protipříklad je taky naměřený: sídliště 5 × 5 na
+(29, 12) končí v ose x tam, kde začíná domek na (34, 14), takže je za ním,
+ale jeho přední roh je hlouběji, takže ho každý skalár z předního rohu prohodí.
+
+Hrany se nehledají přes všechny dvojice, ale zametáním po svislých pruzích
+obrazovky — vodorovná poloha v izometrii závisí jen na `x − y`, ne na výšce.
+Přerovnání 700 budov: **4,4 → 1,0 ms**. Syntetických 2 500 budov: **33 → 2,1 ms**.
+
+### Dům visel, protože stál na nejvyšším rohu parcely
+
+Podlaha ležela na `max` rohů půdorysu, takže podezdívka musela dosáhnout až
+k tomu nejnižšímu a dům stál celou parcelou na betonovém soklu. Teď leží na
+**průměru** rohů: dolní půlka se dozdí, horní se zařízne do svahu — jak se na
+kopci opravdu staví. Na dlaždici, na kterou si autor stěžoval (rohy 3/4/2/3),
+klesla podezdívka ze dvou pater na jedno.
+
+Ořez průměru do `[min, max]` jsem přidal a zase odstranil: mutační test ho
+označil za mrtvý kód. Průměr celých čísel mezi nimi leží a zaokrouhlením
+z toho intervalu nevypadne.
+
+### Kaskádové budovy: proč ne
+
+Měřeno v autorově savu. Z 246 budov stojících nakřivo stojí **0** na schodech —
+174 na nakloněné jedné dlaždici, 72 vícedlaždicových má aspoň jednu dlaždici
+nakloněnou. Kaskáda předpokládá schody a ty ve městě nejsou; terén je spojitá
+rampa. Navíc obrázek nejde podél schodu rozstřihnout, řez by vedl přes okna,
+takže by musely být obrázky přímo pro každý schodový vzor — prostor vzorů je
+14 pro 2 × 2 ve dvou úrovních a 3⁹ pro 3 × 3 ve třech.
+
+U budovy, kterou autor ukázal (sídliště na 68, 13), je terén pod půdorysem
+dokonce **hřeben**, ne svah: rohy po řadách `1 1 1 1 / 2 2 2 2 / 1 1 2 2 /
+1 1 1 2`. Kaskádový obrázek by na něj nesedl v žádné orientaci.
+
+### Dočasné: jméno souboru v panelu budovy
+
+Panel budovy ukazuje řádek „Obrázek (dočasné)" se jménem souboru, kterým se
+budova zrovna kreslí. Autor si podle něj kontroluje vygenerované varianty
+ručně. Počítá se stejnou cestou jako v rendereru přes `variantFor`, takže
+ukazuje opravdu ten obrázek, který je vidět na mapě. **Až kontrola skončí,
+řádek i klíč `ui.info.spriteFile` pryč.**
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

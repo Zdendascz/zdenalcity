@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { compareDepth, isBehind } from '@/render/depth';
+import { depthOrder, isBehind, mustDrawBefore } from '@/render/depth';
+import type { DepthBox } from '@/render/depth';
 import {
   clampZoom,
   createCamera,
@@ -14,7 +15,13 @@ import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { iconShape } from '@/render/icons';
 import { containsPoint, pickTile } from '@/render/picking';
-import { createCornerHeights, cornerIndex, groundHeightAt, MAX_HEIGHT } from '@/sim/heights';
+import {
+  areaHeightRange,
+  cornerIndex,
+  createCornerHeights,
+  groundHeightAt,
+  MAX_HEIGHT,
+} from '@/sim/heights';
 import {
   cuboidFaces,
   diamondPoints,
@@ -575,6 +582,50 @@ describe('výška terénu mezi rohy', () => {
   });
 });
 
+describe('podlaha budovy leží v průměru rohů', () => {
+  function heights(values: readonly (readonly number[])[]): Uint8Array {
+    const side = values.length;
+    const out = createCornerHeights(side - 1);
+    for (let y = 0; y < side; y++)
+      for (let x = 0; x < side; x++) out[cornerIndex(x, y, side)] = values[y]?.[x] ?? 0;
+    return out;
+  }
+
+  it('diagonální rampa: podlaha uprostřed, ne nahoře', () => {
+    // Přesně dlaždice, na kterou si autor stěžoval slovy „dům pořád visí":
+    // rohy 3/4/2/3, tedy dva stupně na jedné dlaždici. Na nejvyšším rohu by
+    // podezdívka musela mít dvě patra a dům by stál na soklu; na průměru má
+    // jedno a druhé patro se zařízne do svahu.
+    const h = heights([
+      [3, 4],
+      [2, 3],
+    ]);
+    expect(areaHeightRange(h, 0, 0, 1, 1)).toEqual({ min: 2, max: 4, pad: 3 });
+  });
+
+  it('na rovné parcele je podlaha na zemi a podezdívka žádná', () => {
+    const h = heights([
+      [2, 2],
+      [2, 2],
+    ]);
+    const { min, pad } = areaHeightRange(h, 0, 0, 1, 1);
+    expect(pad).toBe(2);
+    expect(pad - min).toBe(0);
+  });
+
+  it('podlaha nikdy nevyjde mimo rozsah rohů', () => {
+    // Zaokrouhlení nesmí utéct ven: podezdívka by pak visela nad terénem,
+    // nebo by ji dům měl zápornou.
+    const h = heights([
+      [0, 5],
+      [0, 0],
+    ]);
+    const { min, max, pad } = areaHeightRange(h, 0, 0, 1, 1);
+    expect(pad).toBeGreaterThanOrEqual(min);
+    expect(pad).toBeLessThanOrEqual(max);
+  });
+});
+
 describe('podezdívka kopíruje terén', () => {
   function heightsFor(values: readonly (readonly number[])[]): Uint8Array {
     const side = values.length;
@@ -739,45 +790,62 @@ describe('variace dlaždic', () => {
  * jiným skalárem** — protipříklady si odporují. Proto se porovnává po dvojicích.
  */
 describe('hloubka budov', () => {
-  const box = (x: number, y: number, width: number, depth: number, base = 0) =>
-    ({ x, y, width, depth, base });
+  const box = (x: number, y: number, width: number, depth: number, base = 0) => ({
+    x,
+    y,
+    width,
+    depth,
+    base,
+  });
+
+  /** Pořadí kreslení pro pár krabic. Vrací id v pořadí od zadní k přední. */
+  function poradi(...boxes: DepthBox[]): number[] {
+    return depthOrder(new Map(boxes.map((b, i) => [i, b])));
+  }
 
   it('velká budova se kreslí dřív než malá před ní', () => {
     // Přesně nahlášený případ. Domek hned za pravým okrajem sídliště je
     // blíž pozorovateli, takže sídliště nesmí být nakreslené po něm.
-    const sidliste = box(62, 62, 3, 3);
-    const domek = box(65, 62, 1, 1);
-
-    expect(compareDepth(sidliste, domek)).toBeLessThan(0);
-    expect(compareDepth(domek, sidliste)).toBeGreaterThan(0);
+    expect(poradi(box(62, 62, 3, 3), box(65, 62, 1, 1))).toEqual([0, 1]);
+    expect(poradi(box(65, 62, 1, 1), box(62, 62, 3, 3))).toEqual([1, 0]);
   });
 
   it('to platí i v druhé ose', () => {
-    expect(compareDepth(box(62, 62, 3, 3), box(62, 65, 1, 1))).toBeLessThan(0);
+    expect(poradi(box(62, 62, 3, 3), box(62, 65, 1, 1))).toEqual([0, 1]);
   });
 
-  it('žádné jediné číslo to nezvládne — dva protichůdné případy', () => {
-    // Kdyby se řadilo podle x, jeden z těch dvou by vyšel obráceně.
-    // Továrna 2×2 a obchod za ní: obchod má VĚTŠÍ x a kreslí se dřív.
-    expect(compareDepth(box(11, 9, 1, 1), box(10, 10, 2, 2))).toBeLessThan(0);
-    // Dva domky vedle sebe: první má MENŠÍ x a kreslí se dřív.
-    expect(compareDepth(box(10, 11, 1, 1), box(11, 10, 1, 1))).toBeLessThan(0);
+  it('žádné jediné číslo to nezvládne — naměřený protipříklad', () => {
+    // Z autorova města. Sídliště 5 × 5 na (29, 12) končí v ose x tam, kde
+    // začíná domek na (34, 14), takže je **za** ním. Jeho přední roh je ale
+    // hlouběji (34 + 17 proti 35 + 15), takže skalár z předního rohu je
+    // prohodí. Tohle byla ta dvojice, na které padlo řazení jedním číslem.
+    expect(poradi(box(29, 12, 5, 5), box(34, 14, 1, 1))).toEqual([0, 1]);
+
+    // A druhý směr: obchod má VĚTŠÍ x než továrna a kreslí se dřív.
+    expect(poradi(box(10, 10, 2, 2), box(11, 9, 1, 1))).toEqual([1, 0]);
+  });
+
+  it('dvojice na úhlopříčce se za sebou nepovažuje ani jedním směrem', () => {
+    // Tohle rozhodilo řazení celého města: `isBehind` u nich platí oběma
+    // směry, takže starý komparátor tvrdil `a < b` i `b < a`. Dotýkají se
+    // rohem, jedna druhou nepřekryje a na pořadí nezáleží.
+    const a = box(10, 11, 1, 1);
+    const b = box(11, 10, 1, 1);
+
+    expect(isBehind(a, b)).toBe(true);
+    expect(isBehind(b, a)).toBe(true);
+    expect(mustDrawBefore(a, b)).toBe(false);
+    expect(mustDrawBefore(b, a)).toBe(false);
   });
 
   it('ve stejné hloubce je výš položená budova dál', () => {
-    // Dvě budovy vedle sebe, jedna na kopci: v izometrii se překrývají a ta
-    // výš stojící je od pozorovatele dál (§7 fáze 3).
-    const nahore = box(20, 20, 1, 1, 5);
-    const dole = box(20, 20, 1, 1, 0);
-
-    expect(compareDepth(nahore, dole)).toBeLessThan(0);
+    // Dvě budovy na stejném místě, jedna na kopci: ta výš stojící je od
+    // pozorovatele dál (§7 fáze 3).
+    expect(poradi(box(20, 20, 1, 1, 0), box(20, 20, 1, 1, 5))).toEqual([1, 0]);
   });
 
   it('řada domů se seřadí od zadního k přednímu', () => {
-    const rada = [box(14, 10, 1, 1), box(10, 10, 1, 1), box(12, 10, 1, 1)];
-    const serazeno = [...rada].sort(compareDepth).map((b) => b.x);
-
-    expect(serazeno).toEqual([10, 12, 14]);
+    expect(poradi(box(14, 10, 1, 1), box(10, 10, 1, 1), box(12, 10, 1, 1))).toEqual([1, 2, 0]);
   });
 
   it('sousedící budovy se považují za zaň sebou, ne za překrývající', () => {
@@ -785,5 +853,43 @@ describe('hloubka budov', () => {
     // „za sebou", jinak by o jejich pořadí rozhodovala až výška.
     expect(isBehind(box(10, 10, 2, 2), box(12, 10, 2, 2))).toBe(true);
     expect(isBehind(box(12, 10, 2, 2), box(10, 10, 2, 2))).toBe(false);
+  });
+
+  it('ve větší čtvrti nezůstane ani jedna dvojice nakreslená obráceně', () => {
+    // Vlastnostní test. Přesně tohle se naměřilo v autorově městě a vyšlo
+    // 754 špatných dvojic z 2130; jednotlivé případy výš to neodhalily,
+    // protože chyba vznikala až složením přes `Array.sort`.
+    const boxes = new Map<number, DepthBox>();
+    let id = 0;
+    for (let y = 0; y < 12; y++) {
+      for (let x = 0; x < 12; x++) {
+        // Nepravidelná směs velikostí a výšek, ať se potkají všechny případy.
+        const big = (x * 7 + y * 3) % 5 === 0;
+        const size = big ? 3 : 1;
+        if (x + size > 12 || y + size > 12) continue;
+        // Ať se půdorysy nepřekrývají, velké se sázejí jen na mřížku po třech.
+        if (big && (x % 3 !== 0 || y % 3 !== 0)) continue;
+        boxes.set(id++, { x, y, width: size, depth: size, base: (x + y) % 4 });
+      }
+    }
+    // Půdorysy se nesmí překrývat, jinak by test měřil nesmysl.
+    const obsazeno = new Set<string>();
+    for (const b of boxes.values()) {
+      for (let dy = 0; dy < b.depth; dy++)
+        for (let dx = 0; dx < b.width; dx++) obsazeno.add(`${b.x + dx},${b.y + dy}`);
+    }
+
+    const order = depthOrder(boxes);
+    expect(order.length).toBe(boxes.size);
+
+    const misto = new Map(order.map((key, i) => [key, i]));
+    let spatne = 0;
+    for (const [ka, a] of boxes) {
+      for (const [kb, b] of boxes) {
+        if (ka === kb) continue;
+        if (mustDrawBefore(a, b) && misto.get(ka)! > misto.get(kb)!) spatne++;
+      }
+    }
+    expect(spatne).toBe(0);
   });
 });
