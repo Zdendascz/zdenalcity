@@ -323,7 +323,11 @@ export function estimatePlacement(
   if (!definition) return { building: 0, levelling: 0, total: 0, changes: new Map() };
 
   const [width, depth] = definition.footprint;
-  const changes = planLevelling(world, x, y, width, depth);
+  // Co snese svah, to se nesrovnává a nic za srovnání neplatí — park se do
+  // kopce posadí, jak je (`allowsSlope`, P5).
+  const changes = definition.construction.allowsSlope
+    ? new Map<number, number>()
+    : planLevelling(world, x, y, width, depth);
   const levelling = changes.size * (balance?.map.terraformCost ?? 0);
   const building = definition.construction.cost;
 
@@ -779,11 +783,17 @@ export interface TerraformEstimate {
 /**
  * Smí se terén na tomhle plánu hnout? Pravidlo je ve `world.ts`, protože se na
  * ně ptá i růst zástavby — tady se jen překládá na hlášku pro hráče.
+ *
+ * **Budova v cestě terén nezastaví** (rozhodnutí autora, stejné jako u silnic).
+ * Dřív se to odmítalo hláškou „nejdřív ji zbourej", takže hráč nemohl srovnat
+ * roh pod křivou silnicí, i když by mu stačilo podezdít dům vedle. Podezdívku
+ * si budova dokreslí sama, protože renderer kopíruje terén, a `applyHeightChanges`
+ * ji označí za změněnou, takže se překreslí hned.
+ *
+ * Voda pořád ano: zvednutý roh u hladiny by udělal souš pod vodou.
  */
 function checkTerraform(world: WorldState, changes: ReadonlyMap<number, number>): CommandResult {
-  const blocker = reshapeBlocker(world, changes);
-  if (blocker === 'building') return reject('error.terraformBuilding');
-  if (blocker === 'water') return reject('error.terraformWater');
+  if (reshapeBlocker(world, changes) === 'water') return reject('error.terraformWater');
   return OK;
 }
 

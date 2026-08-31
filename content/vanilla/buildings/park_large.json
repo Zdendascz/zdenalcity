@@ -5,12 +5,19 @@
   "menu": "parks",
   "name": "building.park_large.name",
   "description": "building.park_large.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "construction": {
     "cost": 400,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowsSlope": true,
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 60

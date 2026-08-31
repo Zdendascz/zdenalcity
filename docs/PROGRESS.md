@@ -3546,6 +3546,44 @@ ukazuje opravdu ten obrázek, který je vidět na mapě. **Až kontrola skončí
 řádek i klíč `ui.info.spriteFile` pryč.**
 
 
+## Terén pod budovou a park ve svahu
+
+Dvě věci z jednoho autorova snímku.
+
+### „Pod budovou se terén hýbat nedá" — už dá
+
+Ruční srovnání rohu se odmítalo, když kolem něj stála budova. Autor na to
+narazil takhle: měl křivou silnici, chtěl srovnat roh, a hra ho poslala nejdřív
+zbourat dům vedle — *„přitom by to normálně v pohodě mělo… podezdí barák
+a cesta na rovině"*.
+
+Zůstala jediná překážka, **voda**: zvednutý roh u hladiny by udělal souš pod
+vodou. Budovu to nezastaví, podezdívku si dokreslí sama a `applyHeightChanges`
+ji označí za změněnou, takže se překreslí hned — ověřeno v běžící hře.
+
+Platí to pro ruční terraforming i pro srovnání parcely při ruční stavbě.
+**Hromadné srovnání při zónování zůstává, jak bylo** — to při tažení přes celou
+čtvrť sahá na desítky parcel naráz a tichý přesun terénu pod hotovou zástavbou
+je něco jiného než jeden klik na jeden roh. Hláška `error.terraformBuilding`
+zmizela z obou lokalizací.
+
+### Park se do kopce posadí, jak je
+
+*„Zrovna park by asi mohl být i v kopci, aniž by se musel rovnat ne?"* — ano.
+Definice si to říká sama přes `construction.allowsSlope` (P5), takže to není
+výjimka v kódu a mod si to smí nastavit pro cokoli. Nastaveno u `park_small`,
+`park_large` a `city_park`; `industrial_park` ne — to je zástavba průmyslové
+zóny, ne služba.
+
+Co má příznak, tomu `checkFootprint` neřeší rovinu a `estimatePlacement` mu
+neplánuje ani neúčtuje srovnání. Ověřeno v běžící hře: park na dlaždici s rohy
+1/2/1/2 se postavil, terén se nehnul ani o roh a strhlo se přesně 100.
+
+Testy o srovnávání parcely přešly z parku na **větrnou elektrárnu** — park už
+by v nich neměřil nic. Mutační test: plošně zapnutý `allowsSlope` zachycen,
+vynechaná výjimka v odhadu ceny zachycena, vypuštěná kontrola vody zachycena.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

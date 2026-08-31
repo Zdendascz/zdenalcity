@@ -13,6 +13,7 @@
     "cost": 1300,
     "requiresRoad": true,
     "requiresPower": false,
+    "allowsSlope": true,
     "allowedTerrain": [
       0,
       2

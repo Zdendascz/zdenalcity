@@ -51,13 +51,15 @@ function raise(w: WorldState, x: number, y: number, h: number): void {
 }
 
 describe('budovy chtějí rovinu (§7 fáze 3)', () => {
+  // Větrná elektrárna, ne park: park od T72 svah **snese** a nic se pod ním
+  // nesrovnává (`allowsSlope`), takže by tyhle testy neměřily nic.
   it('na svahu se ručně nepostaví, dokud se parcela nesrovná', async () => {
     const content = await vanilla();
     const w = world();
     raise(w, 20, 20, 3);
     expect(isFlatTile(w.cornerHeight, 20, 20)).toBe(false);
 
-    const definition = content.get('vanilla:park_small');
+    const definition = content.get('vanilla:wind_turbine');
     expect(definition).toBeDefined();
     if (!definition) return;
 
@@ -66,7 +68,7 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
     expect(checkFootprint(w, definition, 20, 20).ok === false).toBe(true);
 
     // …ale stavba ho **srovná a postaví**, protože o to hráči jde.
-    expect(placeDefinition(w, content, 'vanilla:park_small', 20, 20, VANILLA_BALANCE).ok).toBe(true);
+    expect(placeDefinition(w, content, 'vanilla:wind_turbine', 20, 20, VANILLA_BALANCE).ok).toBe(true);
     expect(isFlatTile(w.cornerHeight, 20, 20)).toBe(true);
   });
 
@@ -75,12 +77,12 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
     const w = world();
     raise(w, 30, 30, 3);
 
-    const plan = estimatePlacement(w, content, 'vanilla:park_small', 30, 30, VANILLA_BALANCE);
+    const plan = estimatePlacement(w, content, 'vanilla:wind_turbine', 30, 30, VANILLA_BALANCE);
     expect(plan.levelling).toBeGreaterThan(0);
     expect(plan.total).toBe(plan.building + plan.levelling);
 
     const before = w.economy.funds;
-    expect(placeDefinition(w, content, 'vanilla:park_small', 30, 30, VANILLA_BALANCE).ok).toBe(true);
+    expect(placeDefinition(w, content, 'vanilla:wind_turbine', 30, 30, VANILLA_BALANCE).ok).toBe(true);
     expect(before - w.economy.funds).toBe(plan.total);
   });
 
@@ -88,7 +90,7 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
     const content = await vanilla();
     const w = world();
 
-    const plan = estimatePlacement(w, content, 'vanilla:park_small', 40, 40, VANILLA_BALANCE);
+    const plan = estimatePlacement(w, content, 'vanilla:wind_turbine', 40, 40, VANILLA_BALANCE);
 
     expect(plan.levelling).toBe(0);
     expect(plan.total).toBe(plan.building);
@@ -100,10 +102,10 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
     const w = world();
     raise(w, 50, 50, 4);
 
-    const plan = estimatePlacement(w, content, 'vanilla:park_small', 50, 50, VANILLA_BALANCE);
+    const plan = estimatePlacement(w, content, 'vanilla:wind_turbine', 50, 50, VANILLA_BALANCE);
     w.economy.funds = plan.total - 1;
 
-    const result = placeDefinition(w, content, 'vanilla:park_small', 50, 50, VANILLA_BALANCE);
+    const result = placeDefinition(w, content, 'vanilla:wind_turbine', 50, 50, VANILLA_BALANCE);
 
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toBe('error.notEnoughFunds');
@@ -124,7 +126,7 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
     w.cornerHeight[cornerIndex(71, 72, CORNER_SIZE)] = 0;
     w.cornerHeight[cornerIndex(72, 72, CORNER_SIZE)] = 0;
 
-    const result = placeDefinition(w, content, 'vanilla:park_small', 70, 70, VANILLA_BALANCE);
+    const result = placeDefinition(w, content, 'vanilla:wind_turbine', 70, 70, VANILLA_BALANCE);
 
     expect(result.ok).toBe(true);
     expect(isFlatTile(w.cornerHeight, 70, 70)).toBe(true);
@@ -142,17 +144,47 @@ describe('budovy chtějí rovinu (§7 fáze 3)', () => {
     }
   });
 
-  it('srovnání pod sousední budovou stavbu zastaví', async () => {
-    // Kaskáda by sáhla pod budovu vedle, a tam se terén hýbat nesmí (T32).
+  it('park se do kopce posadí, jak je, a nic za srovnání neplatí', async () => {
+    // Autor: „zrovna park by asi mohl být i v kopci, aniž by se musel rovnat".
+    // Je to vlastnost **definice** (`allowsSlope`), ne výjimka v kódu (P5).
+    const content = await vanilla();
+    const w = world();
+    raise(w, 80, 80, 3);
+    expect(isFlatTile(w.cornerHeight, 80, 80)).toBe(false);
+
+    const předtím = Uint8Array.from(w.cornerHeight);
+    const plan = estimatePlacement(w, content, 'vanilla:park_small', 80, 80, VANILLA_BALANCE);
+    expect(plan.levelling).toBe(0);
+    expect(plan.changes.size).toBe(0);
+
+    const kasa = w.economy.funds;
+    expect(placeDefinition(w, content, 'vanilla:park_small', 80, 80, VANILLA_BALANCE).ok).toBe(true);
+
+    // Terén se nehnul ani o roh a strhla se jen cena parku.
+    expect(w.cornerHeight).toEqual(předtím);
+    expect(kasa - w.economy.funds).toBe(content.get('vanilla:park_small')?.construction.cost);
+  });
+
+  it('co svah nesnese, to se pod sebou pořád srovná', async () => {
+    // Kontrola, že `allowsSlope` je opravdu podle definice, ne plošné vypnutí.
+    const content = await vanilla();
+    const w = world();
+    raise(w, 85, 85, 3);
+
+    const plan = estimatePlacement(w, content, 'vanilla:wind_turbine', 85, 85, VANILLA_BALANCE);
+    expect(plan.levelling).toBeGreaterThan(0);
+  });
+
+  it('srovnání smí sáhnout i pod sousední budovu', async () => {
+    // Do T72 to stavbu zastavilo (T32). Autor rozhodl obráceně: soused se
+    // podezdí, stavět jde. Zastaví to jen voda.
     const content = await vanilla();
     const w = world();
     raise(w, 60, 60, 5);
     w.layers.buildingId[index(61, 60, MAP_SIZE)] = 3;
 
     const result = placeDefinition(w, content, 'vanilla:park_small', 60, 60, VANILLA_BALANCE);
-
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toBe('error.terraformBuilding');
+    expect(result, JSON.stringify(result)).toEqual({ ok: true });
   });
 });
 

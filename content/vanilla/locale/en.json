@@ -316,7 +316,6 @@
   "error.occupied": "The tile is occupied.",
   "error.occupiedFootprint": "It does not fit here. This building needs {width} × {depth} free tiles.",
   "error.nothingToBulldoze": "Nothing to bulldoze here.",
-  "error.terraformBuilding": "The ground under a building cannot move. Demolish it first.",
   "error.needsWater": "Nothing builds here without water. Bring a pipe over.",
   "error.needsShore": "A waterworks has to stand by the water.",
   "error.noPipe": "There is no pipe here.",

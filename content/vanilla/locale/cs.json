@@ -316,7 +316,6 @@
   "error.occupied": "Dlaždice je obsazená.",
   "error.occupiedFootprint": "Nevejde se sem. Tahle budova potřebuje volných {width} × {depth} dlaždic.",
   "error.nothingToBulldoze": "Není tu co bourat.",
-  "error.terraformBuilding": "Pod budovou se terén hýbat nedá. Nejdřív ji zbourej.",
   "error.needsWater": "Bez vodovodu se tu stavět nedá. Doveď sem potrubí.",
   "error.needsShore": "Vodárna musí stát u vody.",
   "error.noPipe": "Tady žádné potrubí není.",

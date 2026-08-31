@@ -90,7 +90,14 @@ export function checkFootprint(
       // Budova stojí na rovině (§7 fáze 3). Na svahu by visela jedním rohem ve
       // vzduchu — a srovnat parcelu je nabídka, ne automatika, protože stojí
       // peníze a hráč to má vidět předem (§12 kritérium 14).
-      if (!options.skipFlatCheck && !isFlatTile(world.cornerHeight, tileX, tileY)) {
+      //
+      // Výjimku si říká **definice** sama přes `allowsSlope` (P5): park se do
+      // kopce posadí, jak je, a nic se pod ním nerovná.
+      if (
+        !options.skipFlatCheck &&
+        !definition.construction.allowsSlope &&
+        !isFlatTile(world.cornerHeight, tileX, tileY)
+      ) {
         return reject('error.notFlat');
       }
     }

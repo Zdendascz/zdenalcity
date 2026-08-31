@@ -54,6 +54,15 @@ export interface BuildingDefinition {
     requiresWater?: boolean;
     /** Musí sousedit s vodní plochou — vodárna z ní bere (§8 fáze 3). */
     nearWater?: boolean;
+    /**
+     * Snese svah, takže se pod ní parcela nesrovnává.
+     *
+     * Většina staveb potřebuje rovinu — dům ani elektrárna se přes zlom
+     * nepostaví. Park ale ano: „zrovna park by asi mohl být i v kopci, aniž by
+     * se musel rovnat" (rozhodnutí autora). Je to vlastnost **definice**, ne
+     * kódu, aby si to mod směl nastavit sám (P5).
+     */
+    allowsSlope?: boolean;
     allowedTerrain: readonly number[];
   };
   economy: { upkeep: number };
@@ -514,6 +523,7 @@ function validateConstruction(
     'construction.requiresWater',
   );
   const nearWater = optionalBoolean(issues, section, 'nearWater', 'construction.nearWater');
+  const allowsSlope = optionalBoolean(issues, section, 'allowsSlope', 'construction.allowsSlope');
 
   return {
     cost,
@@ -521,6 +531,7 @@ function validateConstruction(
     requiresPower,
     ...(requiresWater ? { requiresWater } : {}),
     ...(nearWater ? { nearWater } : {}),
+    ...(allowsSlope ? { allowsSlope } : {}),
     allowedTerrain,
   };
 }

@@ -127,32 +127,52 @@ describe('terraforming — co se nesmí', () => {
     expect(terraformCorner(w, 10, 10, -2, VANILLA_BALANCE).ok).toBe(true);
   });
 
-  it('pod budovou se terén nehýbe ani nahoru, ani dolů', () => {
-    // Budova stojí na rovině; nakloněný terén pod ní by ji zavěsil do vzduchu.
+  it('pod budovou se terén hýbat smí, nahoru i dolů', () => {
+    // Rozhodnutí autora, stejné jako u silnic. Dřív se to odmítalo hláškou
+    // „nejdřív ji zbourej", takže hráč nemohl srovnat roh pod křivou silnicí,
+    // i když by mu stačilo podezdít dům vedle. Nahlásil to na snímku.
     const w = world();
     // Terén ve třetím patře, ať má snížení kam jít — snižovat nulu není změna.
     w.cornerHeight.fill(3);
     w.layers.buildingId[index(25, 25, MAP_SIZE)] = 42;
 
     for (const delta of [1, -1]) {
-      const result = terraformCorner(w, 25, 25, delta, VANILLA_BALANCE);
-      expect(result.ok, `delta ${delta}`).toBe(false);
-      expect(result.ok === false && result.reason).toBe('error.terraformBuilding');
+      expect(terraformCorner(w, 25, 25, delta, VANILLA_BALANCE).ok, `delta ${delta}`).toBe(true);
     }
   });
 
-  it('budova zasažená až kaskádou zastaví celou operaci', () => {
-    // Klik je daleko od budovy, ale vlna se k ní dokutálí. Musí spadnout celá
-    // operace — polovina kaskády by porušila invariant.
+  it('budova se pozná jako změněná, aby si přepočítala podezdívku', () => {
+    // Bez toho by dům zůstal nakreslený nad starým terénem až do chvíle, kdy
+    // se ho dotkne něco jiného — a přesně tak vypadá „visící barák".
+    const w = world();
+    w.cornerHeight.fill(3);
+    w.layers.buildingId[index(25, 25, MAP_SIZE)] = 42;
+    w.dirty.buildings.clear();
+
+    expect(terraformCorner(w, 25, 25, 1, VANILLA_BALANCE).ok).toBe(true);
+    expect(w.dirty.buildings.has(42)).toBe(true);
+  });
+
+  it('kaskáda pod vzdálenou budovou projde celá', () => {
+    // Klik je daleko od budovy, ale vlna se k ní dokutálí. Dřív spadla celá
+    // operace; teď se terén hne a budova se podezdí.
     const w = world();
     w.layers.buildingId[index(43, 40, MAP_SIZE)] = 7;
     const before = Uint8Array.from(w.cornerHeight);
 
-    const result = terraformCorner(w, 40, 40, 5, VANILLA_BALANCE);
+    expect(terraformCorner(w, 40, 40, 5, VANILLA_BALANCE).ok).toBe(true);
+    expect(w.cornerHeight).not.toEqual(before);
+  });
+
+  it('do vody se pořád nesype', () => {
+    // Jediná zbylá překážka. Zvednutý roh u hladiny by udělal souš pod vodou.
+    const w = world();
+    w.layers.terrain[index(51, 50, MAP_SIZE)] = TERRAIN.water;
+
+    const result = terraformCorner(w, 50, 50, 2, VANILLA_BALANCE);
 
     expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toBe('error.terraformBuilding');
-    expect(w.cornerHeight).toEqual(before);
+    expect(result.ok === false && result.reason).toBe('error.terraformWater');
   });
 
   it('silnice se hýbat smí', () => {
