@@ -71,7 +71,19 @@ MODEL = 'gpt-image-2'
 FENCE = r'```(.*?)```'
 SUBJECT = r'^#{3,4} `([a-z0-9_]+)`.*?$(.*?)(?=^#{3,4} |^## |\Z)'
 VARIANT = r'^\| \*\*([abc])\*\* \| (.+?) \|\s*$'
-SIZE = '1024x1024'
+# Čtvercové plátno má strop na výšku budovy: podstava má vyplnit šířku, takže
+# vysoká stavba se do čtverce nevejde. Naměřeno na první dávce — 129 z 228
+# budov vyšlo nižších, než čeká `heightLevels`, medián o 32 %. Vysoké se proto
+# kreslí **na výšku**.
+SIZE_SQUARE = '1024x1024'
+SIZE_TALL = '1024x1536'
+
+# Kolik místa nad podstavou zbývá ve čtvercovém plátně.
+#
+# Podstava má vyplnit šířku a v projekci 2:1 je dvakrát širší než vyšší, takže
+# ve čtverci o straně `W` zabere pás `W × W/2` uprostřed — nad ní zbývá `W/4`.
+# Tělo budovy potřebuje `W · pater / (2·(w+d))`. Do čtverce se tedy vejde,
+# dokud `pater ≤ (w+d)/2`; nad tím je potřeba plátno na výšku.
 
 # Bez `--all` se udělá jen tahle hrstka. Utrácí se cizí peníze, takže výchozí
 # chování má být to opatrné.
@@ -108,18 +120,33 @@ def tls_context() -> ssl.SSLContext:
     return ssl.create_default_context(cafile=certifi.where())
 
 
-def load_footprints() -> dict[str, tuple[int, int]]:
-    """Půdorysy budov z definic. Klíč je holé id bez jmenného prostoru."""
-    out: dict[str, tuple[int, int]] = {}
+# Oddělovač odstavců v promptu. Doslovný prázdný řádek.
+PARAGRAPH = '''
+
+'''
+
+
+def load_footprints() -> dict[str, tuple[int, int, int]]:
+    """Půdorys a patra budov z definic. Klíč je holé id bez jmenného prostoru."""
+    out: dict[str, tuple[int, int, int]] = {}
     for path in sorted((ROOT / 'content' / 'vanilla' / 'buildings').glob('*.json')):
         data = json.loads(path.read_text(encoding='utf-8'))
         if data.get('type') != 'building':
             continue
         w, d = data['footprint']
-        out[data['id'].split(':', 1)[1]] = (w, d)
+        out[data['id'].split(':', 1)[1]] = (w, d, data['graphics']['heightLevels'])
     for n in (1, 2, 3, 4):
-        out[f'ruin_{n}x{n}'] = (n, n)
+        out[f'ruin_{n}x{n}'] = (n, n, 1)
     return out
+
+
+def canvas_for(name: str, shapes: dict[str, tuple[int, int, int]]) -> str:
+    """Které plátno na tuhle budovu. Odvozeno z půdorysu a pater v datech."""
+    size = shapes.get(name)
+    if size is None:
+        return SIZE_SQUARE
+    w, d, levels = size
+    return SIZE_TALL if levels > (w + d) / 2 else SIZE_SQUARE
 
 
 def read_spec() -> tuple[str, dict[str, dict[str, str]]]:
@@ -160,7 +187,7 @@ def plot_sentence(name: str, shapes: dict[str, tuple[int, int]]) -> str:
     size = shapes.get(name)
     if size is None:
         return ''
-    w, d = size
+    w, d, _ = size
     if w == d:
         return f'The plot is a square of {w} by {d} city tiles.'
     return (
@@ -189,7 +216,7 @@ def multipart(fields: dict[str, str], files: dict[str, tuple[str, bytes]]) -> tu
     return b''.join(parts), f'multipart/form-data; boundary={boundary}'
 
 
-def request(key: str, prompt: str, model: str, reference: bytes | None) -> bytes:
+def request(key: str, prompt: str, model: str, reference: bytes | None, size: str) -> bytes:
     """Jeden obrázek. Vrací PNG.
 
     S referencí jde požadavek na `images/edits`, bez ní na `images/generations`.
@@ -201,7 +228,7 @@ def request(key: str, prompt: str, model: str, reference: bytes | None) -> bytes
         body = json.dumps({
             'model': model,
             'prompt': prompt,
-            'size': SIZE,
+            'size': size,
             'n': 1,
             'background': 'transparent',
             'output_format': 'png',
@@ -216,7 +243,7 @@ def request(key: str, prompt: str, model: str, reference: bytes | None) -> bytes
             {
                 'model': model,
                 'prompt': prompt,
-                'size': SIZE,
+                'size': size,
                 'n': '1',
                 'background': 'transparent',
                 'output_format': 'png',
@@ -322,9 +349,17 @@ def main() -> int:
     done = 0
     for name, variant, prompt in batch:
         target = RAW / f'{name}__{variant}.png'
-        print(f'   {name}__{variant} …', flush=True)
-        png = request(key, f'{header}\n\n{prompt}', model, reference)
+        print(f'   {name}__{variant} …', end='', flush=True)
+        canvas = canvas_for(name, shapes)
+        png = request(
+            key,
+            PARAGRAPH.join([header, plot_sentence(name, shapes), prompt]),
+            model,
+            reference,
+            canvas,
+        )
         target.write_bytes(png)
+        print(f' {canvas}', flush=True)
         done += 1
 
     print(f'\n{done} vygenerováno do {RAW.relative_to(ROOT)}.')
