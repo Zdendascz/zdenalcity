@@ -121,16 +121,40 @@ interface Message {
   params?: Record<string, string | number>;
 }
 
+/**
+ * Varianta obrázku pro danou budovu.
+ *
+ * Odvozuje se **z id entity**, ne z losu při stavbě, a je za tím rozvaha:
+ *
+ * - Do savu nic nepřibývá. Id se ukládá odjakživa, takže varianta přežije
+ *   uložení sama od sebe a **není potřeba nová verze formátu ani migrace**.
+ * - Nesahá se na `world.rng`. Los při stavbě by posunul celý proud náhody
+ *   a s ním každý golden test i každé rozehrané město.
+ * - Je to pořád „náhodně a navždy", jak si autor přál: id je jedinečné,
+ *   po zbourání a znovupostavení vyjde jiné.
+ *
+ * Kolik variant budova má, říká **obsah** (P5) — kód jen bere zbytek po dělení,
+ * takže budova s jedinou variantou i budova s pěti fungují stejně.
+ */
+export function variantFor(variants: readonly string[], buildingId: number): string | undefined {
+  if (variants.length === 0) return undefined;
+  // Rozhoz bitů: sousední id musí dát nesouvisející varianty, jinak by celá
+  // řada domů postavená za sebou vyšla stejně.
+  let h = Math.imul(buildingId ^ 0x9e3779b9, 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  // `>>> 0` na konci schválně: `^` vrací znaménkové číslo, takže bez toho
+  // vyjde u části id záporný zbytek, `variants[-2]` je `undefined` a budova
+  // se místo obrázku nakreslí jako kvádr. Odhalil to test rozložení.
+  return variants[((h ^ (h >>> 16)) >>> 0) % variants.length];
+}
+
 function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
-  return (definitionId) => {
+  return (definitionId, buildingId) => {
     const definition = content.get(definitionId);
     if (!definition) return undefined;
     const icon = definition.graphics.icon;
 
-    // Zatím **natvrdo první varianta** (T70). Losovat se bude z `world.rng`,
-    // až se varianta začne ukládat do savu — bez toho by si každé načtení hry
-    // vybralo jinou a město by se pod rukama převlékalo.
-    const variant = content.getSpriteVariants(definitionId)[0];
+    const variant = variantFor(content.getSpriteVariants(definitionId), buildingId);
     const sprite = variant === undefined ? undefined : content.getSprite(definitionId, variant);
 
     return {

@@ -47,7 +47,14 @@ export interface BuildingAppearance {
   };
 }
 
-export type AppearanceLookup = (definitionId: string) => BuildingAppearance | undefined;
+/**
+ * Vzhled budovy. Bere **id entity**, ne jen definici, protože z něj se vybírá
+ * varianta obrázku — dva domy téhož druhu mají vypadat jinak.
+ */
+export type AppearanceLookup = (
+  definitionId: string,
+  buildingId: number,
+) => BuildingAppearance | undefined;
 
 /**
  * O kolik dlaždice se kvádr zmenší proti svému půdorysu, na každé straně.
@@ -124,7 +131,7 @@ export class BuildingRenderer {
       return;
     }
 
-    const found = this.appearance(building.definitionId);
+    const found = this.appearance(building.definitionId, id);
     if (!found) return; // chybějící definice řeší content registry, ne renderer
 
     // Ruina si drží půdorys, ale ne vzhled: šedý kvádr o jedné úrovni, bez

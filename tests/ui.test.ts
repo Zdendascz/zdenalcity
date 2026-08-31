@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
-import { createLayerOptions, createTools, createViewOptions } from '@/render/app';
+import { createLayerOptions, createTools, createViewOptions, variantFor } from '@/render/app';
 import { I18n } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
 import { uiIconShape } from '@/ui/icons';
@@ -296,5 +296,61 @@ describe('okno hlášení', () => {
 
     expect(shown).toEqual([12, 34]);
     expect(a.isOpen).toBe(false);
+  });
+});
+
+/**
+ * Výběr varianty obrázku (T71).
+ *
+ * Autor chtěl „náhodně vybere jednu variantu a ta pak na daném místě bude
+ * trvale". Odvozuje se z **id entity**, ne z losu při stavbě: id se ukládá
+ * odjakživa, takže varianta přežije uložení sama od sebe, a nesahá se přitom
+ * na `world.rng`, jehož posun by rozhodil každý golden test.
+ */
+describe('varianta obrázku budovy', () => {
+  const VARIANTY = ['a', 'b', 'c'];
+
+  it('táž budova dá vždy touž variantu', () => {
+    // Jinak by se město při každém překreslení převlékalo.
+    for (const id of [1, 7, 42, 1000, 65535]) {
+      expect(variantFor(VARIANTY, id)).toBe(variantFor(VARIANTY, id));
+    }
+  });
+
+  it('bez variant vrátí undefined, ne výjimku', () => {
+    // Budova, ke které obsah obrázek nedodal, se kreslí jako kvádr.
+    expect(variantFor([], 5)).toBeUndefined();
+  });
+
+  it('s jedinou variantou vrátí vždycky ji', () => {
+    // Kolik variant budova má, říká obsah (P5) — tři jsou dnešní rozhodnutí,
+    // ne konstanta v kódu.
+    expect(variantFor(['a'], 1)).toBe('a');
+    expect(variantFor(['a'], 99)).toBe('a');
+  });
+
+  it('sousední id nedávají tutéž variantu', () => {
+    // Řada domů se staví za sebou, takže dostane po sobě jdoucí id. Kdyby se
+    // varianta brala přímo z něj, vyšla by celá ulice stejně.
+    const rada = Array.from({ length: 12 }, (_, i) => variantFor(VARIANTY, i + 1));
+    expect(new Set(rada).size).toBeGreaterThan(1);
+    let stejnychPoSobe = 0;
+    for (let i = 1; i < rada.length; i++) if (rada[i] === rada[i - 1]) stejnychPoSobe++;
+    expect(stejnychPoSobe).toBeLessThan(rada.length / 2);
+  });
+
+  it('rozdělí se mezi varianty zhruba rovnoměrně', () => {
+    // Nerovnoměrný hash by znamenal, že jedna varianta je v celém městě
+    // vzácná — a dvě třetiny obrázků by se skoro neukázaly.
+    const pocty = new Map<string, number>();
+    for (let id = 1; id <= 3000; id++) {
+      const v = variantFor(VARIANTY, id) ?? '?';
+      pocty.set(v, (pocty.get(v) ?? 0) + 1);
+    }
+    expect(pocty.size).toBe(3);
+    for (const [, n] of pocty) {
+      expect(n).toBeGreaterThan(3000 / 3 * 0.8);
+      expect(n).toBeLessThan(3000 / 3 * 1.2);
+    }
   });
 });

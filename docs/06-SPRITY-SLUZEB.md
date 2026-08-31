@@ -21,18 +21,25 @@ neplatí** (rozhodl autor). Terén a silnice procedurální zůstávají.
 
 ### Co z toho plyne pro simulaci
 
-Varianta se losuje jednou při vzniku budovy a **musí se uložit do savu**:
+Varianta se **odvozuje z id entity**, ne losuje při stavbě — a je to
+rozhodnutí proti tomu, co tady stálo dřív.
 
-- **P2 — determinismus.** Losuje se z `world.rng`, ne z `Math.random`. Jinak
-  by dva běhy téhož seedu daly jiné město a golden testy by se rozsypaly.
-- **P7 — verze savu.** Varianta je nový údaj entity, takže přibude
-  `formatVersion` a migrace. Starý save variantu nemá; migrace ji musí
-  dolosovat, nebo se rozhodnout pro nultou.
-- **P6 — identifikátory.** Ukládá se **jméno varianty** (`a`, `b`, `c`), ne
-  index do pole. Mod smí varianty přidat i přejmenovat.
-- **P5 — obsah, ne kód.** Kolik variant budova má, říká obsah. Tři jsou
-  dnešní rozhodnutí, ne konstanta v kódu; budova s jedinou variantou musí
-  fungovat stejně jako budova s pěti.
+Původně tu bylo, že se varianta vylosuje z `world.rng` a uloží do savu jako
+nová verze formátu. Při psaní se ukázalo, že obojí je zbytečné a obojí něco
+stojí:
+
+- **Do savu nic nepřibývá.** Id entity se ukládá odjakživa, takže varianta
+  přežije uložení sama od sebe. Žádná verze 9, žádná migrace, staré savy se
+  načtou beze změny a rovnou s variantami.
+- **Nesahá se na `world.rng`.** Los při stavbě by posunul celý proud náhody
+  a s ním každý golden test i každé rozehrané město — a to jen kvůli vzhledu.
+- **Pořád je to „náhodně a navždy".** Id je jedinečné a po zbourání
+  a znovupostavení vyjde jiné, přesně jak si autor přál.
+- **P5 — obsah, ne kód.** Kolik variant budova má, říká obsah; kód bere zbytek
+  po dělení, takže budova s jedinou variantou i budova s pěti fungují stejně.
+
+Cena je jediná: kdyby skin dodal jiný **počet** variant než tři, budovy by se
+přeskládaly. Proto ta smlouva níž — každý skin vyplní všechny tři sloty.
 
 Totéž platí pro **variantu ruiny** — losuje se při vzniku suti a musí přežít
 uložení, jinak by se trosky s každým načtením přeskládaly.
