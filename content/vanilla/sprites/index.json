@@ -135,6 +135,435 @@
       ]
     },
     {
+      "building": "vanilla:commercial_arcade",
+      "variant": "a",
+      "file": "commercial_arcade__a.png",
+      "width": 384,
+      "height": 253,
+      "anchor": [
+        193,
+        253
+      ]
+    },
+    {
+      "building": "vanilla:commercial_arcade",
+      "variant": "b",
+      "file": "commercial_arcade__b.png",
+      "width": 384,
+      "height": 265,
+      "anchor": [
+        191,
+        265
+      ]
+    },
+    {
+      "building": "vanilla:commercial_arcade",
+      "variant": "c",
+      "file": "commercial_arcade__c.png",
+      "width": 384,
+      "height": 234,
+      "anchor": [
+        195,
+        234
+      ]
+    },
+    {
+      "building": "vanilla:commercial_centre",
+      "variant": "a",
+      "file": "commercial_centre__a.png",
+      "width": 512,
+      "height": 385,
+      "anchor": [
+        255,
+        385
+      ]
+    },
+    {
+      "building": "vanilla:commercial_centre",
+      "variant": "b",
+      "file": "commercial_centre__b.png",
+      "width": 512,
+      "height": 483,
+      "anchor": [
+        256,
+        483
+      ]
+    },
+    {
+      "building": "vanilla:commercial_centre",
+      "variant": "c",
+      "file": "commercial_centre__c.png",
+      "width": 512,
+      "height": 395,
+      "anchor": [
+        252,
+        395
+      ]
+    },
+    {
+      "building": "vanilla:commercial_downtown",
+      "variant": "a",
+      "file": "commercial_downtown__a.png",
+      "width": 768,
+      "height": 660,
+      "anchor": [
+        381,
+        660
+      ]
+    },
+    {
+      "building": "vanilla:commercial_downtown",
+      "variant": "b",
+      "file": "commercial_downtown__b.png",
+      "width": 768,
+      "height": 601,
+      "anchor": [
+        378,
+        601
+      ]
+    },
+    {
+      "building": "vanilla:commercial_downtown",
+      "variant": "c",
+      "file": "commercial_downtown__c.png",
+      "width": 768,
+      "height": 626,
+      "anchor": [
+        449,
+        626
+      ]
+    },
+    {
+      "building": "vanilla:commercial_gallery",
+      "variant": "a",
+      "file": "commercial_gallery__a.png",
+      "width": 640,
+      "height": 392,
+      "anchor": [
+        348,
+        392
+      ]
+    },
+    {
+      "building": "vanilla:commercial_gallery",
+      "variant": "b",
+      "file": "commercial_gallery__b.png",
+      "width": 640,
+      "height": 401,
+      "anchor": [
+        317,
+        401
+      ]
+    },
+    {
+      "building": "vanilla:commercial_gallery",
+      "variant": "c",
+      "file": "commercial_gallery__c.png",
+      "width": 640,
+      "height": 398,
+      "anchor": [
+        330,
+        398
+      ]
+    },
+    {
+      "building": "vanilla:commercial_highrise",
+      "variant": "a",
+      "file": "commercial_highrise__a.png",
+      "width": 512,
+      "height": 544,
+      "anchor": [
+        253,
+        544
+      ]
+    },
+    {
+      "building": "vanilla:commercial_highrise",
+      "variant": "b",
+      "file": "commercial_highrise__b.png",
+      "width": 512,
+      "height": 446,
+      "anchor": [
+        254,
+        446
+      ]
+    },
+    {
+      "building": "vanilla:commercial_highrise",
+      "variant": "c",
+      "file": "commercial_highrise__c.png",
+      "width": 512,
+      "height": 447,
+      "anchor": [
+        252,
+        447
+      ]
+    },
+    {
+      "building": "vanilla:commercial_large",
+      "variant": "a",
+      "file": "commercial_large__a.png",
+      "width": 256,
+      "height": 165,
+      "anchor": [
+        124,
+        165
+      ]
+    },
+    {
+      "building": "vanilla:commercial_large",
+      "variant": "b",
+      "file": "commercial_large__b.png",
+      "width": 256,
+      "height": 169,
+      "anchor": [
+        126,
+        169
+      ]
+    },
+    {
+      "building": "vanilla:commercial_large",
+      "variant": "c",
+      "file": "commercial_large__c.png",
+      "width": 256,
+      "height": 186,
+      "anchor": [
+        127,
+        186
+      ]
+    },
+    {
+      "building": "vanilla:commercial_mall",
+      "variant": "a",
+      "file": "commercial_mall__a.png",
+      "width": 768,
+      "height": 544,
+      "anchor": [
+        384,
+        544
+      ]
+    },
+    {
+      "building": "vanilla:commercial_mall",
+      "variant": "b",
+      "file": "commercial_mall__b.png",
+      "width": 768,
+      "height": 538,
+      "anchor": [
+        381,
+        538
+      ]
+    },
+    {
+      "building": "vanilla:commercial_mall",
+      "variant": "c",
+      "file": "commercial_mall__c.png",
+      "width": 768,
+      "height": 565,
+      "anchor": [
+        390,
+        565
+      ]
+    },
+    {
+      "building": "vanilla:commercial_medium",
+      "variant": "a",
+      "file": "commercial_medium__a.png",
+      "width": 256,
+      "height": 175,
+      "anchor": [
+        132,
+        175
+      ]
+    },
+    {
+      "building": "vanilla:commercial_medium",
+      "variant": "b",
+      "file": "commercial_medium__b.png",
+      "width": 256,
+      "height": 181,
+      "anchor": [
+        123,
+        181
+      ]
+    },
+    {
+      "building": "vanilla:commercial_medium",
+      "variant": "c",
+      "file": "commercial_medium__c.png",
+      "width": 256,
+      "height": 165,
+      "anchor": [
+        126,
+        165
+      ]
+    },
+    {
+      "building": "vanilla:commercial_offices",
+      "variant": "a",
+      "file": "commercial_offices__a.png",
+      "width": 512,
+      "height": 415,
+      "anchor": [
+        254,
+        415
+      ]
+    },
+    {
+      "building": "vanilla:commercial_offices",
+      "variant": "b",
+      "file": "commercial_offices__b.png",
+      "width": 512,
+      "height": 376,
+      "anchor": [
+        258,
+        376
+      ]
+    },
+    {
+      "building": "vanilla:commercial_offices",
+      "variant": "c",
+      "file": "commercial_offices__c.png",
+      "width": 512,
+      "height": 406,
+      "anchor": [
+        255,
+        406
+      ]
+    },
+    {
+      "building": "vanilla:commercial_plaza",
+      "variant": "a",
+      "file": "commercial_plaza__a.png",
+      "width": 768,
+      "height": 551,
+      "anchor": [
+        374,
+        551
+      ]
+    },
+    {
+      "building": "vanilla:commercial_plaza",
+      "variant": "b",
+      "file": "commercial_plaza__b.png",
+      "width": 768,
+      "height": 573,
+      "anchor": [
+        385,
+        573
+      ]
+    },
+    {
+      "building": "vanilla:commercial_plaza",
+      "variant": "c",
+      "file": "commercial_plaza__c.png",
+      "width": 768,
+      "height": 532,
+      "anchor": [
+        371,
+        532
+      ]
+    },
+    {
+      "building": "vanilla:commercial_row",
+      "variant": "a",
+      "file": "commercial_row__a.png",
+      "width": 384,
+      "height": 226,
+      "anchor": [
+        163,
+        226
+      ]
+    },
+    {
+      "building": "vanilla:commercial_row",
+      "variant": "b",
+      "file": "commercial_row__b.png",
+      "width": 384,
+      "height": 207,
+      "anchor": [
+        191,
+        207
+      ]
+    },
+    {
+      "building": "vanilla:commercial_row",
+      "variant": "c",
+      "file": "commercial_row__c.png",
+      "width": 384,
+      "height": 203,
+      "anchor": [
+        188,
+        203
+      ]
+    },
+    {
+      "building": "vanilla:commercial_small",
+      "variant": "a",
+      "file": "commercial_small__a.png",
+      "width": 256,
+      "height": 183,
+      "anchor": [
+        128,
+        183
+      ]
+    },
+    {
+      "building": "vanilla:commercial_small",
+      "variant": "b",
+      "file": "commercial_small__b.png",
+      "width": 256,
+      "height": 170,
+      "anchor": [
+        126,
+        170
+      ]
+    },
+    {
+      "building": "vanilla:commercial_small",
+      "variant": "c",
+      "file": "commercial_small__c.png",
+      "width": 256,
+      "height": 172,
+      "anchor": [
+        124,
+        172
+      ]
+    },
+    {
+      "building": "vanilla:commercial_tower",
+      "variant": "a",
+      "file": "commercial_tower__a.png",
+      "width": 512,
+      "height": 431,
+      "anchor": [
+        265,
+        431
+      ]
+    },
+    {
+      "building": "vanilla:commercial_tower",
+      "variant": "b",
+      "file": "commercial_tower__b.png",
+      "width": 512,
+      "height": 353,
+      "anchor": [
+        227,
+        353
+      ]
+    },
+    {
+      "building": "vanilla:commercial_tower",
+      "variant": "c",
+      "file": "commercial_tower__c.png",
+      "width": 512,
+      "height": 456,
+      "anchor": [
+        244,
+        456
+      ]
+    },
+    {
       "building": "vanilla:community_centre",
       "variant": "a",
       "file": "community_centre__a.png",
@@ -396,6 +825,435 @@
       "anchor": [
         385,
         527
+      ]
+    },
+    {
+      "building": "vanilla:industrial_chemical",
+      "variant": "a",
+      "file": "industrial_chemical__a.png",
+      "width": 512,
+      "height": 385,
+      "anchor": [
+        252,
+        385
+      ]
+    },
+    {
+      "building": "vanilla:industrial_chemical",
+      "variant": "b",
+      "file": "industrial_chemical__b.png",
+      "width": 512,
+      "height": 364,
+      "anchor": [
+        257,
+        364
+      ]
+    },
+    {
+      "building": "vanilla:industrial_chemical",
+      "variant": "c",
+      "file": "industrial_chemical__c.png",
+      "width": 512,
+      "height": 347,
+      "anchor": [
+        255,
+        347
+      ]
+    },
+    {
+      "building": "vanilla:industrial_complex",
+      "variant": "a",
+      "file": "industrial_complex__a.png",
+      "width": 768,
+      "height": 458,
+      "anchor": [
+        371,
+        458
+      ]
+    },
+    {
+      "building": "vanilla:industrial_complex",
+      "variant": "b",
+      "file": "industrial_complex__b.png",
+      "width": 768,
+      "height": 386,
+      "anchor": [
+        377,
+        386
+      ]
+    },
+    {
+      "building": "vanilla:industrial_complex",
+      "variant": "c",
+      "file": "industrial_complex__c.png",
+      "width": 768,
+      "height": 411,
+      "anchor": [
+        387,
+        411
+      ]
+    },
+    {
+      "building": "vanilla:industrial_foundry",
+      "variant": "a",
+      "file": "industrial_foundry__a.png",
+      "width": 512,
+      "height": 408,
+      "anchor": [
+        257,
+        408
+      ]
+    },
+    {
+      "building": "vanilla:industrial_foundry",
+      "variant": "b",
+      "file": "industrial_foundry__b.png",
+      "width": 512,
+      "height": 327,
+      "anchor": [
+        255,
+        327
+      ]
+    },
+    {
+      "building": "vanilla:industrial_foundry",
+      "variant": "c",
+      "file": "industrial_foundry__c.png",
+      "width": 512,
+      "height": 367,
+      "anchor": [
+        252,
+        367
+      ]
+    },
+    {
+      "building": "vanilla:industrial_hall",
+      "variant": "a",
+      "file": "industrial_hall__a.png",
+      "width": 640,
+      "height": 331,
+      "anchor": [
+        312,
+        331
+      ]
+    },
+    {
+      "building": "vanilla:industrial_hall",
+      "variant": "b",
+      "file": "industrial_hall__b.png",
+      "width": 640,
+      "height": 331,
+      "anchor": [
+        322,
+        331
+      ]
+    },
+    {
+      "building": "vanilla:industrial_hall",
+      "variant": "c",
+      "file": "industrial_hall__c.png",
+      "width": 640,
+      "height": 386,
+      "anchor": [
+        295,
+        386
+      ]
+    },
+    {
+      "building": "vanilla:industrial_large",
+      "variant": "a",
+      "file": "industrial_large__a.png",
+      "width": 256,
+      "height": 178,
+      "anchor": [
+        126,
+        178
+      ]
+    },
+    {
+      "building": "vanilla:industrial_large",
+      "variant": "b",
+      "file": "industrial_large__b.png",
+      "width": 256,
+      "height": 173,
+      "anchor": [
+        126,
+        173
+      ]
+    },
+    {
+      "building": "vanilla:industrial_large",
+      "variant": "c",
+      "file": "industrial_large__c.png",
+      "width": 256,
+      "height": 175,
+      "anchor": [
+        134,
+        175
+      ]
+    },
+    {
+      "building": "vanilla:industrial_medium",
+      "variant": "a",
+      "file": "industrial_medium__a.png",
+      "width": 256,
+      "height": 172,
+      "anchor": [
+        125,
+        172
+      ]
+    },
+    {
+      "building": "vanilla:industrial_medium",
+      "variant": "b",
+      "file": "industrial_medium__b.png",
+      "width": 256,
+      "height": 143,
+      "anchor": [
+        127,
+        143
+      ]
+    },
+    {
+      "building": "vanilla:industrial_medium",
+      "variant": "c",
+      "file": "industrial_medium__c.png",
+      "width": 256,
+      "height": 158,
+      "anchor": [
+        125,
+        158
+      ]
+    },
+    {
+      "building": "vanilla:industrial_park",
+      "variant": "a",
+      "file": "industrial_park__a.png",
+      "width": 768,
+      "height": 437,
+      "anchor": [
+        374,
+        437
+      ]
+    },
+    {
+      "building": "vanilla:industrial_park",
+      "variant": "b",
+      "file": "industrial_park__b.png",
+      "width": 768,
+      "height": 520,
+      "anchor": [
+        397,
+        520
+      ]
+    },
+    {
+      "building": "vanilla:industrial_park",
+      "variant": "c",
+      "file": "industrial_park__c.png",
+      "width": 768,
+      "height": 479,
+      "anchor": [
+        380,
+        479
+      ]
+    },
+    {
+      "building": "vanilla:industrial_refinery",
+      "variant": "a",
+      "file": "industrial_refinery__a.png",
+      "width": 768,
+      "height": 514,
+      "anchor": [
+        382,
+        514
+      ]
+    },
+    {
+      "building": "vanilla:industrial_refinery",
+      "variant": "b",
+      "file": "industrial_refinery__b.png",
+      "width": 768,
+      "height": 526,
+      "anchor": [
+        381,
+        526
+      ]
+    },
+    {
+      "building": "vanilla:industrial_refinery",
+      "variant": "c",
+      "file": "industrial_refinery__c.png",
+      "width": 768,
+      "height": 464,
+      "anchor": [
+        386,
+        464
+      ]
+    },
+    {
+      "building": "vanilla:industrial_row",
+      "variant": "a",
+      "file": "industrial_row__a.png",
+      "width": 384,
+      "height": 225,
+      "anchor": [
+        190,
+        225
+      ]
+    },
+    {
+      "building": "vanilla:industrial_row",
+      "variant": "b",
+      "file": "industrial_row__b.png",
+      "width": 384,
+      "height": 228,
+      "anchor": [
+        188,
+        228
+      ]
+    },
+    {
+      "building": "vanilla:industrial_row",
+      "variant": "c",
+      "file": "industrial_row__c.png",
+      "width": 384,
+      "height": 205,
+      "anchor": [
+        192,
+        205
+      ]
+    },
+    {
+      "building": "vanilla:industrial_small",
+      "variant": "a",
+      "file": "industrial_small__a.png",
+      "width": 256,
+      "height": 155,
+      "anchor": [
+        127,
+        155
+      ]
+    },
+    {
+      "building": "vanilla:industrial_small",
+      "variant": "b",
+      "file": "industrial_small__b.png",
+      "width": 256,
+      "height": 161,
+      "anchor": [
+        128,
+        161
+      ]
+    },
+    {
+      "building": "vanilla:industrial_small",
+      "variant": "c",
+      "file": "industrial_small__c.png",
+      "width": 256,
+      "height": 152,
+      "anchor": [
+        128,
+        152
+      ]
+    },
+    {
+      "building": "vanilla:industrial_smelter",
+      "variant": "a",
+      "file": "industrial_smelter__a.png",
+      "width": 512,
+      "height": 423,
+      "anchor": [
+        255,
+        423
+      ]
+    },
+    {
+      "building": "vanilla:industrial_smelter",
+      "variant": "b",
+      "file": "industrial_smelter__b.png",
+      "width": 512,
+      "height": 411,
+      "anchor": [
+        265,
+        411
+      ]
+    },
+    {
+      "building": "vanilla:industrial_smelter",
+      "variant": "c",
+      "file": "industrial_smelter__c.png",
+      "width": 512,
+      "height": 368,
+      "anchor": [
+        254,
+        368
+      ]
+    },
+    {
+      "building": "vanilla:industrial_works",
+      "variant": "a",
+      "file": "industrial_works__a.png",
+      "width": 512,
+      "height": 299,
+      "anchor": [
+        255,
+        299
+      ]
+    },
+    {
+      "building": "vanilla:industrial_works",
+      "variant": "b",
+      "file": "industrial_works__b.png",
+      "width": 512,
+      "height": 331,
+      "anchor": [
+        253,
+        331
+      ]
+    },
+    {
+      "building": "vanilla:industrial_works",
+      "variant": "c",
+      "file": "industrial_works__c.png",
+      "width": 512,
+      "height": 292,
+      "anchor": [
+        253,
+        292
+      ]
+    },
+    {
+      "building": "vanilla:industrial_yard",
+      "variant": "a",
+      "file": "industrial_yard__a.png",
+      "width": 384,
+      "height": 222,
+      "anchor": [
+        198,
+        222
+      ]
+    },
+    {
+      "building": "vanilla:industrial_yard",
+      "variant": "b",
+      "file": "industrial_yard__b.png",
+      "width": 384,
+      "height": 230,
+      "anchor": [
+        190,
+        230
+      ]
+    },
+    {
+      "building": "vanilla:industrial_yard",
+      "variant": "c",
+      "file": "industrial_yard__c.png",
+      "width": 384,
+      "height": 231,
+      "anchor": [
+        190,
+        231
       ]
     },
     {
@@ -759,6 +1617,435 @@
       "anchor": [
         127,
         162
+      ]
+    },
+    {
+      "building": "vanilla:residential_court",
+      "variant": "a",
+      "file": "residential_court__a.png",
+      "width": 512,
+      "height": 287,
+      "anchor": [
+        230,
+        287
+      ]
+    },
+    {
+      "building": "vanilla:residential_court",
+      "variant": "b",
+      "file": "residential_court__b.png",
+      "width": 512,
+      "height": 297,
+      "anchor": [
+        245,
+        297
+      ]
+    },
+    {
+      "building": "vanilla:residential_court",
+      "variant": "c",
+      "file": "residential_court__c.png",
+      "width": 512,
+      "height": 382,
+      "anchor": [
+        254,
+        382
+      ]
+    },
+    {
+      "building": "vanilla:residential_estate",
+      "variant": "a",
+      "file": "residential_estate__a.png",
+      "width": 768,
+      "height": 757,
+      "anchor": [
+        384,
+        757
+      ]
+    },
+    {
+      "building": "vanilla:residential_estate",
+      "variant": "b",
+      "file": "residential_estate__b.png",
+      "width": 768,
+      "height": 475,
+      "anchor": [
+        384,
+        475
+      ]
+    },
+    {
+      "building": "vanilla:residential_estate",
+      "variant": "c",
+      "file": "residential_estate__c.png",
+      "width": 768,
+      "height": 611,
+      "anchor": [
+        408,
+        611
+      ]
+    },
+    {
+      "building": "vanilla:residential_highrise",
+      "variant": "a",
+      "file": "residential_highrise__a.png",
+      "width": 512,
+      "height": 506,
+      "anchor": [
+        251,
+        506
+      ]
+    },
+    {
+      "building": "vanilla:residential_highrise",
+      "variant": "b",
+      "file": "residential_highrise__b.png",
+      "width": 512,
+      "height": 426,
+      "anchor": [
+        256,
+        426
+      ]
+    },
+    {
+      "building": "vanilla:residential_highrise",
+      "variant": "c",
+      "file": "residential_highrise__c.png",
+      "width": 512,
+      "height": 453,
+      "anchor": [
+        256,
+        453
+      ]
+    },
+    {
+      "building": "vanilla:residential_large",
+      "variant": "a",
+      "file": "residential_large__a.png",
+      "width": 256,
+      "height": 206,
+      "anchor": [
+        126,
+        206
+      ]
+    },
+    {
+      "building": "vanilla:residential_large",
+      "variant": "b",
+      "file": "residential_large__b.png",
+      "width": 256,
+      "height": 186,
+      "anchor": [
+        122,
+        186
+      ]
+    },
+    {
+      "building": "vanilla:residential_large",
+      "variant": "c",
+      "file": "residential_large__c.png",
+      "width": 256,
+      "height": 178,
+      "anchor": [
+        129,
+        178
+      ]
+    },
+    {
+      "building": "vanilla:residential_medium",
+      "variant": "a",
+      "file": "residential_medium__a.png",
+      "width": 256,
+      "height": 158,
+      "anchor": [
+        126,
+        158
+      ]
+    },
+    {
+      "building": "vanilla:residential_medium",
+      "variant": "b",
+      "file": "residential_medium__b.png",
+      "width": 256,
+      "height": 200,
+      "anchor": [
+        133,
+        200
+      ]
+    },
+    {
+      "building": "vanilla:residential_medium",
+      "variant": "c",
+      "file": "residential_medium__c.png",
+      "width": 256,
+      "height": 175,
+      "anchor": [
+        131,
+        175
+      ]
+    },
+    {
+      "building": "vanilla:residential_quarter",
+      "variant": "a",
+      "file": "residential_quarter__a.png",
+      "width": 768,
+      "height": 432,
+      "anchor": [
+        416,
+        432
+      ]
+    },
+    {
+      "building": "vanilla:residential_quarter",
+      "variant": "b",
+      "file": "residential_quarter__b.png",
+      "width": 768,
+      "height": 545,
+      "anchor": [
+        368,
+        545
+      ]
+    },
+    {
+      "building": "vanilla:residential_quarter",
+      "variant": "c",
+      "file": "residential_quarter__c.png",
+      "width": 768,
+      "height": 534,
+      "anchor": [
+        382,
+        534
+      ]
+    },
+    {
+      "building": "vanilla:residential_row",
+      "variant": "a",
+      "file": "residential_row__a.png",
+      "width": 384,
+      "height": 207,
+      "anchor": [
+        171,
+        207
+      ]
+    },
+    {
+      "building": "vanilla:residential_row",
+      "variant": "b",
+      "file": "residential_row__b.png",
+      "width": 384,
+      "height": 259,
+      "anchor": [
+        222,
+        259
+      ]
+    },
+    {
+      "building": "vanilla:residential_row",
+      "variant": "c",
+      "file": "residential_row__c.png",
+      "width": 384,
+      "height": 209,
+      "anchor": [
+        164,
+        209
+      ]
+    },
+    {
+      "building": "vanilla:residential_skyline",
+      "variant": "a",
+      "file": "residential_skyline__a.png",
+      "width": 768,
+      "height": 636,
+      "anchor": [
+        384,
+        636
+      ]
+    },
+    {
+      "building": "vanilla:residential_skyline",
+      "variant": "b",
+      "file": "residential_skyline__b.png",
+      "width": 768,
+      "height": 635,
+      "anchor": [
+        383,
+        635
+      ]
+    },
+    {
+      "building": "vanilla:residential_skyline",
+      "variant": "c",
+      "file": "residential_skyline__c.png",
+      "width": 768,
+      "height": 625,
+      "anchor": [
+        397,
+        625
+      ]
+    },
+    {
+      "building": "vanilla:residential_small",
+      "variant": "a",
+      "file": "residential_small__a.png",
+      "width": 256,
+      "height": 129,
+      "anchor": [
+        130,
+        129
+      ]
+    },
+    {
+      "building": "vanilla:residential_small",
+      "variant": "b",
+      "file": "residential_small__b.png",
+      "width": 256,
+      "height": 178,
+      "anchor": [
+        128,
+        178
+      ]
+    },
+    {
+      "building": "vanilla:residential_small",
+      "variant": "c",
+      "file": "residential_small__c.png",
+      "width": 256,
+      "height": 146,
+      "anchor": [
+        127,
+        146
+      ]
+    },
+    {
+      "building": "vanilla:residential_spire",
+      "variant": "a",
+      "file": "residential_spire__a.png",
+      "width": 512,
+      "height": 459,
+      "anchor": [
+        255,
+        459
+      ]
+    },
+    {
+      "building": "vanilla:residential_spire",
+      "variant": "b",
+      "file": "residential_spire__b.png",
+      "width": 512,
+      "height": 532,
+      "anchor": [
+        255,
+        532
+      ]
+    },
+    {
+      "building": "vanilla:residential_spire",
+      "variant": "c",
+      "file": "residential_spire__c.png",
+      "width": 512,
+      "height": 448,
+      "anchor": [
+        257,
+        448
+      ]
+    },
+    {
+      "building": "vanilla:residential_terrace",
+      "variant": "a",
+      "file": "residential_terrace__a.png",
+      "width": 384,
+      "height": 226,
+      "anchor": [
+        173,
+        226
+      ]
+    },
+    {
+      "building": "vanilla:residential_terrace",
+      "variant": "b",
+      "file": "residential_terrace__b.png",
+      "width": 384,
+      "height": 225,
+      "anchor": [
+        205,
+        225
+      ]
+    },
+    {
+      "building": "vanilla:residential_terrace",
+      "variant": "c",
+      "file": "residential_terrace__c.png",
+      "width": 384,
+      "height": 245,
+      "anchor": [
+        214,
+        245
+      ]
+    },
+    {
+      "building": "vanilla:residential_terraces",
+      "variant": "a",
+      "file": "residential_terraces__a.png",
+      "width": 640,
+      "height": 426,
+      "anchor": [
+        388,
+        426
+      ]
+    },
+    {
+      "building": "vanilla:residential_terraces",
+      "variant": "b",
+      "file": "residential_terraces__b.png",
+      "width": 640,
+      "height": 618,
+      "anchor": [
+        320,
+        618
+      ]
+    },
+    {
+      "building": "vanilla:residential_terraces",
+      "variant": "c",
+      "file": "residential_terraces__c.png",
+      "width": 640,
+      "height": 476,
+      "anchor": [
+        312,
+        476
+      ]
+    },
+    {
+      "building": "vanilla:residential_tower",
+      "variant": "a",
+      "file": "residential_tower__a.png",
+      "width": 512,
+      "height": 379,
+      "anchor": [
+        278,
+        379
+      ]
+    },
+    {
+      "building": "vanilla:residential_tower",
+      "variant": "b",
+      "file": "residential_tower__b.png",
+      "width": 512,
+      "height": 428,
+      "anchor": [
+        254,
+        428
+      ]
+    },
+    {
+      "building": "vanilla:residential_tower",
+      "variant": "c",
+      "file": "residential_tower__c.png",
+      "width": 512,
+      "height": 376,
+      "anchor": [
+        266,
+        376
       ]
     },
     {
