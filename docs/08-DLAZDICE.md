@@ -28,9 +28,20 @@ Tohle je celý rozdíl proti budovám a taky největší riziko celého zadání
 - **Povrchy** navazovat nemusí přesně. Tráva, skála a les jsou organické, takže
   přechod mezi dvěma dlaždicemi nikdo nepozná. Proto se u nich nic nevynucuje.
 - **Silnice a potrubí navazovat musí.** Vozovka vstupuje do dlaždice přesně
-  ve **středu strany** a je široká **polovinu strany**. Kdyby to každá dlaždice
-  měla jinak, byly by na každém spoji schody. Prompt to říká, `fit-tiles.py` to
-  změří a co nesedí, ohlásí.
+  ve **středu strany** kosočtverce a její šířku předepisuje typ. Kdyby to každá
+  dlaždice měla jinak, byly by na každém spoji schody. Prompt to říká,
+  `fit-tiles.py` to změří a co nesedí, ohlásí.
+
+**Strany, ne světové strany.** První dávka řekla „vozovka odchází k severu",
+a generátor si to přeložil jako směr **k vrcholu** kosočtverce místo **přes
+jeho stranu**. Křižovatka pak vyšla jako `X` místo `+` a slepé konce mířily
+jinam, než měly. Prompt proto pojmenovává strany doslova („upper-right side")
+a zvlášť říká, že čtyři špičaté rohy jsou vždycky tráva.
+
+**Šířka se měří proti sobě, ne proti zadání.** Pro spoj není podstatné, jak je
+vozovka široká, ale jestli je na obou stranách stejná. `fit-tiles.py` proto
+srovnává s **mediánem rodiny**, ne s pevným číslem — jinak by zahodil obrázky,
+které na sebe sedí.
 
 ## Styl
 
@@ -127,37 +138,42 @@ skládá z popisu typu a popisu tvaru, takže se tvary nepíšou třikrát.
 
 | id | popis |
 |---|---|
-| `street` | A narrow residential street: worn asphalt, granite kerbs, a strip of grass along each side. |
-| `avenue` | A wide two-lane road: darker asphalt, a painted centre line worn thin, concrete kerbs and a paved verge. |
-| `highway` | A four-lane trunk road: fresh dark asphalt, a crash barrier along both shoulders, gravel verge. |
+| `street` | A narrow residential street: worn asphalt, granite kerbs, a strip of grass along each side. The carriageway with its kerbs is ONE QUARTER of the length of the side it crosses. |
+| `avenue` | A wide two-lane road: darker asphalt, a painted centre line worn thin, concrete kerbs and a paved verge. The carriageway with its kerbs is ONE THIRD of the length of the side it crosses. |
+| `highway` | A four-lane trunk road: fresh dark asphalt, a crash barrier along both shoulders, gravel verge. The carriageway with its shoulders is ONE HALF of the length of the side it crosses. |
 
 ### Tvary
 
 | maska | id | prompt |
 |---|---|---|
-| 0 | `0` | An isolated square of carriageway with no connections, its edges finished with kerbs. |
-| 1 | `n` | The carriageway ends here and leaves only towards the upper right; the other three sides are kerbed. |
-| 2 | `e` | The carriageway ends here and leaves only towards the lower right; the other three sides are kerbed. |
-| 3 | `ne` | A bend joining the upper-right edge to the lower-right edge. |
-| 4 | `s` | The carriageway ends here and leaves only towards the lower left; the other three sides are kerbed. |
-| 5 | `ns` | A straight run entering at the upper-right edge and leaving at the lower-left edge. |
-| 6 | `es` | A bend joining the lower-right edge to the lower-left edge. |
-| 7 | `nes` | A T junction: a straight run from the upper right to the lower left, with a branch to the lower right. |
-| 8 | `w` | The carriageway ends here and leaves only towards the upper left; the other three sides are kerbed. |
-| 9 | `nw` | A bend joining the upper-right edge to the upper-left edge. |
-| 10 | `ew` | A straight run entering at the lower-right edge and leaving at the upper-left edge. |
-| 11 | `new` | A T junction: a straight run from the lower right to the upper left, with a branch to the upper right. |
-| 12 | `sw` | A bend joining the lower-left edge to the upper-left edge. |
-| 13 | `nsw` | A T junction: a straight run from the upper right to the lower left, with a branch to the upper left. |
-| 14 | `esw` | A T junction: a straight run from the lower right to the upper left, with a branch to the lower left. |
-| 15 | `nesw` | A crossroads: carriageway leaving all four edges. |
+| 0 | `0` | A short stub of carriageway that touches no side of the diamond at all; grass all around it. |
+| 1 | `n` | The carriageway crosses the UPPER-RIGHT side of the diamond and ends inside the tile in a turning head. It touches no other side. |
+| 2 | `e` | The carriageway crosses the LOWER-RIGHT side of the diamond and ends inside the tile in a turning head. It touches no other side. |
+| 3 | `ne` | The carriageway runs between the UPPER-RIGHT side and the LOWER-RIGHT side of the diamond, and touches no other side. |
+| 4 | `s` | The carriageway crosses the LOWER-LEFT side of the diamond and ends inside the tile in a turning head. It touches no other side. |
+| 5 | `ns` | The carriageway runs between the UPPER-RIGHT side and the LOWER-LEFT side of the diamond, and touches no other side. |
+| 6 | `es` | The carriageway runs between the LOWER-RIGHT side and the LOWER-LEFT side of the diamond, and touches no other side. |
+| 7 | `nes` | A T junction: the carriageway crosses the UPPER-RIGHT side, the LOWER-RIGHT side and the LOWER-LEFT side of the diamond, and touches no other side. |
+| 8 | `w` | The carriageway crosses the UPPER-LEFT side of the diamond and ends inside the tile in a turning head. It touches no other side. |
+| 9 | `nw` | The carriageway runs between the UPPER-RIGHT side and the UPPER-LEFT side of the diamond, and touches no other side. |
+| 10 | `ew` | The carriageway runs between the LOWER-RIGHT side and the UPPER-LEFT side of the diamond, and touches no other side. |
+| 11 | `new` | A T junction: the carriageway crosses the UPPER-RIGHT side, the LOWER-RIGHT side and the UPPER-LEFT side of the diamond, and touches no other side. |
+| 12 | `sw` | The carriageway runs between the LOWER-LEFT side and the UPPER-LEFT side of the diamond, and touches no other side. |
+| 13 | `nsw` | A T junction: the carriageway crosses the UPPER-RIGHT side, the LOWER-LEFT side and the UPPER-LEFT side of the diamond, and touches no other side. |
+| 14 | `esw` | A T junction: the carriageway crosses the LOWER-RIGHT side, the LOWER-LEFT side and the UPPER-LEFT side of the diamond, and touches no other side. |
+| 15 | `nesw` | A crossroads: the carriageway crosses all four SIDES of the diamond — upper-right, lower-right, lower-left and upper-left. It does NOT run to the four pointed corners of the diamond; those corners are grass. |
 
 Ke každému tvaru se přidá věta o navazování, kterou skript doplní sám:
 
 ```
-Where the carriageway meets an edge of the diamond it must cross exactly at
-the middle of that edge and be exactly half the length of the edge wide, so
-that neighbouring tiles line up. Edges with no connection are closed off.
+The diamond has four SIDES (upper-right, lower-right, lower-left, upper-left)
+and four pointed CORNERS (top, right, bottom, left). Roads leave through the
+SIDES, never through the corners: the four pointed corners are always grass.
+
+Where the carriageway crosses a side it must cross exactly at the MIDDLE of
+that side, at a right angle to it, and keep the width given above along the
+whole crossing, so that neighbouring tiles line up. Sides with no connection
+are closed off with a kerb.
 ```
 
 ## Potrubí
