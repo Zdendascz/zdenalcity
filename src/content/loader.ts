@@ -50,25 +50,6 @@ export function createVanillaSource(): ContentSource {
     spriteUrls[name] = spriteFiles[absolute] as string;
   }
 
-  // Povrchy. Jméno souboru je `<druh>__<varianta>.png` a klíč `<druh>|<varianta>`,
-  // takže se rejstřík `tiles/index.json` k ničemu nepotřebuje: rozměr je vždycky
-  // čtverec a kotva u dlaždice nedává smysl. Silnice a potrubí se **neberou** —
-  // jejich obrázky sice ve složce leží, ale mají vadné spoje a vozovka by na
-  // každém styku uskakovala (`docs/08-DLAZDICE.md`).
-  const SURFACES = new Set(['grass', 'water', 'sand', 'rock', 'forest', 'marsh']);
-  const tileFiles = import.meta.glob('../../content/vanilla/tiles/*.png', {
-    eager: true,
-    query: '?url',
-    import: 'default',
-  });
-  const tiles: Record<string, string> = {};
-  for (const absolute of Object.keys(tileFiles).sort()) {
-    const name = relativePath(absolute).slice('tiles/'.length).replace(/\.png$/, '');
-    const [terrain, variant] = name.split('__');
-    if (terrain === undefined || variant === undefined || !SURFACES.has(terrain)) continue;
-    tiles[`${terrain}|${variant}`] = tileFiles[absolute] as string;
-  }
-
   let manifest: unknown = undefined;
   let spriteIndex: unknown = undefined;
   let balance: unknown = undefined;
@@ -101,7 +82,6 @@ export function createVanillaSource(): ContentSource {
     locales,
     icons,
     sprites: buildSprites(spriteIndex, spriteUrls),
-    tiles,
   };
 }
 

@@ -22,10 +22,7 @@ Sprity **budou** — rozhodnutí autora se dvakrát změnilo, tak pozor na pořa
 - **T60:** ikony rozhraní jsou obrázky v `content/vanilla/icons/`. Jen tlačítka.
 - **T70:** obrázky dostávají i **budovy na mapě**, každá ve třech variantách.
   Zadání a prompty jsou v `docs/06-SPRITY-SLUZEB.md`.
-- **T72:** povrch terénu má obrázky v `content/vanilla/tiles/`. Kreslí se jako
-  výplň polygonu s maticí, ne přes mesh, takže chunkové pečení zůstalo.
-  **Silnice a potrubí zůstávají procedurální** — jejich dlaždice vygenerované
-  jsou, ale 42 ze 64 má vadný spoj, viz `docs/08-DLAZDICE.md`.
+- **Terén a silnice zůstávají procedurální.** Tady se nic nezměnilo.
 
 Vše jde přes `ContentSource`, aby to mod směl přidat i přepsat (P5). Chybějící
 obrázek nesmí hru zastavit — kreslí se kvádr jako dřív.

@@ -3693,44 +3693,40 @@ nerozpoznanou cestu tiše ignoruje, takže `tiles/index.json` hru nerozbije
 a čeká na napojení rendereru.
 
 
-## Povrch terénu z obrázků
+## Povrch z obrázků zkusen a vrácen zpátky
 
-Rozhodnutí autora: zapojit **jen povrchy**, silnice a potrubí nechat
-procedurální, dokud se nevyřeší spoje.
+Autor si vyžádal zapojení povrchů, viděl výsledek a řekl „je to hodně špatně".
+Souhlas — commit `f6f8b46` je proto revertovaný. Obrázky, generátor i fitter
+v repu zůstávají; zrušené je jen jejich napojení na renderer.
 
-### Výplň polygonu, ne mesh
+### Co bylo vidět
 
-Textura jde do `Graphics.fill({ texture, matrix })`, takže **chunkové pečení
-zůstalo, jak bylo** — 16 × 16 dlaždic do jednoho `Graphics`. S meshem na dlaždici
-by se ta úspora zahodila.
+Přes celou mapu vedly **souvislé úhlopříčné pruhy**. Tráva vypadala jako manšestr
+a řeky jako žebrovaná hadice. Tři varianty na druh terénu to nezachránily.
 
-Cena je, že afinní matice umí trefit jen tři rohy ze čtyř. Na rovné dlaždici je
-kosočtverec rovnoběžník, takže sedí přesně; na svahu je to přiblížení. U trávy
-a skály to oko nepozná, protože v obrázku není žádná přímka, která by se zlomila.
+### Proč
 
-**Matice se předává obrácená.** Pixi jí převádí bod plochy na místo v textuře,
-ne naopak — s tou přímou se obrázek do dlaždice vešel osmkrát (256 / 32).
+Tři věci, které se sčítají, a **žádná z nich není chyba v kódu**:
 
-### Tón nese světlo, ne barvu terénu
+1. **Obrázky mají směr.** Sekaný trávník má pruhy, vlny na vodě mají hřebeny.
+   Když dostane každá dlaždice tentýž obrázek ve stejné orientaci, pruhy na sebe
+   přes hranice dlaždic navážou a udělají pás přes celou obrazovku.
+2. **Zkosení ten směr zdůrazní.** Renderer mapuje čtverec textury na kosočtverec,
+   takže cokoli vodorovného v obrázku se překlopí do 45°. Všechny dlaždice mají
+   totéž zkosení, takže výsledek je jedna velká úhlopříčná mřížka.
+3. **Nejsou bezešvé.** Každý obrázek je samostatná fotografie s vlastním
+   osvětlením, ne dlaždice navazující na sousedy.
 
-Napoprvé se obrázek násobil barvou terénu a tráva vyšla jako bahno: zelená ×
-zelená. Teď se násobí **bílou ztlumenou sklonem**, takže zůstane stín svahu
-a barva obrázku se nezkalí. Obrys dlaždice se u obrázku nekreslí — byla by z něj
-světlá mřížka přes celou mapu.
+### Co by mohlo pomoct
 
-### Varianta se losuje ze souřadnic
+Nezkoušeno, jen návrh: otáčet a překlápět texturu podle souřadnic dlaždice
+(čtyři orientace ze stejné míchačky, která teď losuje variantu), tím se dlouhé
+pruhy rozbijí; a mísit obrázek s plochou barvou na část krytí, aby kresba jen
+doplňovala barvu, místo aby ji nahradila. Obojí je pár řádků v `chunkRenderer`.
 
-Ne z `world.rng`: musí to vyjít stejně při každém překreslení i po načtení savu,
-a rng se mezitím posune. Stejná míchačka jako u variant budov, jen krmená `x`
-a `y` místo id budovy.
-
-### Co je změřené a co ne
-
-Odeslání kreslicích příkazů: 0,02 ms na snímek s texturou proti 0,01 ms bez —
-tedy nic. **Skutečné FPS změřené není**: `requestAnimationFrame` se
-v prostředí, ze kterého měřím, nespouští, takže se mi nepodařilo změřit snímkovou
-frekvenci ani rychlost pečení chunků při posunu. Akceptační kritérium 2
-(512 × 512 při 60 FPS) je tím pádem **potřeba přeměřit ručně**.
+Zbývá otázka, jestli tudy vůbec jít. **Generátor umí kreslit předměty, ne
+dlaždice**: u budov měřitelně uspěl, u navazujících dlaždic selhal dvakrát —
+u silnic na spojích a tady na opakování.
 
 
 ## Rozpracované

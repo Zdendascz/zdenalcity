@@ -1,5 +1,4 @@
-import { Container, Graphics, Matrix } from 'pixi.js';
-import type { Texture } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 import { MAX_HEIGHT, tileCorners } from '@/sim/heights';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
@@ -48,30 +47,12 @@ import {
   slopeLight,
   TILE_H,
   TILE_W,
-  surfaceCorners,
   tileQuad,
   tileVariation,
 } from './projection';
 import { iconShape } from './icons';
 import { isRubbleMarkOrigin } from '@/sim/disasters/rubble';
 import { roadMask, roadPolygons } from './roads';
-
-/**
- * Jména terénů pro klíč obrázku povrchu. Index je hodnota vrstvy `terrain`,
- * takže to musí sedět na `TERRAIN` v `sim/layers.ts` — na pořadí, ne na jméno
- * konstanty. Druh, který obrázek nemá, se kreslí barvou jako dřív.
- */
-const TERRAIN_NAMES: readonly (string | undefined)[] = [
-  'grass',
-  'water',
-  'sand',
-  'rock',
-  'forest',
-  'marsh',
-];
-
-/** Varianty povrchu. Tři na druh, aby se sousední dlaždice neopakovaly. */
-const SURFACE_VARIANTS = ['a', 'b', 'c'] as const;
 
 /** Chunk = 16×16 dlaždic. Změna jedné dlaždice invaliduje jeden chunk, ne mapu. */
 export const CHUNK_SIZE = 16;
@@ -200,16 +181,6 @@ export class ChunkRenderer {
    * „překreslilo se to a vyšlo to stejně".
    */
   private bakes = 0;
-
-  /**
-   * Obrázky povrchu. Klíč `<druh>|<varianta>`; chybí-li, kreslí se barva.
-   *
-   * Dodává je volající už načtené, protože pečení chunku je synchronní a na
-   * dotažení textury nemá kde počkat. Než dorazí, kreslí se barva — a to je
-   * i trvalý stav, když obsah obrázky nemá (P5, „chybějící obrázek hru
-   * nezastaví").
-   */
-  private surfaces: ReadonlyMap<string, Texture> = new Map();
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
@@ -373,29 +344,6 @@ export class ChunkRenderer {
     }
   }
 
-  /** Nastaví obrázky povrchu a překreslí, co je vidět. */
-  setSurfaces(surfaces: ReadonlyMap<string, Texture>): void {
-    this.surfaces = surfaces;
-    this.invalidateAll();
-  }
-
-  /**
-   * Který obrázek padne na tuhle dlaždici.
-   *
-   * Losuje se ze **souřadnic**, ne z `world.rng`: musí to vyjít stejně při
-   * každém překreslení i po načtení savu, a rng se mezitím posune. Stejná
-   * míchačka jako u variant budov, jen krmená jinak.
-   */
-  private surfaceFor(terrain: number, x: number, y: number): Texture | undefined {
-    const name = TERRAIN_NAMES[terrain];
-    if (name === undefined || this.surfaces.size === 0) return undefined;
-
-    let h = Math.imul((x * 0x1f1f1f1f) ^ y, 0x85ebca6b) >>> 0;
-    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
-    const variant = SURFACE_VARIANTS[((h ^ (h >>> 16)) >>> 0) % SURFACE_VARIANTS.length];
-    return this.surfaces.get(`${name}|${variant}`);
-  }
-
   private drawTile(graphics: Graphics, x: number, y: number): void {
     if (x >= this.world.size || y >= this.world.size) return;
 
@@ -415,41 +363,10 @@ export class ChunkRenderer {
     // ne do pravidelného diamantu. Na svahu by se od terénu odlepilo.
     const points = tileQuad(x, y, corners);
 
-    // Obrázek povrchu, když ho obsah dodal. Kreslí se **jako výplň polygonu**
-    // s maticí, ne přes mesh: dlaždice se peče do jednoho `Graphics` na chunk
-    // a mesh by tuhle úsporu zahodil. Matice mapuje čtverec textury na tři rohy
-    // dlaždice, takže na rovině sedí přesně a na svahu je to afinní přiblížení —
-    // u trávy a skály to oko nepozná, protože v obrázku není žádná přímka.
-    //
-    // Barva zůstává jako **tón**: bez ní by ze svahu zmizel stín a kopec by
-    // vypadal jako rovina.
-    const surface = this.surfaceFor(terrain, x, y);
-    if (surface !== undefined) {
-      const size = surface.width || 1;
-      const [nw, ne, sw] = surfaceCorners(x, y, corners);
-      // **Obrácená matice.** Pixi jí převádí bod plochy na místo v textuře, ne
-      // naopak; s tou přímou se obrázek do dlaždice vešel osmkrát (256 / 32).
-      const matrix = new Matrix(
-        (ne[0] - nw[0]) / size,
-        (ne[1] - nw[1]) / size,
-        (sw[0] - nw[0]) / size,
-        (sw[1] - nw[1]) / size,
-        nw[0],
-        nw[1],
-      ).invert();
-      // Tón je **bílá ztlumená sklonem**, ne barva terénu: obrázek už zelený je
-      // a vynásobit ho zelenou znamená bahno. Zůstat musí jen světlo, jinak by
-      // ze svahu zmizel stín a kopec by vypadal jako rovina.
-      const light = shade(0xffffff, slopeLight(corners) * (underground ? UNDERGROUND_TERRAIN_SHADE : 1));
-      graphics.poly(points).fill({ texture: surface, matrix, color: light });
-    } else {
-      graphics.poly(points).fill({ color });
-      // Obrys jen u barevné dlaždice. Na obrázku by z něj byla světlá mřížka
-      // přes celou mapu — tvar terénu tam čte samo světlo a kresba povrchu.
-      graphics
-        .poly(points)
-        .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
-    }
+    graphics
+      .poly(points)
+      .fill({ color })
+      .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
 
     const zone = this.world.layers.zone[tileIndex] ?? 0;
     const zoneColor = ZONE_COLOR_BY_VALUE[zone];

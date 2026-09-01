@@ -36,14 +36,6 @@ export interface ContentSource {
    */
   readonly sprites?: Readonly<Record<string, SpriteImage>>;
   /**
-   * Obrázky povrchu. Klíč = `<druh terénu>|<varianta>`, tedy `grass|a`.
-   *
-   * Zdroj je mít nemusí — hra pak kreslí terén barvou jako dřív. Silnice ani
-   * potrubí tudy zatím nejdou: jejich dlaždice sice existují, ale mají vadné
-   * spoje, takže by vozovka na každém styku uskakovala (viz `docs/08-DLAZDICE.md`).
-   */
-  readonly tiles?: Readonly<Record<string, string>>;
-  /**
    * Balanc. Zdroj ho mít nemusí; když ho má, musí být úplný a přepíše ten
    * dosavadní — tak mod přeladí hru bez zásahu do definic.
    */
@@ -97,7 +89,6 @@ export class ContentRegistry {
   /** jméno ikony → URL obrázku, slito přes všechny zdroje. */
   private readonly icons = new Map<string, string>();
   private readonly sprites = new Map<string, SpriteImage>();
-  private readonly tiles = new Map<string, string>();
   private balance: Balance | null = null;
 
   /**
@@ -184,11 +175,6 @@ export class ContentRegistry {
       this.sprites.set(key, sprite);
     }
 
-    // A povrchy. Mod smí přidat vlastní variantu trávy nebo přepsat vanilla.
-    for (const [key, url] of Object.entries(source.tiles ?? {})) {
-      this.tiles.set(key, url);
-    }
-
     // Pozdější zdroj smí text přepsat — tak se překládají nebo přejmenovávají
     // cizí budovy, aniž by se sahalo na jejich definici.
     for (const [language, table] of incomingLocales) {
@@ -230,20 +216,6 @@ export class ContentRegistry {
    */
   getSprite(definitionId: string, variant: string): SpriteImage | undefined {
     return this.sprites.get(`${definitionId}|${variant}`);
-  }
-
-  /** URL obrázku povrchu, nebo `undefined`, když ho obsah nedodal. */
-  getTile(terrain: string, variant: string): string | undefined {
-    return this.tiles.get(`${terrain}|${variant}`);
-  }
-
-  /** Varianty, ke kterým povrch obrázek má. Seřazené, ať je losování stabilní. */
-  getTileVariants(terrain: string): string[] {
-    const prefix = `${terrain}|`;
-    return [...this.tiles.keys()]
-      .filter((key) => key.startsWith(prefix))
-      .map((key) => key.slice(prefix.length))
-      .sort();
   }
 
   /**
