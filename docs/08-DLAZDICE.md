@@ -120,6 +120,12 @@ s kameny a vyšlapanou pěšinu — jenže při třech variantách by ta plešin
 každé třetí dlaždici a z mapy by byl leopard. Varianty se proto liší jen
 odstínem, hustotou a drobnostmi; nic, co by šlo poznat jako **místo**.
 
+**Odlesk je taky směr.** Voda dostala „fine ripples" a generátor k nim přidal
+bílé hřebeny a jiskření na slunci. Odlesk míří vždycky stejným směrem, takže se
+přes hranice dlaždic složil do pruhů — týž manšestr jako u trávy, jen na vodě.
+Prompt proto vyjmenovává, co tam **nemá** být: vlny, bílé hřebeny, jiskření
+a pěna.
+
 **Široká proměnlivost patří sklonu, ne kresbě.** Tráva měla „faint broad
 patches of lighter and darker green" a každá dlaždice si to flekování udělala
 po svém — z mapy byl ubrus. Světlo svahu tu proměnlivost dodá samo a zadarmo,
@@ -203,9 +209,9 @@ Písek jako v pískovišti, odkud je vzor.
 
 | | prompt |
 |---|---|
-| **a** | Open water seen from far above: one even blue-green surface with fine ripples, the same everywhere, no shore and no bottom. |
-| **b** | Deep open water seen from far above: one even dark blue surface with fine ripples, the same everywhere, no shore and no bottom. |
-| **c** | Open water seen from far above: one even lighter blue surface with very fine ripples, the same everywhere, no shore and no bottom. |
+| **a** | Open water seen from far above: one flat even blue-green surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom — only a very faint fine texture. |
+| **b** | Deep open water seen from far above: one flat even dark blue surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom — only a very faint fine texture. |
+| **c** | Open water seen from far above: one flat even lighter blue surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom — only a very faint fine texture. |
 
 ## Silnice
 

@@ -3770,6 +3770,27 @@ není, jde z popisu.
 
 Těžkou práci odvedla věta o měřítku v hlavičce, ne vzor.
 
+### Karta unese jen pár různých textur na chunk
+
+Ve vodě se objevily **fialové skvrny**. Nebyla to chyba obrázku — všechny tři
+varianty vody mají shodný odstín — ale **barva pod obrázkem**, která prosvítala
+tam, kde se textura nenakreslila vůbec.
+
+Příčina: chunk je jeden `Graphics` se 256 dlaždicemi a všechny výplně v něm jdou
+na kartu **jednou dávkou**. Do té se vejde jen omezený počet různých textur
+a zbytek karta zahodí. Změřeno přímo: s osmnácti texturami (6 druhů × 3 varianty)
+skvrny byly, se šesti zmizely.
+
+Zkusil jsem to obejít **atlasem** — slepit obrázky do jednoho a adresovat v něm
+výřezy. Nefunguje ani s ručním posunem v matici, ani s `Texture` s rámečkem:
+výplň s maticí v Pixi rámeček nectí a vzorkuje ve zdroji, takže každá dlaždice
+bere kus celého atlasu. Zahozeno.
+
+Zůstala **jedna varianta od druhu terénu** (`SURFACE_VARIANT_LIMIT`). Pestrost
+stejně nese hlavně otáčení po dlaždicích, které nic nestojí. Varianty `b` a `c`
+zůstávají v obsahu nevyužité — až se strop zvedne nebo atlas rozchodí, jsou po
+ruce.
+
 ### Co je změřené a co ne
 
 Odeslání kreslicích příkazů: 0,02 ms na snímek s texturou proti 0,01 ms bez —

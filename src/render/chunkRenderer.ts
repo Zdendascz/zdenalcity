@@ -212,7 +212,15 @@ export class ChunkRenderer {
    * i trvalý stav, když obsah obrázky nemá (P5, „chybějící obrázek hru
    * nezastaví").
    */
-  /** Obrázky po druzích terénu. Jen ty, které obsah opravdu dodal. */
+  /**
+   * Obrázky povrchu po druzích terénu.
+   *
+   * Všechny **sdílejí jeden zdroj** — jsou to výřezy z atlasu, který se skládá
+   * při načtení. Chunk je jeden `Graphics` a jeho výplně jdou na kartu jednou
+   * dávkou; do té se vejde jen omezený počet různých textur a zbytek karta
+   * zahodí. S osmnácti samostatnými obrázky se to projevilo jako fialové skvrny
+   * ve vodě, se šesti zmizely. Atlas ten strop obchází.
+   */
   private surfacesByTerrain = new Map<number, Texture[]>();
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
@@ -379,9 +387,9 @@ export class ChunkRenderer {
 
   /** Nastaví obrázky povrchu a překreslí, co je vidět. */
   setSurfaces(surfaces: ReadonlyMap<string, Texture>): void {
-    // Losuje se **z toho, co přišlo**, ne z pevné trojice a/b/c. Marsh má dvě
-    // varianty a písek jednu; kdyby se sahalo po chybějícím `c`, byla by
-    // třetina dlaždic bez obrázku a mapa by vyšla flekatá.
+    // Losuje se **z toho, co přišlo**, ne z pevné trojice a/b/c. Kdyby některý
+    // druh terénu variantu neměl a sahalo se po ní, zůstala by část dlaždic bez
+    // obrázku a mapa by vyšla flekatá.
     this.surfacesByTerrain = new Map();
     for (let terrain = 0; terrain < TERRAIN_NAMES.length; terrain++) {
       const name = TERRAIN_NAMES[terrain];

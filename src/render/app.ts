@@ -422,25 +422,40 @@ export function createTools(content: ContentRegistry): ToolOption[] {
 }
 
 /**
- * Načte obrázky povrchu, které obsah dodal. Co se nepovede stáhnout, se přeskočí
- * — chybějící obrázek nesmí hru zastavit, jen se dlaždice nakreslí barvou.
+ * Načte obrázky povrchu, které obsah dodal.
+ *
+ * **Bere nejvýš `SURFACE_VARIANT_LIMIT` variant od druhu**, a to je oprava, ne
+ * úspora. Chunk je jeden `Graphics` se 256 dlaždicemi a všechny výplně v něm
+ * jdou na kartu jednou dávkou; do té se vejde jen omezený počet různých textur
+ * a zbytek karta **zahodí**. Na mapě se to projevilo jako fialové skvrny ve
+ * vodě, kde prosvítala barva pod obrázkem. Změřeno: s osmnácti texturami skvrny
+ * byly, se šesti zmizely.
+ *
+ * Zkoušel jsem to obejít atlasem, tedy slepit obrázky do jednoho a adresovat
+ * v něm výřezy. Nefunguje: výplň s maticí v Pixi rámeček textury nectí
+ * a vzorkuje ve zdroji, takže každá dlaždice bere kus celého atlasu. Ubrat
+ * varianty je proti tomu jednoduché a prokazatelně funguje — a pestrost stejně
+ * nese hlavně otáčení po dlaždicích, které nic nestojí.
+ *
+ * Co se nepovede stáhnout, se přeskočí: chybějící obrázek nesmí hru zastavit,
+ * jen se dlaždice nakreslí barvou.
  */
 async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Texture>> {
   const out = new Map<string, Texture>();
   const jobs: Promise<void>[] = [];
 
   for (const terrain of TERRAIN_NAMES) {
-    for (const variant of content.getTileVariants(terrain)) {
+    for (const variant of content.getTileVariants(terrain).slice(0, SURFACE_VARIANT_LIMIT)) {
       const url = content.getTile(terrain, variant);
       if (url === undefined) continue;
       jobs.push(
         Assets.load(url)
           .then((texture: Texture) => {
-            // **Opakování, ne oříznutí.** Na svahu není dlaždice rovnoběžník,
-            // takže afinní matice sáhne kousek za okraj textury — a s výchozím
-            // režimem tam Pixi vrátí průhlednou, což se na mapě projeví jako
-            // černé dlaždice u pobřeží. Autor to nahlásil.
-            texture.source.addressMode = 'repeat';
+            // **Natažení okraje, ne opakování.** Na svahu není dlaždice
+            // rovnoběžník, takže afinní matice sáhne kousek za okraj textury.
+            // S výchozím režimem tam karta vrátí průhlednou (černé klíny
+            // u pobřeží), s opakováním skočí na protější okraj a udělá šev.
+            texture.source.addressMode = 'clamp-to-edge';
             out.set(`${terrain}|${variant}`, texture);
           })
           .catch(() => undefined),
@@ -451,6 +466,12 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
   await Promise.all(jobs);
   return out;
 }
+
+/**
+ * Kolik variant od druhu terénu se smí načíst. Viz `loadSurfaces` — je to strop
+ * daný kartou, ne volba vzhledu.
+ */
+const SURFACE_VARIANT_LIMIT = 1;
 
 /** Druhy terénu, ke kterým se hledá obrázek. Sedí na `TERRAIN` v `sim/layers.ts`. */
 const TERRAIN_NAMES = ['grass', 'water', 'sand', 'rock', 'forest', 'marsh'] as const;
