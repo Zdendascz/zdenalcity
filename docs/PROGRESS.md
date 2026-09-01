@@ -3693,6 +3693,46 @@ nerozpoznanou cestu tiše ignoruje, takže `tiles/index.json` hru nerozbije
 a čeká na napojení rendereru.
 
 
+## Povrch terénu z obrázků
+
+Rozhodnutí autora: zapojit **jen povrchy**, silnice a potrubí nechat
+procedurální, dokud se nevyřeší spoje.
+
+### Výplň polygonu, ne mesh
+
+Textura jde do `Graphics.fill({ texture, matrix })`, takže **chunkové pečení
+zůstalo, jak bylo** — 16 × 16 dlaždic do jednoho `Graphics`. S meshem na dlaždici
+by se ta úspora zahodila.
+
+Cena je, že afinní matice umí trefit jen tři rohy ze čtyř. Na rovné dlaždici je
+kosočtverec rovnoběžník, takže sedí přesně; na svahu je to přiblížení. U trávy
+a skály to oko nepozná, protože v obrázku není žádná přímka, která by se zlomila.
+
+**Matice se předává obrácená.** Pixi jí převádí bod plochy na místo v textuře,
+ne naopak — s tou přímou se obrázek do dlaždice vešel osmkrát (256 / 32).
+
+### Tón nese světlo, ne barvu terénu
+
+Napoprvé se obrázek násobil barvou terénu a tráva vyšla jako bahno: zelená ×
+zelená. Teď se násobí **bílou ztlumenou sklonem**, takže zůstane stín svahu
+a barva obrázku se nezkalí. Obrys dlaždice se u obrázku nekreslí — byla by z něj
+světlá mřížka přes celou mapu.
+
+### Varianta se losuje ze souřadnic
+
+Ne z `world.rng`: musí to vyjít stejně při každém překreslení i po načtení savu,
+a rng se mezitím posune. Stejná míchačka jako u variant budov, jen krmená `x`
+a `y` místo id budovy.
+
+### Co je změřené a co ne
+
+Odeslání kreslicích příkazů: 0,02 ms na snímek s texturou proti 0,01 ms bez —
+tedy nic. **Skutečné FPS změřené není**: `requestAnimationFrame` se
+v prostředí, ze kterého měřím, nespouští, takže se mi nepodařilo změřit snímkovou
+frekvenci ani rychlost pečení chunků při posunu. Akceptační kritérium 2
+(512 × 512 při 60 FPS) je tím pádem **potřeba přeměřit ručně**.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c
