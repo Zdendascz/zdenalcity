@@ -72,58 +72,120 @@ flat; do not draw its side walls or thickness.
 NO TEXT, NO LETTERS, NO NUMBERS, NO SIGNAGE, NO WATERMARK.
 ```
 
+## Vzory
+
+Povrch se generuje **s referenčním obrázkem**, ne jen z popisu. Rozhodnutí
+autora, a má dobrý důvod: tráva a písek, které v parkových spritech vyšly, jsou
+přesně to, co má být na zemi — stejné měřítko, stejné světlo, stejný styl. Popsat
+to slovy podruhé znamená vymýšlet, co už existuje.
+
+| povrch | vzor | co se z něj bere |
+|---|---|---|
+| `grass` | `park_small__a.png` | trávník pod stromem |
+| `sand` | `park_small__c.png` | písek z pískoviště |
+| `rock` | `park_small__a.png` | kamenné obruby a dlažba |
+| `forest` | `city_park__a.png` | koruny stromů shora |
+| `marsh` | `park_small__b.png` | voda a mokrá dlažba u kašny |
+| `water` | `park_small__b.png` | hladina kašny |
+
+Vzory jsou **hotové sprity z `content/vanilla/sprites/`**, ne zvláštní soubory:
+kdyby se vedle nich vedla druhá sada, rozešly by se.
+
+Ke každému promptu se vzorem se přidá ještě tahle věta, jinak se vzor
+překreslí i s lavičkou a stromem:
+
+```
+The reference image shows this material in a real place. Copy ONLY its ground
+material, its colour and its light. Do NOT copy anything that stands on it or
+around it: no tree, no bench, no fence, no lamp, no kerb, no path, no paving,
+no toy, no fountain. The result is that bare material alone, edge to edge.
+```
+
 ## Povrchy
 
 Tři varianty od každého, aby se sousední dlaždice neopakovaly. Losuje se stejně
 jako u budov, podle souřadnic dlaždice.
 
+**Varianta je totéž jinak, ne něco jiného.** První pokus dal trávě plešinu
+s kameny a vyšlapanou pěšinu — jenže při třech variantách by ta plešina byla na
+každé třetí dlaždici a z mapy by byl leopard. Varianty se proto liší jen
+odstínem, hustotou a drobnostmi; nic, co by šlo poznat jako **místo**.
+
+**Ale nesmí se psát „the same".** Druhý pokus popsal variantu b jako „the same
+lawn, a shade deeper" — a protože se generuje **s referenčním obrázkem**, model
+to přečetl jako „nech to být" a vrátil skoro nezměněný park i s prolézačkami.
+Každá varianta se proto popisuje **celou větou od začátku**, i když se od
+sousední liší jen odstínem.
+
+**Co vzor umí a co ne — změřeno na hotové sadě.** Reference pomůže jen tam, kde
+ten materiál ve zdrojovém spritu opravdu je:
+
+| povrch | výsledek |
+|---|---|
+| `grass` | 3 ze 3 použitelné — v parku trávník je |
+| `sand` | 1 ze 3; `a` opsalo i betonový rám pískoviště, `b` vyšlo jako zorané pole |
+| `rock` | 0 ze 3 — v parku není holá skála, jen dlažba, a tu to opsalo i se spárami |
+| `forest` | 0 ze 3 — park viděný z izometrie nemá zápoj korun shora, vyšla tráva |
+| `marsh` | 2 ze 3, `c` vyšla jako tráva |
+| `water` | 0 ze 3 — z kašny to vzalo dlažbu s kruhem, ne hladinu |
+
+Skála a les takhle nepůjdou nikdy: ten materiál nemá odkud vzít. **Patří to
+k autorovu nápadu udělat z nich objekty** — strom a balvan jsou předměty, a ty
+generátor umí.
+
 ### `grass`
+
+Trávník jako v parku pod stromem, odkud je vzor. Žádná cesta, žádná plešina.
 
 | | prompt |
 |---|---|
-| **a** | Mown lawn grass, even and short, a few clover patches and two dandelions. |
-| **b** | Rougher meadow grass with a bald patch of dry earth and a scatter of small stones. |
-| **c** | Lawn grass with a shallow worn footpath crossing it diagonally, edges frayed into the turf. |
+| **a** | Even mown lawn, uniform all over, a few clover leaves. |
+| **b** | Even mown lawn in a deeper green, dense and uniform all over. |
+| **c** | Even mown lawn in a lighter, drier green, uniform all over, a few tiny daisies. |
 
 ### `forest`
 
+Souvislý zápoj korun shora. Jednotlivý strom sem nepatří — od toho je objekt.
+
 | | prompt |
 |---|---|
-| **a** | Dense deciduous canopy seen from above: linden and birch crowns touching, dark gaps between them. |
-| **b** | Mixed woodland canopy, two spruces among broadleaf crowns, a sliver of forest floor visible at one edge. |
-| **c** | Thinner woodland: four separate crowns with grass and leaf litter between them. |
+| **a** | Continuous deciduous canopy from above, crowns touching, dark gaps between them. |
+| **b** | Continuous deciduous canopy from above in a deeper green, crowns packed tight. |
+| **c** | Continuous deciduous canopy from above in a lighter green, crowns touching. |
 
 ### `rock`
 
 | | prompt |
 |---|---|
-| **a** | Bare grey granite bedrock, weathered and cracked, with lichen in the fissures. |
-| **b** | Broken rock: angular boulders and scree over pale stone, sparse dry grass in the gaps. |
-| **c** | Rounded rock outcrop, smooth grey stone with a shallow ledge and moss on the north side. |
+| **a** | Bare grey granite, weathered and evenly cracked all over. |
+| **b** | Bare grey granite, darker and damp, evenly cracked all over. |
+| **c** | Bare pale granite, dry and evenly cracked all over, with fine lichen. |
 
 ### `sand`
 
+Písek jako v pískovišti, odkud je vzor.
+
 | | prompt |
 |---|---|
-| **a** | Fine river sand, rippled by wind, a few small pebbles. |
-| **b** | Coarse sand with gravel, damp in patches, one piece of driftwood. |
-| **c** | Dry pale sand with sparse tufts of marram grass. |
+| **a** | Clean fine sand, evenly raked, uniform all over. |
+| **b** | Clean fine sand, damp and darker, evenly raked, uniform all over. |
+| **c** | Clean pale sand, dry and evenly raked, uniform all over, a scatter of tiny pebbles. |
 
 ### `marsh`
 
 | | prompt |
 |---|---|
-| **a** | Boggy ground: dark waterlogged peat, tussocks of sedge, two shallow pools reflecting the sky. |
-| **b** | Reed bed in shallow water, dense stems, the water dark between them. |
-| **c** | Wet meadow turning to bog, coarse grass with standing water in the hollows. |
+| **a** | Waterlogged ground: dark peat under a even cover of low sedge. |
+| **b** | Waterlogged dark peat under an even cover of low sedge, wetter and darker. |
+| **c** | Damp peat under a dense even cover of low sedge, little standing water. |
 
 ### `water`
 
 | | prompt |
 |---|---|
-| **a** | Calm fresh water, gentle ripples, the bottom faintly visible as a darker green. |
-| **b** | Water with a light breeze on it: small waves catching the daylight. |
-| **c** | Deeper water, darker and quieter, a few floating leaves. |
+| **a** | Calm fresh water with fine even ripples all over. |
+| **b** | Deep calm fresh water, darker, with fine even ripples all over. |
+| **c** | Shallow calm fresh water, lighter, with very fine even ripples all over. |
 
 ## Silnice
 
