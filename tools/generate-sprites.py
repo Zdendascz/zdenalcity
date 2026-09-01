@@ -190,9 +190,19 @@ def plot_sentence(name: str, shapes: dict[str, tuple[int, int]]) -> str:
     w, d, _ = size
     if w == d:
         return f'The plot is a square of {w} by {d} city tiles.'
+    # **Která osa, ne jen „jedna z nich".** Do T72 tu stálo „elongated along one
+    # axis" a generátor si směr vybíral sám — `commercial_row__b` vyšel otočený
+    # o devadesát stupňů a autor to našel na mapě. Delší strana leží podél
+    # mřížkové osy x, a ta v izometrii míří doprava dolů.
+    smer = (
+        'from the upper-left to the lower-right'
+        if w > d
+        else 'from the upper-right to the lower-left'
+    )
     return (
-        f'The plot is a RECTANGLE of {w} by {d} city tiles, not a square — '
-        f'in this projection its diamond is clearly elongated along one axis.'
+        f'The plot is a RECTANGLE of {w} by {d} city tiles, not a square. '
+        f'Its LONG side runs {smer}; the short ends face the other two corners. '
+        f'Do not rotate the building by ninety degrees.'
     )
 
 

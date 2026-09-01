@@ -307,6 +307,34 @@ def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str,
     measured_x = final[1] if final else None
     tolerance = target_w * ANCHOR_TOLERANCE
 
+    # Otočená budova. Vrchol podstavy sedí na místě, kam patří **prohozený**
+    # půdorys — generátor nakreslil 1 × 2 místo 2 × 1. Zrcadlení podle svislé
+    # osy je v izometrii přesně to prohození: mřížkové `(x, y) → (y, x)` dá
+    # obrazové `x → −x`, protože `sx = (x − y)·32`.
+    #
+    # Opravuje se to **jen v tomhle úzkém případě**: změřený vrchol musí sedět
+    # u prohozené polohy a být daleko od té správné. Nepřesně změřená podstava
+    # se tím nesmí zrcadlit, ta se jen dorovná na geometrii o kus níž.
+    #
+    # Cena: světlo se překlopí, takže stín padá na opačnou stranu než u ostatních
+    # budov. Je to menší zlo než barák položený napříč parcelou, a autor tuhle
+    # chybu našel očima na mapě (`commercial_row__b`). Prompt směr osy říká,
+    # ale generátor ho neposlechl ani na druhý pokus.
+    if measured_x is not None and footprint_w != footprint_d:
+        swapped_x = round(target_w * footprint_d / (footprint_w + footprint_d))
+        middle = target_w / 2
+        # Blíž k prohozené poloze **a** na opačné straně od středu. Samotné okno
+        # kolem prohozené polohy nestačilo — `commercial_row__b` se změřil o kus
+        # vedle a proklouzl. A samotná strana taky ne: podstava změřená přesně
+        # na středu je selhané měření, ne otočená budova, a leží od obou poloh
+        # stejně daleko.
+        blizsi = abs(measured_x - swapped_x) < abs(measured_x - expected_x)
+        opacna_strana = (measured_x - middle) * (expected_x - middle) < 0
+        if blizsi and opacna_strana:
+            resized = resized.transpose(Image.FLIP_LEFT_RIGHT)
+            measured_x = target_w - measured_x
+            notes.append('  ← nakreslený napříč parcelou, zrcadlím (světlo se překlopí)')
+
     if measured_x is None:
         anchor_x = expected_x
         notes.append('  ← podstavu nejde změřit, kotva dopočítaná z půdorysu')
