@@ -64,6 +64,36 @@ export function areaQuad(
 }
 
 /**
+ * Tři rohy dlaždice, ze kterých se skládá matice pro obrázek povrchu.
+ *
+ * Vrací všechny čtyři rohy v pixelech po směru hodin: severozápadní,
+ * severovýchodní, jihovýchodní, jihozápadní. Afinní zobrazení potřebuje jen
+ * tři, ale který trojici vzít, rozhoduje **otočení** obrázku — proto se vrací
+ * všechny. Čtvrtý roh se u nerovné dlaždice stejně nedá trefit, a právě proto
+ * je obrázek na svahu jen přiblížení.
+ *
+ * Pořadí sedí na `fit-tiles.py`: v narovnaném čtverci je `(0,0)` severozápad,
+ * `+u` míří na severovýchod a `+v` na jihozápad.
+ */
+export function surfaceCorners(
+  x: number,
+  y: number,
+  corners: readonly [number, number, number, number],
+): [[number, number], [number, number], [number, number], [number, number]] {
+  const [nw, ne, sw, se] = corners;
+  const a = gridToScreen(x, y, nw);
+  const b = gridToScreen(x + 1, y, ne);
+  const c = gridToScreen(x + 1, y + 1, se);
+  const d = gridToScreen(x, y + 1, sw);
+  return [
+    [a.x, a.y],
+    [b.x, b.y],
+    [c.x, c.y],
+    [d.x, d.y],
+  ];
+}
+
+/**
  * O kolik ztmavit nebo zesvětlit dlaždici podle sklonu.
  *
  * Bez tohohle by se svah od roviny nedal rozeznat: obě plochy mají stejnou

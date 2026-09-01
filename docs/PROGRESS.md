@@ -3693,40 +3693,61 @@ nerozpoznanou cestu tiše ignoruje, takže `tiles/index.json` hru nerozbije
 a čeká na napojení rendereru.
 
 
-## Povrch z obrázků zkusen a vrácen zpátky
+## Povrch terénu z obrázků
 
-Autor si vyžádal zapojení povrchů, viděl výsledek a řekl „je to hodně špatně".
-Souhlas — commit `f6f8b46` je proto revertovaný. Obrázky, generátor i fitter
-v repu zůstávají; zrušené je jen jejich napojení na renderer.
+Rozhodnutí autora: zapojit **jen povrchy**, silnice a potrubí nechat
+procedurální, dokud se nevyřeší spoje.
 
-### Co bylo vidět
+### Výplň polygonu, ne mesh
 
-Přes celou mapu vedly **souvislé úhlopříčné pruhy**. Tráva vypadala jako manšestr
-a řeky jako žebrovaná hadice. Tři varianty na druh terénu to nezachránily.
+Textura jde do `Graphics.fill({ texture, matrix })`, takže **chunkové pečení
+zůstalo, jak bylo** — 16 × 16 dlaždic do jednoho `Graphics`. S meshem na dlaždici
+by se ta úspora zahodila.
 
-### Proč
+Cena je, že afinní matice umí trefit jen tři rohy ze čtyř. Na rovné dlaždici je
+kosočtverec rovnoběžník, takže sedí přesně; na svahu je to přiblížení. U trávy
+a skály to oko nepozná, protože v obrázku není žádná přímka, která by se zlomila.
 
-Tři věci, které se sčítají, a **žádná z nich není chyba v kódu**:
+**Matice se předává obrácená.** Pixi jí převádí bod plochy na místo v textuře,
+ne naopak — s tou přímou se obrázek do dlaždice vešel osmkrát (256 / 32).
 
-1. **Obrázky mají směr.** Sekaný trávník má pruhy, vlny na vodě mají hřebeny.
-   Když dostane každá dlaždice tentýž obrázek ve stejné orientaci, pruhy na sebe
-   přes hranice dlaždic navážou a udělají pás přes celou obrazovku.
-2. **Zkosení ten směr zdůrazní.** Renderer mapuje čtverec textury na kosočtverec,
-   takže cokoli vodorovného v obrázku se překlopí do 45°. Všechny dlaždice mají
-   totéž zkosení, takže výsledek je jedna velká úhlopříčná mřížka.
-3. **Nejsou bezešvé.** Každý obrázek je samostatná fotografie s vlastním
-   osvětlením, ne dlaždice navazující na sousedy.
+### Tón nese světlo, ne barvu terénu
 
-### Co by mohlo pomoct
+Napoprvé se obrázek násobil barvou terénu a tráva vyšla jako bahno: zelená ×
+zelená. Teď se násobí **bílou ztlumenou sklonem**, takže zůstane stín svahu
+a barva obrázku se nezkalí. Obrys dlaždice se u obrázku nekreslí — byla by z něj
+světlá mřížka přes celou mapu.
 
-Nezkoušeno, jen návrh: otáčet a překlápět texturu podle souřadnic dlaždice
-(čtyři orientace ze stejné míchačky, která teď losuje variantu), tím se dlouhé
-pruhy rozbijí; a mísit obrázek s plochou barvou na část krytí, aby kresba jen
-doplňovala barvu, místo aby ji nahradila. Obojí je pár řádků v `chunkRenderer`.
+### Varianta se losuje ze souřadnic
 
-Zbývá otázka, jestli tudy vůbec jít. **Generátor umí kreslit předměty, ne
-dlaždice**: u budov měřitelně uspěl, u navazujících dlaždic selhal dvakrát —
-u silnic na spojích a tady na opakování.
+Ne z `world.rng`: musí to vyjít stejně při každém překreslení i po načtení savu,
+a rng se mezitím posune. Stejná míchačka jako u variant budov, jen krmená `x`
+a `y` místo id budovy.
+
+### Zapojeno je jen to, co obstálo
+
+Ne všech šest povrchů, ale **tráva (3 varianty), mokřad (2) a písek (1)**.
+Skála, les a voda se z parkových vzorů vygenerovat nedaly a zůstávají barvou;
+dlaždice, které za nic nestály, leží v `art/tiles/rejected/` mimo repo.
+
+Z toho plynou dvě věci v rendereru, které při prvním pokusu chyběly:
+
+- **Losuje se z variant, které opravdu jsou.** Mokřad má dvě a písek jednu;
+  kdyby se sahalo po pevné trojici `a/b/c`, byla by třetina dlaždic bez obrázku
+  a mapa flekatá.
+- **Obrázek se po dlaždicích otáčí** o násobek čtvrtiny. Dělá se to výběrem
+  rohů, ne otáčením obrázku, takže je to zadarmo. Tohle je oprava toho, co autor
+  odmítl slovy „je to hodně špatně": bez otočení mají všechny dlaždice kresbu ve
+  stejném směru, navážou na sebe přes hranice a udělají pruh přes celou
+  obrazovku.
+
+### Co je změřené a co ne
+
+Odeslání kreslicích příkazů: 0,02 ms na snímek s texturou proti 0,01 ms bez —
+tedy nic. **Skutečné FPS změřené není**: `requestAnimationFrame` se
+v prostředí, ze kterého měřím, nespouští, takže se mi nepodařilo změřit snímkovou
+frekvenci ani rychlost pečení chunků při posunu. Akceptační kritérium 2
+(512 × 512 při 60 FPS) je tím pádem **potřeba přeměřit ručně**.
 
 
 ## Rozpracované

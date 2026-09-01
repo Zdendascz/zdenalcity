@@ -1,4 +1,5 @@
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Assets, Container, Graphics } from 'pixi.js';
+import type { Texture } from 'pixi.js';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import type { Definition } from '@/content/schema';
@@ -420,6 +421,35 @@ export function createTools(content: ContentRegistry): ToolOption[] {
   return tools.sort((a, b) => (order.get(a.groupKey) ?? 0) - (order.get(b.groupKey) ?? 0));
 }
 
+/**
+ * Načte obrázky povrchu, které obsah dodal. Co se nepovede stáhnout, se přeskočí
+ * — chybějící obrázek nesmí hru zastavit, jen se dlaždice nakreslí barvou.
+ */
+async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Texture>> {
+  const out = new Map<string, Texture>();
+  const jobs: Promise<void>[] = [];
+
+  for (const terrain of TERRAIN_NAMES) {
+    for (const variant of content.getTileVariants(terrain)) {
+      const url = content.getTile(terrain, variant);
+      if (url === undefined) continue;
+      jobs.push(
+        Assets.load(url)
+          .then((texture: Texture) => {
+            out.set(`${terrain}|${variant}`, texture);
+          })
+          .catch(() => undefined),
+      );
+    }
+  }
+
+  await Promise.all(jobs);
+  return out;
+}
+
+/** Druhy terénu, ke kterým se hledá obrázek. Sedí na `TERRAIN` v `sim/layers.ts`. */
+const TERRAIN_NAMES = ['grass', 'water', 'sand', 'rock', 'forest', 'marsh'] as const;
+
 export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Obsah se načítá první. Nevalidní definice má spadnout dřív, než se objeví
   // plátno — tichý pád s polovinou obsahu je horší než hlasitá chyba.
@@ -543,6 +573,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // dostane jen tuhle jednu funkci (P5).
     (definitionId) => content.get(definitionId)?.graphics.icon,
   );
+
+  // Obrázky povrchu se dotahují **na pozadí**: pečení chunku je synchronní
+  // a nemá kde počkat, takže se do té doby kreslí barva. Když obsah obrázky
+  // nemá, zůstane barva navždy a hra běží dál (P5).
+  //
+  // Silnice a potrubí se sem **záměrně nedávají**. Jejich dlaždice existují,
+  // ale 42 ze 64 má vozovku jinde, než má, takže by na každém spoji uskakovala.
+  // Rozhodnutí, co s tím, je v `docs/08-DLAZDICE.md`.
+  void loadSurfaces(content).then((surfaces) => {
+    if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
+  });
   const buildingRenderer = new BuildingRenderer(
     world,
     worldContainer,

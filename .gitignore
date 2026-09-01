@@ -29,6 +29,7 @@ art/sprites/raw/*.png
 
 # Syrové obrázky dlaždic: totéž co u budov — velké a znovu vygenerovatelné.
 art/tiles/raw/*.png
+art/tiles/rejected/*.png
 
 # Bajtkód Pythonu. Do repa se dostal omylem s nástroji na sprity.
 __pycache__/
