@@ -8,6 +8,16 @@ import type { ZoneType } from '@/sim/layers';
  * ani jedné budovy (P5). Totéž platí pro ikonu i zařazení do nabídky.
  */
 export type ToolAction =
+  /**
+   * Pacička: posun po mapě levým tlačítkem a **výběr** kliknutím.
+   *
+   * Dvě věci v jednom nástroji schválně (rozhodnutí autora): posouvat mapu šlo
+   * jen prostředním tlačítkem nebo mezerníkem s levým, což na notebooku bez myši
+   * nejde pohodlně. Klik bez tažení dělá totéž co pravé tlačítko, tedy otevře
+   * detail budovy — proto nemá vlastní větev v `applyTool`, obsluhuje se
+   * u ukazatele.
+   */
+  | { kind: 'pan' }
   | { kind: 'road'; roadType: number }
   /**
    * Potrubí. **Vlastní nástroj, ne přepnutý stavební**: do T41 kladl trubky

@@ -3615,6 +3615,28 @@ a kotva y na spodní hraně. Ověřeno mutací dat — vrácení staré kotvy
 `commercial_row__b` test shodí.
 
 
+## Pacička: posun a výběr v jednom nástroji
+
+Zadání autora. Posouvat mapou šlo jen prostředním tlačítkem nebo mezerníkem
+s levým, což na notebooku bez myši nejde pohodlně.
+
+Pacička je normální nástroj v liště, první zleva, klávesa `h`. Levým tlačítkem
+mapa jezdí. **Klik bez tažení** dělá totéž co pravé tlačítko, tedy otevře detail
+budovy — proto nemá vlastní větev v `applyTool`, obsluhuje se u ukazatele.
+
+Klik od tažení odlišuje práh **osmi pixelů** posunu ukazatele, ne změna
+dlaždice: hráč může mapou posunout a skončit nad toutéž dlaždicí, a to výběr
+není. Zpátky ani prst, ani myš polohu nedrží přesně, takže bez prahu by se
+detail neotevřel skoro nikdy.
+
+Je to jediný nástroj, kterým hráč nemůže nic postavit ani zbourat — proto stojí
+v liště první.
+
+Ikona se kreslí z polygonů (`UI_SHAPES.hand`), takže do projektu nepřibyl
+obrázek. Až někdo nakreslí `content/vanilla/icons/hand.png`, hra si vezme ten:
+`iconSvg` dává přednost obsahu a na tvary padá jen jako záloha.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

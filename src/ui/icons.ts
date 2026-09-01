@@ -287,7 +287,37 @@ const GEAR: Shape = [
  * Tvary jen pro rozhraní. Střešní symboly se sem nekopírují — `iconShape` sáhne
  * do sady rendereru, když tady jméno nenajde.
  */
+/**
+ * Dlaň se vztyčeným palcem — posun po mapě a výběr v jednom.
+ *
+ * Kreslí se z polygonů jako ostatní nástroje, takže do projektu nepřibývá
+ * obrázek. Až někdo nakreslí `content/vanilla/icons/hand.png`, hra si vezme
+ * ten — `iconSvg` dává přednost obsahu a na tvary padá jen jako záloha.
+ */
+const HAND: Shape = [
+  // Dlaň.
+  [
+    [0.32, 0.44],
+    [0.68, 0.44],
+    [0.72, 0.78],
+    [0.5, 0.92],
+    [0.28, 0.78],
+  ],
+  // Tři prsty vedle sebe.
+  bar(0.36, 0.2, 0.44, 0.46),
+  bar(0.46, 0.14, 0.54, 0.46),
+  bar(0.56, 0.2, 0.64, 0.46),
+  // Palec ven doleva.
+  [
+    [0.32, 0.46],
+    [0.32, 0.62],
+    [0.18, 0.56],
+    [0.2, 0.44],
+  ],
+];
+
 const UI_SHAPES: Readonly<Record<string, Shape>> = {
+  hand: HAND,
   raise: ARROW_UP,
   lower: ARROW_DOWN,
   level: LEVEL,

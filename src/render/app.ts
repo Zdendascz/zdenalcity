@@ -266,6 +266,17 @@ export function classIconsOf(content: ContentRegistry): Map<string, string> {
 export function createTools(content: ContentRegistry): ToolOption[] {
   const roadTypes = content.getBalance().traffic.roadTypes;
   const tools: ToolOption[] = [
+    // Pacička je první, protože se s ní nic nestaví ani nebourá — je to jediný
+    // nástroj, ve kterém hráč nemůže omylem nic provést.
+    {
+      id: 'pan',
+      labelKey: 'ui.tool.pan',
+      icon: 'hand',
+      hotkey: 'h',
+      groupKey: 'ui.menu.pan',
+      groupIcon: 'hand',
+      action: { kind: 'pan' as const },
+    },
     // Typy silnic jdou z balancu, ne z kódu: přidat čtvrtý je změna JSONu
     // a jednoho lokalizačního klíče (§4 fáze 3).
     ...roadTypes.map((road, order) => ({
@@ -1012,10 +1023,28 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   const canvas = app.canvas;
 
-  /** Panuje se prostředním tlačítkem nebo mezerníkem s levým. */
+  /**
+   * Panuje se prostředním tlačítkem, mezerníkem s levým, nebo **pacičkou**.
+   *
+   * Pacička je normální nástroj: když je vybraná, levé tlačítko posouvá mapu.
+   * Rozdíl proti ostatním dvěma je, že klik bez tažení u ní ještě něco udělá —
+   * viz `panStartedAt`.
+   */
   function isPanButton(event: PointerEvent): boolean {
-    return event.button === 1 || (event.button === 0 && spaceDown);
+    if (event.button === 1) return true;
+    if (event.button !== 0) return false;
+    return spaceDown || activeTool.action.kind === 'pan';
   }
+
+  /**
+   * Kde a čím začalo panování pacičkou. `null` u ostatních způsobů posunu —
+   * u nich se klik bez tažení nemá čím projevit.
+   *
+   * Prahem osmi pixelů se odlišuje klik od tažení: prst ani myš nedrží polohu
+   * přesně a bez prahu by se výběr při sebemenším chvění neotevřel.
+   */
+  let panStartedAt: { x: number; y: number; tile: { x: number; y: number } } | null = null;
+  const CLICK_SLOP = 8;
 
   function tileAt(event: PointerEvent): { x: number; y: number } | null {
     return pickTile(
@@ -1276,6 +1305,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
       canvas.setPointerCapture(event.pointerId);
+      const tile = activeTool.action.kind === 'pan' ? tileAt(event) : null;
+      panStartedAt = tile ? { x: event.clientX, y: event.clientY, tile } : null;
       return;
     }
 
@@ -1380,6 +1411,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (dragPointerId !== event.pointerId) return;
     canvas.releasePointerCapture(event.pointerId);
     dragPointerId = null;
+
+    // Pacička: klik bez tažení otevře detail, stejně jako pravé tlačítko.
+    // Měří se posun ukazatele, ne to, jestli se změnila dlaždice — hráč může
+    // mapou posunout o kus a skončit nad toutéž dlaždicí, a to výběr není.
+    const start = panStartedAt;
+    panStartedAt = null;
+    if (!start) return;
+    const moved = Math.abs(event.clientX - start.x) + Math.abs(event.clientY - start.y);
+    if (moved <= CLICK_SLOP) showBuildingAt(start.tile);
   }
 
   canvas.addEventListener('pointerup', endDrag);
@@ -1387,6 +1427,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   canvas.addEventListener('pointerleave', () => {
     hoveredTile = null;
     paintButton = null;
+    panStartedAt = null;
     // Tažení, které opustilo plátno, se zahodí. Dokreslit ho naslepo by
     // znamenalo zónu tam, kam hráč nevidí.
     dragAnchor = null;

@@ -464,5 +464,7 @@
   "building.plaza.desc": "Paving and benches. The cheapest thing that lifts land value.",
   "building.city_park.name": "City park",
   "building.city_park.desc": "The largest park in town. Lifts land value over a wide area.",
-  "ui.info.spriteFile": "Sprite file (temporary)"
+  "ui.info.spriteFile": "Sprite file (temporary)",
+  "ui.tool.pan": "Hand",
+  "ui.menu.pan": "Move"
 }

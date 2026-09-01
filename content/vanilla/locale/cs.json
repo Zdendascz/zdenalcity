@@ -464,5 +464,7 @@
   "building.plaza.desc": "Dlážděná plocha s lavičkami. Nejlevnější, co zvedne cenu půdy.",
   "building.city_park.name": "Městský park",
   "building.city_park.desc": "Největší park ve městě. Zvedá cenu půdy v širokém okolí.",
-  "ui.info.spriteFile": "Obrázek (dočasné)"
+  "ui.info.spriteFile": "Obrázek (dočasné)",
+  "ui.tool.pan": "Pacička",
+  "ui.menu.pan": "Pohyb"
 }
