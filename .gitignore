@@ -26,3 +26,10 @@ dist-ssr
 # Syrové obrázky budov: velké a znovu vygenerovatelné z promptů.
 # Do repa jde až to, co z nich udělá tools/fit-sprites.py.
 art/sprites/raw/*.png
+
+# Syrové obrázky dlaždic: totéž co u budov — velké a znovu vygenerovatelné.
+art/tiles/raw/*.png
+
+# Bajtkód Pythonu. Do repa se dostal omylem s nástroji na sprity.
+__pycache__/
+*.pyc
