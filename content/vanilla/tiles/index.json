@@ -1,0 +1,498 @@
+{
+  "formatVersion": 1,
+  "size": 256,
+  "tiles": [
+    {
+      "tile": "avenue",
+      "shape": "0",
+      "file": "avenue__0.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "e",
+      "file": "avenue__e.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "es",
+      "file": "avenue__es.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "esw",
+      "file": "avenue__esw.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "ew",
+      "file": "avenue__ew.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "n",
+      "file": "avenue__n.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "ne",
+      "file": "avenue__ne.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "nes",
+      "file": "avenue__nes.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "nesw",
+      "file": "avenue__nesw.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "new",
+      "file": "avenue__new.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "ns",
+      "file": "avenue__ns.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "nsw",
+      "file": "avenue__nsw.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "nw",
+      "file": "avenue__nw.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "s",
+      "file": "avenue__s.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "sw",
+      "file": "avenue__sw.png",
+      "size": 256
+    },
+    {
+      "tile": "avenue",
+      "shape": "w",
+      "file": "avenue__w.png",
+      "size": 256
+    },
+    {
+      "tile": "forest",
+      "shape": "a",
+      "file": "forest__a.png",
+      "size": 256
+    },
+    {
+      "tile": "forest",
+      "shape": "b",
+      "file": "forest__b.png",
+      "size": 256
+    },
+    {
+      "tile": "forest",
+      "shape": "c",
+      "file": "forest__c.png",
+      "size": 256
+    },
+    {
+      "tile": "grass",
+      "shape": "a",
+      "file": "grass__a.png",
+      "size": 256
+    },
+    {
+      "tile": "grass",
+      "shape": "b",
+      "file": "grass__b.png",
+      "size": 256
+    },
+    {
+      "tile": "grass",
+      "shape": "c",
+      "file": "grass__c.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "0",
+      "file": "highway__0.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "e",
+      "file": "highway__e.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "es",
+      "file": "highway__es.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "esw",
+      "file": "highway__esw.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "ew",
+      "file": "highway__ew.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "n",
+      "file": "highway__n.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "ne",
+      "file": "highway__ne.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "nes",
+      "file": "highway__nes.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "nesw",
+      "file": "highway__nesw.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "new",
+      "file": "highway__new.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "ns",
+      "file": "highway__ns.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "nsw",
+      "file": "highway__nsw.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "nw",
+      "file": "highway__nw.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "s",
+      "file": "highway__s.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "sw",
+      "file": "highway__sw.png",
+      "size": 256
+    },
+    {
+      "tile": "highway",
+      "shape": "w",
+      "file": "highway__w.png",
+      "size": 256
+    },
+    {
+      "tile": "marsh",
+      "shape": "a",
+      "file": "marsh__a.png",
+      "size": 256
+    },
+    {
+      "tile": "marsh",
+      "shape": "b",
+      "file": "marsh__b.png",
+      "size": 256
+    },
+    {
+      "tile": "marsh",
+      "shape": "c",
+      "file": "marsh__c.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "0",
+      "file": "pipe__0.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "e",
+      "file": "pipe__e.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "es",
+      "file": "pipe__es.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "esw",
+      "file": "pipe__esw.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "ew",
+      "file": "pipe__ew.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "n",
+      "file": "pipe__n.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "ne",
+      "file": "pipe__ne.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "nes",
+      "file": "pipe__nes.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "nesw",
+      "file": "pipe__nesw.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "new",
+      "file": "pipe__new.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "ns",
+      "file": "pipe__ns.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "nsw",
+      "file": "pipe__nsw.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "nw",
+      "file": "pipe__nw.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "s",
+      "file": "pipe__s.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "sw",
+      "file": "pipe__sw.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "w",
+      "file": "pipe__w.png",
+      "size": 256
+    },
+    {
+      "tile": "rock",
+      "shape": "a",
+      "file": "rock__a.png",
+      "size": 256
+    },
+    {
+      "tile": "rock",
+      "shape": "b",
+      "file": "rock__b.png",
+      "size": 256
+    },
+    {
+      "tile": "rock",
+      "shape": "c",
+      "file": "rock__c.png",
+      "size": 256
+    },
+    {
+      "tile": "sand",
+      "shape": "a",
+      "file": "sand__a.png",
+      "size": 256
+    },
+    {
+      "tile": "sand",
+      "shape": "b",
+      "file": "sand__b.png",
+      "size": 256
+    },
+    {
+      "tile": "sand",
+      "shape": "c",
+      "file": "sand__c.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "0",
+      "file": "street__0.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "e",
+      "file": "street__e.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "es",
+      "file": "street__es.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "esw",
+      "file": "street__esw.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "ew",
+      "file": "street__ew.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "n",
+      "file": "street__n.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "ne",
+      "file": "street__ne.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "nes",
+      "file": "street__nes.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "nesw",
+      "file": "street__nesw.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "new",
+      "file": "street__new.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "ns",
+      "file": "street__ns.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "nsw",
+      "file": "street__nsw.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "nw",
+      "file": "street__nw.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "s",
+      "file": "street__s.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "sw",
+      "file": "street__sw.png",
+      "size": 256
+    },
+    {
+      "tile": "street",
+      "shape": "w",
+      "file": "street__w.png",
+      "size": 256
+    },
+    {
+      "tile": "water",
+      "shape": "a",
+      "file": "water__a.png",
+      "size": 256
+    },
+    {
+      "tile": "water",
+      "shape": "b",
+      "file": "water__b.png",
+      "size": 256
+    },
+    {
+      "tile": "water",
+      "shape": "c",
+      "file": "water__c.png",
+      "size": 256
+    }
+  ]
+}

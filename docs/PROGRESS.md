@@ -3637,6 +3637,62 @@ obrázek. Až někdo nakreslí `content/vanilla/icons/hand.png`, hra si vezme te
 `iconSvg` dává přednost obsahu a na tvary padá jen jako záloha.
 
 
+## Dlaždice: 82 obrázků a změřené navazování
+
+Zadání autora „dogeneruj grafiku pro povrchy, silnice a potrubí". Prompty jsou
+v `docs/08-DLAZDICE.md`, generuje `tools/generate-tiles.py`, ladí
+`tools/fit-tiles.py`.
+
+### Narovnaný čtverec, ne kosočtverec
+
+Rozhodnutí autora. Terén se kreslí jako zdeformovaný čtyřúhelník podle výšek
+rohů, takže obrázek na něj půjde jako textura na mesh; čtverec má UV rohů
+`(0,0)`–`(1,1)` a využije se celý, kdežto u kosočtverce by byla půlka textury
+průhledná plocha, do které se nikdy netrefí.
+
+Vedlejší efekt, který se hodí: po narovnání se **hrany čtverce rovnají světovým
+stranám** — horní je sever, pravá východ — takže měření spoje je „co leží
+u horní hrany" a masky ze `sim/roads.ts` sedí přímo.
+
+### Detektor jde po sytosti, ne po jasu
+
+Naměřeno na hraně: tráva má jas 89, asfalt 108. Asfalt je tedy **světlejší**
+než tráva a práh na jasu měřil kdeco. Sytost je odděluje bez diskuse: 70 %
+proti 10 %.
+
+### Co ukázalo měření
+
+První dávka: **54 z 64** navazujících dlaždic vadných. Příčinu ukázal kontaktní
+list, ne čísla — prompt říkal „vozovka odchází k severu" a generátor si to
+přeložil jako směr **k vrcholu** kosočtverce místo přes jeho **stranu**.
+Křižovatka vyšla jako `X` místo `+`, slepé konce mířily jinam. Oblouky,
+T-křižovatky a přímé úseky byly správně.
+
+Zadání teď pojmenovává strany doslova a říká, že čtyři špičaté rohy jsou vždycky
+tráva. Po přegenerování: **42 z 64**. Hrubá geometrie je opravená, zbytek jsou
+**posunuté spoje** — vozovka protíná hranu jednou v 0,38, jindy v 0,62, a šířku
+má taky pokaždé jinou. Medián šířky: ulice 0,18, třída 0,26, dálnice 0,22,
+potrubí 0,27.
+
+**Generátor neumí trefit pevné místo na hraně.** To není vada promptu, kterou by
+šlo doladit slovy — je to mez nástroje. Silnice z těchto obrázků budou na spojích
+uskakovat.
+
+Co s tím dál, rozhodne autor. Nabízí se buď dlaždice po vygenerování **narovnat
+strojově** (posunout a roztáhnout pruh vozovky tak, aby hranu protínal na pevném
+místě), nebo **nechat silnice procedurální**, jak `CLAUDE.md` původně říkalo,
+a z generovaných obrázků vzít jen povrchy. Povrchů se to netýká vůbec: tráva,
+skála ani les navazovat nemusí a **18 z 18** je použitelných.
+
+### Do repa
+
+Naladěné dlaždice jsou v `content/vanilla/tiles/` (82 souborů, 16 MB). Syrové
+předlohy ne — jsou velké a znovu vygenerovatelné z promptů, stejně jako u budov.
+Loader je zatím **nenačítá**: `content/vanilla/**/*.json` sice bere, ale
+nerozpoznanou cestu tiše ignoruje, takže `tiles/index.json` hru nerozbije
+a čeká na napojení rendereru.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c
