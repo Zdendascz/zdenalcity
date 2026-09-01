@@ -322,6 +322,18 @@
     },
     {
       "tile": "sand",
+      "shape": "a",
+      "file": "sand__a.png",
+      "size": 256
+    },
+    {
+      "tile": "sand",
+      "shape": "b",
+      "file": "sand__b.png",
+      "size": 256
+    },
+    {
+      "tile": "sand",
       "shape": "c",
       "file": "sand__c.png",
       "size": 256

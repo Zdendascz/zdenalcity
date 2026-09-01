@@ -72,6 +72,14 @@ WIDTH_TOLERANCE = 0.08
 # pohled — 70 % proti 10 %.
 SATURATION_ROAD = 0.30
 
+# Povrchy téhož druhu se srovnají na **společný průměrný tón**.
+#
+# Varianty mají dělat rozdíl uvnitř kresby, ne mezi dlaždicemi. Naměřeno na
+# trávě: tři varianty měly průměrný jas 84, 94 a 101, tedy rozpětí přes 20 %,
+# a mapa z toho vyšla jako kostkovaný ubrus — autor to nahlásil. Srovnává se
+# **kanál po kanálu**, aby se s jasem nerozešel i odstín.
+SURFACE_FAMILIES = ('grass', 'water', 'sand', 'rock', 'forest', 'marsh')
+
 
 def shared():
     """`key_out` a spol. z `fit-sprites.py`. Jedna kopie klíčování, ne dvě."""
@@ -170,6 +178,31 @@ def edge_band(square: Image.Image, edge: str) -> tuple[float, float] | None:
     return ((best_start + best_len / 2) / len(hit), best_len / len(hit))
 
 
+def mean_colour(square: Image.Image) -> tuple[float, float, float]:
+    """Průměrná barva kryté části. Průhledné pixely by průměr stáhly k nule."""
+    rgba = np.asarray(square.convert('RGBA')).astype(np.float32)
+    mask = rgba[:, :, 3] > 8
+    if not mask.any():
+        return (0.0, 0.0, 0.0)
+    pixels = rgba[:, :, :3][mask]
+    return (float(pixels[:, 0].mean()), float(pixels[:, 1].mean()), float(pixels[:, 2].mean()))
+
+
+def match_tone(square: Image.Image, source: tuple[float, float, float], target: tuple[float, float, float]) -> Image.Image:
+    """Přebarví dlaždici tak, aby měla průměrný tón `target`.
+
+    Násobí se, ne přičítá: násobení drží nulu na nule, takže se ze stínů nestane
+    šeď. Ořezává se na 255, což u světlé trávy ubere kousek kontrastu — pořád
+    lepší než kostkovaná mapa.
+    """
+    rgba = np.asarray(square.convert('RGBA')).astype(np.float32)
+    for channel in range(3):
+        if source[channel] <= 1.0:
+            continue
+        rgba[:, :, channel] = np.clip(rgba[:, :, channel] * (target[channel] / source[channel]), 0, 255)
+    return Image.fromarray(rgba.astype(np.uint8), 'RGBA')
+
+
 def measure(name: str, square: Image.Image) -> dict | None:
     """Změří všechny čtyři hrany. `None` u povrchů, ty navazovat nemusí."""
     family, _, shape = name.partition('__')
@@ -245,6 +278,24 @@ def main() -> int:
         sample = measure(path.stem, square)
         if sample is not None:
             samples[path.stem] = sample
+
+    # Srovnání tónu uvnitř rodiny povrchů. Cíl je **medián** průměrů, ne průměr
+    # průměrů: jedna ujetá varianta by průměr stáhla a posunula i ty dvě dobré.
+    tones: dict[str, list[tuple[float, float, float]]] = {}
+    for name, square in squares.items():
+        family = name.partition('__')[0]
+        if family in SURFACE_FAMILIES:
+            tones.setdefault(family, []).append(mean_colour(square))
+    for family, values in tones.items():
+        target = (
+            float(np.median([v[0] for v in values])),
+            float(np.median([v[1] for v in values])),
+            float(np.median([v[2] for v in values])),
+        )
+        for name in list(squares):
+            if name.partition('__')[0] != family:
+                continue
+            squares[name] = match_tone(squares[name], mean_colour(squares[name]), target)
 
     medians: dict[str, float] = {}
     for family in {s['family'] for s in samples.values()}:

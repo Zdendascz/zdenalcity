@@ -447,6 +447,12 @@ export class ChunkRenderer {
     //
     // Barva zůstává jako **tón**: bez ní by ze svahu zmizel stín a kopec by
     // vypadal jako rovina.
+    // **Barva se kreslí vždycky, i pod obrázek.** Texturová výplň nechává na
+    // některých dlaždicích průhledná místa — projevilo se to jako černé klíny
+    // u pobřeží a autor to nahlásil. Barva pod ní je zároveň to, co tam patří:
+    // když obrázek chybí nebo se nedokreslí, zůstane terén, ne díra.
+    graphics.poly(points).fill({ color });
+
     const surface = this.surfaceFor(terrain, x, y);
     if (surface !== undefined) {
       const size = surface.texture.width || 1;
@@ -473,7 +479,6 @@ export class ChunkRenderer {
       const light = shade(0xffffff, slopeLight(corners) * (underground ? UNDERGROUND_TERRAIN_SHADE : 1));
       graphics.poly(points).fill({ texture: surface.texture, matrix, color: light });
     } else {
-      graphics.poly(points).fill({ color });
       // Obrys jen u barevné dlaždice. Na obrázku by z něj byla světlá mřížka
       // přes celou mapu — tvar terénu tam čte samo světlo a kresba povrchu.
       graphics

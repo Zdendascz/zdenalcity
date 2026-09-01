@@ -436,6 +436,11 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
       jobs.push(
         Assets.load(url)
           .then((texture: Texture) => {
+            // **Opakování, ne oříznutí.** Na svahu není dlaždice rovnoběžník,
+            // takže afinní matice sáhne kousek za okraj textury — a s výchozím
+            // režimem tam Pixi vrátí průhlednou, což se na mapě projeví jako
+            // černé dlaždice u pobřeží. Autor to nahlásil.
+            texture.source.addressMode = 'repeat';
             out.set(`${terrain}|${variant}`, texture);
           })
           .catch(() => undefined),

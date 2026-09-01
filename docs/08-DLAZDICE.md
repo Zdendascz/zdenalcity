@@ -63,6 +63,13 @@ The place is central Europe, the materials those of a Czechoslovak town in the
 1980s: cast concrete, asphalt with patches, granite kerbs, mown grass with
 clover, birch and linden.
 
+SCALE MATTERS MORE THAN DETAIL. This piece of ground is EIGHT METRES across and
+is seen from far above, the way a whole town is seen on a map. Individual grains
+of sand, single pebbles, single blades of grass and single leaves are FAR too
+small to see and must not be drawn. What is visible is the material as one
+surface: its colour, its soft light, and broad gentle variation across metres.
+Think of ground photographed from a tall building, not of a close-up sample.
+
 The ground fills the frame as a DIAMOND whose four corners touch the middle of
 each edge of the square image. Everything outside that diamond is fully
 transparent — no background, no vignette, no shadow outside the diamond. The
@@ -111,6 +118,12 @@ s kameny a vyšlapanou pěšinu — jenže při třech variantách by ta plešin
 každé třetí dlaždici a z mapy by byl leopard. Varianty se proto liší jen
 odstínem, hustotou a drobnostmi; nic, co by šlo poznat jako **místo**.
 
+**A materiál se kreslí z dálky, ne zblízka.** Písek vyšel jako fotka zrnek
+s rýhami po hrábích a vedle pískoviště v parku vypadal katastrofálně — autor to
+nahlásil. Generátor totiž kreslí materiál, jako bys nad ním stál. Hlavička proto
+říká, že dlaždice je **osm metrů široká** a že jednotlivé zrnko, kamínek ani
+stéblo v ní vidět nejsou.
+
 **Ale nesmí se psát „the same".** Druhý pokus popsal variantu b jako „the same
 lawn, a shade deeper" — a protože se generuje **s referenčním obrázkem**, model
 to přečetl jako „nech to být" a vrátil skoro nezměněný park i s prolézačkami.
@@ -139,9 +152,9 @@ Trávník jako v parku pod stromem, odkud je vzor. Žádná cesta, žádná ple�
 
 | | prompt |
 |---|---|
-| **a** | Even mown lawn, uniform all over, a few clover leaves. |
-| **b** | Even mown lawn in a deeper green, dense and uniform all over. |
-| **c** | Even mown lawn in a lighter, drier green, uniform all over, a few tiny daisies. |
+| **a** | Mown lawn seen from far above: an even green surface, faint broad patches of lighter and darker green. |
+| **b** | Mown lawn seen from far above in a deeper green: an even surface with faint broad mottling. |
+| **c** | Mown lawn seen from far above in a lighter, drier green: an even surface with faint broad mottling. |
 
 ### `forest`
 
@@ -167,16 +180,16 @@ Písek jako v pískovišti, odkud je vzor.
 
 | | prompt |
 |---|---|
-| **a** | Clean fine sand, evenly raked, uniform all over. |
-| **b** | Clean fine sand, damp and darker, evenly raked, uniform all over. |
-| **c** | Clean pale sand, dry and evenly raked, uniform all over, a scatter of tiny pebbles. |
+| **a** | Dry sand seen from far above: a smooth even surface, no grain, faint broad shading. |
+| **b** | Damp sand seen from far above: a smooth even surface, darker, no grain, faint broad shading. |
+| **c** | Pale dry sand seen from far above: a smooth even surface, no grain, very faint broad shading. |
 
 ### `marsh`
 
 | | prompt |
 |---|---|
-| **a** | Waterlogged ground: dark peat under a even cover of low sedge. |
-| **b** | Waterlogged dark peat under an even cover of low sedge, wetter and darker. |
+| **a** | Boggy ground seen from far above: dark wet earth showing through an even cover of low sedge. |
+| **b** | Wet boggy ground seen from far above: darker, with broad shallow pools among low sedge. |
 | **c** | Damp peat under a dense even cover of low sedge, little standing water. |
 
 ### `water`

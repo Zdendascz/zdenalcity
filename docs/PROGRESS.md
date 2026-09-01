@@ -3741,6 +3741,23 @@ Z toho plynou dvě věci v rendereru, které při prvním pokusu chyběly:
   stejném směru, navážou na sebe přes hranice a udělají pruh přes celou
   obrazovku.
 
+### Tři věci, které se musely doladit, než to vypadalo k něčemu
+
+**Barva se kreslí i pod obrázek.** Texturová výplň nechává na některých
+dlaždicích průhledná místa a na mapě z toho byly **černé klíny u pobřeží**.
+Nehledal jsem proč — barva pod ní tam stejně patří: když obrázek chybí nebo se
+nedokreslí, má zůstat terén, ne díra.
+
+**Materiál se kreslí z dálky, ne zblízka.** Písek vyšel jako fotka zrnek s rýhami
+po hrábích a vedle pískoviště v parku vypadal katastrofálně. Generátor kreslí
+materiál, jako bys nad ním stál; hlavička promptu proto říká, že dlaždice je
+**osm metrů široká** a že jednotlivé zrnko ani stéblo v ní vidět není.
+
+**Varianty se srovnají na společný tón.** Tři trávy měly průměrný jas 84, 94
+a 101 — přes 20 % rozpětí — a mapa z toho byla kostkovaný ubrus. `fit-tiles.py`
+je teď násobí na medián rodiny, kanál po kanálu, aby se s jasem nerozešel odstín.
+Rozdíl mezi variantami má být **uvnitř kresby**, ne mezi dlaždicemi.
+
 ### Co je změřené a co ne
 
 Odeslání kreslicích příkazů: 0,02 ms na snímek s texturou proti 0,01 ms bez —
