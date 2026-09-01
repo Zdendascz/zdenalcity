@@ -99,6 +99,24 @@
       "size": 256
     },
     {
+      "tile": "forest",
+      "shape": "a",
+      "file": "forest__a.png",
+      "size": 256
+    },
+    {
+      "tile": "forest",
+      "shape": "b",
+      "file": "forest__b.png",
+      "size": 256
+    },
+    {
+      "tile": "forest",
+      "shape": "c",
+      "file": "forest__c.png",
+      "size": 256
+    },
+    {
       "tile": "grass",
       "shape": "a",
       "file": "grass__a.png",
@@ -225,6 +243,12 @@
       "size": 256
     },
     {
+      "tile": "marsh",
+      "shape": "c",
+      "file": "marsh__c.png",
+      "size": 256
+    },
+    {
       "tile": "pipe",
       "shape": "0",
       "file": "pipe__0.png",
@@ -318,6 +342,24 @@
       "tile": "pipe",
       "shape": "w",
       "file": "pipe__w.png",
+      "size": 256
+    },
+    {
+      "tile": "rock",
+      "shape": "a",
+      "file": "rock__a.png",
+      "size": 256
+    },
+    {
+      "tile": "rock",
+      "shape": "b",
+      "file": "rock__b.png",
+      "size": 256
+    },
+    {
+      "tile": "rock",
+      "shape": "c",
+      "file": "rock__c.png",
       "size": 256
     },
     {
@@ -432,6 +474,24 @@
       "tile": "street",
       "shape": "w",
       "file": "street__w.png",
+      "size": 256
+    },
+    {
+      "tile": "water",
+      "shape": "a",
+      "file": "water__a.png",
+      "size": 256
+    },
+    {
+      "tile": "water",
+      "shape": "b",
+      "file": "water__b.png",
+      "size": 256
+    },
+    {
+      "tile": "water",
+      "shape": "c",
+      "file": "water__c.png",
       "size": 256
     }
   ]

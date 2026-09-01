@@ -3758,6 +3758,18 @@ a 101 — přes 20 % rozpětí — a mapa z toho byla kostkovaný ubrus. `fit-ti
 je teď násobí na medián rodiny, kanál po kanálu, aby se s jasem nerozešel odstín.
 Rozdíl mezi variantami má být **uvnitř kresby**, ne mezi dlaždicemi.
 
+### Skála, les a voda vyšly, až když se vzor zahodil
+
+První pokus je měl s parkovým vzorem a všechny tři skončily 0 ze 3: v parku není
+holá skála ani zápoj korun shora a z kašny se dá opsat jen dlažba. **Bez vzoru
+vyšly napoprvé** — les dokonce jako opravdové koruny stromů shora.
+
+Vzor tedy pomůže jen tam, kde ten materiál ve zdrojovém spritu opravdu je, a
+jinde **škodí**. Tabulka vzorů proto uvádí jen trávu, písek a mokřad; co v ní
+není, jde z popisu.
+
+Těžkou práci odvedla věta o měřítku v hlavičce, ne vzor.
+
 ### Co je změřené a co ne
 
 Odeslání kreslicích příkazů: 0,02 ms na snímek s texturou proti 0,01 ms bez —

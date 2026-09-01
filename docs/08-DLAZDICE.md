@@ -90,10 +90,12 @@ to slovy podruhé znamená vymýšlet, co už existuje.
 |---|---|---|
 | `grass` | `park_small__a.png` | trávník pod stromem |
 | `sand` | `park_small__c.png` | písek z pískoviště |
-| `rock` | `park_small__a.png` | kamenné obruby a dlažba |
-| `forest` | `city_park__a.png` | koruny stromů shora |
-| `marsh` | `park_small__b.png` | voda a mokrá dlažba u kašny |
-| `water` | `park_small__b.png` | hladina kašny |
+| `marsh` | `park_small__b.png` | mokrá zem u kašny |
+
+**Skála, les a voda vzor nemají**, a je to schválně. V parku není holá skála ani
+zápoj korun shora a z kašny se dá opsat jen dlažba — první pokus přesně tak
+dopadl, 0 ze 3 u všech tří. Bez vzoru se aspoň kreslí materiál, ne obkreslený
+park. Rozhoduje o tom tabulka: povrch, který v ní není, se generuje z popisu.
 
 Vzory jsou **hotové sprity z `content/vanilla/sprites/`**, ne zvláštní soubory:
 kdyby se vedle nich vedla druhá sada, rozešly by se.
@@ -117,6 +119,11 @@ jako u budov, podle souřadnic dlaždice.
 s kameny a vyšlapanou pěšinu — jenže při třech variantách by ta plešina byla na
 každé třetí dlaždici a z mapy by byl leopard. Varianty se proto liší jen
 odstínem, hustotou a drobnostmi; nic, co by šlo poznat jako **místo**.
+
+**Široká proměnlivost patří sklonu, ne kresbě.** Tráva měla „faint broad
+patches of lighter and darker green" a každá dlaždice si to flekování udělala
+po svém — z mapy byl ubrus. Světlo svahu tu proměnlivost dodá samo a zadarmo,
+takže obrázek má být **na celé ploše stejný**.
 
 **A materiál se kreslí z dálky, ne zblízka.** Písek vyšel jako fotka zrnek
 s rýhami po hrábích a vedle pískoviště v parku vypadal katastrofálně — autor to
@@ -152,9 +159,9 @@ Trávník jako v parku pod stromem, odkud je vzor. Žádná cesta, žádná ple�
 
 | | prompt |
 |---|---|
-| **a** | Mown lawn seen from far above: an even green surface, faint broad patches of lighter and darker green. |
-| **b** | Mown lawn seen from far above in a deeper green: an even surface with faint broad mottling. |
-| **c** | Mown lawn seen from far above in a lighter, drier green: an even surface with faint broad mottling. |
+| **a** | Mown lawn seen from far above: one even green surface, the same everywhere, fine short texture and no patches. |
+| **b** | Mown lawn seen from far above in a deeper green: one even surface, the same everywhere, fine short texture and no patches. |
+| **c** | Mown lawn seen from far above in a lighter green: one even surface, the same everywhere, fine short texture and no patches. |
 
 ### `forest`
 
@@ -162,17 +169,17 @@ Souvislý zápoj korun shora. Jednotlivý strom sem nepatří — od toho je obj
 
 | | prompt |
 |---|---|
-| **a** | Continuous deciduous canopy from above, crowns touching, dark gaps between them. |
-| **b** | Continuous deciduous canopy from above in a deeper green, crowns packed tight. |
-| **c** | Continuous deciduous canopy from above in a lighter green, crowns touching. |
+| **a** | Woodland seen from far above: an unbroken cover of treetops, crowns two or three metres across, dark shade between them. |
+| **b** | Woodland seen from far above in a deeper green: an unbroken cover of treetops packed tight, dark shade between them. |
+| **c** | Woodland seen from far above in a lighter green: an unbroken cover of treetops, crowns touching, dark shade between them. |
 
 ### `rock`
 
 | | prompt |
 |---|---|
-| **a** | Bare grey granite, weathered and evenly cracked all over. |
-| **b** | Bare grey granite, darker and damp, evenly cracked all over. |
-| **c** | Bare pale granite, dry and evenly cracked all over, with fine lichen. |
+| **a** | Bare rocky ground seen from far above: grey stone, one even surface, the same everywhere. |
+| **b** | Bare rocky ground seen from far above: darker grey stone, one even surface, the same everywhere. |
+| **c** | Bare rocky ground seen from far above: pale grey stone, one even surface, the same everywhere. |
 
 ### `sand`
 
@@ -196,9 +203,9 @@ Písek jako v pískovišti, odkud je vzor.
 
 | | prompt |
 |---|---|
-| **a** | Calm fresh water with fine even ripples all over. |
-| **b** | Deep calm fresh water, darker, with fine even ripples all over. |
-| **c** | Shallow calm fresh water, lighter, with very fine even ripples all over. |
+| **a** | Open water seen from far above: one even blue-green surface with fine ripples, the same everywhere, no shore and no bottom. |
+| **b** | Deep open water seen from far above: one even dark blue surface with fine ripples, the same everywhere, no shore and no bottom. |
+| **c** | Open water seen from far above: one even lighter blue surface with very fine ripples, the same everywhere, no shore and no bottom. |
 
 ## Silnice
 
