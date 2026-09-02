@@ -3,6 +3,39 @@
   "scale": 4,
   "sprites": [
     {
+      "building": "boulders",
+      "variant": "a",
+      "file": "boulders__a.png",
+      "width": 256,
+      "height": 209,
+      "anchor": [
+        128,
+        209
+      ]
+    },
+    {
+      "building": "boulders",
+      "variant": "b",
+      "file": "boulders__b.png",
+      "width": 256,
+      "height": 243,
+      "anchor": [
+        128,
+        243
+      ]
+    },
+    {
+      "building": "boulders",
+      "variant": "c",
+      "file": "boulders__c.png",
+      "width": 256,
+      "height": 193,
+      "anchor": [
+        128,
+        193
+      ]
+    },
+    {
       "building": "vanilla:cinema",
       "variant": "a",
       "file": "cinema__a.png",
@@ -660,6 +693,39 @@
       "anchor": [
         255,
         311
+      ]
+    },
+    {
+      "building": "forest_clump",
+      "variant": "a",
+      "file": "forest_clump__a.png",
+      "width": 256,
+      "height": 237,
+      "anchor": [
+        128,
+        237
+      ]
+    },
+    {
+      "building": "forest_clump",
+      "variant": "b",
+      "file": "forest_clump__b.png",
+      "width": 256,
+      "height": 277,
+      "anchor": [
+        128,
+        277
+      ]
+    },
+    {
+      "building": "forest_clump",
+      "variant": "c",
+      "file": "forest_clump__c.png",
+      "width": 256,
+      "height": 276,
+      "anchor": [
+        128,
+        276
       ]
     },
     {

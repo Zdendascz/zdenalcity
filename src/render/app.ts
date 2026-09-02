@@ -1,5 +1,6 @@
 import { Application, Assets, Container, Graphics } from 'pixi.js';
 import type { Texture } from 'pixi.js';
+import type { TerrainDecor } from './chunkRenderer';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import type { Definition } from '@/content/schema';
@@ -468,6 +469,46 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
 }
 
 /**
+ * Předměty, které stojí na terénu: strom na lese, balvan na skále.
+ *
+ * Rozhodnutí autora — a je za ním měření: jako **materiál** skála i les
+ * napoprvé selhaly, protože se z parku nedaly opsat, kdežto jako **předmět**
+ * je generátor nakreslil napoprvé. Povrch pod nimi zůstává, kreslí se navrch.
+ *
+ * V simulaci nepřibývá nic: je to čistě věc rendereru, takže les o dvou
+ * tisících dlaždicích nestojí ani jednu entitu.
+ */
+const TERRAIN_DECOR: readonly (readonly [string, string])[] = [
+  ['forest', 'forest_clump'],
+  ['rock', 'boulders'],
+];
+
+async function loadDecor(content: ContentRegistry): Promise<Map<string, TerrainDecor>> {
+  const out = new Map<string, TerrainDecor>();
+  const jobs: Promise<void>[] = [];
+
+  for (const [terrain, id] of TERRAIN_DECOR) {
+    // Jedna varianta, ze stejného důvodu jako u povrchů: karta unese jen pár
+    // různých textur na chunk. Viz `SURFACE_VARIANT_LIMIT`.
+    const variant = content.getSpriteVariants(id)[0];
+    if (variant === undefined) continue;
+    const sprite = content.getSprite(id, variant);
+    if (sprite === undefined) continue;
+    jobs.push(
+      Assets.load(sprite.url)
+        .then((texture: Texture) => {
+          texture.source.addressMode = 'clamp-to-edge';
+          out.set(terrain, { texture, anchor: sprite.anchor, scale: sprite.scale });
+        })
+        .catch(() => undefined),
+    );
+  }
+
+  await Promise.all(jobs);
+  return out;
+}
+
+/**
  * Kolik variant od druhu terénu se smí načíst. Viz `loadSurfaces` — je to strop
  * daný kartou, ne volba vzhledu.
  */
@@ -609,6 +650,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Rozhodnutí, co s tím, je v `docs/08-DLAZDICE.md`.
   void loadSurfaces(content).then((surfaces) => {
     if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
+  });
+  void loadDecor(content).then((decor) => {
+    if (decor.size > 0) chunkRenderer.setDecor(decor);
   });
   const buildingRenderer = new BuildingRenderer(
     world,

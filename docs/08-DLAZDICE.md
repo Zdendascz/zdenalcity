@@ -213,6 +213,65 @@ Písek jako v pískovišti, odkud je vzor.
 | **b** | Deep open water seen from far above: one flat even dark blue surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom — only a very faint fine texture. |
 | **c** | Open water seen from far above: one flat even lighter blue surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom — only a very faint fine texture. |
 
+## Objekty na terénu
+
+Les a skála **nejsou jen povrch**. Rozhodnutí autora: strom a balvan jsou
+předměty, a ty generátor umí prokazatelně dobře — 228 spritů budov to ukázalo,
+kdežto jako materiál skála i les napoprvé selhaly.
+
+Kreslí se **navrch povrchu**, ne místo něj: pod lesem zůstane tráva, pod skálou
+holá zem. Je to čistě věc rendereru — v simulaci žádná entita nepřibývá, takže
+les o dvou tisících dlaždicích nestojí ani jeden objekt navíc v `world`.
+
+Generují se sem, ale ukládají do `art/sprites/raw/`, protože je pak ladí
+`fit-sprites.py` jako každý jiný předmět: měří se jim kotva, ne kosočtverec.
+
+| id | půdorys | patra | co to je |
+|---|---|---|---|
+| `forest_clump` | 1 × 1 | 2 | skupinka stromů na jedné dlaždici |
+| `boulders` | 1 × 1 | 1 | balvany a kamení na jedné dlaždici |
+
+Hlavička je jiná než u dlaždic a musí být **důrazná**. Napoprvé stálo v prvním
+řádku „for an isometric game map" a generátor z toho udělal dlaždici i se
+silnicemi kolem stromů — slovo „map" a „tile" ho k tomu svádí. Teď se v ní
+o dlaždici ani o mapě nemluví a výčet toho, co tam nemá být, je dlouhý schválně:
+
+```
+A CUT-OUT OBJECT, alone on a fully transparent background.
+
+THERE IS NO GROUND IN THIS IMAGE. No grass, no soil, no rock plate, no paving,
+no road, no kerb, no plot, no tile, no square, no frame, no base, no border.
+Only the objects themselves, cut out and floating free, with a small soft
+shadow directly beneath them and nothing else.
+
+Seen from a high angle, about thirty degrees above the horizon, the way things
+are shown in an isometric game. Daylight from the upper left. Soft-shaded
+three-dimensional render, NOT a cartoon and NOT a photograph: no black
+outlines, no cel shading, no visible brush strokes. Colours natural but a touch
+more saturated, so it reads at small size.
+
+Central Europe, the 1980s. The objects together are about as wide as a small
+house is long.
+
+NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK.
+```
+
+### `forest_clump`
+
+| | prompt |
+|---|---|
+| **a** | Three mature linden trees standing close together, full round crowns, trunks visible beneath. |
+| **b** | Four smaller birches in a loose clump, slender white trunks, light open crowns. |
+| **c** | Two spruces and one broadleaf tree together, dark conical crowns beside a round one. |
+
+### `boulders`
+
+| | prompt |
+|---|---|
+| **a** | Three grey granite boulders of different sizes lying together, weathered and lichen-spotted. |
+| **b** | One large split boulder with two smaller stones at its foot. |
+| **c** | A low scatter of five rounded stones, none taller than a man. |
+
 ## Silnice
 
 Šestnáct tvarů podle toho, kam vozovka pokračuje. Maska je `N = 1, E = 2,

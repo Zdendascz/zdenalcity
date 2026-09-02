@@ -26,6 +26,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / 'docs' / '08-DLAZDICE.md'
 OUT = ROOT / 'art' / 'tiles' / 'raw'
+# Objekty na terénu jdou mezi sprity, ne mezi dlaždice: ladí je `fit-sprites.py`,
+# protože se jim měří kotva, ne kosočtverec.
+OUT_OBJECTS = ROOT / 'art' / 'sprites' / 'raw'
 
 # Povrchy mají tři varianty, aby se sousední dlaždice neopakovaly.
 VARIANTS = ('a', 'b', 'c')
@@ -75,13 +78,21 @@ def section(text: str, title: str) -> str:
 def read_spec() -> dict:
     """Hlavička stylu, věty o navazování, povrchy, typy vozovek a tvary."""
     text = SPEC.read_text(encoding='utf-8')
-    fences = [f.strip() for f in FENCE.findall(text)]
-    # Bloky **v pořadí, v jakém stojí v dokumentu**: styl, věta ke vzoru, věta
-    # o navazování vozovky. Rozbalovat je podle pozice je křehké, ale poznat je
-    # podle obsahu by bylo ještě horší — text se mění, pořadí oddílů ne.
-    if len(fences) < 3:
-        raise SystemExit(f'{SPEC.name}: čekám tři oplocené bloky, mám {len(fences)}')
-    header, reference_note, road_seam = fences[0], fences[1], fences[2]
+
+    # Každý blok se bere **ze svého oddílu**, ne podle pořadí v dokumentu.
+    # Podle pořadí to tu jednou bylo a stačilo vložit nový oddíl doprostřed:
+    # objekty dostaly jako hlavičku větu o navazování vozovky a generátor kolem
+    # stromů nakreslil silnice.
+    def fence(title: str) -> str:
+        found = FENCE.search(section(text, title))
+        if found is None:
+            raise SystemExit(f'{SPEC.name}: oddíl „{title}" nemá oplocený blok')
+        return found.group(1).strip()
+
+    header = fence('Styl')
+    reference_note = fence('Vzory')
+    object_header = fence('Objekty na terénu')
+    road_seam = fence('Silnice')
     # Věta o navazování je u potrubí stejná, jen jiné slovo — říká to dokument.
     pipe_seam = road_seam.replace('carriageway', 'pipe')
 
@@ -111,6 +122,11 @@ def read_spec() -> dict:
         'pipes': pipes,
         'references': references,
         'reference_note': reference_note,
+        'object_header': object_header,
+        'objects': {
+            name: dict(VARIANT_ROW.findall(body))
+            for name, body in SURFACE.findall(section(text, 'Objekty na terénu'))
+        },
     }
 
 
@@ -126,6 +142,14 @@ def plan(spec: dict) -> list[tuple[str, str, str | None]]:
                 casti.append(spec['reference_note'])
             jobs.append((f'{name}__{variant}', PARAGRAPH.join(casti), vzor))
 
+    for name, rows in spec['objects'].items():
+        for variant in VARIANTS:
+            jobs.append((
+                f'{name}__{variant}',
+                PARAGRAPH.join([spec['object_header'], rows[variant]]),
+                None,
+            ))
+
     for family, seam in (('types', 'road_seam'), ('pipes', 'pipe_seam')):
         for name, popis in spec[family].items():
             for shape, tvar in spec['shapes'].items():
@@ -136,6 +160,15 @@ def plan(spec: dict) -> list[tuple[str, str, str | None]]:
                 ))
 
     return jobs
+
+
+# Kam který obrázek patří. Objekty mezi sprity, zbytek mezi dlaždice.
+OBJECT_NAMES = ('forest_clump', 'boulders')
+
+
+def target_for(name: str) -> Path:
+    root = OUT_OBJECTS if name.partition('__')[0] in OBJECT_NAMES else OUT
+    return root / f'{name}.png'
 
 
 def main() -> int:
@@ -158,7 +191,8 @@ def main() -> int:
             return 1
 
     OUT.mkdir(parents=True, exist_ok=True)
-    missing = [j for j in jobs if not (OUT / f'{j[0]}.png').exists()]
+    OUT_OBJECTS.mkdir(parents=True, exist_ok=True)
+    missing = [j for j in jobs if not target_for(j[0]).exists()]
     print(f'Chybí {len(missing)} z {len(jobs)}.')
     if not missing:
         return 0
@@ -200,7 +234,7 @@ def main() -> int:
         except Exception as chyba:  # noqa: BLE001 — dávka nesmí spadnout na jednom
             print(f'chyba: {chyba}')
             continue
-        (OUT / f'{name}.png').write_bytes(blob)
+        target_for(name).write_bytes(blob)
         done += 1
         print('ok')
 

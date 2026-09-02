@@ -76,6 +76,18 @@ interface SurfacePick {
   turn: number;
 }
 
+/**
+ * Předmět, který stojí na terénu — strom nebo balvan.
+ *
+ * `anchor` je bod obrázku, který sedí na **předním rohu dlaždice**, v pixelech
+ * obrázku. `scale` je nadvzorkování, kterým ho vyrobil `fit-sprites.py`.
+ */
+export interface TerrainDecor {
+  texture: Texture;
+  anchor: readonly [number, number];
+  scale: number;
+}
+
 /** Chunk = 16×16 dlaždic. Změna jedné dlaždice invaliduje jeden chunk, ne mapu. */
 export const CHUNK_SIZE = 16;
 
@@ -222,6 +234,19 @@ export class ChunkRenderer {
    * ve vodě, se šesti zmizely. Atlas ten strop obchází.
    */
   private surfacesByTerrain = new Map<number, Texture[]>();
+  /**
+   * Stromy a balvany podle druhu terénu.
+   *
+   * Kreslí se **do chunku jako texturovaný obdélník**, ne jako Pixi sprite.
+   * Sprite by musel do řazení hloubky vedle budov, a les o dvou tisících
+   * dlaždicích by tam přidal dva tisíce uzlů. Takhle se upeče spolu s terénem
+   * a nestojí nic navíc.
+   *
+   * Cena: chunk se kreslí **pod** budovami, takže strom na dlaždici před domem
+   * zůstane za ním. Nikdy naopak — na lese se nestaví, dokud se nevykácí —
+   * takže se to potká jen na hranici lesa a zástavby.
+   */
+  private decorByTerrain = new Map<number, TerrainDecor>();
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
@@ -404,6 +429,18 @@ export class ChunkRenderer {
     this.invalidateAll();
   }
 
+  /** Nastaví stromy a balvany a překreslí, co je vidět. */
+  setDecor(decor: ReadonlyMap<string, TerrainDecor>): void {
+    this.decorByTerrain = new Map();
+    for (let terrain = 0; terrain < TERRAIN_NAMES.length; terrain++) {
+      const name = TERRAIN_NAMES[terrain];
+      if (name === undefined) continue;
+      const found = decor.get(name);
+      if (found !== undefined) this.decorByTerrain.set(terrain, found);
+    }
+    this.invalidateAll();
+  }
+
   /**
    * Který obrázek padne na tuhle dlaždici.
    *
@@ -502,6 +539,44 @@ export class ChunkRenderer {
       graphics
         .poly(points)
         .fill({ color: zoneColor, alpha: underground ? UNDERGROUND_ZONE_ALPHA : ZONE_OVERLAY_ALPHA });
+    }
+
+    // Strom nebo balvan. Kreslí se **po** povrchu i po zóně, ale pořád uvnitř
+    // téže dlaždice, takže ho bližší dlaždice v chunku správně překryje.
+    //
+    // V podzemí ne: tam se dívá pod zem a koruna stromu by clonila potrubí.
+    const decor = underground ? undefined : this.decorByTerrain.get(terrain);
+    if (decor !== undefined) {
+      const [nw, ne, sw, se] = corners;
+      // Předmět stojí na **průměrné výšce** rohů, ne na jednom z nich: na svahu
+      // by jinak visel v jednom rohu ve vzduchu, stejně jako to dělaly budovy.
+      const pad = Math.round((nw + ne + sw + se) / 4);
+      // **Střed dlaždice, ne přední roh.** Na předním rohu by strom stál na
+      // hraně a půlkou přečuhoval do sousední dlaždice.
+      const front = gridToScreen(x + 0.5, y + 0.5, pad);
+      const width = decor.texture.width;
+      const height = decor.texture.height;
+      const left = front.x - decor.anchor[0] / decor.scale;
+      const top = front.y - decor.anchor[1] / decor.scale;
+      const box = [
+        left,
+        top,
+        left + width / decor.scale,
+        top,
+        left + width / decor.scale,
+        top + height / decor.scale,
+        left,
+        top + height / decor.scale,
+      ];
+      const matrix = new Matrix(
+        1 / decor.scale,
+        0,
+        0,
+        1 / decor.scale,
+        left,
+        top,
+      ).invert();
+      graphics.poly(box).fill({ texture: decor.texture, matrix });
     }
 
     if (underground) {

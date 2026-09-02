@@ -73,10 +73,17 @@ def spec_for(w: int, d: int, levels: int) -> dict:
 # hráč viděl, co je za ní.
 RUINS = {f'ruin_{n}x{n}': (n, n, 1) for n in (1, 2, 3, 4)}
 
+# Objekty na terénu — strom a balvan. Definici budovy taky nemají, protože to
+# nejsou entity: kreslí je renderer podle druhu terénu a v simulaci po nich
+# nezůstane nic. Zadání je v `docs/08-DLAZDICE.md`.
+DECOR = {'forest_clump': (1, 1, 2), 'boulders': (1, 1, 1)}
+
 
 def load_definitions() -> dict[str, dict]:
     """Půdorysy a patra všech budov a ruin, klíčem holé id bez namespace."""
-    out: dict[str, dict] = {name: spec_for(*size) for name, size in RUINS.items()}
+    out: dict[str, dict] = {
+        name: spec_for(*size) for name, size in {**RUINS, **DECOR}.items()
+    }
     for path in sorted(DEFS.glob('*.json')):
         data = json.loads(path.read_text(encoding='utf-8'))
         # Všechny budovy, ne jen služby: zástavba v zónách má sprity taky
@@ -250,12 +257,42 @@ def trim(image: Image.Image) -> Image.Image | None:
 
 
 def spriteKey(name: str) -> str:
-    """Klíč do manifestu. Ruiny nejsou budovy, takže nedostávají jejich jmenný prostor."""
-    return name if name in RUINS else f'vanilla:{name}'
+    """Klíč do manifestu.
+
+    Ruiny ani předměty na terénu nejsou budovy, takže nedostávají jejich jmenný
+    prostor: nemají definici, o kterou by se opíral, a renderer si je hledá pod
+    holým jménem stejně jako suť.
+    """
+    return name if name in RUINS or name in DECOR else f'vanilla:{name}'
 
 
 # Naměřené kotvy, aby je šlo zapsat do manifestu. Sbírá je `process`.
 ANCHORS: dict[str, dict] = {}
+
+
+def fit_decor(
+    building: str, variant: str, cropped: Image.Image, spec: dict, write: bool
+) -> tuple[str, bool]:
+    """Naladí předmět na terénu: strom, balvan.
+
+    Šířka se srovná na dlaždici a **kotva sedí na spodním středu obrázku** —
+    tam, kde má předmět stín a kde se dotýká země. Neměří se, protože měřit
+    není co: v obrázku je jen předmět.
+    """
+    target_w = spec['width']
+    scale = target_w / cropped.width
+    target_h = max(1, round(cropped.height * scale))
+    resized = cropped.resize((target_w, target_h), Image.LANCZOS)
+
+    if write:
+        OUT.mkdir(parents=True, exist_ok=True)
+        resized.save(OUT / f'{building}__{variant}.png')
+        ANCHORS[f'{building}__{variant}'] = {
+            'width': target_w,
+            'height': target_h,
+            'anchor': [target_w // 2, target_h],
+        }
+    return f'  {building}__{variant}  →  {target_w}×{target_h}  (předmět, kotva ze středu)', True
 
 
 def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str, bool]:
@@ -276,6 +313,14 @@ def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str,
         return f'{path.name}: po odklíčování nezbylo nic — jiné pozadí?', False
 
     notes: list[str] = []
+
+    # **Objekt na terénu podstavu nemá**, a tak se mu neopravuje projekce ani
+    # neměří kotva. Strom se kreslí bez země pod sebou; `base_diamond` by
+    # v něm našel obrys koruny a `to_two_to_one` by ho podle něj zmáčkl na
+    # polovinu — přesně to se stalo napoprvé.
+    if building in DECOR:
+        return fit_decor(building, variant, cropped, spec, write)
+
     measured = base_diamond(cropped)
     if measured is None:
         notes.append('  ← podstavu nejde změřit, projekci neopravuji')
