@@ -466,5 +466,6 @@
   "building.city_park.desc": "Největší park ve městě. Zvedá cenu půdy v širokém okolí.",
   "ui.info.spriteFile": "Obrázek (dočasné)",
   "ui.tool.pan": "Pacička",
-  "ui.menu.pan": "Pohyb"
+  "ui.menu.pan": "Pohyb",
+  "ui.view.decor": "Skrýt stromy a kameny"
 }

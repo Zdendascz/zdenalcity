@@ -103,6 +103,14 @@ export class BuildingRenderer {
    * unese — naměřeno 2,1 ms na 2 500 krabicích a přerovnává se jen při změně.
    */
   private decorByTerrain = new Map<number, TerrainDecor[]>();
+  /**
+   * Kreslí se stromy a balvany?
+   *
+   * **Ne průhlednost, ale úplné vypnutí** (rozhodnutí autora). Průhledný les
+   * pořád překáží: hráč pod ním hledá dlaždici, na kterou chce kliknout, a
+   * poloprůhledná koruna mu ji zakrývá stejně jako plná.
+   */
+  private decorVisible = true;
 
   constructor(world: ReadonlyWorldView, parent: Container, appearance: AppearanceLookup) {
     this.world = world;
@@ -142,6 +150,14 @@ export class BuildingRenderer {
     this.reorder();
   }
 
+  /** Zapne nebo vypne stromy a balvany. Vypnuté se **vůbec nevytvářejí**. */
+  setDecorVisible(visible: boolean): void {
+    if (this.decorVisible === visible) return;
+    this.decorVisible = visible;
+    this.rebuildDecor();
+    this.reorder();
+  }
+
   /** Nastaví obrázky stromů a balvanů a postaví je znovu. */
   setDecor(decor: ReadonlyMap<number, TerrainDecor[]>): void {
     this.decorByTerrain = new Map(decor);
@@ -159,7 +175,9 @@ export class BuildingRenderer {
     for (const id of [...this.views.keys()]) {
       if (id < 0) this.remove(id);
     }
-    if (this.decorByTerrain.size === 0) return;
+    // Vypnuté se nejen skryjí, ale ani nevzniknou: uzel, který nikdo nevidí,
+    // nemá co dělat ani v řazení hloubky.
+    if (!this.decorVisible || this.decorByTerrain.size === 0) return;
 
     const size = this.world.size;
     const terrainLayer = this.world.layers.terrain;

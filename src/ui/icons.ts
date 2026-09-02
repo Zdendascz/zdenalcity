@@ -316,8 +316,34 @@ const HAND: Shape = [
   ],
 ];
 
+/**
+ * Strom — přepínač terénních objektů.
+ *
+ * Kreslí se z polygonů jako ostatní nástroje, takže do projektu nepřibývá
+ * obrázek. Až někdo nakreslí `content/vanilla/icons/view-decor.png`, hra si
+ * vezme ten.
+ */
+const TREE_TOGGLE: Shape = [
+  // Koruna ve třech patrech.
+  [
+    [0.5, 0.08],
+    [0.76, 0.4],
+    [0.24, 0.4],
+  ],
+  [
+    [0.5, 0.26],
+    [0.84, 0.62],
+    [0.16, 0.62],
+  ],
+  // Kmen.
+  bar(0.43, 0.62, 0.57, 0.86),
+  // Země pod ním.
+  bar(0.18, 0.86, 0.82, 0.92),
+];
+
 const UI_SHAPES: Readonly<Record<string, Shape>> = {
   hand: HAND,
+  'view-decor': TREE_TOGGLE,
   raise: ARROW_UP,
   lower: ARROW_DOWN,
   level: LEVEL,

@@ -3841,6 +3841,20 @@ jakou část dlaždice předmět zabere, a balvan má 0,45.
 Přeladit velikost je tím pádem **zadarmo** — obrázky se negenerují znovu, jen
 se jinak zmenší.
 
+### Přepínač, který stromy vypne
+
+Zadání autora: „úplně skryje terénní objekty — aby přes ně bylo vidět, nejen
+zprůhlední, ale úplně zneviditelní."
+
+Vypnuté se **vůbec nevytvářejí**, jen se neschovají. Průhledný les by pořád
+překážel: hráč pod ním hledá dlaždici, na kterou chce kliknout, a poloprůhledná
+koruna mu ji zakrývá stejně jako plná. A uzel, který nikdo nevidí, nemá co dělat
+ani v řazení hloubky.
+
+Tlačítko sedí vedle průhlednosti budov, protože je to totéž zrnem: mění se jím,
+co je vidět, ne co se ve městě děje. Svítí, když jsou stromy **schované** — svítí
+tedy to, co hráč zapnul, ne výchozí stav.
+
 ### Proč nejsou obrázky pro osm typů svahu
 
 Autor navrhoval vygenerovat strom a balvan zvlášť pro každý svah. Nedělá se to,

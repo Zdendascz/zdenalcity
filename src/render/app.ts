@@ -1053,6 +1053,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let viewMode = 'surface';
   let layerMode = 'none';
   let ghostBuildings = false;
+  let decorVisible = true;
 
   function applyViewAndLayer(): void {
     // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu
@@ -1066,6 +1067,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Budovy v podzemním pohledu překáží — hráč se dívá pod ně.
     buildingRenderer.setVisible(viewMode !== 'underground');
     buildingRenderer.setGhost(ghostBuildings);
+    buildingRenderer.setDecorVisible(decorVisible);
   }
 
   function setView(id: string): void {
@@ -1113,6 +1115,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     },
     onToggleGhost: () => {
       ghostBuildings = !ghostBuildings;
+      applyViewAndLayer();
+    },
+    onToggleDecor: () => {
+      decorVisible = !decorVisible;
       applyViewAndLayer();
     },
     onFundingChange: (serviceClass, funding) =>
@@ -1872,6 +1878,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       transitVisible: transitPanel.isVisible(),
       disastersEnabled: simWorld.disasters.enabled,
       ghost: ghostBuildings,
+      decor: decorVisible,
       poweredBuildings,
       funding: simWorld.serviceFunding,
       message: message ? i18n.t(message.key, message.params) : '',

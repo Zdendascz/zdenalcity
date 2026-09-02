@@ -31,6 +31,7 @@ export interface HudCallbacks {
   onToggleTransit(): void;
   /** Zprůhlednit budovy, aby šlo vidět a klikat na to pod nimi. */
   onToggleGhost(): void;
+  onToggleDecor(): void;
   onFundingChange(serviceClass: string, funding: number): void;
   onLanguageChange(language: string): void;
   /**
@@ -70,6 +71,8 @@ export interface HudState {
   disastersEnabled: boolean;
   /** Jsou budovy průhledné? */
   ghost: boolean;
+  /** Kreslí se stromy a balvany? */
+  decor: boolean;
   poweredBuildings: number;
   /** Kolik proudu město vyrábí a kolik ho potřebuje. */
   powerProduced: number;
@@ -126,6 +129,7 @@ export class Hud {
   /** Se kterým stavem je nabídka katastrof postavená. `null` = ještě s žádným. */
   private disastersShown: boolean | null = null;
   private ghostButton: HTMLButtonElement | null = null;
+  private decorButton: HTMLButtonElement | null = null;
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
   private readonly views: readonly OverlayOption[];
@@ -143,6 +147,7 @@ export class Hud {
     transitVisible: false,
     disastersEnabled: true,
     ghost: false,
+    decor: true,
     poweredBuildings: 0,
     powerProduced: 0,
     powerNeeded: 0,
@@ -253,6 +258,9 @@ export class Hud {
     this.financeButton?.classList.toggle('is-active', state.financeVisible);
     this.transitButton?.classList.toggle('is-active', state.transitVisible);
     this.ghostButton?.classList.toggle('is-active', state.ghost);
+    // Aktivní je tlačítko, když jsou stromy **schované** — svítí to, co hráč
+    // zapnul, ne výchozí stav.
+    this.decorButton?.classList.toggle('is-active', !state.decor);
 
     // Text přepínače závisí na stavu, který HUD sám nedrží — přijde ve `state`.
     if (state.disastersEnabled !== this.disastersShown) {
@@ -285,6 +293,7 @@ export class Hud {
     this.buildSpeed();
     this.buildViews();
     this.buildGhost();
+    this.buildDecor();
     this.buildLayers();
     this.buildDisasters();
     this.buildTaxes();
@@ -397,6 +406,20 @@ export class Hud {
     node.title = label;
     node.setAttribute('aria-label', label);
     this.ghostButton = node;
+    this.controls.appendChild(node);
+  }
+
+  /**
+   * Vypnutí stromů a balvanů. Vedle průhlednosti budov, protože je to totéž
+   * zrnem: mění se jím, co je vidět, ne co se ve městě děje.
+   */
+  private buildDecor(): void {
+    const label = this.i18n.t('ui.view.decor');
+    const node = button('toolbar__button', () => this.callbacks.onToggleDecor());
+    node.appendChild(iconSvg('view-decor'));
+    node.title = label;
+    node.setAttribute('aria-label', label);
+    this.decorButton = node;
     this.controls.appendChild(node);
   }
 
