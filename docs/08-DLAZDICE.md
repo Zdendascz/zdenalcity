@@ -283,54 +283,53 @@ NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK.
 
 ## Silnice
 
-Šestnáct tvarů podle toho, kam vozovka pokračuje. Maska je `N = 1, E = 2,
-S = 4, W = 8`, a **N je v izometrii směr doprava nahoru** — tak ji počítá
-`src/sim/roads.ts`.
+**Šestnáct hotových dlaždic na typ se zahazuje.** Vygenerovaly se, změřily
+a padly: 42 ze 64 má vozovku jinde, než má. Generátor pevné místo na hraně
+netrefí a doladit se to slovy nedá — je to mez nástroje, ne promptu.
 
-Tři typy vozovky se liší šířkou a povrchem, tvary jsou stejné. Prompt tvaru se
-skládá z popisu typu a popisu tvaru, takže se tvary nepíšou třikrát.
+Návrh je proto obrácený: **tvar vozovky se počítá, obrázek dodá jen povrch.**
 
-### Typy
+### Proč to takhle vůbec jde
 
-| id | popis |
+Půlka řešení už v kódu je. `roadPolygons` v `src/render/roads.ts` skládá vozovku
+ze **středového kusu a ramen**, a všechny jejich vrcholy odvozuje z rohů
+dlaždice. Sousední dlaždice tedy sdílejí tytéž rohy a **spoj sedí ze zásady**,
+ne náhodou. Šířku dává `ROAD_WIDTHS` jako podíl dlaždice: ulice 0,5, třída 0,68,
+dálnice 0,86.
+
+Dneska se ty polygony vyplňují plochou barvou z `ROAD_COLORS`. Návrh je jediná
+změna: **místo barvy textura**, přesně jak to od T72 dělá povrch terénu.
+
+### Co se generuje
+
+Ne šestnáct tvarů, ale **jeden materiál na typ vozovky**. Tři obrázky místo
+osmačtyřiceti:
+
+| id | prompt |
 |---|---|
-| `street` | A narrow residential street: worn asphalt, granite kerbs, a strip of grass along each side. The carriageway with its kerbs is ONE QUARTER of the length of the side it crosses. |
-| `avenue` | A wide two-lane road: darker asphalt, a painted centre line worn thin, concrete kerbs and a paved verge. The carriageway with its kerbs is ONE THIRD of the length of the side it crosses. |
-| `highway` | A four-lane trunk road: fresh dark asphalt, a crash barrier along both shoulders, gravel verge. The carriageway with its shoulders is ONE HALF of the length of the side it crosses. |
+| `asphalt_street` | Worn asphalt seen from far above: one even grey surface, patched and cracked, the same everywhere. |
+| `asphalt_avenue` | Darker asphalt seen from far above: one even surface, smoother, the same everywhere. |
+| `asphalt_highway` | Fresh dark asphalt seen from far above: one even surface, the same everywhere. |
 
-### Tvary
+Platí pro ně totéž co pro povrchy: **z dálky, ne zblízka**, žádný směr, žádné
+místo, které by šlo poznat. Jednotlivá spára ani kámen v dlaždici vidět nejsou.
 
-| maska | id | prompt |
-|---|---|---|
-| 0 | `0` | A short stub of carriageway that touches no side of the diamond at all; grass all around it. |
-| 1 | `n` | The carriageway crosses the UPPER-RIGHT side of the diamond and ends inside the tile in a turning head. It touches no other side. |
-| 2 | `e` | The carriageway crosses the LOWER-RIGHT side of the diamond and ends inside the tile in a turning head. It touches no other side. |
-| 3 | `ne` | The carriageway runs between the UPPER-RIGHT side and the LOWER-RIGHT side of the diamond, and touches no other side. |
-| 4 | `s` | The carriageway crosses the LOWER-LEFT side of the diamond and ends inside the tile in a turning head. It touches no other side. |
-| 5 | `ns` | The carriageway runs between the UPPER-RIGHT side and the LOWER-LEFT side of the diamond, and touches no other side. |
-| 6 | `es` | The carriageway runs between the LOWER-RIGHT side and the LOWER-LEFT side of the diamond, and touches no other side. |
-| 7 | `nes` | A T junction: the carriageway crosses the UPPER-RIGHT side, the LOWER-RIGHT side and the LOWER-LEFT side of the diamond, and touches no other side. |
-| 8 | `w` | The carriageway crosses the UPPER-LEFT side of the diamond and ends inside the tile in a turning head. It touches no other side. |
-| 9 | `nw` | The carriageway runs between the UPPER-RIGHT side and the UPPER-LEFT side of the diamond, and touches no other side. |
-| 10 | `ew` | The carriageway runs between the LOWER-RIGHT side and the UPPER-LEFT side of the diamond, and touches no other side. |
-| 11 | `new` | A T junction: the carriageway crosses the UPPER-RIGHT side, the LOWER-RIGHT side and the UPPER-LEFT side of the diamond, and touches no other side. |
-| 12 | `sw` | The carriageway runs between the LOWER-LEFT side and the UPPER-LEFT side of the diamond, and touches no other side. |
-| 13 | `nsw` | A T junction: the carriageway crosses the UPPER-RIGHT side, the LOWER-LEFT side and the UPPER-LEFT side of the diamond, and touches no other side. |
-| 14 | `esw` | A T junction: the carriageway crosses the LOWER-RIGHT side, the LOWER-LEFT side and the UPPER-LEFT side of the diamond, and touches no other side. |
-| 15 | `nesw` | A crossroads: the carriageway crosses all four SIDES of the diamond — upper-right, lower-right, lower-left and upper-left. It does NOT run to the four pointed corners of the diamond; those corners are grass. |
+### Co se kreslí, a ne generuje
 
-Ke každému tvaru se přidá věta o navazování, kterou skript doplní sám:
+Všechno, co musí lícovat:
 
-```
-The diamond has four SIDES (upper-right, lower-right, lower-left, upper-left)
-and four pointed CORNERS (top, right, bottom, left). Roads leave through the
-SIDES, never through the corners: the four pointed corners are always grass.
+- **obrubník** — obtah kolem polygonu vozovky, ne kresba v obrázku,
+- **vodicí čára** u třídy a dálnice — úsečka po ose ramene,
+- **přechody a zebry**, pokud je někdy budeme chtít.
 
-Where the carriageway crosses a side it must cross exactly at the MIDDLE of
-that side, at a right angle to it, and keep the width given above along the
-whole crossing, so that neighbouring tiles line up. Sides with no connection
-are closed off with a kerb.
-```
+Generovaný obrázek by je nikdy nenavázal přes hranici dlaždice; spočítaná
+úsečka ano.
+
+### Co z toho plyne pro repo
+
+Osmačtyřicet silničních a šestnáct potrubních dlaždic v `content/vanilla/tiles/`
+je k zahození, protože je nikdo nepoužije. Zůstane po nich zadání a měření
+v tomhle dokumentu — ať je jasné, proč se ta cesta opustila.
 
 ## Potrubí
 
