@@ -14,9 +14,12 @@ import {
   WALL_RIGHT_SHADE,
   FOUNDATION_COLOR,
 } from './palette';
-import { areaHeightRange, groundHeightAt } from '@/sim/heights';
+import { areaHeightRange, groundHeightAt, tileCorners } from '@/sim/heights';
 import { depthOrder } from './depth';
 import type { DepthBox } from './depth';
+import { decorDensity, decorHere, decorPick, decorShift, decorTiles } from './decor';
+import type { TerrainDecor } from './decor';
+import { index, TERRAIN } from '@/sim/layers';
 import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
 
 /**
@@ -88,6 +91,18 @@ export class BuildingRenderer {
   private readonly skirts = new Map<number, Graphics>();
   /** Půdorysy pro řazení. Klíč je id budovy. */
   private readonly boxes = new Map<number, DepthBox>();
+  /**
+   * Stromy a balvany podle druhu terénu.
+   *
+   * Jsou tady, a ne v terénním chunku, protože se **musí řadit spolu
+   * s budovami**. V chunku byly dřív a park se pak nakreslil přes stromy, které
+   * měly stát před ním. Chunk se kreslí pod celou zástavbou, takže se z něj
+   * správné pořadí vzít nedá.
+   *
+   * Cena je počet uzlů: les na velké mapě jich přidá řádově tisíc. Řazení to
+   * unese — naměřeno 2,1 ms na 2 500 krabicích a přerovnává se jen při změně.
+   */
+  private decorByTerrain = new Map<number, TerrainDecor[]>();
 
   constructor(world: ReadonlyWorldView, parent: Container, appearance: AppearanceLookup) {
     this.world = world;
@@ -121,7 +136,82 @@ export class BuildingRenderer {
 
   update(dirty: DirtySet): void {
     this.refreshAll(dirty);
+    // Terén se mění zřídka (terraforming, kácení), ale když se změní, musí se
+    // stromy přepočítat celé: mizí i přibývají a jejich id nejsou v `dirty`.
+    if (dirty.fullRedraw || dirty.tiles.size > 0) this.rebuildDecor();
     this.reorder();
+  }
+
+  /** Nastaví obrázky stromů a balvanů a postaví je znovu. */
+  setDecor(decor: ReadonlyMap<number, TerrainDecor[]>): void {
+    this.decorByTerrain = new Map(decor);
+    this.rebuildDecor();
+    this.reorder();
+  }
+
+  /**
+   * Rozestaví stromy a balvany po mapě.
+   *
+   * Id jsou **záporná**, aby se nesrazila s budovami: `-(index dlaždice + 1)`.
+   * Díky tomu je nese táž mapa a řadí je totéž porovnání.
+   */
+  private rebuildDecor(): void {
+    for (const id of [...this.views.keys()]) {
+      if (id < 0) this.remove(id);
+    }
+    if (this.decorByTerrain.size === 0) return;
+
+    const size = this.world.size;
+    const terrainLayer = this.world.layers.terrain;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const tile = index(x, y, size);
+        const choices = this.decorByTerrain.get(terrainLayer[tile] ?? 0);
+        if (choices === undefined || choices.length === 0) continue;
+
+        const decor = choices[decorPick(x, y) % choices.length];
+        if (decor === undefined || !decorHere(x, y, decorDensity(decor))) continue;
+        // Nad vodou strom nestojí. Je široký víc než dlaždici, takže by na
+        // břehu přečuhoval nad hladinu a vypadal, že letí — autor to nahlásil.
+        if (this.nearWater(x, y, decorTiles(decor))) continue;
+
+        this.placeDecor(-(tile + 1), x, y, decor);
+      }
+    }
+  }
+
+  /** Je v dosahu předmětu voda? Nad ní se nestaví. */
+  private nearWater(x: number, y: number, tiles: number): boolean {
+    const reach = Math.max(1, tiles - 1);
+    const size = this.world.size;
+    for (let dy = -reach; dy <= reach; dy++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+        if (this.world.layers.terrain[index(nx, ny, size)] === TERRAIN.water) return true;
+      }
+    }
+    return false;
+  }
+
+  private placeDecor(id: number, x: number, y: number, decor: TerrainDecor): void {
+    const sprite = new Sprite(decor.texture);
+    sprite.anchor.set(decor.anchor[0] / decor.texture.width, decor.anchor[1] / decor.texture.height);
+    sprite.scale.set(1 / decor.scale);
+
+    const corners = tileCorners(this.world.cornerHeight, x, y);
+    // Stojí na **průměrné výšce** rohů: strom roste svisle a na svahu se mění
+    // jen místo, kde se dotýká země. Proto pro něj nejsou zvláštní obrázky
+    // podle svahu — kreslily by osmkrát totéž.
+    const pad = Math.round((corners[0] + corners[1] + corners[2] + corners[3]) / 4);
+    const [shiftX, shiftY] = decorShift(x, y);
+    const at = gridToScreen(x + 0.5 + shiftX, y + 0.5 + shiftY, pad);
+    sprite.position.set(at.x, at.y);
+
+    this.container.addChild(sprite);
+    this.views.set(id, sprite);
+    this.boxes.set(id, { x, y, width: 1, depth: 1, base: pad });
   }
 
   /**

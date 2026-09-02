@@ -3807,17 +3807,31 @@ nejsou objekty, jak jsme se domluvili?" Právem — jako **materiál** skála i 
 napoprvé selhaly, protože se z parku nedaly opsat, kdežto jako **předmět** je
 generátor nakreslil.
 
-### Kreslí se do chunku, ne jako sprite
+### Kreslí se mezi budovami, ne v terénu
 
-Předmět jde do chunku jako **texturovaný obdélník**, ne jako uzel Pixi. Sprite
-by musel do řazení hloubky vedle budov a les o dvou tisících dlaždicích by tam
-přidal dva tisíce uzlů. Takhle se upeče spolu s terénem a nestojí nic navíc.
+Nejdřív šel předmět do chunku jako texturovaný obdélník, protože se tím ušetřilo
+řazení hloubky. **Nešlo to**: chunk se kreslí pod celou zástavbou, takže se park
+nakreslil přes stromy, které měly stát před ním. Autor to nahlásil slovy „park
+přečuhuje přes stromy, měl by být za nimi".
+
+Předměty jsou proto uzly ve vrstvě budov a řadí se s nimi jedním porovnáním.
+Naměřeno na mapě 128 × 128 s lesem: **1 746 uzlů, přerovnání 3,3 ms**, a z 846
+571 jednoznačných dvojic je jedna nakreslená obráceně — spadá to do pojistky
+proti zacyklení, kterou `depthOrder` má.
 
 V simulaci nepřibývá **nic**: je to čistě věc rendereru, žádná entita.
 
-Cena: chunk se kreslí pod budovami, takže strom na dlaždici před domem zůstane
-za ním. Naopak to nenastane — na lese se nestaví, dokud se nevykácí — takže se
-to potká jen na hranici lesa a zástavby.
+### Nad vodou strom nestojí
+
+Strom je širší než dlaždice, takže na břehu přečuhoval nad hladinu a vypadal, že
+letí. Nestaví se proto tam, kde je v jeho dosahu voda. Na pobřeží tím vznikne
+pruh bez stromů, což je i tak správně — les nesahá až do vody.
+
+### Proč nejsou obrázky pro osm typů svahu
+
+Autor navrhoval vygenerovat strom a balvan zvlášť pro každý svah. Nedělá se to,
+protože **strom roste svisle**: na svahu se mění jen bod, kterým se dotýká země,
+a ten se počítá z průměru rohů. Osm variant obrázku by kreslilo osmkrát totéž.
 
 Bez mezer a rozházení je z lesa **sad**: zhruba každá třetí dlaždice zůstane
 prázdná a zbytek se posune do třetiny dlaždice od středu.

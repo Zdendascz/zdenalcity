@@ -70,36 +70,10 @@ const TERRAIN_NAMES: readonly (string | undefined)[] = [
   'marsh',
 ];
 
-/**
- * Stojí na téhle dlaždici předmět, nebo je mezera?
- *
- * Bez mezer je z lesa **hradba**: pravidelná mřížka stejných korun, které se
- * navíc překrývají. Kolik jich zůstane, říká `decorDensity`.
- */
-function decorHere(x: number, y: number, density: number): boolean {
-  let h = Math.imul((x * 0x27d4eb2d) ^ (y * 0x165667b1), 0x9e3779b1) >>> 0;
-  h = (h ^ (h >>> 15)) >>> 0;
-  return (h % 1000) / 1000 < density;
-}
-
-/** Která varianta předmětu padne na dlaždici. Vlastní míchačka, ať se neváže
- * na mezery ani na posun — jinak by třeba všechny smrky stály vlevo. */
-function decorPick(x: number, y: number): number {
-  const h = Math.imul((x * 0x2545f491) ^ (y * 0x9e3779b1), 0x85ebca6b) >>> 0;
-  return (h ^ (h >>> 16)) >>> 0;
-}
-
-/**
- * O kolik se předmět posune od středu dlaždice, v dílech dlaždice.
- *
- * Ze stejného důvodu jako mezery: kdyby všechny stromy stály přesně na středu,
- * vyjde z toho mřížka. Drží se do třetiny dlaždice od středu, aby strom
- * nepřelezl k sousedovi.
- */
-function decorShift(x: number, y: number): [number, number] {
-  let h = Math.imul((x * 0x85ebca6b) ^ (y * 0xc2b2ae35), 0x27d4eb2f) >>> 0;
-  h = (h ^ (h >>> 13)) >>> 0;
-  return [((h & 15) / 15 - 0.5) / 1.5, (((h >>> 8) & 15) / 15 - 0.5) / 1.5];
+/** Co padlo na dlaždici: obrázek a o kolik čtvrtin otočený. */
+interface SurfacePick {
+  texture: Texture;
+  turn: number;
 }
 
 /** Co padlo na dlaždici: obrázek a o kolik čtvrtin otočený. */
@@ -118,19 +92,6 @@ export interface TerrainDecor {
   texture: Texture;
   anchor: readonly [number, number];
   scale: number;
-}
-
-/**
- * Jak často předmět stojí, podle toho, jak je široký.
- *
- * Strom je široký dvě dlaždice, takže na dvou třetinách dlaždic se stromy
- * překrývají v hradbu. Hustota se proto odvozuje z jeho vlastní šířky:
- * jeden na tolik dlaždic, kolik jich zabere. Nad dvě třetiny se nejde —
- * z plné hustoty by byla souvislá plocha bez mezer.
- */
-function decorDensity(decor: TerrainDecor): number {
-  const tiles = Math.max(1, Math.round(decor.texture.width / (2 * 32 * decor.scale)));
-  return Math.min(2 / 3, 1 / (tiles * tiles));
 }
 
 /** Chunk = 16×16 dlaždic. Změna jedné dlaždice invaliduje jeden chunk, ne mapu. */
@@ -279,19 +240,6 @@ export class ChunkRenderer {
    * ve vodě, se šesti zmizely. Atlas ten strop obchází.
    */
   private surfacesByTerrain = new Map<number, Texture[]>();
-  /**
-   * Stromy a balvany podle druhu terénu.
-   *
-   * Kreslí se **do chunku jako texturovaný obdélník**, ne jako Pixi sprite.
-   * Sprite by musel do řazení hloubky vedle budov, a les o dvou tisících
-   * dlaždicích by tam přidal dva tisíce uzlů. Takhle se upeče spolu s terénem
-   * a nestojí nic navíc.
-   *
-   * Cena: chunk se kreslí **pod** budovami, takže strom na dlaždici před domem
-   * zůstane za ním. Nikdy naopak — na lese se nestaví, dokud se nevykácí —
-   * takže se to potká jen na hranici lesa a zástavby.
-   */
-  private decorByTerrain = new Map<number, TerrainDecor[]>();
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
@@ -474,18 +422,6 @@ export class ChunkRenderer {
     this.invalidateAll();
   }
 
-  /** Nastaví stromy a balvany a překreslí, co je vidět. */
-  setDecor(decor: ReadonlyMap<string, TerrainDecor[]>): void {
-    this.decorByTerrain = new Map();
-    for (let terrain = 0; terrain < TERRAIN_NAMES.length; terrain++) {
-      const name = TERRAIN_NAMES[terrain];
-      if (name === undefined) continue;
-      const found = decor.get(name);
-      if (found !== undefined && found.length > 0) this.decorByTerrain.set(terrain, found);
-    }
-    this.invalidateAll();
-  }
-
   /**
    * Který obrázek padne na tuhle dlaždici.
    *
@@ -587,42 +523,6 @@ export class ChunkRenderer {
       graphics
         .poly(points)
         .fill({ color: zoneColor, alpha: underground ? UNDERGROUND_ZONE_ALPHA : ZONE_OVERLAY_ALPHA });
-    }
-
-    // Strom nebo balvan. Kreslí se **po** povrchu i po zóně, ale pořád uvnitř
-    // téže dlaždice, takže ho bližší dlaždice v chunku správně překryje.
-    //
-    // V podzemí ne: tam se dívá pod zem a koruna stromu by clonila potrubí.
-    const choices = underground ? undefined : this.decorByTerrain.get(terrain);
-    const decor = choices === undefined ? undefined : choices[decorPick(x, y) % choices.length];
-    if (decor !== undefined && decorHere(x, y, decorDensity(decor))) {
-      const [nw, ne, sw, se] = corners;
-      // Předmět stojí na **průměrné výšce** rohů, ne na jednom z nich: na svahu
-      // by jinak visel v jednom rohu ve vzduchu, stejně jako to dělaly budovy.
-      const pad = Math.round((nw + ne + sw + se) / 4);
-      // **Střed dlaždice, ne přední roh.** Na předním rohu by strom stál na
-      // hraně a půlkou přečuhoval do sousední dlaždice. Kolem středu se ještě
-      // rozhodí, jinak je z lesa sad.
-      const [shiftX, shiftY] = decorShift(x, y);
-      const front = gridToScreen(x + 0.5 + shiftX, y + 0.5 + shiftY, pad);
-      const width = decor.texture.width;
-      const height = decor.texture.height;
-      const left = front.x - decor.anchor[0] / decor.scale;
-      const top = front.y - decor.anchor[1] / decor.scale;
-      const box = [
-        left,
-        top,
-        left + width / decor.scale,
-        top,
-        left + width / decor.scale,
-        top + height / decor.scale,
-        left,
-        top + height / decor.scale,
-      ];
-      // Totéž co u povrchu: z textury do plochy. Obrázek je `scale`× větší,
-      // než jak se kreslí, takže se zmenšuje.
-      const matrix = new Matrix(1 / decor.scale, 0, 0, 1 / decor.scale, left, top);
-      graphics.poly(box).fill({ texture: decor.texture, matrix });
     }
 
     if (underground) {

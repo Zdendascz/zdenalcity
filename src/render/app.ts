@@ -1,6 +1,6 @@
 import { Application, Assets, Container, Graphics } from 'pixi.js';
 import type { Texture } from 'pixi.js';
-import type { TerrainDecor } from './chunkRenderer';
+import type { TerrainDecor } from './decor';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import type { Definition } from '@/content/schema';
@@ -18,7 +18,7 @@ import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
 import type { CommandResult } from '@/sim/result';
 import { cornerIndex, tileCorners } from '@/sim/heights';
-import { index, ZONE } from '@/sim/layers';
+import { index, TERRAIN, ZONE } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
@@ -478,13 +478,13 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
  * V simulaci nepřibývá nic: je to čistě věc rendereru, takže les o dvou
  * tisících dlaždicích nestojí ani jednu entitu.
  */
-const TERRAIN_DECOR: readonly (readonly [string, string])[] = [
-  ['forest', 'forest_clump'],
-  ['rock', 'boulders'],
+const TERRAIN_DECOR: readonly (readonly [number, string])[] = [
+  [TERRAIN.forest, 'forest_clump'],
+  [TERRAIN.rock, 'boulders'],
 ];
 
-async function loadDecor(content: ContentRegistry): Promise<Map<string, TerrainDecor[]>> {
-  const out = new Map<string, TerrainDecor[]>();
+async function loadDecor(content: ContentRegistry): Promise<Map<number, TerrainDecor[]>> {
+  const out = new Map<number, TerrainDecor[]>();
   const jobs: Promise<void>[] = [];
 
   for (const [terrain, id] of TERRAIN_DECOR) {
@@ -660,7 +660,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
   });
   void loadDecor(content).then((decor) => {
-    if (decor.size > 0) chunkRenderer.setDecor(decor);
+    if (decor.size > 0) buildingRenderer.setDecor(decor);
   });
   const buildingRenderer = new BuildingRenderer(
     world,
