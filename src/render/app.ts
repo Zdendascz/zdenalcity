@@ -513,6 +513,39 @@ async function loadDecor(content: ContentRegistry): Promise<Map<number, TerrainD
   return out;
 }
 
+/**
+ * Obrázky vozovky podle typu a tvaru napojení.
+ *
+ * Vygenerované jsou a autor je chtěl vidět v běhu, ne jen ve statistice.
+ * Měření z `docs/08-DLAZDICE.md` říká, že 42 ze 64 má vozovku jinde, než má —
+ * tohle je způsob, jak si to prohlédnout na mapě a rozhodnout.
+ */
+async function loadRoadTiles(content: ContentRegistry): Promise<Map<string, Texture>> {
+  const out = new Map<string, Texture>();
+  const jobs: Promise<void>[] = [];
+
+  for (const family of ROAD_TILE_NAMES) {
+    for (const shape of content.getTileVariants(family)) {
+      const url = content.getTile(family, shape);
+      if (url === undefined) continue;
+      jobs.push(
+        Assets.load(url)
+          .then((texture: Texture) => {
+            texture.source.addressMode = 'clamp-to-edge';
+            out.set(`${family}|${shape}`, texture);
+          })
+          .catch(() => undefined),
+      );
+    }
+  }
+
+  await Promise.all(jobs);
+  return out;
+}
+
+/** Rodiny dlaždic vozovky. Pořadí sedí na hodnoty vrstvy `road`, potrubí zvlášť. */
+const ROAD_TILE_NAMES = ['street', 'avenue', 'highway', 'pipe'] as const;
+
 /** Kolik variant předmětu se smí načíst. Týž strop karty jako u povrchů. */
 const DECOR_VARIANT_LIMIT = 2;
 
@@ -661,6 +694,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   });
   void loadDecor(content).then((decor) => {
     if (decor.size > 0) buildingRenderer.setDecor(decor);
+  });
+  void loadRoadTiles(content).then((roads) => {
+    if (roads.size > 0) chunkRenderer.setRoadTiles(roads);
   });
   const buildingRenderer = new BuildingRenderer(
     world,

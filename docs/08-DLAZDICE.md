@@ -283,9 +283,14 @@ NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK.
 
 ## Silnice
 
-**Šestnáct hotových dlaždic na typ se zahazuje.** Vygenerovaly se, změřily
-a padly: 42 ze 64 má vozovku jinde, než má. Generátor pevné místo na hraně
-netrefí a doladit se to slovy nedá — je to mez nástroje, ne promptu.
+**Šestnáct hotových dlaždic na typ nejspíš k ničemu nebude.** Vygenerovaly se,
+změřily a padly: 42 ze 64 má vozovku jinde, než má. Generátor pevné místo na
+hraně netrefí a doladit se to slovy nedá — je to mez nástroje, ne promptu.
+
+**Zapojené ale jsou**, na autorovu žádost („to co je vygenerované aplikuj, když
+jsou v repu… já je neviděl"). Kreslí se místo spočítaných polygonů, když k tvaru
+obrázek existuje; zahodit je jde jedním smazáním souborů, a do té doby se dá
+posoudit očima, ne jen z čísla.
 
 Návrh je proto obrácený: **tvar vozovky se počítá, obrázek dodá jen povrch.**
 
