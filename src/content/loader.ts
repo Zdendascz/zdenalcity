@@ -50,24 +50,12 @@ export function createVanillaSource(): ContentSource {
     spriteUrls[name] = spriteFiles[absolute] as string;
   }
 
-  // Dlaždice. Jméno souboru je `<druh>__<co>.png` a klíč `<druh>|<co>`, takže se
-  // rejstřík `tiles/index.json` k ničemu nepotřebuje: rozměr je vždycky čtverec
-  // a kotva u dlaždice nedává smysl.
-  // Povrchy i vozovky. Vozovky se rozlišují podle **tvaru** (`street__ns`),
-  // povrchy podle **varianty** (`grass__a`); renderer si je najde podle klíče,
-  // takže tady se jen pustí dál.
-  const SURFACES = new Set([
-    'grass',
-    'water',
-    'sand',
-    'rock',
-    'forest',
-    'marsh',
-    'street',
-    'avenue',
-    'highway',
-    'pipe',
-  ]);
+  // Povrchy. Jméno souboru je `<druh>__<varianta>.png` a klíč `<druh>|<varianta>`,
+  // takže se rejstřík `tiles/index.json` k ničemu nepotřebuje: rozměr je vždycky
+  // čtverec a kotva u dlaždice nedává smysl. Silnice a potrubí se **neberou** —
+  // jejich obrázky sice ve složce leží, ale mají vadné spoje a vozovka by na
+  // každém styku uskakovala (`docs/08-DLAZDICE.md`).
+  const SURFACES = new Set(['grass', 'water', 'sand', 'rock', 'forest', 'marsh']);
   const tileFiles = import.meta.glob('../../content/vanilla/tiles/*.png', {
     eager: true,
     query: '?url',

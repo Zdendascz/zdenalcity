@@ -283,14 +283,19 @@ NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK.
 
 ## Silnice
 
-**Šestnáct hotových dlaždic na typ nejspíš k ničemu nebude.** Vygenerovaly se,
-změřily a padly: 42 ze 64 má vozovku jinde, než má. Generátor pevné místo na
-hraně netrefí a doladit se to slovy nedá — je to mez nástroje, ne promptu.
+**Šestnáct hotových dlaždic na typ se zahazuje.** Vygenerovaly se, změřily
+a padly: 42 ze 64 má vozovku jinde, než má. Generátor pevné místo na hraně
+netrefí a doladit se to slovy nedá — je to mez nástroje, ne promptu.
 
-**Zapojené ale jsou**, na autorovu žádost („to co je vygenerované aplikuj, když
-jsou v repu… já je neviděl"). Kreslí se místo spočítaných polygonů, když k tvaru
-obrázek existuje; zahodit je jde jedním smazáním souborů, a do té doby se dá
-posoudit očima, ne jen z čísla.
+**A zapojit je ani nejde.** Autor je chtěl vidět v běhu, tak jsem je zapojil —
+a rozbil tím kreslení: chunk je jedna dávka a do té se vejde jen pár různých
+textur. Se šesti povrchy to prošlo, se čtyřiašedesáti dlaždicemi vozovky navrch
+karta část výplní zahodila a část vzala z cizí textury, takže na silnici byla
+tráva. Přitom **jsem ten strop sám změřil o den dřív**. Revertováno.
+
+Nejde tedy jen o to, že jsou dlaždice vozovky nepřesné. Ani kdyby přesné byly,
+šestnáct tvarů na typ se do jedné dávky nevejde — a tím padá celý ten přístup,
+ne jen tahle sada.
 
 Návrh je proto obrácený: **tvar vozovky se počítá, obrázek dodá jen povrch.**
 

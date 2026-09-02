@@ -61,51 +61,6 @@ import { roadMask, roadPolygons } from './roads';
  * takže to musí sedět na `TERRAIN` v `sim/layers.ts` — na pořadí, ne na jméno
  * konstanty. Druh, který obrázek nemá, se kreslí barvou jako dřív.
  */
-/**
- * Jména rodin vozovky. Index je hodnota vrstvy `road`, takže nula je „žádná".
- */
-const ROAD_TILE_NAMES: readonly (string | undefined)[] = [
-  undefined,
-  'street',
-  'avenue',
-  'highway',
-];
-
-/** Maska sousedů na jméno tvaru, jak ho dal generátor: `n`, `e`, `s`, `w`, `0`. */
-function maskLetters(mask: number): string {
-  let out = '';
-  if (mask & 1) out += 'n';
-  if (mask & 2) out += 'e';
-  if (mask & 4) out += 's';
-  if (mask & 8) out += 'w';
-  return out === '' ? '0' : out;
-}
-
-/**
- * Matice, kterou se obrázek posadí na dlaždici. Sdílí ji povrch i vozovka,
- * protože obojí pokrývá celý diamant.
- */
-function surfaceMatrix(
-  x: number,
-  y: number,
-  corners: readonly [number, number, number, number],
-  texture: Texture,
-): Matrix {
-  const size = texture.width || 1;
-  const quad = surfaceCorners(x, y, corners);
-  const origin = quad[0]!;
-  const alongU = quad[1]!;
-  const alongV = quad[3]!;
-  return new Matrix(
-    (alongU[0] - origin[0]) / size,
-    (alongU[1] - origin[1]) / size,
-    (alongV[0] - origin[0]) / size,
-    (alongV[1] - origin[1]) / size,
-    origin[0],
-    origin[1],
-  );
-}
-
 const TERRAIN_NAMES: readonly (string | undefined)[] = [
   'grass',
   'water',
@@ -285,14 +240,6 @@ export class ChunkRenderer {
    * ve vodě, se šesti zmizely. Atlas ten strop obchází.
    */
   private surfacesByTerrain = new Map<number, Texture[]>();
-  /**
-   * Obrázky vozovky, klíč `<typ>|<tvar>`, například `street|ns`.
-   *
-   * Když k tvaru obrázek je, nakreslí se **místo** spočítaných polygonů. Tvar
-   * se skládá z písmen `n`, `e`, `s`, `w` v tomhle pořadí, `0` je dlaždice bez
-   * napojení — tak je pojmenoval generátor.
-   */
-  private roadTiles = new Map<string, Texture>();
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
@@ -456,12 +403,6 @@ export class ChunkRenderer {
     }
   }
 
-  /** Nastaví obrázky vozovky a překreslí, co je vidět. */
-  setRoadTiles(tiles: ReadonlyMap<string, Texture>): void {
-    this.roadTiles = new Map(tiles);
-    this.invalidateAll();
-  }
-
   /** Nastaví obrázky povrchu a překreslí, co je vidět. */
   setSurfaces(surfaces: ReadonlyMap<string, Texture>): void {
     // Losuje se **z toho, co přišlo**, ne z pevné trojice a/b/c. Kdyby některý
@@ -479,13 +420,6 @@ export class ChunkRenderer {
     }
 
     this.invalidateAll();
-  }
-
-  /** Obrázek vozovky pro typ a masku, nebo `undefined`, když k ní není. */
-  private roadTexture(roadType: number, mask: number): Texture | undefined {
-    const family = ROAD_TILE_NAMES[roadType];
-    if (family === undefined || this.roadTiles.size === 0) return undefined;
-    return this.roadTiles.get(`${family}|${maskLetters(mask)}`);
   }
 
   /**
@@ -607,17 +541,10 @@ export class ChunkRenderer {
       // Bitmask se počítá z „je tam jakákoli silnice" — všechny typy se
       // navzájem napojují (§4). Šířku a barvu určuje typ vlastní dlaždice.
       const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
-      const painted = bridge ? undefined : this.roadTexture(roadType, mask);
-      if (painted !== undefined) {
-        // Obrázek pokrývá **celou dlaždici**, ne jen vozovku: tráva kolem ní je
-        // jeho součástí. Kreslí se proto na diamant, ne na polygony vozovky.
-        graphics.poly(points).fill({ texture: painted, matrix: surfaceMatrix(x, y, corners, painted) });
-      } else {
-        for (const polygon of roadPolygons(points, mask, ROAD_WIDTHS[roadType])) {
-          graphics
-            .poly(polygon)
-            .fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[roadType] ?? ROAD_COLOR) });
-        }
+      for (const polygon of roadPolygons(points, mask, ROAD_WIDTHS[roadType])) {
+        graphics
+          .poly(polygon)
+          .fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[roadType] ?? ROAD_COLOR) });
       }
     }
 
