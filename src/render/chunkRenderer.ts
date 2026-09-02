@@ -85,7 +85,7 @@ function decorHere(x: number, y: number, density: number): boolean {
 /** Která varianta předmětu padne na dlaždici. Vlastní míchačka, ať se neváže
  * na mezery ani na posun — jinak by třeba všechny smrky stály vlevo. */
 function decorPick(x: number, y: number): number {
-  let h = Math.imul((x * 0x2545f491) ^ (y * 0x9e3779b1), 0x85ebca6b) >>> 0;
+  const h = Math.imul((x * 0x2545f491) ^ (y * 0x9e3779b1), 0x85ebca6b) >>> 0;
   return (h ^ (h >>> 16)) >>> 0;
 }
 
