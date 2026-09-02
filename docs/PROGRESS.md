@@ -3822,6 +3822,23 @@ to potká jen na hranici lesa a zástavby.
 Bez mezer a rozházení je z lesa **sad**: zhruba každá třetí dlaždice zůstane
 prázdná a zbytek se posune do třetiny dlaždice od středu.
 
+### Stromy byly maličké, protože byly namačkané do dlaždice
+
+Autor: „stromy maličké, oproti těm v parku". Dvě příčiny naráz:
+
+**Les jako povrch byl zápoj korun shora** a generátor jich na dlaždici nakreslil
+dvacet. Jenže dlaždice je osm metrů a koruna vzrostlého stromu je skoro celá.
+Povrch je teď **lesní půda** — tráva a listí ve stínu — a stromy kreslí objekt.
+
+**Objekt měl půdorys 1 × 1**, takže se tři stromy mačkaly do 256 px. Strom má
+teď v `DECOR` půdorys **2 × 2**, i když stojí na jedné dlaždici: půdorys tam
+určuje jen velikost obrázku. A v promptu je „ONE big tree… filling the picture"
+místo skupinky.
+
+**Hustota se odvozuje z šířky předmětu.** Strom široký dvě dlaždice stojí na
+každé čtvrté, balvan na dvou třetinách. S pevnou hustotou se z velkých stromů
+stala souvislá hradba.
+
 ### Matice textury se obracet neměla
 
 Tohle je **oprava chyby, kterou autor viděl a já ne**. Matice u výplně vede

@@ -171,13 +171,16 @@ Trávník jako v parku pod stromem, odkud je vzor. Žádná cesta, žádná ple�
 
 ### `forest`
 
-Souvislý zápoj korun shora. Jednotlivý strom sem nepatří — od toho je objekt.
+**Lesní půda, ne koruny.** Napoprvé to byl zápoj korun viděný shora a vyšly
+z toho dvacet korun na dlaždici — jenže dlaždice je osm metrů a koruna
+vzrostlého stromu je skoro celá. Stromy proto kreslí **objekt**, a povrch je
+jen to, na čem stojí.
 
 | | prompt |
 |---|---|
-| **a** | Woodland seen from far above: an unbroken cover of treetops, crowns two or three metres across, dark shade between them. |
-| **b** | Woodland seen from far above in a deeper green: an unbroken cover of treetops packed tight, dark shade between them. |
-| **c** | Woodland seen from far above in a lighter green: an unbroken cover of treetops, crowns touching, dark shade between them. |
+| **a** | Forest floor seen from far above: grass and leaf litter in shade, one even surface, the same everywhere. |
+| **b** | Forest floor seen from far above in deeper shade: dark grass and leaf litter, one even surface, the same everywhere. |
+| **c** | Forest floor seen from far above: mossy ground with fallen leaves, one even surface, the same everywhere. |
 
 ### `rock`
 
@@ -228,8 +231,14 @@ Generují se sem, ale ukládají do `art/sprites/raw/`, protože je pak ladí
 
 | id | půdorys | patra | co to je |
 |---|---|---|---|
-| `forest_clump` | 1 × 1 | 2 | skupinka stromů na jedné dlaždici |
-| `boulders` | 1 × 1 | 1 | balvany a kamení na jedné dlaždici |
+| `forest_clump` | 2 × 2 | 3 | jeden až dva vzrostlé stromy |
+| `boulders` | 1 × 1 | 1 | balvany a kamení |
+
+Strom má půdorys **2 × 2, i když stojí na jedné dlaždici**. Není to rozpor:
+půdorys tu určuje jen to, jak velký obrázek se vyrobí. Vzrostlý strom je proti
+osmimetrové dlaždici širší než ona a namačkat ho do její šířky znamená mít
+v lese samé zakrslíky — autor to nahlásil slovy „stromy maličké, oproti těm
+v parku".
 
 Hlavička je jiná než u dlaždic a musí být **důrazná**. Napoprvé stálo v prvním
 řádku „for an isometric game map" a generátor z toho udělal dlaždici i se
@@ -260,17 +269,17 @@ NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK.
 
 | | prompt |
 |---|---|
-| **a** | Three mature linden trees standing close together, full round crowns, trunks visible beneath. |
-| **b** | Four smaller birches in a loose clump, slender white trunks, light open crowns. |
-| **c** | Two spruces and one broadleaf tree together, dark conical crowns beside a round one. |
+| **a** | ONE big mature linden tree, a full round crown and a thick trunk, filling the picture. |
+| **b** | TWO tall birches side by side, slender white trunks, light open crowns, filling the picture. |
+| **c** | ONE big spruce, a dark conical crown down to the ground, filling the picture. |
 
 ### `boulders`
 
 | | prompt |
 |---|---|
-| **a** | Three grey granite boulders of different sizes lying together, weathered and lichen-spotted. |
-| **b** | One large split boulder with two smaller stones at its foot. |
-| **c** | A low scatter of five rounded stones, none taller than a man. |
+| **a** | ONE large grey granite boulder, taller than a man, weathered and lichen-spotted, filling the picture. |
+| **b** | TWO grey boulders lying side by side, one split, filling the picture. |
+| **c** | THREE rounded grey stones together, the biggest as tall as a man, filling the picture. |
 
 ## Silnice
 

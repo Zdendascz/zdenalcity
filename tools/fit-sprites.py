@@ -76,7 +76,9 @@ RUINS = {f'ruin_{n}x{n}': (n, n, 1) for n in (1, 2, 3, 4)}
 # Objekty na terénu — strom a balvan. Definici budovy taky nemají, protože to
 # nejsou entity: kreslí je renderer podle druhu terénu a v simulaci po nich
 # nezůstane nic. Zadání je v `docs/08-DLAZDICE.md`.
-DECOR = {'forest_clump': (1, 1, 2), 'boulders': (1, 1, 1)}
+# Strom má půdorys 2 × 2, i když stojí na jedné dlaždici: půdorys tu určuje jen
+# velikost obrázku. Vzrostlý strom je proti osmimetrové dlaždici širší než ona.
+DECOR = {'forest_clump': (2, 2, 3), 'boulders': (1, 1, 1)}
 
 
 def load_definitions() -> dict[str, dict]:

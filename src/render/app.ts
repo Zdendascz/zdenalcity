@@ -483,30 +483,38 @@ const TERRAIN_DECOR: readonly (readonly [string, string])[] = [
   ['rock', 'boulders'],
 ];
 
-async function loadDecor(content: ContentRegistry): Promise<Map<string, TerrainDecor>> {
-  const out = new Map<string, TerrainDecor>();
+async function loadDecor(content: ContentRegistry): Promise<Map<string, TerrainDecor[]>> {
+  const out = new Map<string, TerrainDecor[]>();
   const jobs: Promise<void>[] = [];
 
   for (const [terrain, id] of TERRAIN_DECOR) {
-    // Jedna varianta, ze stejného důvodu jako u povrchů: karta unese jen pár
-    // různých textur na chunk. Viz `SURFACE_VARIANT_LIMIT`.
-    const variant = content.getSpriteVariants(id)[0];
-    if (variant === undefined) continue;
-    const sprite = content.getSprite(id, variant);
-    if (sprite === undefined) continue;
-    jobs.push(
-      Assets.load(sprite.url)
-        .then((texture: Texture) => {
-          texture.source.addressMode = 'clamp-to-edge';
-          out.set(terrain, { texture, anchor: sprite.anchor, scale: sprite.scale });
-        })
-        .catch(() => undefined),
-    );
+    // Dvě varianty, ne tři: karta unese jen pár různých textur na chunk, viz
+    // `SURFACE_VARIANT_LIMIT`. S jedinou byly všechny stromy v lese stejné.
+    for (const variant of content.getSpriteVariants(id).slice(0, DECOR_VARIANT_LIMIT)) {
+      const sprite = content.getSprite(id, variant);
+      if (sprite === undefined) continue;
+      jobs.push(
+        Assets.load(sprite.url)
+          .then((texture: Texture) => {
+            texture.source.addressMode = 'clamp-to-edge';
+            const list = out.get(terrain) ?? [];
+            list.push({ texture, anchor: sprite.anchor, scale: sprite.scale });
+            out.set(terrain, list);
+          })
+          .catch(() => undefined),
+      );
+    }
   }
 
   await Promise.all(jobs);
+  // Pořadí musí být stabilní: stahování dobíhá, jak přijde ze sítě, a losování
+  // podle souřadnic by pak po každém spuštění padlo jinam.
+  for (const list of out.values()) list.sort((a, b) => a.texture.label!.localeCompare(b.texture.label!));
   return out;
 }
+
+/** Kolik variant předmětu se smí načíst. Týž strop karty jako u povrchů. */
+const DECOR_VARIANT_LIMIT = 2;
 
 /**
  * Kolik variant od druhu terénu se smí načíst. Viz `loadSurfaces` — je to strop
