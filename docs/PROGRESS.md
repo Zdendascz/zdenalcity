@@ -3827,6 +3827,20 @@ Strom je širší než dlaždice, takže na břehu přečuhoval nad hladinu a vy
 letí. Nestaví se proto tam, kde je v jeho dosahu voda. Na pobřeží tím vznikne
 pruh bez stromů, což je i tak správně — les nesahá až do vody.
 
+### Velikost se ladí v fitteru, ne v promptu
+
+Strom měl chvíli půdorys 2 × 2 a vyšel **vyšší než čtyřpatrový dům**. Skutečná
+lípa přes dvacet metrů vysoká je, ale vedle herních domů z toho byl pralesní
+velikán — autorovo „stromy jsou proti domům moc obrovské". Zpátky na 1 × 1.
+
+Balvan je ale zase o dost menší než strom, a generátor kreslí předmět **přes
+celý obrázek**, ať je to lípa nebo kámen; kdyby ho kreslil malý, `trim` by ho
+stejně ořízl na obrys. Rozdíl se proto dělá až v fitteru: `DECOR_SHARE` říká,
+jakou část dlaždice předmět zabere, a balvan má 0,45.
+
+Přeladit velikost je tím pádem **zadarmo** — obrázky se negenerují znovu, jen
+se jinak zmenší.
+
 ### Proč nejsou obrázky pro osm typů svahu
 
 Autor navrhoval vygenerovat strom a balvan zvlášť pro každý svah. Nedělá se to,

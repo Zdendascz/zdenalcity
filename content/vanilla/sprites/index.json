@@ -6,33 +6,33 @@
       "building": "boulders",
       "variant": "a",
       "file": "boulders__a.png",
-      "width": 256,
-      "height": 258,
+      "width": 115,
+      "height": 116,
       "anchor": [
-        128,
-        258
+        57,
+        116
       ]
     },
     {
       "building": "boulders",
       "variant": "b",
       "file": "boulders__b.png",
-      "width": 256,
-      "height": 212,
+      "width": 115,
+      "height": 95,
       "anchor": [
-        128,
-        212
+        57,
+        95
       ]
     },
     {
       "building": "boulders",
       "variant": "c",
       "file": "boulders__c.png",
-      "width": 256,
-      "height": 256,
+      "width": 115,
+      "height": 115,
       "anchor": [
-        128,
-        256
+        57,
+        115
       ]
     },
     {
@@ -699,33 +699,33 @@
       "building": "forest_clump",
       "variant": "a",
       "file": "forest_clump__a.png",
-      "width": 512,
-      "height": 515,
+      "width": 256,
+      "height": 258,
       "anchor": [
-        256,
-        515
+        128,
+        258
       ]
     },
     {
       "building": "forest_clump",
       "variant": "b",
       "file": "forest_clump__b.png",
-      "width": 512,
-      "height": 587,
+      "width": 256,
+      "height": 294,
       "anchor": [
-        256,
-        587
+        128,
+        294
       ]
     },
     {
       "building": "forest_clump",
       "variant": "c",
       "file": "forest_clump__c.png",
-      "width": 512,
-      "height": 765,
+      "width": 256,
+      "height": 382,
       "anchor": [
-        256,
-        765
+        128,
+        382
       ]
     },
     {

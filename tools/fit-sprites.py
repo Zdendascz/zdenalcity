@@ -76,9 +76,21 @@ RUINS = {f'ruin_{n}x{n}': (n, n, 1) for n in (1, 2, 3, 4)}
 # Objekty na terénu — strom a balvan. Definici budovy taky nemají, protože to
 # nejsou entity: kreslí je renderer podle druhu terénu a v simulaci po nich
 # nezůstane nic. Zadání je v `docs/08-DLAZDICE.md`.
-# Strom má půdorys 2 × 2, i když stojí na jedné dlaždici: půdorys tu určuje jen
-# velikost obrázku. Vzrostlý strom je proti osmimetrové dlaždici širší než ona.
-DECOR = {'forest_clump': (2, 2, 3), 'boulders': (1, 1, 1)}
+# Půdorys tu určuje jen **velikost obrázku**, ne místo v simulaci.
+#
+# Strom byl chvíli 2 × 2 a vyšel vyšší než čtyřpatrový dům — skutečná lípa má
+# přes dvacet metrů, jenže vedle herních domů to vypadá jako pralesní velikán.
+# Autorovo „stromy jsou proti domům moc obrovské". Zpátky na 1 × 1; přesnost
+# proti skutečnosti tu prohrává s tím, aby město šlo přečíst.
+DECOR = {'forest_clump': (1, 1, 3), 'boulders': (1, 1, 1)}
+
+# Kolik z té dlaždice předmět skutečně zabere.
+#
+# Generátor kreslí předmět **přes celý obrázek**, ať je to lípa nebo kámen —
+# jinak by ho `trim` stejně ořízl na jeho obrys. Rozdíl mezi stromem a balvanem
+# se proto dělá až tady. Balvan přes celou dlaždici je osm metrů vysoký kámen
+# a vedle domu vypadá jako skála.
+DECOR_SHARE = {'boulders': 0.45}
 
 
 def load_definitions() -> dict[str, dict]:
@@ -281,7 +293,7 @@ def fit_decor(
     tam, kde má předmět stín a kde se dotýká země. Neměří se, protože měřit
     není co: v obrázku je jen předmět.
     """
-    target_w = spec['width']
+    target_w = max(1, round(spec['width'] * DECOR_SHARE.get(building, 1.0)))
     scale = target_w / cropped.width
     target_h = max(1, round(cropped.height * scale))
     resized = cropped.resize((target_w, target_h), Image.LANCZOS)
