@@ -3800,6 +3800,47 @@ frekvenci ani rychlost pečení chunků při posunu. Akceptační kritérium 2
 (512 × 512 při 60 FPS) je tím pádem **potřeba přeměřit ručně**.
 
 
+## Stromy a balvany jsou objekty, ne povrch
+
+Zadání autora, a čekalo dvakrát odkývnuté a neudělané: „proč kurva lesy a šutry
+nejsou objekty, jak jsme se domluvili?" Právem — jako **materiál** skála i les
+napoprvé selhaly, protože se z parku nedaly opsat, kdežto jako **předmět** je
+generátor nakreslil.
+
+### Kreslí se do chunku, ne jako sprite
+
+Předmět jde do chunku jako **texturovaný obdélník**, ne jako uzel Pixi. Sprite
+by musel do řazení hloubky vedle budov a les o dvou tisících dlaždicích by tam
+přidal dva tisíce uzlů. Takhle se upeče spolu s terénem a nestojí nic navíc.
+
+V simulaci nepřibývá **nic**: je to čistě věc rendereru, žádná entita.
+
+Cena: chunk se kreslí pod budovami, takže strom na dlaždici před domem zůstane
+za ním. Naopak to nenastane — na lese se nestaví, dokud se nevykácí — takže se
+to potká jen na hranici lesa a zástavby.
+
+Bez mezer a rozházení je z lesa **sad**: zhruba každá třetí dlaždice zůstane
+prázdná a zbytek se posune do třetiny dlaždice od středu.
+
+### Matice textury se obracet neměla
+
+Tohle je **oprava chyby, kterou autor viděl a já ne**. Matice u výplně vede
+z textury do plochy; já ji obracel, takže se povrch kreslil **osmkrát
+zvětšený**. Na trávě to nešlo poznat — zvětšený trávník je pořád trávník —
+a prozradily to až dvě jiné věci: písek, který vyšel rozmazaný (autorovo „vedle
+toho na hřišti vypadá katastrofálně"), a strom, ze kterého zbyl svislý proužek.
+
+Část ladění promptů kolem měřítka tedy léčila následek mojí chyby v rendereru,
+ne vadu generátoru.
+
+### Bloky v zadání se čtou podle oddílu, ne podle pořadí
+
+Objekty vyšly napoprvé jako dlaždice se silnicemi. Nebyl to model: generátor
+bral oplocené bloky podle pořadí v dokumentu, a když se nový oddíl vložil
+doprostřed, dostaly objekty jako hlavičku větu o navazování vozovky. Teď se
+každý blok bere ze svého oddílu podle nadpisu.
+
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

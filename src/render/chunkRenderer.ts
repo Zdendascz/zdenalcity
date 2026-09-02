@@ -70,6 +70,31 @@ const TERRAIN_NAMES: readonly (string | undefined)[] = [
   'marsh',
 ];
 
+/**
+ * Stojí na téhle dlaždici strom, nebo je mezera?
+ *
+ * Bez mezer je z lesa **sad**: pravidelná mřížka stejných korun. Zhruba každá
+ * třetí dlaždice zůstane prázdná a je vidět povrch pod ní.
+ */
+function decorHere(x: number, y: number): boolean {
+  let h = Math.imul((x * 0x27d4eb2d) ^ (y * 0x165667b1), 0x9e3779b1) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0;
+  return h % 3 !== 0;
+}
+
+/**
+ * O kolik se předmět posune od středu dlaždice, v dílech dlaždice.
+ *
+ * Ze stejného důvodu jako mezery: kdyby všechny stromy stály přesně na středu,
+ * vyjde z toho mřížka. Drží se do třetiny dlaždice od středu, aby strom
+ * nepřelezl k sousedovi.
+ */
+function decorShift(x: number, y: number): [number, number] {
+  let h = Math.imul((x * 0x85ebca6b) ^ (y * 0xc2b2ae35), 0x27d4eb2f) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  return [((h & 15) / 15 - 0.5) / 1.5, (((h >>> 8) & 15) / 15 - 0.5) / 1.5];
+}
+
 /** Co padlo na dlaždici: obrázek a o kolik čtvrtin otočený. */
 interface SurfacePick {
   texture: Texture;
@@ -508,8 +533,11 @@ export class ChunkRenderer {
       const origin = quad[surface.turn]!;
       const alongU = quad[(surface.turn + 1) & 3]!;
       const alongV = quad[(surface.turn + 3) & 3]!;
-      // **Obrácená matice.** Pixi jí převádí bod plochy na místo v textuře, ne
-      // naopak; s tou přímou se obrázek do dlaždice vešel osmkrát (256 / 32).
+      // Matice vede **z textury do plochy**: obrázek 256 px na dlaždici širokou
+      // 64. Obracet ji nemá, a dělal jsem to — kresba pak byla osmkrát zvětšená
+      // a na trávě to nešlo poznat, protože zvětšený trávník je pořád trávník.
+      // Prozradil to až písek, který vyšel rozmazaný, a strom, ze kterého zbyl
+      // svislý proužek.
       const matrix = new Matrix(
         (alongU[0] - origin[0]) / size,
         (alongU[1] - origin[1]) / size,
@@ -517,7 +545,7 @@ export class ChunkRenderer {
         (alongV[1] - origin[1]) / size,
         origin[0],
         origin[1],
-      ).invert();
+      );
       // Tón je **bílá ztlumená sklonem**, ne barva terénu: obrázek už zelený je
       // a vynásobit ho zelenou znamená bahno. Zůstat musí jen světlo, jinak by
       // ze svahu zmizel stín a kopec by vypadal jako rovina.
@@ -546,14 +574,16 @@ export class ChunkRenderer {
     //
     // V podzemí ne: tam se dívá pod zem a koruna stromu by clonila potrubí.
     const decor = underground ? undefined : this.decorByTerrain.get(terrain);
-    if (decor !== undefined) {
+    if (decor !== undefined && decorHere(x, y)) {
       const [nw, ne, sw, se] = corners;
       // Předmět stojí na **průměrné výšce** rohů, ne na jednom z nich: na svahu
       // by jinak visel v jednom rohu ve vzduchu, stejně jako to dělaly budovy.
       const pad = Math.round((nw + ne + sw + se) / 4);
       // **Střed dlaždice, ne přední roh.** Na předním rohu by strom stál na
-      // hraně a půlkou přečuhoval do sousední dlaždice.
-      const front = gridToScreen(x + 0.5, y + 0.5, pad);
+      // hraně a půlkou přečuhoval do sousední dlaždice. Kolem středu se ještě
+      // rozhodí, jinak je z lesa sad.
+      const [shiftX, shiftY] = decorShift(x, y);
+      const front = gridToScreen(x + 0.5 + shiftX, y + 0.5 + shiftY, pad);
       const width = decor.texture.width;
       const height = decor.texture.height;
       const left = front.x - decor.anchor[0] / decor.scale;
@@ -568,14 +598,9 @@ export class ChunkRenderer {
         left,
         top + height / decor.scale,
       ];
-      const matrix = new Matrix(
-        1 / decor.scale,
-        0,
-        0,
-        1 / decor.scale,
-        left,
-        top,
-      ).invert();
+      // Totéž co u povrchu: z textury do plochy. Obrázek je `scale`× větší,
+      // než jak se kreslí, takže se zmenšuje.
+      const matrix = new Matrix(1 / decor.scale, 0, 0, 1 / decor.scale, left, top);
       graphics.poly(box).fill({ texture: decor.texture, matrix });
     }
 
