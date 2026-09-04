@@ -70,6 +70,8 @@ import { BuildingRenderer } from './buildingRenderer';
 import type { AppearanceLookup } from './buildingRenderer';
 import { createCamera, pan, viewportToWorld, zoomAt } from './camera';
 import { ChunkRenderer, viewportFor } from './chunkRenderer';
+import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
+import { ROAD_SHAPES } from './roadShapes';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
 import { TrafficOverlay } from './trafficOverlay';
@@ -504,33 +506,32 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
 }
 
 /**
- * Načte materiál vozovky — **jeden obrázek na typ silnice**.
+ * Načte dlaždice vozovky. Klíč je `rodina__tvar`, jak je pojmenoval
+ * `fit-roads.py`.
  *
- * Tvar vozovky se počítá z rohů dlaždice, obrázek dodá jen povrch. Hotové
- * dlaždice na každý tvar se zkoušely a zahodily: šestnáct tvarů na typ je
- * čtyřicet osm textur navíc a do jedné dávky se nevejdou ani zdaleka, viz
- * `loadSurfaces`. Tři materiály jsou proti tomu levné.
- *
- * Klíčem je jméno materiálu, ne typ silnice: o vrstvu `road` se stará
- * `ChunkRenderer`, obsah dodává obrázky pod jmény (P5).
+ * **Strop na počet obrázků tu není**, na rozdíl od povrchů: vozovka se kreslí
+ * jako sprite, ne jako výplň v chunku, a sprity se dávkují po svém. Právě
+ * proto se sem vejde jednadvacet dlaždic, kdežto povrchů se vejde šest.
  */
-async function loadRoadSurfaces(content: ContentRegistry): Promise<Map<string, Texture>> {
+async function loadRoadTiles(content: ContentRegistry): Promise<Map<string, Texture>> {
   const out = new Map<string, Texture>();
+  const available = content.getRoads();
   const jobs: Promise<void>[] = [];
 
-  for (const name of ROAD_SURFACE_NAMES) {
-    const [variant] = content.getTileVariants(name);
-    if (variant === undefined) continue;
-    const url = content.getTile(name, variant);
-    if (url === undefined) continue;
-    jobs.push(
-      Assets.load(url)
-        .then((texture: Texture) => {
-          sampleSmooth(texture);
-          out.set(name, texture);
-        })
-        .catch(() => undefined),
-    );
+  for (const family of ROAD_FAMILIES) {
+    if (family === undefined) continue;
+    for (const shape of ROAD_SHAPES) {
+      const key = `${family}__${shape}`;
+      const url = available[key];
+      if (url === undefined) continue;
+      jobs.push(
+        Assets.load(url)
+          .then((texture: Texture) => {
+            out.set(key, texture);
+          })
+          .catch(() => undefined),
+      );
+    }
   }
 
   await Promise.all(jobs);
@@ -602,11 +603,6 @@ const SCREENSHOT_RESOLUTION = 2;
 /** Druhy terénu, ke kterým se hledá obrázek. Sedí na `TERRAIN` v `sim/layers.ts`. */
 const TERRAIN_NAMES = ['grass', 'water', 'sand', 'rock', 'forest', 'marsh'] as const;
 
-/**
- * Materiály vozovky. Pořadí je jedno — přiřazení k typu silnice dělá
- * `ROAD_NAMES` v `chunkRenderer.ts`, tady jde jen o to, co stáhnout.
- */
-const ROAD_SURFACE_NAMES = ['asphalt_street', 'asphalt_avenue', 'asphalt_highway'] as const;
 
 export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Obsah se načítá první. Nevalidní definice má spadnout dřív, než se objeví
@@ -753,12 +749,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   void loadSurfaces(content).then((surfaces) => {
     if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
   });
-  void loadRoadSurfaces(content).then((surfaces) => {
-    if (surfaces.size > 0) chunkRenderer.setRoadSurfaces(surfaces);
+  void loadRoadTiles(content).then((tiles) => {
+    if (tiles.size === 0) return;
+    roadRenderer.setTextures(tiles);
+    // Teprve teď chunk přestane kreslit polygony. Kdyby se vypnuly dřív,
+    // byla by na mapě do stažení obrázků díra místo silniční sítě.
+    chunkRenderer.setRoadSprites(true);
   });
   void loadDecor(content).then((decor) => {
     if (decor.size > 0) buildingRenderer.setDecor(decor);
   });
+  // Silnice leží **mezi terénem a budovami**: kreslí se po chunku, ale pod
+  // domy. Vlastní kontejner, ne řazení podle hloubky — vozovka je země.
+  const roadRenderer = new RoadRenderer(world, worldContainer);
+
   const buildingRenderer = new BuildingRenderer(
     world,
     worldContainer,
@@ -1218,6 +1222,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     trafficOverlay.setVisible(layerMode === 'traffic');
     // Budovy v podzemním pohledu překáží — hráč se dívá pod ně.
     buildingRenderer.setVisible(viewMode !== 'underground');
+    roadRenderer.setVisible(viewMode !== 'underground');
     buildingRenderer.setGhost(ghostBuildings);
     buildingRenderer.setDecorVisible(decorVisible);
   }
@@ -1844,6 +1849,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     chunkRenderer.cull(
       viewportFor(camera.x, camera.y, camera.zoom, app.screen.width, app.screen.height),
     );
+    roadRenderer.update(dirty);
     buildingRenderer.update(dirty);
     coarseOverlay.update(dirty.coarseChanged);
     trafficOverlay.update();

@@ -83,6 +83,19 @@ export function createVanillaSource(): ContentSource {
     tiles[`${terrain}|${variant}`] = tileFiles[absolute] as string;
   }
 
+  // Dlaždice vozovky. Sedm tvarů na typ, zbytek vznikne překlopením
+  // v rendereru — klíč je `rodina__tvar`, jak je pojmenoval `fit-roads.py`.
+  const roadFiles = import.meta.glob('../../content/vanilla/roads/*.png', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  });
+  const roads: Record<string, string> = {};
+  for (const absolute of Object.keys(roadFiles).sort()) {
+    const name = relativePath(absolute).slice('roads/'.length).replace(/\.png$/, '');
+    roads[name] = roadFiles[absolute] as string;
+  }
+
   let manifest: unknown = undefined;
   let spriteIndex: unknown = undefined;
   let balance: unknown = undefined;
@@ -116,6 +129,7 @@ export function createVanillaSource(): ContentSource {
     icons,
     sprites: buildSprites(spriteIndex, spriteUrls),
     tiles,
+    roads,
   };
 }
 

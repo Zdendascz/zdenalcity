@@ -43,6 +43,8 @@ export interface ContentSource {
    * spoje, takže by vozovka na každém styku uskakovala (viz `docs/08-DLAZDICE.md`).
    */
   readonly tiles?: Readonly<Record<string, string>>;
+  /** Dlaždice vozovky pod klíčem `rodina__tvar`. */
+  readonly roads?: Readonly<Record<string, string>>;
   /**
    * Balanc. Zdroj ho mít nemusí; když ho má, musí být úplný a přepíše ten
    * dosavadní — tak mod přeladí hru bez zásahu do definic.
@@ -98,6 +100,7 @@ export class ContentRegistry {
   private readonly icons = new Map<string, string>();
   private readonly sprites = new Map<string, SpriteImage>();
   private readonly tiles = new Map<string, string>();
+  private readonly roads = new Map<string, string>();
   private balance: Balance | null = null;
 
   /**
@@ -185,6 +188,9 @@ export class ContentRegistry {
     }
 
     // A povrchy. Mod smí přidat vlastní variantu trávy nebo přepsat vanilla.
+    for (const [key, url] of Object.entries(source.roads ?? {})) {
+      this.roads.set(key, url);
+    }
     for (const [key, url] of Object.entries(source.tiles ?? {})) {
       this.tiles.set(key, url);
     }
@@ -220,6 +226,11 @@ export class ContentRegistry {
    * URL obrázků ikon. Prázdné, když je žádný zdroj nedodal — rozhraní si pak
    * poradí polygony.
    */
+  /** Všechny dlaždice vozovky, které obsah dodal. Klíč je `rodina__tvar`. */
+  getRoads(): Record<string, string> {
+    return Object.fromEntries(this.roads);
+  }
+
   getIcons(): Record<string, string> {
     return Object.fromEntries(this.icons);
   }

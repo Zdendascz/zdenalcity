@@ -70,43 +70,10 @@ const TERRAIN_NAMES: readonly (string | undefined)[] = [
   'marsh',
 ];
 
-/**
- * Jména materiálů vozovky. Index je hodnota vrstvy `road`, takže to musí sedět
- * na `ROAD` v `sim/layers.ts`. Nula je „žádná silnice" a obrázek nemá.
- *
- * Materiál je **jeden na typ**, ne šestnáct tvarů: tvar vozovky se počítá
- * z rohů dlaždice (`roadPolygons`) a obrázek dodá jen povrch. Hotové dlaždice
- * na tvar se zkoušely a zahodily — do jedné kreslicí dávky se jich tolik
- * nevejde. Měření je v `docs/08-DLAZDICE.md`.
- */
-export const ROAD_NAMES: readonly (string | undefined)[] = [
-  undefined,
-  'asphalt_street',
-  'asphalt_avenue',
-  'asphalt_highway',
-];
-
 /** Co padlo na dlaždici: obrázek a o kolik čtvrtin otočený. */
 interface SurfacePick {
   texture: Texture;
   turn: number;
-}
-
-/**
- * O kolik čtvrtin se otočí asfalt na téhle dlaždici.
- *
- * Materiál je jen jeden, takže bez otočení by měly všechny dlaždice kresbu ve
- * stejném směru a slily by se v pruh — přesně to, co u trávy dopadlo jako
- * „manšestr". Asfalt žádný směr nemá, takže otočit se smí bez ohledu na to,
- * kudy silnice vede.
- *
- * Losuje se ze **souřadnic**, ne z `world.rng`: musí to vyjít stejně při každém
- * překreslení i po načtení savu.
- */
-function roadTurn(x: number, y: number): number {
-  let h = Math.imul((x * 0x9e3779b1) ^ (y * 0x7feb352d), 0x846ca68b) >>> 0;
-  h = (h ^ (h >>> 15)) >>> 0;
-  return h & 3;
 }
 
 /**
@@ -312,8 +279,14 @@ export class ChunkRenderer {
    * ve vodě, se šesti zmizely. Atlas ten strop obchází.
    */
   private surfacesByTerrain = new Map<number, Texture[]>();
-  /** Materiál vozovky podle typu. Jeden obrázek na typ, viz `ROAD_NAMES`. */
-  private roadSurfaces = new Map<number, Texture>();
+  /**
+   * Kreslí vozovku někdo jiný?
+   *
+   * Sprity zapne `RoadRenderer`, jakmile má obrázky. Do té doby kreslí
+   * polygony chunk, aby síť nechyběla; potom se vypnou, ať se nekreslí
+   * dvakrát a nesvítí barva zpod obrázku.
+   */
+  private roadSprites = false;
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
@@ -496,21 +469,10 @@ export class ChunkRenderer {
     this.invalidateAll();
   }
 
-  /**
-   * Nastaví materiál vozovky a překreslí, co je vidět.
-   *
-   * Klíč je jméno materiálu z `ROAD_NAMES`, ne typ silnice: obsah o vrstvě
-   * `road` nic neví a dodává obrázky pod jmény (P5).
-   */
-  setRoadSurfaces(surfaces: ReadonlyMap<string, Texture>): void {
-    this.roadSurfaces = new Map();
-    for (let roadType = 0; roadType < ROAD_NAMES.length; roadType++) {
-      const name = ROAD_NAMES[roadType];
-      if (name === undefined) continue;
-      const texture = surfaces.get(name);
-      if (texture !== undefined) this.roadSurfaces.set(roadType, texture);
-    }
-
+  /** Přepne kreslení vozovky na sprity, nebo zpátky na polygony. */
+  setRoadSprites(enabled: boolean): void {
+    if (this.roadSprites === enabled) return;
+    this.roadSprites = enabled;
     this.invalidateAll();
   }
 
@@ -625,28 +587,16 @@ export class ChunkRenderer {
     if (bridge) {
       graphics.poly(points).fill({ color: BRIDGE_RAIL_COLOR });
     }
-    if (roadType !== ROAD.none) {
-      // Bitmask se počítá z „je tam jakákoli silnice" — všechny typy se
-      // navzájem napojují (§4). Šířku a barvu určuje typ vlastní dlaždice.
+    if (roadType !== ROAD.none && (bridge || !this.roadSprites)) {
+      // **Záloha, ne hlavní cesta.** Vozovku kreslí `RoadRenderer` jako sprity;
+      // tenhle polygon zůstává pro dva případy: most, který obrázek nemá,
+      // a chvíli po startu, než se dlaždice stáhnou. Bez něj by na mapě byla
+      // do té doby díra v silniční síti.
       const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
-      // Na mostě zůstává barva: most není asfalt na zemi, ale konstrukce nad
-      // vodou, a musí být poznat, kde silnice opouští břeh (§7 fáze 3).
-      const asphalt = bridge ? undefined : this.roadSurfaces.get(roadType);
-      const matrix =
-        asphalt === undefined
-          ? undefined
-          : tileMatrix(x, y, corners, roadTurn(x, y), asphalt.width || 1);
       for (const polygon of roadPolygons(points, mask, ROAD_WIDTHS[roadType])) {
-        // Barva se kreslí **vždycky, i pod obrázek** — stejně jako u terénu.
-        // Když obrázek chybí nebo se nedokreslí, zůstane vozovka, ne díra.
         graphics
           .poly(polygon)
           .fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[roadType] ?? ROAD_COLOR) });
-        if (asphalt !== undefined && matrix !== undefined) {
-          graphics
-            .poly(polygon)
-            .fill({ texture: asphalt, matrix, color: light, textureSpace: 'global' });
-        }
       }
     }
 
