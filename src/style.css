@@ -275,7 +275,10 @@ body {
   background: rgb(255 255 255 / 6%);
 }
 
-.is-negative {
+/* Ztlumení se týká **pruhu poptávky**, ne čísel.
+   Jako obecné `.is-negative` shodilo krytí i záporným částkám v rozpisu
+   a z červené byla nečitelná šeď — autor to nahlásil. */
+.demand__bar.is-negative {
   opacity: 0.35;
 }
 
@@ -720,8 +723,9 @@ body {
   font-size: 11px;
 }
 
+/* Záporné číslo je červené a plně kryjící. Je to informace, ne poznámka. */
 .is-negative {
-  color: #ff9d8a;
+  color: #ff8e78;
 }
 
 /* --- bublina s cenou ---------------------------------------------------- */
@@ -901,10 +905,62 @@ body {
   background: rgb(30 8 8 / 78%);
 }
 
+/* Karta katastrofy: vlevo obrázek, vpravo povídání. Velikostí jako rozbor
+   parcely — proužek s jednou větou hráče nepřinutil zvednout hlavu. */
 .alert__panel {
-  max-width: 520px;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 0;
+  width: min(900px, 94vw);
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid rgb(232 107 107 / 45%);
   box-shadow: 0 24px 70px rgb(0 0 0 / 70%);
+}
+
+/* Na úzkém okně obrázek nad textem; vedle sebe by z obojího nezbylo nic. */
+@media (width <= 760px) {
+  .alert__panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.alert__picture {
+  overflow: hidden;
+  background: #0b1114;
+}
+
+.alert__picture.is-hidden {
+  display: none;
+}
+
+.alert__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  object-fit: cover;
+}
+
+.alert__text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px;
+}
+
+.alert__story {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alert__paragraph {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .alert__head {
@@ -938,6 +994,7 @@ body {
 .alert__actions {
   display: flex;
   gap: 8px;
+  margin-top: auto;
   justify-content: flex-end;
 }
 

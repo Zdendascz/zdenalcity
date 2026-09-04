@@ -527,5 +527,20 @@
   "ui.version.months.many": "před {count} měsíci",
   "ui.version.years.one": "před rokem",
   "ui.version.years.few": "před {count} roky",
-  "ui.version.years.many": "před {count} lety"
+  "ui.version.years.many": "před {count} lety",
+  "ui.alert.story.fire": "Hoří. Plameny prorazily okny do ulice a kouř leze pod dveře sousedům. Hasiči jsou na cestě, ale dokud nedojedou, oheň se šíří dál — a co shoří, to se neopraví, to se zbourá.\n\nZkontrolujte, jestli má ta čtvrť vůbec hasičárnu v dosahu.",
+  "ui.alert.story.wildfire": "Les hoří. Vítr žene oheň po svahu a jiskry padají tam, kde jsme čekali, že bude klid. Kouř je vidět přes celé město.\n\nDokud plameny nedojdou na holou zem nebo k vodě, samy se nezastaví.",
+  "ui.alert.story.flood": "Voda stoupla. Ulice v nížině jsou pod hladinou, přízemí se plní a doprava tudy neprojede. Kanály to nestíhají.\n\nAž voda opadne, zůstane bahno, plíseň a účet. Stavět v záplavovém pásu byla vždycky sázka.",
+  "ui.alert.story.tornado": "Přišlo tornádo. Během několika minut sebralo střechy, vylámalo stromy a nechalo za sebou pruh, který je vidět z druhého konce města.\n\nCo stálo v cestě, už nestojí. Ostatní mělo štěstí.",
+  "ui.alert.story.earthquake": "Zatřáslo to celým městem. Asfalt popraskal, z fasád spadly balkony a lidé stojí venku a dívají se na svoje domy.\n\nStatika starších domů to nemusela vydržet. Bude se počítat, co se dá zachránit.",
+  "ui.alert.story.explosion": "Výbuch. Přízemí je pryč, ze zdi zbyla díra a sklo doletělo přes ulici. Ránu slyšeli i ve vedlejší čtvrti.\n\nCo bylo v okruhu, dostalo naplno. Zbytek dostal strach.",
+  "ui.alert.story.industrialAccident": "Havárie v provozu. Střecha haly je otevřená, z potrubí uniká pára a na dvoře leží to, co bývalo nádrží.\n\nVýroba stojí a okolí to odnese na zdraví i na ceně pozemků. Průmysl vedle bydlení má vždycky tenhle háček.",
+  "ui.alert.story.pileup": "Hromadná nehoda. Vozy zablokovaly oba pruhy a doprava kolem stojí. Než se to odklidí, hledá si každý objížďku.\n\nJedna přetížená křižovatka umí zastavit půl města. Možná je čas na širší silnici.",
+  "ui.alert.story.strike": "Stávka. Vozovna je zavřená, tramvaje stojí v řadě a nikdo nikam nejede. Lidé se do práce dostávají, jak umí.\n\nDokud to trvá, doprava ve městě prostě není. A spokojenost jde dolů rychleji než tržby.",
+  "ui.alert.story.riot": "Nepokoje. V ulicích hoří koše, výlohy jsou vytlučené a lidé se drží doma. Nespadlo to z nebe — dlouho to viselo ve vzduchu.\n\nNespokojené město se dřív nebo později ozve. Tohle je to později.",
+  "ui.alert.story.gangWar": "Válka gangů. Ve vedlejších ulicích se střílelo, po ránu tam stojí vyhořelé auto a nikdo nic neviděl.\n\nKde chybí policie a práce, zabydlí se tohle. Čtvrť si to bude pamatovat dlouho.",
+  "ui.alert.story.blackout": "Výpadek proudu. Celá čtvrť je potmě, výtahy stojí, lednice se rozmrazují a v obchodech nefunguje nic.\n\nSíť neunesla, co se po ní chtělo. Buď přidat zdroj, nebo ubrat spotřebu — jinak přijde další.",
+  "ui.alert.story.epidemic": "Epidemie. Před nemocnicí stojí sanitky, na trávníku vyrostl stan a lidé chodí ven jen na nutné.\n\nMěsto s málo doktory a vysokou hustotou to odnese dvakrát: nejdřív na zdraví, pak na náladě.",
+  "ui.alert.story.chemicalSpill": "Únik chemikálií. Převrácená cisterna pustila obsah na silnici a odtud do kanálu. Ve vzduchu je to cítit přes tři ulice.\n\nVoda odsud bude nepoužitelná, dokud se to nevyčistí. A vodárna, která z ní bere, nedodá ani kapku.",
+  "ui.alert.story.landslide": "Sesuv půdy. Svah se utrhl a lehl si přes silnici, spolu se stromy a kusem zahrady nad ním. Cesta tudy nevede.\n\nKopce vypadají na mapě hezky. Když se do nich zařízne stavba, občas se ozvou."
 }

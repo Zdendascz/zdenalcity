@@ -1,14 +1,14 @@
-"""Vygeneruje propagacni sceny z urovne oci do `art/scenes/`.
+"""Vygeneruje dlazdice vozovky do `art/roads/raw/`.
 
-    python tools/generate-scenes.py --dry-run
-    python tools/generate-scenes.py --only ulice
-    python tools/generate-scenes.py --all
+    python tools/generate-roads.py --dry-run
+    python tools/generate-roads.py --only street__ns
+    python tools/generate-roads.py --all
 
-Prompty cte ze zadani `docs/10-SCENY.md`. Klic z `OPENAI_API_KEY`; skript ho
-nikam nevypisuje.
+Prompty cte ze zadani `docs/12-SILNICE.md`. Klic z `OPENAI_API_KEY`; skript
+ho nikam nevypisuje.
 
-Proti ikonam a dlazdicim se lisi ve dvou vecech: obrazek je **na sirku**
-a **krycí**, ne pruhledny. Scena vyplnuje cely ramecek vcetne oblohy.
+Sedm tvaru na typ, ne sestnact -- zbytek vznikne preklopenim v rendereru.
+Proc, viz zadani.
 """
 
 from __future__ import annotations
@@ -20,27 +20,19 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-
-# Zadání i výstup jdou zvenčí: stejný nástroj kreslí pohledy z ulice
-# (`10-SCENY.md` → `art/scenes/`) i dramatické obrázky katastrof
-# (`11-UDALOSTI.md` → `art/events/`). Liší se jen text, ne postup.
-DEFAULT_SPEC = 'docs/10-SCENY.md'
-OUT_BY_SPEC = {
-    '10-SCENY.md': ROOT / 'art' / 'scenes',
-    '11-UDALOSTI.md': ROOT / 'art' / 'events',
-}
+SPEC = ROOT / 'docs' / '12-SILNICE.md'
+OUT = ROOT / 'art' / 'roads' / 'raw'
 
 FENCE = re.compile(r'```(.*?)```', re.S)
-# Velka pismena tam byt musi: katastrofy maji id v camelCase
-# (industrialAccident, chemicalSpill, gangWar) a bez nich tri z patnacti
-# tise vypadly.
-SCENE_ROW = re.compile(r'^\| `([A-Za-z0-9_-]+)` \| (.+?) \|\s*$', re.M)
+ROW = re.compile(r'^\| `([a-z0-9_]+)` \| (.+?) \|\s*$', re.M)
+
+# Oddily s tabulkami. Styl je jinde a nesmi se cist jako dlazdice.
+SECTIONS = ('Ulice', 'Třída', 'Dálnice')
 
 PARAGRAPH = '\n\n'
 
 
 def shared():
-    """Kus `generate-sprites.py`, ktery mluvi s API. Jedna kopie, ne dvě."""
     path = ROOT / 'tools' / 'generate-sprites.py'
     spec = importlib.util.spec_from_file_location('generate_sprites', path)
     if spec is None or spec.loader is None:
@@ -55,18 +47,22 @@ def section(text: str, title: str) -> str:
     return found.group(1) if found else ''
 
 
-def read_spec(spec: Path) -> dict[str, str]:
-    text = spec.read_text(encoding='utf-8')
+def read_spec() -> dict[str, str]:
+    text = SPEC.read_text(encoding='utf-8')
 
     found = FENCE.search(section(text, 'Styl'))
     if found is None:
-        raise SystemExit(f'{spec.name}: oddil "Styl" nema oploceny blok')
+        raise SystemExit(f'{SPEC.name}: oddil "Styl" nema oploceny blok')
     header = found.group(1).strip()
 
-    rows = SCENE_ROW.findall(section(text, 'Scény'))
-    if not rows:
-        raise SystemExit(f'{spec.name}: v oddilu "Scény" nejsou zadne radky')
-    return {name: PARAGRAPH.join([header, prompt]) for name, prompt in rows}
+    out: dict[str, str] = {}
+    for title in SECTIONS:
+        rows = ROW.findall(section(text, title))
+        if not rows:
+            raise SystemExit(f'{SPEC.name}: oddil "{title}" nema zadne dlazdice')
+        for name, prompt in rows:
+            out[name] = PARAGRAPH.join([header, prompt])
+    return out
 
 
 def main() -> int:
@@ -78,29 +74,22 @@ def main() -> int:
     parser.add_argument('--all', action='store_true')
     parser.add_argument('--only', default=None)
     parser.add_argument('--model', default=None)
-    parser.add_argument('--spec', default=DEFAULT_SPEC)
     args, _ = parser.parse_known_args()
 
-    spec = ROOT / args.spec
-    out = OUT_BY_SPEC.get(spec.name)
-    if out is None:
-        print(f'pro {spec.name} neni znamy vystupni adresar')
-        return 1
-
-    jobs = list(read_spec(spec).items())
+    jobs = list(read_spec().items())
     if args.only:
         jobs = [job for job in jobs if job[0] == args.only]
         if not jobs:
             print(f'"{args.only}" v zadani neni')
             return 1
 
-    out.mkdir(parents=True, exist_ok=True)
-    missing = [job for job in jobs if not (out / f'{job[0]}.png').exists()]
+    OUT.mkdir(parents=True, exist_ok=True)
+    missing = [job for job in jobs if not (OUT / f'{job[0]}.png').exists()]
     print(f'Chybi {len(missing)} z {len(jobs)}.')
     if not missing:
         return 0
 
-    batch = missing if (args.all or args.only) else missing[:2]
+    batch = missing if (args.all or args.only) else missing[:3]
 
     if args.dry_run:
         print(f'\nGenerovalo by se {len(batch)}:')
@@ -122,15 +111,16 @@ def main() -> int:
     for name, prompt in batch:
         print(f'   {name} ... ', end='', flush=True)
         try:
-            blob = sprites.request(key, prompt, model, None, sprites.SIZE_WIDE, 'opaque')
+            blob = sprites.request(key, prompt, model, None, sprites.SIZE_SQUARE)
         except Exception as chyba:  # noqa: BLE001 - davka nesmi spadnout na jedne
             print(f'chyba: {chyba}')
             continue
-        (out / f'{name}.png').write_bytes(blob)
+        (OUT / f'{name}.png').write_bytes(blob)
         done += 1
         print('ok')
 
-    print(f'\n{done} vygenerovano do {out.relative_to(ROOT)}.')
+    print(f'\n{done} vygenerovano do {OUT.relative_to(ROOT)}.')
+    print('Dal: python tools/fit-roads.py')
     return 0
 
 

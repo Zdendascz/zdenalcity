@@ -1,4 +1,8 @@
 import { button, el } from './dom';
+
+/** Prázdný řádek dělí odstavce v překladu. Text se píše jako text. */
+const PARAGRAPH_BREAK = /\n{2,}/;
+
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
 
@@ -63,6 +67,9 @@ export class DisasterAlert {
   private readonly icon: HTMLElement;
   private readonly title: HTMLElement;
   private readonly body: HTMLElement;
+  private readonly story: HTMLElement;
+  private readonly picture: HTMLElement;
+  private readonly image: HTMLImageElement;
   private readonly ignore: HTMLButtonElement;
   private readonly show: HTMLButtonElement;
   private readonly i18n: I18n;
@@ -76,12 +83,25 @@ export class DisasterAlert {
     this.root = el('div', 'dialog__backdrop alert is-hidden');
     const panel = el('div', 'dialog alert__panel');
 
+    // **Karta, ne proužek.** Vlevo obrázek, vpravo povídání — velikostí jako
+    // rozbor parcely. Rozhodnutí autora; hlášení má na starostu působit, ne
+    // ho informovat. Kolik dlaždic hoří, si přečte na mapě.
+    this.picture = el('div', 'alert__picture');
+    this.image = el('img', 'alert__image');
+    this.image.alt = '';
+    // Chybějící obrázek nesmí zprávu zahodit: sloupec zmizí a zbude text.
+    this.image.addEventListener('error', () => this.picture.classList.add('is-hidden'));
+    this.picture.appendChild(this.image);
+
+    const text = el('div', 'alert__text');
+
     const head = el('div', 'alert__head');
     this.icon = el('span', 'alert__icon');
     this.title = el('h1', 'dialog__title alert__title');
     head.append(this.icon, this.title);
 
     this.body = el('p', 'alert__body');
+    this.story = el('div', 'alert__story');
 
     const actions = el('div', 'alert__actions');
     this.show = button('chip chip--primary', () => {
@@ -95,7 +115,8 @@ export class DisasterAlert {
     });
     actions.append(this.show, this.ignore);
 
-    panel.append(head, this.body, actions);
+    text.append(head, this.body, this.story, actions);
+    panel.append(this.picture, text);
     this.root.appendChild(panel);
     mount.appendChild(this.root);
   }
@@ -119,6 +140,19 @@ export class DisasterAlert {
     this.icon.replaceChildren(iconSvg(kind));
     this.title.textContent = this.i18n.t('ui.alert.title', { name });
     this.body.textContent = this.i18n.t(`ui.alert.body.${kind}`);
+
+    // Povídání je **jeden překlad s prázdnými řádky**, ne pole klíčů: text se
+    // píše jako text a odstavce v něm jsou přirozená hranice.
+    this.story.replaceChildren(
+      ...this.i18n
+        .t(`ui.alert.story.${kind}`)
+        .split(PARAGRAPH_BREAK)
+        .map((paragraph) => el('p', 'alert__paragraph', paragraph)),
+    );
+
+    this.picture.classList.remove('is-hidden');
+    this.image.src = `events/${kind}.jpg`;
+
     this.show.textContent = this.i18n.t('ui.alert.show');
     this.ignore.textContent = this.i18n.t('ui.alert.ignore');
 

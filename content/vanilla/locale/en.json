@@ -527,5 +527,20 @@
   "ui.version.months.many": "{count} months ago",
   "ui.version.years.one": "a year ago",
   "ui.version.years.few": "{count} years ago",
-  "ui.version.years.many": "{count} years ago"
+  "ui.version.years.many": "{count} years ago",
+  "ui.alert.story.fire": "Fire. Flames have broken through the windows into the street and smoke is creeping under the neighbours’ doors. The brigade is on its way, but until it arrives the fire spreads — and what burns is not repaired, it is demolished.\n\nCheck whether that quarter has a fire station within reach at all.",
+  "ui.alert.story.wildfire": "The woods are burning. Wind is driving the fire up the slope and embers are landing where we expected quiet. The smoke is visible across the whole city.\n\nUntil the flames reach bare ground or water, they will not stop on their own.",
+  "ui.alert.story.flood": "The water has risen. Low streets are under the surface, ground floors are filling and nothing gets through. The drains cannot cope.\n\nWhen it falls there will be mud, mould and a bill. Building on the flood plain was always a bet.",
+  "ui.alert.story.tornado": "A tornado came through. In a few minutes it took roofs, snapped trees and left a strip you can see from the far side of town.\n\nWhat stood in its way no longer stands. The rest was lucky.",
+  "ui.alert.story.earthquake": "The whole city shook. The asphalt has cracked, balconies came off the facades and people are standing outside looking at their houses.\n\nOlder buildings may not have taken it. Someone will have to count what can be saved.",
+  "ui.alert.story.explosion": "An explosion. The ground floor is gone, there is a hole where a wall was and glass reached across the street. They heard it in the next quarter.\n\nEverything within the radius took it head on. The rest took a fright.",
+  "ui.alert.story.industrialAccident": "An accident at the works. The hall roof is open, steam is escaping from the pipework and what used to be a tank is lying in the yard.\n\nProduction has stopped and the neighbourhood pays in health and in land value. Industry next to housing always has this catch.",
+  "ui.alert.story.pileup": "A pile-up. Vehicles are blocking both lanes and traffic around it is at a standstill. Until it is cleared, everyone is looking for a way round.\n\nOne overloaded junction can stop half a city. Perhaps it is time for a wider road.",
+  "ui.alert.story.strike": "A strike. The depot is shut, the trams are parked in a row and nobody is going anywhere. People are getting to work however they can.\n\nWhile it lasts, the city has no transit at all. And happiness falls faster than takings.",
+  "ui.alert.story.riot": "Riots. Bins are burning in the streets, shop windows are broken and people are staying in. This did not fall out of the sky — it had been hanging in the air.\n\nAn unhappy city speaks up sooner or later. This is the later.",
+  "ui.alert.story.gangWar": "A gang war. There was shooting in the side streets; by morning there is a burnt-out car and nobody saw anything.\n\nWhere policing and work are missing, this moves in. The quarter will remember it for a long time.",
+  "ui.alert.story.blackout": "A blackout. The whole quarter is dark, lifts have stopped, fridges are thawing and nothing works in the shops.\n\nThe grid could not carry what was asked of it. Either add supply or cut demand — otherwise another one is coming.",
+  "ui.alert.story.epidemic": "An epidemic. Ambulances are queuing outside the hospital, a white tent has gone up on the lawn and people only go out when they must.\n\nA city with few doctors and high density pays twice: first in health, then in mood.",
+  "ui.alert.story.chemicalSpill": "A chemical spill. An overturned tanker has emptied onto the road and from there into the drain. You can smell it three streets away.\n\nThe water here is unusable until it is cleaned up. And the works that draws from it will not deliver a drop.",
+  "ui.alert.story.landslide": "A landslide. The slope tore away and lay down across the road, together with the trees and a piece of the garden above it. Nothing gets through.\n\nHills look nice on the map. Cut into them and they occasionally answer back."
 }

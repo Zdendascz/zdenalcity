@@ -396,17 +396,30 @@ export class BuildingInfo {
 
       breakdown.appendChild(el('dt', undefined, label));
       const amount = Math.round(term.amount);
-      // Typografické znaménko, ať se rozpis nerozchází se zbytkem UI.
+      // **Plus jen tam, kde je to příplatek.** Základ není přírůstek proti
+      // ničemu, je to výchozí hodnota, a „+40" u něj svádí číst ho jako bonus.
+      // Ostatní sčítance příplatek jsou, takže znaménko nesou — záporné navíc
+      // červeně, protože to je ta polovina, kterou hráč hledá.
+      const base = term.source === 'base';
+      const sign = base ? '' : amount < 0 ? '−' : '+';
       breakdown.appendChild(
         el(
           'dd',
           amount < 0 ? 'is-negative' : undefined,
-          `${amount < 0 ? '−' : '+'}${formatNumber(Math.abs(amount))}`,
+          `${sign}${formatNumber(Math.abs(amount))}`,
         ),
       );
     }
+    // Součet je **absolutní hodnota**, ne přírůstek, takže taky bez plus.
+    const target = Math.round(parcel.landValue.raw);
     breakdown.appendChild(el('dt', 'sheet__total', t('ui.parcel.target')));
-    breakdown.appendChild(el('dd', 'sheet__total', formatNumber(Math.round(parcel.landValue.raw))));
+    breakdown.appendChild(
+      el(
+        'dd',
+        target < 0 ? 'sheet__total is-negative' : 'sheet__total',
+        formatNumber(target),
+      ),
+    );
     parent.appendChild(breakdown);
   }
 
