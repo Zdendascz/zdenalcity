@@ -41,13 +41,33 @@ export function buildAge(
   const elapsed = Math.max(0, now - built);
 
   if (elapsed < HOUR) return t('ui.version.justNow');
-  if (elapsed < DAY) return t('ui.version.hours', { count: Math.floor(elapsed / HOUR) });
+  if (elapsed < DAY) return plural(t, 'hours', Math.floor(elapsed / HOUR));
 
   const days = Math.floor(elapsed / DAY);
-  if (days < 14) return t('ui.version.days', { count: days });
-  if (days < 60) return t('ui.version.weeks', { count: Math.floor(days / 7) });
-  if (days < 730) return t('ui.version.months', { count: Math.floor(days / 30) });
-  return t('ui.version.years', { count: Math.floor(days / 365) });
+  if (days < 14) return plural(t, 'days', days);
+  if (days < 60) return plural(t, 'weeks', Math.floor(days / 7));
+  if (days < 730) return plural(t, 'months', Math.floor(days / 30));
+  return plural(t, 'years', Math.floor(days / 365));
+}
+
+/**
+ * Český tvar podle počtu.
+ *
+ * Čeština má tři: **jeden** rok, **dva až čtyři** roky, **pět a víc** let.
+ * Jediný klíč s `{count}` dá „před 1 lety" a to je vidět na první pohled.
+ *
+ * Tvar `.few` mají **oba jazyky**, i když ho angličtina nepotřebuje. Záloha
+ * v `I18n` je totiž angličtina, takže chybějící anglický klíč nemá kam
+ * spadnout a vypsal by se jako holé `ui.version.years.few`. Dva stejné řádky
+ * jsou levnější než výjimka v kódu.
+ */
+function plural(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  unit: string,
+  count: number,
+): string {
+  const form = count === 1 ? 'one' : count < 5 ? 'few' : 'many';
+  return t(`ui.version.${unit}.${form}`, { count });
 }
 
 /** Datum sestavení podle jazyka hráče, bez času. */
