@@ -1064,14 +1064,60 @@ body {
   font-size: 15px;
 }
 
-/* Vodorovný pás karet. Netflix ho posouvá šipkami; tady stačí táhnout,
-   protože karet je pět, ne padesát. */
+/* Slideshow: pás se posouvá transformem, ne posuvníkem. Rám ořezává. */
+.home__frame {
+  position: relative;
+  overflow: hidden;
+}
+
 .home__strip {
   display: flex;
   gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  scroll-snap-type: x mandatory;
+  transition: transform 0.45s ease;
+}
+
+/* Šipky leží na okrajích rámu a jsou vidět jen na dotyk myší — jinak by
+   překážely obrázku, kvůli kterému tam jsou. */
+.home__step {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  padding: 10px 14px;
+  border: 1px solid rgb(238 243 245 / 25%);
+  border-radius: 6px;
+  background: rgb(14 32 40 / 78%);
+  color: #eef3f5;
+  font-size: 24px;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.18s ease;
+  cursor: pointer;
+}
+
+.home__frame:hover .home__step {
+  opacity: 1;
+}
+
+.home__step:hover {
+  border-color: #eef3f5;
+}
+
+.home__step--prev {
+  left: 8px;
+}
+
+.home__step--next {
+  right: 8px;
+}
+
+/* Značka sestavení. Drobná a v rohu — je to údaj pro hlášení chyb, ne titulek. */
+.home__version {
+  position: relative;
+  margin: 14px 0 0;
+  color: #8ea0a8;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
 }
 
 .home__card {

@@ -509,7 +509,13 @@
   "ui.parcel.landValueTitle": "What makes the land value",
   "ui.parcel.servicesTitle": "Services nearby",
   "ui.authors.dedication": "For my dad.",
-  "ui.home.gallery": "Gallery",
   "ui.home.previous": "Previous",
-  "ui.home.next": "Next"
+  "ui.home.next": "Next",
+  "ui.version.label": "Build",
+  "ui.version.justNow": "just released",
+  "ui.version.hours": "{count} h ago",
+  "ui.version.days": "{count} days ago",
+  "ui.version.weeks": "{count} weeks ago",
+  "ui.version.months": "{count} months ago",
+  "ui.version.years": "{count} years ago"
 }

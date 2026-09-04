@@ -509,7 +509,13 @@
   "ui.parcel.landValueTitle": "Z čeho je cena půdy",
   "ui.parcel.servicesTitle": "Služby v okolí",
   "ui.authors.dedication": "Věnováno tátovi.",
-  "ui.home.gallery": "Galerie",
   "ui.home.previous": "Předchozí",
-  "ui.home.next": "Další"
+  "ui.home.next": "Další",
+  "ui.version.label": "Verze",
+  "ui.version.justNow": "právě vydáno",
+  "ui.version.hours": "před {count} h",
+  "ui.version.days": "před {count} dny",
+  "ui.version.weeks": "před {count} týdny",
+  "ui.version.months": "před {count} měsíci",
+  "ui.version.years": "před {count} lety"
 }

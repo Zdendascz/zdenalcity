@@ -2,6 +2,7 @@ import type { Balance } from '@/content/balance';
 import { button, el } from './dom';
 import type { I18n } from './i18n';
 import { showNewGameDialog } from './newGameDialog';
+import { BUILD_COMMIT, buildAge, buildDate } from './version';
 import type { NewGame } from './newGameDialog';
 
 /**
@@ -65,6 +66,9 @@ const GALLERY = [
  */
 const HERO = GALLERY.slice(0, 6);
 
+/** Jak dlouho stojí galerie na jedné kartě, než popojede. */
+const SLIDE_MS = 4500;
+
 /** Jak dlouho zůstane jeden snímek v hlavičce, než se prolne do dalšího. */
 const HERO_MS = 7000;
 
@@ -74,7 +78,7 @@ export function showHome(
   balance: Balance,
   options: HomeOptions,
 ): Promise<HomeChoice> {
-  const t = (key: string) => i18n.t(key);
+  const t = (key: string, params?: Record<string, string | number>) => i18n.t(key, params);
   let resolveChoice: (choice: HomeChoice) => void = () => {};
   let timer: number | undefined;
 
@@ -156,6 +160,20 @@ export function showHome(
   actions.append(open, input);
 
   hero.appendChild(actions);
+
+  // Značka sestavení. Datum samo neodpoví na otázku „je to staré?", tak se
+  // vypisuje i stáří slovy — a hash, aby šlo nahlášenou chybu přiřadit
+  // ke konkrétní verzi.
+  const age = buildAge(t);
+  hero.appendChild(
+    el(
+      'p',
+      'home__version',
+      `${t('ui.version.label')} ${BUILD_COMMIT} · ${buildDate(i18n.getLanguage())}` +
+        (age === '' ? '' : ` · ${age}`),
+    ),
+  );
+
   root.appendChild(hero);
 
   // --- řady karet ---------------------------------------------------------
@@ -177,28 +195,75 @@ export function showHome(
 }
 
 /**
- * Jedna řada obrázků, **bez popisků**.
+ * Slideshow, ne pás se scrollbarem.
  *
- * Popisky pod kartami zabíraly řádek a nic neříkaly — co je na obrázku, je
- * vidět. Zůstávají v `alt` kvůli odečítačkám a ukážou se v lightboxu, kde je
- * na ně místo a kde teprve dávají smysl.
+ * Vodorovný posuvník byl na širokoúhlém monitoru široký přes celou stránku
+ * a nevypadal jako galerie, ale jako tabulka, která se nevešla. Karty se
+ * proto posouvají **po jedné** šipkami a samy od sebe; posuvník je pryč.
+ *
+ * Nadpis „Galerie" taky zmizel — řada obrázků se nemusí představovat.
  */
 function galleryRow(t: (key: string) => string, root: HTMLElement): HTMLElement {
   const section = el('section', 'home__row');
-  section.appendChild(el('h2', 'home__row-title', t('ui.home.gallery')));
-
+  const frame = el('div', 'home__frame');
   const strip = el('div', 'home__strip');
+
   GALLERY.forEach((item, order) => {
     const card = button('home__card home__card--plain', () => showLightbox(root, t, order));
     const image = el('img', 'home__card-image');
     image.src = item.file;
     image.alt = t(item.titleKey);
-    image.loading = 'lazy';
+    // První dva se načtou hned, zbytek až se k němu doposouvá.
+    image.loading = order < 2 ? 'eager' : 'lazy';
     card.appendChild(image);
     strip.appendChild(card);
   });
 
-  section.appendChild(strip);
+  let at = 0;
+
+  /**
+   * Posun se počítá ze **skutečné šířky karty**, ne z konstanty: karta je
+   * `clamp()`, takže na jiném okně vychází jinak. Kolik karet je vidět, se
+   * spočítá taky — na širokém monitoru se posouvá po jedné, ale zastaví se
+   * dřív, aby vpravo nezůstala díra.
+   */
+  function step(delta: number): void {
+    const first = strip.firstElementChild;
+    if (!(first instanceof HTMLElement)) return;
+    const gap = 14;
+    const width = first.getBoundingClientRect().width + gap;
+    const visible = Math.max(1, Math.round(frame.clientWidth / width));
+    const last = Math.max(0, GALLERY.length - visible);
+
+    at += delta;
+    if (at > last) at = 0;
+    if (at < 0) at = last;
+    strip.style.transform = `translateX(${-at * width}px)`;
+  }
+
+  for (const [css, delta, label] of [
+    ['home__step home__step--prev', -1, 'ui.home.previous'],
+    ['home__step home__step--next', 1, 'ui.home.next'],
+  ] as const) {
+    const node = button(css, () => step(delta));
+    node.textContent = delta < 0 ? '‹' : '›';
+    node.title = t(label);
+    node.setAttribute('aria-label', t(label));
+    frame.appendChild(node);
+  }
+
+  frame.appendChild(strip);
+  section.appendChild(frame);
+
+  // Sama se posouvá, dokud na ni hráč nemíří myší. Kdo si prohlíží obrázek,
+  // nechce, aby mu ujel pod kurzorem.
+  let timer = window.setInterval(() => step(1), SLIDE_MS);
+  frame.addEventListener('mouseenter', () => window.clearInterval(timer));
+  frame.addEventListener('mouseleave', () => {
+    timer = window.setInterval(() => step(1), SLIDE_MS);
+  });
+  window.addEventListener('resize', () => step(0));
+
   return section;
 }
 
