@@ -474,7 +474,6 @@
   "building.plaza.desc": "Dlážděná plocha s lavičkami. Nejlevnější, co zvedne cenu půdy.",
   "building.city_park.name": "Městský park",
   "building.city_park.desc": "Největší park ve městě. Zvedá cenu půdy v širokém okolí.",
-  "ui.info.spriteFile": "Obrázek (dočasné)",
   "ui.tool.pan": "Pacička",
   "ui.menu.pan": "Pohyb",
   "ui.view.decor": "Skrýt stromy a kameny",
@@ -505,5 +504,8 @@
   "ui.home.scene.square": "Náměstí",
   "ui.home.scene.estate": "Mezi paneláky",
   "ui.home.scene.stop": "Zastávka",
-  "ui.home.scene.works": "Průmyslová zóna"
+  "ui.home.scene.works": "Průmyslová zóna",
+  "ui.parcel.roadTiles": "{distance} dlaždice",
+  "ui.parcel.landValueTitle": "Z čeho je cena půdy",
+  "ui.parcel.servicesTitle": "Služby v okolí"
 }

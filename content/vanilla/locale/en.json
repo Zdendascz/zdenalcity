@@ -474,7 +474,6 @@
   "building.plaza.desc": "Paving and benches. The cheapest thing that lifts land value.",
   "building.city_park.name": "City park",
   "building.city_park.desc": "The largest park in town. Lifts land value over a wide area.",
-  "ui.info.spriteFile": "Sprite file (temporary)",
   "ui.tool.pan": "Hand",
   "ui.menu.pan": "Move",
   "ui.view.decor": "Hide trees and rocks",
@@ -505,5 +504,8 @@
   "ui.home.scene.square": "Town square",
   "ui.home.scene.estate": "Between the blocks",
   "ui.home.scene.stop": "Bus stop",
-  "ui.home.scene.works": "Industrial edge"
+  "ui.home.scene.works": "Industrial edge",
+  "ui.parcel.roadTiles": "{distance} tiles",
+  "ui.parcel.landValueTitle": "What makes the land value",
+  "ui.parcel.servicesTitle": "Services nearby"
 }

@@ -24,6 +24,46 @@ const TERRAIN_KEYS: Readonly<Record<number, string>> = {
   [TERRAIN.marsh]: 'marsh',
 };
 
+
+/**
+ * Hodnoty vrstev jsou bajty: 0 až 255. Platí pro cenu půdy, spokojenost
+ * i pokrytí službami, takže se všechny tři dají ukázat stejným pruhem.
+ */
+const BYTE_MAX = 255;
+
+/**
+ * Ukazatel „hodně nebo málo".
+ *
+ * Číslo samo o sobě hráči nic neřekne — je 182 hodně? Pruh to odpoví dřív,
+ * než stihne přečíst hodnotu, a barva k tomu přidá soud: červená pod třetinou,
+ * jantarová do dvou třetin, zelená nad nimi. Rozhodnutí autora: „děláme hru,
+ * ne informační systém města".
+ *
+ * Pruh se kreslí **jen tam, kde je známý strop**. U počtu obyvatel nebo u daní
+ * žádný není a vymyslet si ho by znamenalo lhát.
+ */
+function meter(label: string, value: string, share: number): HTMLElement {
+  const clamped = Math.max(0, Math.min(1, share));
+  const row = el('div', 'gauge');
+  row.appendChild(el('span', 'gauge__label', label));
+
+  const track = el('div', 'gauge__track');
+  const fill = el('div', `gauge__fill ${gradeOf(clamped)}`);
+  fill.style.width = `${Math.round(clamped * 100)}%`;
+  track.appendChild(fill);
+  row.appendChild(track);
+
+  row.appendChild(el('span', 'gauge__value', value));
+  return row;
+}
+
+/** Slabé, střední, nebo dobré? Jedna hranice pro všechny pruhy. */
+function gradeOf(share: number): string {
+  if (share < 1 / 3) return 'is-low';
+  if (share < 2 / 3) return 'is-mid';
+  return 'is-high';
+}
+
 /**
  * Stojí tu čerpací stanice, ke které voda nedoteče?
  *
@@ -94,11 +134,13 @@ export class BuildingInfo {
     /** Proč se na parcele nestaví — lokalizační klíč, nebo `null`. */
     blocker: string | null = null,
     /**
-     * Soubor obrázku, kterým se budova zrovna kreslí. **Dočasné** — autor si
-     * podle něj kontroluje vygenerované sprity ručně, protože se v terénu
-     * chovají různě a od pohledu nejde poznat, která varianta padla.
+     * Obrázek, kterým se budova na mapě zrovna kreslí.
+     *
+     * Ukazuje se **jako obrázek, ne jako cesta k souboru**. Cesta tu chvíli
+     * byla, aby si autor mohl ručně kontrolovat vygenerované varianty; svůj
+     * účel splnila a v panelu nemá co dělat.
      */
-    spriteFile: string | null = null,
+    spriteUrl: string | null = null,
   ): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
@@ -117,20 +159,47 @@ export class BuildingInfo {
     header.appendChild(close);
     this.root.append(header);
 
+    // **Dva sloupce, ne nudle se scrollbarem.** Monitory jsou širokoúhlé
+    // a panel byl svislý pruh, ve kterém se rolovalo i u malého domu.
+    // Vlevo budova, vpravo parcela. Bez budovy zbude jeden sloupec.
+    const columns = el('div', 'sheet__cols');
+    const left = el('div', 'sheet__col');
+    const right = el('div', 'sheet__col');
+    this.root.appendChild(columns);
+
     // Diagnostika parcely je pod každou budovou i pod prázdným polem — to je
     // ta část, ze které se hráč dozví, **proč** se tu nic neděje (§12).
     if (!building) {
-      this.appendParcel(parcel, blocker);
+      this.root.classList.add('sheet--single');
+      columns.appendChild(right);
+      this.appendParcel(right, parcel, blocker);
       return;
     }
+
+    this.root.classList.remove('sheet--single');
+    columns.append(left, right);
 
     if (!definition) {
       // Budova z chybějícího modu — save ji drží, ale nevíme o ní nic (§8).
-      this.root.appendChild(el('p', 'sheet__note', t('ui.info.unknownDefinition')));
+      left.appendChild(el('p', 'sheet__note', t('ui.info.unknownDefinition')));
+      this.appendParcel(right, parcel, blocker);
       return;
     }
 
-    this.root.appendChild(el('p', 'sheet__note', t(definition.description)));
+    // Obrázek budovy nahoře. Je to totéž, co hráč vidí na mapě, takže si
+    // kartičku spojí s domem, na který klikl.
+    if (spriteUrl !== null) {
+      const shot = el('div', 'sheet__portrait');
+      const image = el('img', 'sheet__portrait-image');
+      image.src = spriteUrl;
+      image.alt = '';
+      // Chybějící obrázek nesmí rozbít panel — kreslí se kvádr a je to (P5).
+      image.addEventListener('error', () => shot.remove());
+      shot.appendChild(image);
+      left.appendChild(shot);
+    }
+
+    left.appendChild(el('p', 'sheet__note', t(definition.description)));
 
     const rows: [string, string][] = [
       ['ui.info.position', `${building.x}, ${building.y}`],
@@ -139,8 +208,6 @@ export class BuildingInfo {
       ['ui.info.built', t('ui.hud.date', dateParts(building.builtAtTick))],
       ['ui.info.cost', formatNumber(definition.construction.cost)],
     ];
-
-    if (spriteFile !== null) rows.push(['ui.info.spriteFile', spriteFile]);
 
     if (building.population > 0) rows.push(['ui.hud.population', formatNumber(building.population)]);
     if (building.jobs > 0) rows.push(['ui.hud.jobs', formatNumber(building.jobs)]);
@@ -182,12 +249,12 @@ export class BuildingInfo {
       list.appendChild(el('dt', undefined, t(labelKey)));
       list.appendChild(el('dd', undefined, value));
     }
-    this.root.appendChild(list);
+    left.appendChild(list);
 
     if (building.abandoned) {
-      this.root.appendChild(el('p', 'sheet__warning', t('ui.info.abandonedWarning')));
+      left.appendChild(el('p', 'sheet__warning', t('ui.info.abandonedWarning')));
     } else if (!building.powered && consumption > 0) {
-      this.root.appendChild(el('p', 'sheet__warning', t('ui.info.noPowerWarning')));
+      left.appendChild(el('p', 'sheet__warning', t('ui.info.noPowerWarning')));
     }
 
     // Čerpací stanice je **relé, ne zdroj**: sama vodu nevyrábí, jen prodlužuje
@@ -195,10 +262,10 @@ export class BuildingInfo {
     // položená o jedinou dlaždici za hranicí dosahu nedělá vůbec nic a vypadá
     // úplně stejně jako fungující. Přesně na tom uvízlo město autora.
     if (isIdleRelay(world, definition, building)) {
-      this.root.appendChild(el('p', 'sheet__warning', t('ui.info.dryRelayWarning')));
+      left.appendChild(el('p', 'sheet__warning', t('ui.info.dryRelayWarning')));
     }
 
-    this.appendParcel(parcel, blocker);
+    this.appendParcel(right, parcel, blocker);
   }
 
   /**
@@ -210,7 +277,7 @@ export class BuildingInfo {
    *
    * Bez obrázku zůstane jméno. Chybějící obrázek nesmí hru zastavit (P5).
    */
-  private appendSurface(terrain: number): void {
+  private appendSurface(parent: HTMLElement, terrain: number): void {
     const key = TERRAIN_KEYS[terrain];
     if (key === undefined) return;
 
@@ -222,7 +289,7 @@ export class BuildingInfo {
       row.appendChild(tile);
     }
     row.appendChild(el('span', 'sheet__surface-name', this.i18n.t(`ui.terrain.${key}`)));
-    this.root.appendChild(row);
+    parent.appendChild(row);
   }
 
   /**
@@ -231,58 +298,82 @@ export class BuildingInfo {
    * Tohle je podle §12 jediná věc, která z fáze 2 dělá hru místo tabulky —
    * pět neviditelných veličin jinak hráč nemá jak přečíst.
    */
-  private appendParcel(parcel: ParcelExplanation, blocker: string | null): void {
+  private appendParcel(
+    parent: HTMLElement,
+    parcel: ParcelExplanation,
+    blocker: string | null,
+  ): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
 
-    this.root.appendChild(el('h3', 'sheet__subtitle', t('ui.parcel.title')));
-    this.appendSurface(parcel.terrain);
+    parent.appendChild(el('h3', 'sheet__subtitle', t('ui.parcel.title')));
+    this.appendSurface(parent, parcel.terrain);
 
     // Nejdřív odpověď na otázku, se kterou sem hráč přišel: proč se tu nestaví.
     // Teprve pod ní čísla, ze kterých se to dá odvodit.
     if (blocker !== null) {
-      this.root.appendChild(el('p', 'sheet__warning', t(blocker)));
+      parent.appendChild(el('p', 'sheet__warning', t(blocker)));
     }
 
-    const rows: [string, string][] = [
-      ['ui.info.position', `${parcel.x}, ${parcel.y}`],
-      ['ui.overlay.landValue', `${parcel.landValue.current}`],
-      ['ui.overlay.happiness', `${Math.round((parcel.happiness / 255) * 100)} %`],
-    ];
+    // **Co má strop, dostane pruh.** Cena půdy, spokojenost i dosah silnice
+    // mají známé maximum, takže se dá ukázat, jestli je číslo dobré. Poloha
+    // ani poptávka strop nemají a zůstávají textem.
+    parent.appendChild(
+      meter(
+        t('ui.overlay.landValue'),
+        String(parcel.landValue.current),
+        parcel.landValue.current / BYTE_MAX,
+      ),
+    );
+    parent.appendChild(
+      meter(
+        t('ui.overlay.happiness'),
+        `${Math.round((parcel.happiness / BYTE_MAX) * 100)} %`,
+        parcel.happiness / BYTE_MAX,
+      ),
+    );
 
-    // Voda: druhá podmínka, bez které se nestaví, a na rozdíl od silnice není
-    // na mapě vidět vůbec.
-    rows.push([
-      'ui.parcel.water',
-      t(parcel.water ? 'ui.parcel.waterYes' : 'ui.parcel.waterNo'),
-    ]);
+    // Dosah silnice — nejčastější důvod, proč zóna zůstane prázdná. Nula
+    // znamená „parcela z losu vypadne", a to je vidět na prázdném pruhu.
+    parent.appendChild(
+      meter(
+        t('ui.parcel.road'),
+        parcel.roadDistance === null
+          ? t('ui.parcel.roadTooFar')
+          : t('ui.parcel.roadTiles', { distance: parcel.roadDistance }),
+        parcel.roadDistance === null ? 0 : parcel.roadFactor,
+      ),
+    );
 
-    // Dosah silnice — nejčastější důvod, proč zóna zůstane prázdná.
-    rows.push([
-      'ui.parcel.road',
-      parcel.roadDistance === null
-        ? t('ui.parcel.roadTooFar')
-        : t('ui.parcel.roadDistance', {
-            distance: parcel.roadDistance,
-            factor: Math.round(parcel.roadFactor * 100),
-          }),
-    ]);
+    // Dostupnost práce: druhá brzda, kterou hráč nevidí nikde jinde.
+    parent.appendChild(
+      meter(
+        t('ui.parcel.jobAccess'),
+        `${Math.round(parcel.jobAccessFactor * 100)} %`,
+        parcel.jobAccessFactor,
+      ),
+    );
 
-    // Dostupnost práce: druhý nejčastější důvod, proč se čtvrť zadrhne. Čísla
-    // ukazujeme vždycky, i když jsou to jedničky — jinak by hráč nevěděl, že
-    // tahle brzda vůbec existuje.
-    rows.push([
-      'ui.parcel.jobAccess',
-      t('ui.parcel.jobAccessFactors', {
-        cell: Math.round(parcel.jobAccessFactor * 100),
-        city: Math.round(parcel.cityJobAccessFactor * 100),
-      }),
-    ]);
+    // Voda je **ano/ne**, ne stupnice. Pruh na dvě polohy by lhal o tom, že
+    // existuje „skoro voda".
+    const water = el('div', 'gauge gauge--flag');
+    water.appendChild(el('span', 'gauge__label', t('ui.parcel.water')));
+    water.appendChild(
+      el(
+        'span',
+        `gauge__flag ${parcel.water ? 'is-high' : 'is-low'}`,
+        t(parcel.water ? 'ui.parcel.waterYes' : 'ui.parcel.waterNo'),
+      ),
+    );
+    parent.appendChild(water);
 
+    const rows: [string, string][] = [['ui.info.position', `${parcel.x}, ${parcel.y}`]];
     if (parcel.demand !== null) rows.push(['ui.hud.demand', formatNumber(parcel.demand)]);
     if (parcel.levels.nextThreshold !== null) {
       rows.push([
         'ui.parcel.nextLevel',
-        formatNumber(Math.round(Math.max(0, parcel.levels.nextThreshold - parcel.levels.demandRelief))),
+        formatNumber(
+          Math.round(Math.max(0, parcel.levels.nextThreshold - parcel.levels.demandRelief)),
+        ),
       ]);
     }
 
@@ -291,7 +382,11 @@ export class BuildingInfo {
       list.appendChild(el('dt', undefined, t(labelKey)));
       list.appendChild(el('dd', undefined, value));
     }
-    this.root.appendChild(list);
+    parent.appendChild(list);
+
+    this.appendServices(parent, parcel);
+
+    parent.appendChild(el('h3', 'sheet__subtitle', t('ui.parcel.landValueTitle')));
 
     // Rozpis ceny půdy: z čeho se to číslo skládá.
     const breakdown = el('dl', 'sheet__list sheet__list--breakdown');
@@ -312,6 +407,47 @@ export class BuildingInfo {
     }
     breakdown.appendChild(el('dt', 'sheet__total', t('ui.parcel.target')));
     breakdown.appendChild(el('dd', 'sheet__total', formatNumber(Math.round(parcel.landValue.raw))));
-    this.root.appendChild(breakdown);
+    parent.appendChild(breakdown);
+  }
+
+  /**
+   * Pokrytí službami: **ikona a pruh**, ne řádek tabulky.
+   *
+   * Hráč se ptá „mám tu dost škol?", ne „kolik je 137". Ikona je tatáž, jakou
+   * má tlačítko v paletě a vrstva dosahu, takže se to spojí samo. Rozhodnutí
+   * autora — „děláme hru, ne informační systém města".
+   *
+   * Třídy bez jediné budovy se **vynechávají**: nula u služby, kterou město
+   * zatím nemá, není informace, jen šum.
+   */
+  private appendServices(parent: HTMLElement, parcel: ParcelExplanation): void {
+    const present = parcel.coverage.filter((entry) => entry.value > 0);
+    if (present.length === 0) return;
+
+    parent.appendChild(
+      el('h3', 'sheet__subtitle', this.i18n.t('ui.parcel.servicesTitle')),
+    );
+
+    const list = el('div', 'services');
+    for (const entry of [...present].sort((a, b) => b.value - a.value)) {
+      const row = el('div', 'services__row');
+      const icon = iconSvg(`coverage-${entry.serviceClass}`);
+      icon.classList.add('services__icon');
+      row.appendChild(icon);
+
+      const label = this.i18n.t(`ui.service.${entry.serviceClass}`);
+      row.appendChild(el('span', 'services__label', label));
+
+      const share = entry.value / BYTE_MAX;
+      const track = el('div', 'gauge__track');
+      const fill = el('div', `gauge__fill ${gradeOf(share)}`);
+      fill.style.width = `${Math.round(share * 100)}%`;
+      track.appendChild(fill);
+      row.appendChild(track);
+
+      row.appendChild(el('span', 'gauge__value', `${Math.round(share * 100)} %`));
+      list.appendChild(row);
+    }
+    parent.appendChild(list);
   }
 }

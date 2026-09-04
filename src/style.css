@@ -1164,3 +1164,146 @@ body {
 .home__mail {
   color: #f0a020;
 }
+
+/* --- kartička budovy a parcely -------------------------------------------- */
+
+/* Širokoúhlá kartička: vlevo budova, vpravo parcela. Svislá nudle se
+   scrollbarem byla na širokém monitoru zbytečná. */
+.sheet--info {
+  width: min(880px, 94vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+/* Bez budovy zbude jen rozbor parcely a dva sloupce nemá co plnit. */
+.sheet--info.sheet--single {
+  width: min(400px, 94vw);
+}
+
+.sheet__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.sheet--single .sheet__cols {
+  grid-template-columns: 1fr;
+}
+
+/* Pod tuhle šířku se sloupce srovnají pod sebe — na úzkém okně je vedle sebe
+   nemá kam dát. */
+@media (width <= 720px) {
+  .sheet__cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sheet__col {
+  min-width: 0;
+}
+
+/* Obrázek budovy. Sprity jsou různě vysoké, tak se drží dolní hrany —
+   dům pak stojí na zemi místo aby plaval uprostřed. */
+.sheet__portrait {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 132px;
+  margin-bottom: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.sheet__portrait-image {
+  max-width: 100%;
+  max-height: 128px;
+  object-fit: contain;
+}
+
+/* --- ukazatele ----------------------------------------------------------- */
+
+.gauge {
+  display: grid;
+  grid-template-columns: 1fr 84px auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gauge--flag {
+  grid-template-columns: 1fr auto;
+}
+
+.gauge__label {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gauge__track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 10%);
+}
+
+.gauge__fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+
+/* Tři stupně, jedna hranice pro celou hru: pod třetinou zle, do dvou třetin
+   ujde, nad nimi dobré. */
+.gauge__fill.is-low,
+.gauge__flag.is-low {
+  background: #e2674f;
+}
+
+.gauge__fill.is-mid {
+  background: #e0a53c;
+}
+
+.gauge__fill.is-high,
+.gauge__flag.is-high {
+  background: #5cbf7a;
+}
+
+.gauge__value {
+  min-width: 44px;
+  text-align: right;
+  font-size: 12px;
+}
+
+.gauge__flag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: #0e2028;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* --- služby v okolí ------------------------------------------------------- */
+
+.services__row {
+  display: grid;
+  grid-template-columns: 20px 1fr 84px auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.services__icon {
+  width: 18px;
+  height: 18px;
+}
+
+.services__label {
+  overflow: hidden;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
