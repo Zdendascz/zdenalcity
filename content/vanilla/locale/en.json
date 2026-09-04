@@ -545,5 +545,6 @@
   "ui.alert.story.landslide": "A landslide. The slope tore away and lay down across the road, together with the trees and a piece of the garden above it. Nothing gets through.\n\nHills look nice on the map. Cut into them and they occasionally answer back.",
   "ui.road.street": "Street",
   "ui.road.avenue": "Avenue",
-  "ui.road.highway": "Highway"
+  "ui.road.highway": "Highway",
+  "ui.parcel.term.rubble": "Rubble"
 }

@@ -545,5 +545,6 @@
   "ui.alert.story.landslide": "Sesuv půdy. Svah se utrhl a lehl si přes silnici, spolu se stromy a kusem zahrady nad ním. Cesta tudy nevede.\n\nKopce vypadají na mapě hezky. Když se do nich zařízne stavba, občas se ozvou.",
   "ui.road.street": "Ulice",
   "ui.road.avenue": "Třída",
-  "ui.road.highway": "Dálnice"
+  "ui.road.highway": "Dálnice",
+  "ui.parcel.term.rubble": "Trosky"
 }

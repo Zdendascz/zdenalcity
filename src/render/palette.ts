@@ -193,8 +193,16 @@ export const FLOOD_FULL_DEPTH = 3;
  * Trosky. Šedivá suť, která musí být poznat od prázdné dlaždice — je to
  * překážka, ne kosmetika, a hráč na ni musí poslat buldozer.
  */
-export const RUBBLE_COLOR = 0x6b6560;
-export const RUBBLE_ALPHA = 0.85;
+/**
+ * Trosky po katastrofě.
+ *
+ * **Hnědá, ne šedá.** Šedý závoj přes dlaždici vypadal skoro stejně jako
+ * asfalt: autor se ptal, kam se poděly silnice, a přitom koukal na sutinu
+ * z tornáda. Rozvalený dům má být poznat od vozovky na první pohled, takže
+ * je teď rezavě hnědý a méně krycí — pod ním prosvítá terén.
+ */
+export const RUBBLE_COLOR = 0x8a6a4a;
+export const RUBBLE_ALPHA = 0.72;
 
 /**
  * Značka na troskách po budově: symbol toho, co tu stálo, v barvě poplachu.
