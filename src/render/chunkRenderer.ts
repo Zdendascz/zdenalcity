@@ -598,9 +598,14 @@ export class ChunkRenderer {
     if (zone !== 0 && zoneColor !== undefined) {
       // Pod zemí zůstává zóna vidět jen jako náznak: je to hlavní důvod, proč
       // se tam potrubí vede, takže úplně zmizet nesmí.
-      graphics
-        .poly(points)
-        .fill({ color: zoneColor, alpha: underground ? UNDERGROUND_ZONE_ALPHA : ZONE_OVERLAY_ALPHA });
+      //
+      // Na povrchu je to naopak plná barva a podklad zmizí. Sklon se do ní
+      // promítne pořád: kdyby ne, kopec pod zónou by vypadal jako rovina
+      // a hráč by při stavbě neviděl, kam staví.
+      graphics.poly(points).fill({
+        color: underground ? zoneColor : shade(zoneColor, slopeLight(corners)),
+        alpha: underground ? UNDERGROUND_ZONE_ALPHA : ZONE_OVERLAY_ALPHA,
+      });
     }
 
     if (underground) {

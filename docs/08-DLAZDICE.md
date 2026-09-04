@@ -165,9 +165,20 @@ Trávník jako v parku pod stromem, odkud je vzor. Žádná cesta, žádná ple�
 
 | | prompt |
 |---|---|
-| **a** | Mown lawn seen from far above: one even green surface, the same everywhere, fine short texture and no patches. |
-| **b** | Mown lawn seen from far above in a deeper green: one even surface, the same everywhere, fine short texture and no patches. |
-| **c** | Mown lawn seen from far above in a lighter green: one even surface, the same everywhere, fine short texture and no patches. |
+| **a** | Mown lawn seen from far above: one even green surface, the same everywhere, fine short texture and no patches. The light is perfectly flat and even across the whole image: NO shadow, NO vignette, NO darker corner, NO darker band, NO patch of a different green, NO mowing stripes. Every part of the image is exactly as bright as every other part. |
+| **b** | Mown lawn seen from far above in a deeper green: one even surface, the same everywhere, fine short texture and no patches. The light is perfectly flat and even across the whole image: NO shadow, NO vignette, NO darker corner, NO darker band, NO patch of a different green, NO mowing stripes. Every part of the image is exactly as bright as every other part. |
+| **c** | Mown lawn seen from far above in a lighter green: one even surface, the same everywhere, fine short texture and no patches. The light is perfectly flat and even across the whole image: NO shadow, NO vignette, NO darker corner, NO darker band, NO patch of a different green, NO mowing stripes. Every part of the image is exactly as bright as every other part. |
+
+**„No patches" nestačilo.** První sada to v promptu měla a stejně přišel tmavší
+pruh přes třetinu dlaždice — autor to nahlásil slovy „nebýt toho tmavšího fleku
+přes třetinu trávy, tak i tráva by byla boží". Generátor totiž nekreslí flek,
+ale **světlo**: stín, vinětu, přechod. Zakázat se proto musí ta světelná
+proměnlivost jmenovitě, ne jen „skvrny". Stejné poučení jako u `asphalt_avenue`
+— vyjmenovat, co tam nesmí být.
+
+Písek a mokrou zem to **netrápí**, i když mají naměřený přechod taky vysoký:
+autor je označil za dobré („písek je boží, hlína taky"), takže se nesahá.
+Měřítko rozhoduje oko, ne číslo.
 
 ### `forest`
 

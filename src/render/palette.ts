@@ -45,7 +45,15 @@ export const ZONE_COLOR_BY_VALUE = [
   ZONE_COLORS.industrial,
 ] as const;
 
-export const ZONE_OVERLAY_ALPHA = 0.4;
+/**
+ * Zóna na povrchu je **plná barva**, ne závoj přes terén.
+ *
+ * Bývalo 0,4 a pod zónou prosvítala tráva. Rozhodnutí autora: „pod zónou není
+ * potřeba ukazovat podklad". Zóna je plán, ne kus krajiny — a poloprůhledná
+ * barva navíc mění odstín podle toho, co je pod ní, takže se stejná zóna na
+ * trávě a na písku nečetla stejně.
+ */
+export const ZONE_OVERLAY_ALPHA = 1;
 
 /**
  * Overlay znečištění. Jedna barva, sílu nese průhlednost — ramp přes několik
