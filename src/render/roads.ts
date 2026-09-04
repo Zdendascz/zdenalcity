@@ -13,22 +13,12 @@ export { ROAD_N, ROAD_E, ROAD_S, ROAD_W, roadMask } from '@/sim/roads';
 export type { IsRoad } from '@/sim/roads';
 
 /**
- * Jak velká část dlaždice připadá na středový kus vozovky.
+ * Jak velká část dlaždice připadá na vozovku napříč směrem jízdy.
  *
- * Zároveň je to **šířka vozovky**: širší jádro dá širší silnici, takže se tím
+ * Zároveň je to **šířka vozovky**: širší pruh dá širší silnici, takže se tím
  * odlišují typy z §4 fáze 3, aniž by k tomu byla potřeba druhá geometrie.
  */
 const CORE_SCALE = 0.5;
-
-function towardCenter(
-  px: number,
-  py: number,
-  cx: number,
-  cy: number,
-  scale: number,
-): [number, number] {
-  return [cx + (px - cx) * scale, cy + (py - cy) * scale];
-}
 
 /**
  * Diamant dlaždice jako čtyři vrcholy v pořadí sever, východ, jih, západ —
@@ -37,42 +27,108 @@ function towardCenter(
 export type TileQuad = readonly number[];
 
 /**
+ * Bod uvnitř dlaždice v jejích vlastních souřadnicích.
+ *
+ * `u` běží po mřížce od rohu `(x, y)` k `(x+1, y)`, `v` od `(x, y)` k `(x, y+1)`.
+ * Počítá se bilineárně ze čtyř rohů, takže vozovka jde **po ploše dlaždice**:
+ * na svahu se zvedne s ní a od terénu se neodlepí.
+ */
+function inside(quad: TileQuad, u: number, v: number): [number, number] {
+  const nw: [number, number] = [quad[0] ?? 0, quad[1] ?? 0];
+  const ne: [number, number] = [quad[2] ?? 0, quad[3] ?? 0];
+  const se: [number, number] = [quad[4] ?? 0, quad[5] ?? 0];
+  const sw: [number, number] = [quad[6] ?? 0, quad[7] ?? 0];
+
+  const top = (1 - u) * nw[0] + u * ne[0];
+  const bottom = (1 - u) * sw[0] + u * se[0];
+  const topY = (1 - u) * nw[1] + u * ne[1];
+  const bottomY = (1 - u) * sw[1] + u * se[1];
+  return [(1 - v) * top + v * bottom, (1 - v) * topY + v * bottomY];
+}
+
+/**
  * Vozovka jedné dlaždice jako seznam polygonů: středový kus plus jedno rameno
  * na každou stranu, kam silnice pokračuje. Tím vznikne všech 16 variant
  * (slepý konec, rovinka, zatáčka, T, křižovatka) bez jediné hardcoded tabulky.
  *
+ * **Rameno je pruh šířky vozovky, ne celá hrana.** Tohle tu bylo dlouho
+ * špatně: rameno se kreslilo jako čtyřúhelník mezi zmenšeným jádrem a **plnou
+ * hranou diamantu**, takže silnice zabírala celou dlaždici až na čtyři rohové
+ * trojúhelníky a `width` řídil jen délku ramen. Na mapě z toho byly široké
+ * šedé plochy, obrubník se schoval pod vozovku a autor se ptal, kam se
+ * silnice poděly. Sousedé přitom navazují dál: pruh končí přesně na hraně
+ * a soused začíná svým pruhem téže šířky ve stejném místě.
+ *
  * Bere **skutečné vrcholy dlaždice**, ne počátek pravidelného diamantu. Na
  * svahu se totiž každý roh zvedne jinak a silnice počítaná z pravidelného tvaru
- * by se od terénu odlepila (§7 fáze 3). Střed se bere jako průměr rohů, takže
- * geometrie sedí i na zkroucené dlaždici.
+ * by se od terénu odlepila (§7 fáze 3).
  */
 export function roadPolygons(
   quad: TileQuad,
   mask: number,
   width: number = CORE_SCALE,
 ): number[][] {
-  const top: [number, number] = [quad[0] ?? 0, quad[1] ?? 0];
-  const right: [number, number] = [quad[2] ?? 0, quad[3] ?? 0];
-  const bottom: [number, number] = [quad[4] ?? 0, quad[5] ?? 0];
-  const left: [number, number] = [quad[6] ?? 0, quad[7] ?? 0];
-  const cx = (top[0] + right[0] + bottom[0] + left[0]) / 4;
-  const cy = (top[1] + right[1] + bottom[1] + left[1]) / 4;
+  const half = Math.max(0.02, Math.min(0.98, width)) / 2;
+  const lo = 0.5 - half;
+  const hi = 0.5 + half;
 
-  const topCore = towardCenter(top[0], top[1], cx, cy, width);
-  const rightCore = towardCenter(right[0], right[1], cx, cy, width);
-  const bottomCore = towardCenter(bottom[0], bottom[1], cx, cy, width);
-  const leftCore = towardCenter(left[0], left[1], cx, cy, width);
+  const at = (u: number, v: number): [number, number] => inside(quad, u, v);
+  const polygon = (
+    corners: readonly (readonly [number, number])[],
+  ): number[] => corners.flatMap(([u, v]) => at(u, v));
 
   const polygons: number[][] = [
-    [...topCore, ...rightCore, ...bottomCore, ...leftCore],
+    // Střed: čtverec šířky vozovky kolem středu dlaždice.
+    polygon([
+      [lo, lo],
+      [hi, lo],
+      [hi, hi],
+      [lo, hi],
+    ]),
   ];
 
-  // Rameno leží mezi zmenšenou a plnou hranou diamantu, takže na sebe
-  // sousední dlaždice navazují bez mezery.
-  if (mask & ROAD_N) polygons.push([...topCore, ...rightCore, ...right, ...top]);
-  if (mask & ROAD_E) polygons.push([...rightCore, ...bottomCore, ...bottom, ...right]);
-  if (mask & ROAD_S) polygons.push([...bottomCore, ...leftCore, ...left, ...bottom]);
-  if (mask & ROAD_W) polygons.push([...leftCore, ...topCore, ...top, ...left]);
+  // Rameno vede od středového čtverce na hranu, kterou se jde k sousedovi.
+  // Sever je `y - 1`, tedy `v = 0`; východ `x + 1`, tedy `u = 1`.
+  if (mask & ROAD_N) {
+    polygons.push(
+      polygon([
+        [lo, 0],
+        [hi, 0],
+        [hi, lo],
+        [lo, lo],
+      ]),
+    );
+  }
+  if (mask & ROAD_E) {
+    polygons.push(
+      polygon([
+        [hi, lo],
+        [1, lo],
+        [1, hi],
+        [hi, hi],
+      ]),
+    );
+  }
+  if (mask & ROAD_S) {
+    polygons.push(
+      polygon([
+        [lo, hi],
+        [hi, hi],
+        [hi, 1],
+        [lo, 1],
+      ]),
+    );
+  }
+  if (mask & ROAD_W) {
+    polygons.push(
+      polygon([
+        [0, lo],
+        [lo, lo],
+        [lo, hi],
+        [0, hi],
+      ]),
+    );
+  }
 
   return polygons;
 }

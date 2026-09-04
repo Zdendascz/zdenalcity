@@ -146,3 +146,52 @@ kreslí renderer. Generátor to nikdy netrefí a přerušená čára je vidět v
 | `highway__nesw` | A very wide fresh dark asphalt highway crossroads: carriageways leave through the middle of all four edges and meet in a large open junction in the centre. Grass in the four pointed corners only. |
 | `highway__w` | A very wide fresh dark asphalt highway entering at the middle of the upper-left edge and ending in the middle of the tile in a blunt closed end with a concrete barrier across it. Grass fills the rest. |
 | `highway__0` | A square of fresh dark asphalt in the middle of the tile with a concrete barrier all the way round, not touching any edge. Grass fills the rest. |
+
+## T88: rameno je pruh, ne celá hrana
+
+Po přechodu na počítaný tvar zůstala v `roadPolygons` chyba, kvůli které vypadaly
+silnice pořád stejně špatně — a nebylo to obrázky.
+
+Rameno se skládalo jako čtyřúhelník mezi zmenšeným středovým kusem a **plnou
+hranou diamantu**. Parametr `width` tím pádem neřídil šířku vozovky, ale jen to,
+jak daleko od středu rameno začíná, tedy jeho **délku**. Důsledky:
+
+- silnice zabírala celou dlaždici až na čtyři rohové trojúhelníky, takže mezi
+  domy nezbyl kousek trávy a nešlo poznat, kde vozovka končí;
+- obrubník se kreslí jako **širší** kopie tvaru pod vozovkou — jenže „širší“
+  znamenalo „s kratšími rameny“, takže ho vozovka celý zakryla a nebyl vidět
+  nikdy;
+- ulice, třída a dálnice vypadaly stejně, protože všechny tři sahaly na hranu.
+
+Nová verze počítá v souřadnicích dlaždice `(u, v) ∈ [0,1]²` a promítá je
+bilineárně přes čtyři rohy `tileQuad`. Při šířce `w` a `h = w/2`:
+
+| kus | rozsah |
+|---|---|
+| střed | `[0,5−h, 0,5+h] × [0,5−h, 0,5+h]` |
+| rameno N | `[0,5−h, 0,5+h] × [0, 0,5]` |
+| rameno E | `[0,5, 1] × [0,5−h, 0,5+h]` |
+| rameno S | `[0,5−h, 0,5+h] × [0,5, 1]` |
+| rameno W | `[0, 0,5] × [0,5−h, 0,5+h]` |
+
+Spoj drží dál: obě sousední dlaždice počítají z týchž sdílených rohů, takže pruh
+jedné končí přesně tam, kde druhé začíná — hlídá to test „sousedé navazují bez
+mezery“. A protože každá dlaždice kreslí **svou** šířku, přechod ulice → třída →
+dálnice se stane přesně na hranici mezi nimi, bez jediné přechodové dlaždice.
+
+Šířky se tím pádem musely přeškálovat, protože do té doby znamenaly něco jiného:
+
+| typ | dřív (délka ramen) | teď (šířka vozovky) |
+|---|---|---|
+| ulice | 0,50 | 0,38 |
+| třída | 0,68 | 0,55 |
+| dálnice | 0,86 | 0,75 |
+
+K šířce se ještě přičte `KERB = 0,08` na obrubník, takže i dálnice nechá kus
+dlaždice volný.
+
+**Poznámka ke schodišťovým trasám.** Když dvě rovnoběžné silnice vedou vedle
+sebe schodovitě (drag přes dvě osy), zůstanou mezi nimi kosočtverce trávy
+uzavřené asfaltem kolem dokola. Není to chyba geometrie — je to poctivý výsledek
+dvou lomených tras vedle sebe. Kdyby to mělo vadit, řeší se to zaoblením zatáček,
+ne šířkou.

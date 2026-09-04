@@ -281,9 +281,35 @@ describe('auto-tiling silnic', () => {
     expect(roadPolygons(FLAT_TILE, 0)[0]).toEqual([0, 8, 16, 16, 0, 24, -16, 16]);
   });
 
-  it('rameno sahá až na hranu diamantu, aby sousedé navazovali bez mezery', () => {
-    // Severní hrana dlaždice vede z horního vrcholu (0,0) do pravého (32,16).
-    expect(roadPolygons(FLAT_TILE, ROAD_N)[1]).toEqual([0, 8, 16, 16, 32, 16, 0, 0]);
+  it('rameno je pruh šířky vozovky, ne celá hrana dlaždice', () => {
+    // Tohle bylo dlouho špatně: rameno se kreslilo mezi zmenšeným jádrem a
+    // **plnou hranou diamantu**, takže silnice zabírala celou dlaždici až na
+    // rohové trojúhelníky a `width` řídil jen délku ramen. Obrubník se pod
+    // vozovku schoval a autor se ptal, kam se silnice poděly.
+    //
+    // Severní hrana vede z horního vrcholu (0,0) do pravého (32,16); rameno
+    // z ní bere jen prostředních 50 %, tedy úsek (8,4)–(24,12).
+    expect(roadPolygons(FLAT_TILE, ROAD_N)[1]).toEqual([8, 4, 24, 12, 16, 16, 0, 8]);
+  });
+
+  it('sousedé navazují bez mezery: pruh končí přesně na hraně', () => {
+    // Dlaždice (0,0) má rameno na jih, dlaždice (0,1) na sever. Jejich hrany
+    // se musí krýt bod na bod, jinak by mezi nimi zůstal proužek trávy.
+    const upper = roadPolygons(tileQuad(0, 0, [0, 0, 0, 0]), ROAD_S)[1] ?? [];
+    const lower = roadPolygons(tileQuad(0, 1, [0, 0, 0, 0]), ROAD_N)[1] ?? [];
+    // Jižní hrana horní dlaždice jsou body 3 a 4 ramene, severní hrana dolní
+    // body 1 a 2 — obcházejí polygon opačným směrem, takže se porovnají
+    // překříženě.
+    expect(upper.slice(4, 8)).toEqual([lower[2], lower[3], lower[0], lower[1]]);
+  });
+
+  it('širší typ dá širší pruh', () => {
+    const width = (value: number): number => {
+      const arm = roadPolygons(FLAT_TILE, ROAD_N, value)[1] ?? [];
+      return Math.hypot((arm[0] ?? 0) - (arm[2] ?? 0), (arm[1] ?? 0) - (arm[3] ?? 0));
+    };
+    expect(width(0.75)).toBeGreaterThan(width(0.55));
+    expect(width(0.55)).toBeGreaterThan(width(0.38));
   });
 
   it('respektuje posun počátku dlaždice', () => {

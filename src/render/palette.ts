@@ -124,8 +124,19 @@ export const WALL_RIGHT_SHADE = 0.5;
 /** Vozovka. */
 export const ROAD_COLORS = [0x000000, 0x44454d, 0x53555f, 0x646773] as const;
 
-/** Šířka vozovky podle typu; podíl dlaždice, index = hodnota vrstvy `road`. */
-export const ROAD_WIDTHS = [0, 0.5, 0.68, 0.86] as const;
+/**
+ * Šířka vozovky podle typu; podíl dlaždice, index = hodnota vrstvy `road`.
+ *
+ * Doopravdy šířka, ne délka ramen. Do T88 tahle čísla řídila jen to, jak moc
+ * se zmenší středový kus, kdežto rameno leželo přes celou hranu dlaždice —
+ * silnice pak byla široká jako dlaždice bez ohledu na typ a obrubník se pod ni
+ * schoval. Po opravě `roadPolygons` je to pruh té šířky a zbytek dlaždice
+ * zůstane travnatý, takže je poznat, kde silnice končí a kde začíná parcela.
+ *
+ * Zbývá místo na obrubník: k šířce se ještě přičte `KERB`, takže i dálnice
+ * s 0,75 nechá kus dlaždice volný.
+ */
+export const ROAD_WIDTHS = [0, 0.38, 0.55, 0.75] as const;
 
 /**
  * Obruba kolem vozovky. Světlejší než asfalt, ale ne bílá — je to beton.
