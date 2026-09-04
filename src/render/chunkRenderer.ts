@@ -121,6 +121,14 @@ function roadTurn(x: number, y: number): number {
  * a kterými dvěma vedou osy, to o čtvrtinu otočí celou kresbu zadarmo. Rohy
  * chodí po směru hodin, takže `turn` je počet čtvrtin.
  *
+ * Platí to **jen s `textureSpace: 'global'`**, a to je celá historie téhle
+ * funkce. Ve výchozím `'local'` Pixi matici ještě znormalizuje podle obálky
+ * tvaru, tedy podle obdélníku 64 × 32 kolem dlaždice — obrázek se tím zmenší
+ * čtyřikrát na šířku a osmkrát na výšku a `generateTextureMatrix` ho navíc
+ * nechá opakovat, protože si `clamp-to-edge` přepíše na `repeat`. Na mapě z
+ * toho byla mřížka a vypadala jako zrnitost. Autor to popsal přesně: „vypadá
+ * to, jak by na jedné dlaždici bylo 6x6 textur".
+ *
  * Používá ji terén i vozovka. U vozovky je to podstatné: polygon vozovky je
  * jen **výřez dlaždice**, takže když se obrázek mapuje na celou dlaždici,
  * asfalt v rameni navazuje na asfalt v jádru sám od sebe.
@@ -574,7 +582,9 @@ export class ChunkRenderer {
     const surface = this.surfaceFor(terrain, x, y);
     if (surface !== undefined) {
       const matrix = tileMatrix(x, y, corners, surface.turn, surface.texture.width || 1);
-      graphics.poly(points).fill({ texture: surface.texture, matrix, color: light });
+      graphics
+        .poly(points)
+        .fill({ texture: surface.texture, matrix, color: light, textureSpace: 'global' });
     } else {
       // Obrys jen u barevné dlaždice. Na obrázku by z něj byla světlá mřížka
       // přes celou mapu — tvar terénu tam čte samo světlo a kresba povrchu.
@@ -623,7 +633,9 @@ export class ChunkRenderer {
           .poly(polygon)
           .fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[roadType] ?? ROAD_COLOR) });
         if (asphalt !== undefined && matrix !== undefined) {
-          graphics.poly(polygon).fill({ texture: asphalt, matrix, color: light });
+          graphics
+            .poly(polygon)
+            .fill({ texture: asphalt, matrix, color: light, textureSpace: 'global' });
         }
       }
     }

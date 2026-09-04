@@ -394,3 +394,28 @@ kresby, než kolik je jí vidět.
 
 Zapíná se to v `src/render/textures.ts` a platí pro povrchy, materiály vozovky,
 terénní objekty i budovy — jiskřilo to všude stejně.
+
+## Proč byla na dlaždici mřížka
+
+Autor to popsal slovy „vypadá to, jak by na jedné dlaždici bylo 6x6 textur“
+— a bylo to přesně tak. Nešlo o zrnitost obrázků ani o mipmapy.
+
+Pixi má u výplně texturou volbu `textureSpace` a její **výchozí hodnota je
+`'local'`**. V tom režimu si `generateTextureMatrix` naši matici ještě
+znormalizuje podle **obálky tvaru**, tedy podle obdélníku 64 × 32 kolem
+dlaždice. Obrázek se tím zmenšil čtyřikrát na šířku a osmkrát na výšku
+a Pixi ho nechalo opakovat, protože si u výplní `clamp-to-edge` přepíše
+na `repeat`.
+
+Matice byla přitom celou dobu správně — je psaná pro globální prostor a Pixi
+si ji sama obrací (`copyFrom(style.matrix).invert()`). Chybělo jediné slovo:
+`textureSpace: 'global'`.
+
+Ověřeno tak, že se na trávu dočasně dal sprite parku: místo jednoho parku na
+dlaždici jich tam bylo několik vedle sebe. Bez toho pokusu to nešlo poznat,
+protože opakovaná tráva pořád vypadá jako tráva — a právě proto to tak dlouho
+vydrželo. Stejná past jako u obrácené matice o dva týdny dřív.
+
+**Důsledek pro dřívější měření.** Zrnitost, kterou jsem měřil a „opravil“
+mipmapami, byla z velké části tohle. Mipmapy dávají smysl a zůstávají, ale
+zásluhu za lepší vzhled má tenhle řádek, ne ony.
