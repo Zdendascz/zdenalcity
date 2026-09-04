@@ -127,6 +127,14 @@ export const ROAD_COLORS = [0x000000, 0x44454d, 0x53555f, 0x646773] as const;
 /** Šířka vozovky podle typu; podíl dlaždice, index = hodnota vrstvy `road`. */
 export const ROAD_WIDTHS = [0, 0.5, 0.68, 0.86] as const;
 
+/**
+ * Obruba kolem vozovky. Světlejší než asfalt, ale ne bílá — je to beton.
+ *
+ * Kreslí ji renderer jako širší kopii tvaru pod vozovkou, ne obrázek: obrubník
+ * musí navazovat přes hranici dlaždice a to generátor netrefí.
+ */
+export const KERB_COLOR = 0xa8a89e;
+
 /** Barva ulice. Starší kód a testy se odkazují na ni. */
 export const ROAD_COLOR = ROAD_COLORS[1];
 

@@ -6,7 +6,7 @@ import {
   planCornerHeight,
   tileBaseHeight,
 } from '../heights';
-import { inBounds, index, TERRAIN } from '../layers';
+import { inBounds, index, ROAD, TERRAIN } from '../layers';
 import { applyHeightChanges } from '../world';
 import type { WorldState } from '../world';
 import { destroyTile, noLosses, reportLosses } from './damage';
@@ -326,7 +326,14 @@ function collapseAroundChanges(
       if (!inBounds(x, y, world.size)) continue;
       const tile = index(x, y, world.size);
       if (inPath.has(tile)) continue;
-      if ((world.layers.buildingId[tile] ?? 0) === 0) continue;
+      // **Silnice padá stejně jako budova.** Sesuv hne rohy i mimo dráhu
+      // a dlaždice pod vozovkou přestane být rovnoběžník: vozovka na ní pak
+      // visí našikmo přes zlom. Autor to nahlásil obrázkem a má pravdu —
+      // taková silnice se nemá kreslit křivě, má být rozbitá a nepoužitelná.
+      const built =
+        (world.layers.buildingId[tile] ?? 0) !== 0 ||
+        (world.layers.road[tile] ?? ROAD.none) !== ROAD.none;
+      if (!built) continue;
       doomed.add(tile);
     }
   }

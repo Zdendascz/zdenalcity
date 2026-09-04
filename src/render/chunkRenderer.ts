@@ -5,7 +5,6 @@ import { index, ROAD, TERRAIN } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import {
-  BRIDGE_COLOR,
   BRIDGE_RAIL_COLOR,
   FIRE_COLORS,
   FIRE_MAX_ALPHA,
@@ -20,8 +19,6 @@ import {
   POWER_OFF_COLOR,
   POWER_ON_COLOR,
   POWER_OVERLAY_ALPHA,
-  ROAD_COLOR,
-  ROAD_COLORS,
   RUBBLE_ALPHA,
   RUBBLE_COLOR,
   RUBBLE_MARK_ALPHA,
@@ -279,14 +276,6 @@ export class ChunkRenderer {
    * ve vodě, se šesti zmizely. Atlas ten strop obchází.
    */
   private surfacesByTerrain = new Map<number, Texture[]>();
-  /**
-   * Kreslí vozovku někdo jiný?
-   *
-   * Sprity zapne `RoadRenderer`, jakmile má obrázky. Do té doby kreslí
-   * polygony chunk, aby síť nechyběla; potom se vypnou, ať se nekreslí
-   * dvakrát a nesvítí barva zpod obrázku.
-   */
-  private roadSprites = false;
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
@@ -469,13 +458,6 @@ export class ChunkRenderer {
     this.invalidateAll();
   }
 
-  /** Přepne kreslení vozovky na sprity, nebo zpátky na polygony. */
-  setRoadSprites(enabled: boolean): void {
-    if (this.roadSprites === enabled) return;
-    this.roadSprites = enabled;
-    this.invalidateAll();
-  }
-
   /**
    * Který obrázek padne na tuhle dlaždici.
    *
@@ -587,19 +569,6 @@ export class ChunkRenderer {
     if (bridge) {
       graphics.poly(points).fill({ color: BRIDGE_RAIL_COLOR });
     }
-    if (roadType !== ROAD.none && (bridge || !this.roadSprites)) {
-      // **Záloha, ne hlavní cesta.** Vozovku kreslí `RoadRenderer` jako sprity;
-      // tenhle polygon zůstává pro dva případy: most, který obrázek nemá,
-      // a chvíli po startu, než se dlaždice stáhnou. Bez něj by na mapě byla
-      // do té doby díra v silniční síti.
-      const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
-      for (const polygon of roadPolygons(points, mask, ROAD_WIDTHS[roadType])) {
-        graphics
-          .poly(polygon)
-          .fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[roadType] ?? ROAD_COLOR) });
-      }
-    }
-
     // Elektřina je veličina po dlaždicích, takže patří do chunku. Vrstvy
     // na hrubé mřížce kreslí `CoarseOverlay` — ty do chunků nepatří.
     if (this.overlay === 'power') {

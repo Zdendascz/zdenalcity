@@ -71,7 +71,6 @@ import type { AppearanceLookup } from './buildingRenderer';
 import { createCamera, pan, viewportToWorld, zoomAt } from './camera';
 import { ChunkRenderer, viewportFor } from './chunkRenderer';
 import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
-import { ROAD_SHAPES } from './roadShapes';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
 import { TrafficOverlay } from './trafficOverlay';
@@ -533,32 +532,29 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
 }
 
 /**
- * Načte dlaždice vozovky. Klíč je `rodina__tvar`, jak je pojmenoval
- * `fit-roads.py`.
+ * Načte materiály vozovky — **jeden obrázek na typ**, ne dlaždici na tvar.
  *
- * **Strop na počet obrázků tu není**, na rozdíl od povrchů: vozovka se kreslí
- * jako sprite, ne jako výplň v chunku, a sprity se dávkují po svém. Právě
- * proto se sem vejde jednadvacet dlaždic, kdežto povrchů se vejde šest.
+ * Tvar kreslí `RoadRenderer` z rohů dlaždice, obrázek nese jen povrch. Tři
+ * textury v jedné dávce jsou hluboko pod stropem karty.
  */
-async function loadRoadTiles(content: ContentRegistry): Promise<Map<string, Texture>> {
+async function loadRoadMaterials(content: ContentRegistry): Promise<Map<string, Texture>> {
   const out = new Map<string, Texture>();
-  const available = content.getRoads();
   const jobs: Promise<void>[] = [];
 
   for (const family of ROAD_FAMILIES) {
     if (family === undefined) continue;
-    for (const shape of ROAD_SHAPES) {
-      const key = `${family}__${shape}`;
-      const url = available[key];
-      if (url === undefined) continue;
-      jobs.push(
-        Assets.load(url)
-          .then((texture: Texture) => {
-            out.set(key, texture);
-          })
-          .catch(() => undefined),
-      );
-    }
+    const [variant] = content.getTileVariants(`asphalt_${family}`);
+    if (variant === undefined) continue;
+    const url = content.getTile(`asphalt_${family}`, variant);
+    if (url === undefined) continue;
+    jobs.push(
+      Assets.load(url)
+        .then((texture: Texture) => {
+          sampleSmooth(texture);
+          out.set(family, texture);
+        })
+        .catch(() => undefined),
+    );
   }
 
   await Promise.all(jobs);
@@ -802,12 +798,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   void loadSurfaces(content).then((surfaces) => {
     if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
   });
-  void loadRoadTiles(content).then((tiles) => {
-    if (tiles.size === 0) return;
-    roadRenderer.setTextures(tiles);
-    // Teprve teď chunk přestane kreslit polygony. Kdyby se vypnuly dřív,
-    // byla by na mapě do stažení obrázků díra místo silniční sítě.
-    chunkRenderer.setRoadSprites(true);
+  void loadRoadMaterials(content).then((materials) => {
+    if (materials.size > 0) roadRenderer.setTextures(materials);
   });
   void loadDecor(content).then((decor) => {
     if (decor.size > 0) buildingRenderer.setDecor(decor);

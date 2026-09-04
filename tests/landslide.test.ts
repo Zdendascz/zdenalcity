@@ -8,7 +8,7 @@ import {
   steepestDescent,
 } from '@/sim/disasters/landslide';
 import type { ActiveDisaster } from '@/sim/disasters/state';
-import { cornerIndex, countViolations, planCornerHeight } from '@/sim/heights';
+import { cornerIndex, countViolations, planCornerHeight, tileCorners } from '@/sim/heights';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { applyHeightChanges, createWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
@@ -43,6 +43,13 @@ function world(): WorldState {
   const w = createWorld(1, VANILLA_BALANCE.economy);
   w.economy.funds = 500000;
   return w;
+}
+
+/** Kolik dlaždic nese silnici. */
+function countRoads(w: WorldState): number {
+  let total = 0;
+  for (const value of w.layers.road) if (value !== ROAD.none) total++;
+  return total;
 }
 
 function active(x: number, y: number): ActiveDisaster {
@@ -307,6 +314,40 @@ describe('čerstvě přesypaná půda', () => {
 
     expect(isFreshlyTerraformed(w, tile, 360)).toBe(true);
     expect(isFreshlyTerraformed(w, tile, 50)).toBe(false);
+  });
+
+it('silnici, které sesuv podhrabal roh, zboří', async () => {
+    // Sesuv hne rohy i **mimo svou dráhu** a dlaždice pod vozovkou tím
+    // přestane být rovnoběžník. Do T87 taková silnice zůstala stát a kreslila
+    // se našikmo přes zlom; autor to nahlásil obrázkem. Rozbitá silnice je
+    // správná odpověď: přes utržený svah se jezdit nedá.
+    const w = world();
+    slope(w, 20, 6);
+
+    // Silnice se staví **pod svahem, ne na něm**: stavba si srovná příčný
+    // spád, takže pás vozovky přes svah by z něj udělal rovinu a sesuv by se
+    // neměl kde utrhnout. Na tom padl první pokus o tenhle test.
+    for (let x = 27; x <= 31; x++) {
+      for (let y = 28; y <= 32; y++) {
+        expect(buildRoad(w, x, y, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+      }
+    }
+    expect(countRoads(w)).toBe(25);
+
+    await run(w, 24, 30);
+
+    // **Nestačí, že něco spadlo.** Silnice v dráze boural sesuv i předtím;
+    // vada byla v kaskádě, která hne rohy vedle dráhy. Testuje se proto
+    // pravidlo, ne počet: po sesuvu nesmí zůstat vozovka na zkroucené
+    // dlaždici. Zkroucená je ta, které se nerovnají součty protilehlých rohů
+    // — rovina ani rovnoběžný svah takový tvar nemají.
+    for (let tile = 0; tile < w.layers.road.length; tile++) {
+      if ((w.layers.road[tile] ?? ROAD.none) === ROAD.none) continue;
+      const x = tile % MAP_SIZE;
+      const y = (tile - x) / MAP_SIZE;
+      const [nw, ne, sw, se] = tileCorners(w.cornerHeight, x, y);
+      expect(nw + se, `dlaždice ${x}, ${y} je zkroucená`).toBe(ne + sw);
+    }
   });
 
   it('neupravená dlaždice není čerstvá', () => {

@@ -14,7 +14,6 @@ import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { tileQuad } from '@/render/projection';
 import { roadMask, roadPolygons } from '@/render/roads';
 import { ROAD_FAMILIES } from '@/render/roadRenderer';
-import { ROAD_SHAPES, roadPiece, shapeName } from '@/render/roadShapes';
 import { ROAD_COLORS, ROAD_WIDTHS } from '@/render/palette';
 import { computeBudget } from '@/sim/systems/economy';
 import type { BuildingCatalogue } from '@/sim/catalogue';
@@ -242,14 +241,15 @@ describe('vykreslení', () => {
     expect(narrow[0]).not.toEqual(wide[0]);
   });
 
-  it('obrázek má každý typ silnice a obsah ho dodává', () => {
-    // Kdyby přibyl typ silnice a dlaždice se k němu nedoplnily, vozovka by se
-    // tiše kreslila plochou barvou — a to je přesně ten druh vady, které si
-    // nikdo nevšimne, protože záloha vypadá jako záměr.
+  it('materiál má každý typ silnice a obsah ho dodává', () => {
+    // Tvar vozovky kreslí kód, obrázek dodá jen povrch. Kdyby přibyl typ
+    // silnice a materiál se k němu nedoplnil, kreslila by se plochou barvou —
+    // a to je přesně ten druh vady, které si nikdo nevšimne, protože záloha
+    // vypadá jako záměr.
     //
     // Kontroluje se **cesta, kterou jde hra**, ne složka: obrázky se berou
-    // přes `createVanillaSource` a právě tam se na ně jednou zapomnělo.
-    const roads = createVanillaSource().roads ?? {};
+    // přes bílou listinu v `loader.ts` a právě tam se na ně jednou zapomnělo.
+    const tiles = createVanillaSource().tiles ?? {};
     for (const [name, roadType] of [
       ['ulice', ROAD.street],
       ['třída', ROAD.avenue],
@@ -257,41 +257,22 @@ describe('vykreslení', () => {
     ] as const) {
       const family = ROAD_FAMILIES[roadType];
       expect(family, name).toBeDefined();
-      for (const shape of ROAD_SHAPES) {
-        expect(roads[`${family}__${shape}`], `${name}: chybí ${family}__${shape}`).toBeDefined();
-      }
+      expect(
+        Object.keys(tiles).some((key) => key.startsWith(`asphalt_${family}|`)),
+        `${name}: obsah nedodává materiál asphalt_${family}`,
+      ).toBe(true);
     }
 
-    // Nula je „žádná silnice" a obrázek mít nesmí, jinak by se sáhlo i na
+    // Nula je „žádná silnice" a materiál mít nesmí, jinak by se sáhlo i na
     // prázdnou dlaždici.
     expect(ROAD_FAMILIES[ROAD.none]).toBeUndefined();
   });
 
-  it('všech šestnáct masek najde svůj obrázek', () => {
-    // Sedm obrázků pokrývá šestnáct masek jen tehdy, když se překlopení
-    // trefí. Kdyby ze seznamu zástupců někdo vypadl, projevilo by se to jako
-    // chybějící silnice na mapě — a to se hledá hůř než spadlý test.
-    for (let mask = 0; mask < 16; mask++) {
-      const piece = roadPiece(mask);
-      expect(piece, `maska ${mask} (${shapeName(mask)})`).toBeDefined();
-      expect(ROAD_SHAPES).toContain(piece?.shape);
-    }
-  });
-
-  it('překlopení vrátí tvar, ze kterého vzniklo', () => {
-    // Zástupce se sám na sebe musí namapovat bez překlopení, jinak by se
-    // kreslil zrcadlově a nikdo by si toho nevšiml — kosočtverec je souměrný.
-    for (const shape of ROAD_SHAPES) {
-      if (shape === '0') continue;
-      const mask = [...shape].reduce(
-        (bits, letter) =>
-          bits | { n: 1, e: 2, s: 4, w: 8 }[letter as 'n' | 'e' | 's' | 'w'],
-        0,
-      );
-      const piece = roadPiece(mask);
-      expect(piece?.shape, shape).toBe(shape);
-      expect(piece?.flipX, shape).toBe(false);
-      expect(piece?.flipY, shape).toBe(false);
-    }
+  it('šířka vozovky roste s typem a obruba se vejde do dlaždice', () => {
+    // Přechod mezi typy se stane na hranici dlaždic: každá kreslí svou šířku.
+    // Aby to dávalo smysl, musí šířky růst — a s obrubou se pořád vejít.
+    expect(ROAD_WIDTHS[ROAD.avenue]).toBeGreaterThan(ROAD_WIDTHS[ROAD.street]!);
+    expect(ROAD_WIDTHS[ROAD.highway]).toBeGreaterThan(ROAD_WIDTHS[ROAD.avenue]!);
+    expect(ROAD_WIDTHS[ROAD.highway]).toBeLessThan(1);
   });
 });
