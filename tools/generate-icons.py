@@ -52,21 +52,33 @@ def section(text: str, title: str) -> str:
     return found.group(1) if found else ''
 
 
-def read_spec() -> tuple[str, dict[str, str]]:
-    """Hlavička stylu a všechny ikony z oddílu „Ikony"."""
-    text = SPEC.read_text(encoding='utf-8')
-
-    found = FENCE.search(section(text, 'Styl'))
+def fence_of(text: str, title: str) -> str:
+    found = FENCE.search(section(text, title))
     if found is None:
-        raise SystemExit(f'{SPEC.name}: oddíl „Styl" nemá oplocený blok')
-    header = found.group(1).strip()
+        raise SystemExit(f'{SPEC.name}: oddíl „{title}" nemá oplocený blok')
+    return found.group(1).strip()
 
-    # Bere se **jen oddíl „Ikony"**, ne celý dokument: tabulka barev má taky
-    # tři sloupce a bez omezení by se z „pořádek | modrá | bílý" stala ikona.
-    icons = dict(ICON_ROW.findall(section(text, 'Ikony')))
-    if not icons:
-        raise SystemExit(f'{SPEC.name}: v oddílu „Ikony" nejsou žádné řádky')
-    return header, icons
+
+def read_spec() -> dict[str, str]:
+    """Prompty ikon i značky, každý už i se svou hlavičkou.
+
+    Značka má **vlastní hlavičku**: je to logo, ne tlačítko, takže se kolem něj
+    nekreslí štítek. Kdyby se sdílela hlavička ikon, mělo by logo rámeček
+    a na světlém pozadí by překáželo.
+    """
+    text = SPEC.read_text(encoding='utf-8')
+    out: dict[str, str] = {}
+
+    for title, header in (('Ikony', fence_of(text, 'Styl')), ('Značka', fence_of(text, 'Značka'))):
+        # Bere se **jen ten oddíl**, ne celý dokument: tabulka barev má taky
+        # tři sloupce a bez omezení by se z „pořádek | modrá | bílý" stala ikona.
+        rows = ICON_ROW.findall(section(text, title))
+        if not rows:
+            raise SystemExit(f'{SPEC.name}: v oddílu „{title}" nejsou žádné řádky')
+        for name, prompt in rows:
+            out[name] = PARAGRAPH.join([header, prompt])
+
+    return out
 
 
 def main() -> int:
@@ -80,8 +92,7 @@ def main() -> int:
     parser.add_argument('--model', default=None)
     args, _ = parser.parse_known_args()
 
-    header, icons = read_spec()
-    jobs = [(name, PARAGRAPH.join([header, prompt])) for name, prompt in icons.items()]
+    jobs = list(read_spec().items())
     if args.only:
         jobs = [job for job in jobs if job[0] == args.only]
         if not jobs:

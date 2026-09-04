@@ -940,3 +940,222 @@ body {
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* --- úvodní obrazovka ---------------------------------------------------- */
+
+.home {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  background: #0e2028;
+  color: #eef3f5;
+}
+
+/* Hlavička je vysoká, ale ne přes celou obrazovku: kus řady karet musí být
+   vidět, jinak nikdo nepozná, že se dá rolovat. */
+.home__hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 68vh;
+  padding: 32px clamp(20px, 6vw, 72px) 28px;
+}
+
+.home__hero-shot {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+  transition: opacity 1.4s ease-in-out;
+}
+
+.home__hero-shot.is-visible {
+  opacity: 1;
+}
+
+/* Přechod zdola i zleva: text drží na jakémkoli snímku, i na tom světlém. */
+.home__hero-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, #0e2028 4%, rgb(14 32 40 / 55%) 46%, rgb(14 32 40 / 10%) 100%),
+    linear-gradient(to right, rgb(14 32 40 / 78%) 0%, rgb(14 32 40 / 0%) 62%);
+}
+
+.home__brand,
+.home__actions {
+  position: relative;
+}
+
+.home__brand {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.home__logo {
+  width: clamp(64px, 9vw, 112px);
+  height: auto;
+}
+
+.home__title {
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(38px, 7vw, 84px);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.home__tagline {
+  margin: 6px 0 0;
+  color: #b6c6cc;
+  font-size: clamp(13px, 1.6vw, 18px);
+}
+
+/* Beta je označení, ne ozdoba: sedí u názvu a je vidět dřív než tlačítka. */
+.home__beta {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f0a020;
+  color: #0e2028;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.home__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.home__button {
+  padding: 11px 22px;
+  border: 1px solid rgb(238 243 245 / 35%);
+  border-radius: 6px;
+  background: rgb(14 32 40 / 70%);
+  color: #eef3f5;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home__button:hover {
+  border-color: #eef3f5;
+}
+
+.home__button--primary {
+  border-color: #f0a020;
+  background: #f0a020;
+  color: #0e2028;
+}
+
+.home__row {
+  padding: 22px clamp(20px, 6vw, 72px);
+}
+
+.home__row-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+/* Vodorovný pás karet. Netflix ho posouvá šipkami; tady stačí táhnout,
+   protože karet je pět, ne padesát. */
+.home__strip {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+}
+
+.home__card {
+  flex: none;
+  width: clamp(220px, 26vw, 340px);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgb(238 243 245 / 12%);
+  border-radius: 8px;
+  background: #12262f;
+  scroll-snap-align: start;
+  transition: transform 0.18s ease;
+}
+
+.home__card:hover {
+  transform: translateY(-3px);
+}
+
+.home__card-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.home__card-label {
+  display: block;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+
+.home__card--text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 18px;
+  color: #eef3f5;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home__card-title {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.home__card-note {
+  color: #b6c6cc;
+  font-size: 13px;
+}
+
+.home__overlay {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(6 14 18 / 82%);
+  inset: 0;
+}
+
+.home__panel {
+  width: min(560px, 100%);
+  padding: 26px 28px;
+  border: 1px solid rgb(238 243 245 / 15%);
+  border-radius: 10px;
+  background: #12262f;
+}
+
+.home__panel-title {
+  margin: 0 0 14px;
+  font-size: 20px;
+}
+
+.home__panel-line {
+  margin: 0 0 8px;
+  color: #cdd9de;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.home__panel .home__button {
+  margin-top: 14px;
+}

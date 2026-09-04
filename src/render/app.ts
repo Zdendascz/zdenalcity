@@ -19,7 +19,8 @@ import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
 import type { CommandResult } from '@/sim/result';
 import { cornerIndex, tileCorners } from '@/sim/heights';
-import { index, TERRAIN, ZONE } from '@/sim/layers';
+import { DEFAULT_MAP_SIZE, TERRAIN, ZONE, index } from '@/sim/layers';
+import type { MapSize } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
@@ -62,7 +63,7 @@ import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
 import { createBrowserPlatform } from '@/platform';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
-import { showNewGameDialog } from '@/ui/newGameDialog';
+import { showHome } from '@/ui/home';
 import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
 import { BuildingRenderer } from './buildingRenderer';
@@ -630,9 +631,19 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // a tady se nezmění nic.
   const platform = createBrowserPlatform();
 
-  const newGame = await showNewGameDialog(mount, i18n, content.getBalance(), {
+  // Rozcestník: značka, snímky ze hry a tři cesty dál — pokračovat, nové
+  // město, nebo načíst soubor. Dialog nové hry z něj vychází, nezanikl.
+  const choice = await showHome(mount, i18n, content.getBalance(), {
     canResume: await platform.storage.has('autosave'),
+    readFile: (file) => platform.files.read(file),
   });
+  const newGame =
+    choice.kind === 'game'
+      ? choice.game
+      : // Soubor nese vlastní mapu i jméno, takže na parametrech nové hry
+        // nezáleží — přepíše je `applySaveToWorld` o pár řádků níž.
+        { cityName: '', seed: 0, size: DEFAULT_MAP_SIZE as MapSize, disasters: true };
+  const openedFile = choice.kind === 'file' ? choice.bytes : null;
 
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
@@ -669,7 +680,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,
   // že se hráč do hry nedostane vůbec.
   let cityName = newGame.cityName;
-  const resumed = newGame.resume ? await platform.storage.read('autosave') : null;
+  const resumed = openedFile ?? (newGame.resume ? await platform.storage.read('autosave') : null);
   let restored = false;
   if (resumed) {
     try {

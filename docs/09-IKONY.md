@@ -172,3 +172,33 @@ hvězdu, velká dvě. Zmenšit tentýž tvar by nešlo poznat.
 | `hand` | A white open hand with the fingers together, centred on a grey rounded-square badge. |
 | `view-decor` | A white broadleaf tree with a thick diagonal line struck through it, centred on a grey rounded-square badge. |
 | `screenshot` | A white photo camera seen from the front with a round lens, centred on a grey rounded-square badge. |
+
+## Značka
+
+Logo hry. **Není to ikona rozhraní**, takže má vlastní hlavičku bez štítku —
+značka se používá i na světlém pozadí a rámeček by tam překážel.
+
+```
+A single flat vector logo mark centred on a plain background of one solid dark
+teal colour, the same colour edge to edge. Bold solid shapes, no outline, no
+gradient, no shadow, no glow, no halo, no light around the shapes, no texture,
+no vignette. The background is completely even and empty. The mark must stay
+readable at 32 pixels.
+
+NO TEXT, NO LETTERS, NO NUMBERS, NO WORDS, NO SIGNATURE, NO WATERMARK.
+```
+
+**Proč bez písma.** Název se sází v CSS, ne v obrázku: generátor písmena
+komolí a „Zdenalcity" by z něj vyšlo jako „Zdenalclty". Obrázek nese jen
+značku, slovo obstará stránka.
+
+**Proč plné pozadí a ne průhledné.** První pokus žádal průhlednost a dostal
+černou plochu se žlutou září kolem domů. Vyříznout ji nešlo: prahem na jas se
+buď nechala jako mlha, nebo ukrojil kus tmavé strany budovy, a přes hrany
+zůstal roztřepený lem — a když se před hledáním hran rozostřilo, splynula
+tmavá stěna věže s pozadím a věž zmizela. Jedna plochá barva se odečte
+triviálně a je z ní i podklad ikony.
+
+| id | prompt |
+|---|---|
+| `logo` | Three simple isometric city blocks of different heights standing together, seen from the front-above at the isometric angle, in warm amber and deep teal. |
