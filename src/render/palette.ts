@@ -106,6 +106,15 @@ export const TRAFFIC_COLORS = [0x4caf50, 0xa8c93a, 0xe0c33a, 0xe08b3a, 0xd9483a]
 export const TRAFFIC_MAX_ALPHA = 0.85;
 
 /**
+ * Špendlík nad budovou služby, jejíž dosah se kreslí.
+ *
+ * Tmavý s bílým lemem, ne barevný podle třídy: barvu nese ikona uvnitř a
+ * špendlík má být vidět nad zástavbou libovolné barvy.
+ */
+export const MARKER_FILL = 0x1a1d23;
+export const MARKER_LINE = 0xffffff;
+
+/**
  * Tepelná mapa diagnostických pohledů: zelená „skvělé" → rudá „strašné".
  *
  * Nahradila jednu barvu se sílou v průhlednosti. Ta měla vadu, kterou autor

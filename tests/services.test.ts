@@ -26,7 +26,9 @@ const STATION: Definition = {
   level: 1,
   construction: { cost: 500, requiresRoad: false, requiresPower: false, allowedTerrain: [0] },
   economy: { upkeep: 100 },
-  service: { class: 'police', radius: 6, strength: 120 },
+  // Dosah je od T91 v **dlaždicích**, ne v buňkách hrubé mřížky. Dvacet čtyři
+  // dlaždic je šest buněk, tedy přesně to, co tenhle fixture míval.
+  service: { class: 'police', radius: 24, strength: 120 },
   graphics: { color: '#6f7fa8', heightLevels: 1 },
 };
 
@@ -85,7 +87,7 @@ describe('pokrytí službami', () => {
     placeBuilding(world, STATION, 64, 64);
     recomputeCoverage(world, catalogueOf(STATION));
 
-    // Dosah 6 buněk = 24 dlaždic.
+    // Dosah 24 dlaždic = 6 buněk.
     expect(coverage(world, 64 + COARSE_FACTOR * 8, 64)).toBe(0);
   });
 

@@ -71,8 +71,12 @@ export interface BuildingDefinition {
   /** Kolik pracovních míst budova dává. */
   jobs?: { capacity: number };
   /**
-   * Služba: třída, dosah v buňkách hrubé mřížky a síla v centru.
+   * Služba: třída, **dosah v dlaždicích** a síla v centru.
    * Třídy jsou obsah, ne kód — mechanismus je obecný (§6 zadání fáze 2).
+   *
+   * Dlaždice, ne buňky hrubé mřížky. Do T91 to bylo naopak a čísla v obsahu
+   * tím platila čtyřikrát dál, než jak byla napsaná — hasičárna „s dosahem 10"
+   * pokryla čtyřicet dlaždic, tedy půl mapy.
    */
   service?: { class: string; radius: number; strength: number };
   /**
@@ -587,7 +591,8 @@ function validateService(
   if (!section) return undefined;
 
   const serviceClass = requireString(issues, section, 'class', `${field}.class`, NAMESPACE);
-  // Dosah je v buňkách hrubé mřížky, ta má 32 buněk na stranu.
+  // Dosah je v **dlaždicích**. Strop je čtvrtina výchozí mapy: služba, která
+  // dosáhne dál, přestává být místní a hráč nemá co rozmisťovat.
   const radius = requireInt(issues, section, 'radius', `${field}.radius`, 1, 32);
   const strength = requireInt(issues, section, 'strength', `${field}.strength`, 1, 255);
 

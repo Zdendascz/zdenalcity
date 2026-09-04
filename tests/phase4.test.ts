@@ -237,10 +237,17 @@ describe('kritérium 6 — podfinancovaní hasiči hoří déle', () => {
         );
       }
 
-      // Les uvnitř pokrytí, dost velký na to, aby se požár měl kam šířit. Malý
-      // lesík vyhoří za stejnou dobu bez ohledu na hasiče: skončí, až mu dojde
-      // palivo, ne až ho někdo uhasí.
-      for (let y = 15; y < 19; y++) {
+      // Les **hned u zbrojnic**, dost velký na to, aby se požár měl kam šířit.
+      //
+      // Blízkost je od T91 podmínka, ne detail: dosah služeb se tehdy začal
+      // číst v dlaždicích místo v buňkách, takže se čtyřikrát zmenšil. Les
+      // o šest dlaždic dál měl pokrytí 68 z 255 a suppression z něj byla tak
+      // slabá, že požár shořel na palivo stejně rychle jako bez hasičů —
+      // změřeno 31 tiků v obou případech. Takhle vychází 41 proti 65.
+      //
+      // Malý lesík by vyhořel za stejnou dobu bez ohledu na hasiče: skončí, až
+      // mu dojde palivo, ne až ho někdo uhasí.
+      for (let y = 17; y < 20; y++) {
         for (let x = 11; x < 23; x++) world.layers.terrain[index(x, y, MAP_SIZE)] = TERRAIN.forest;
       }
 
@@ -248,8 +255,8 @@ describe('kritérium 6 — podfinancovaní hasiči hoří déle', () => {
       const systems = createDefaultSystems(content, balance);
       for (let tick = 0; tick < 20; tick++) tickWorld(world, systems);
 
-      const tile = index(16, 17, MAP_SIZE);
-      const coverage = world.coverage.get('fire')?.[coarseIndex(16, 17, MAP_SIZE)] ?? 0;
+      const tile = index(16, 19, MAP_SIZE);
+      const coverage = world.coverage.get('fire')?.[coarseIndex(16, 19, MAP_SIZE)] ?? 0;
       expect(igniteTile(world, content, balance, tile, 200, false)).toBe(true);
 
       const everBurnt = new Set<number>();

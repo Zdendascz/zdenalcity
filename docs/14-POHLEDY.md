@@ -131,3 +131,69 @@ a tři čtvrtě při 8×.
 
 Mění to **jen tempo v reálném čase**, ne simulaci: systémy počítají na tiky,
 takže město za tisíc dní vyjde stejně jako dřív a zlaté testy se nehnuly.
+
+## Dosah služeb je v dlaždicích
+
+Autor: „mám ve městě jednu nebo dvě hasičské stanice a dosah přes 3/4 mapy!!!!
+to je strašně moc!"
+
+Byl. `service.radius` z obsahu se bral **jako počet buněk hrubé mřížky**, a ta
+má čtyři dlaždice na stranu — hodnota 10 tedy platila čtyřicet dlaždic daleko.
+Velká zbrojnice se šestnácti pokryla mapu celou.
+
+Čísla v obsahu zůstala; změnila se jednotka, ve které se čtou. `addCoverage` si
+je teď dělí `COARSE_FACTOR`, takže „dosah 10" znamená deset dlaždic — tak, jak
+to člověk při psaní definice myslí.
+
+| budova | dřív | teď |
+|---|---|---|
+| hasičská zbrojnice | 40 dlaždic | 10 dlaždic |
+| velká zbrojnice | 64 dlaždic | 16 dlaždic |
+| policejní stanice | 48 dlaždic | 12 dlaždic |
+| nemocnice | 64 dlaždic | 16 dlaždic |
+
+Chytil to test kritéria 6 („podfinancovaní hasiči hoří déle"), který byl na
+starý dosah postavený: les šest dlaždic od zbrojnic měl pokrytí 68 z 255 a
+požár shořel na palivo za 31 tiků bez ohledu na financování. S lesem hned u
+zbrojnic vychází 41 tiků proti 65 — rozdíl je zpátky, jen se odehrává na
+menší ploše.
+
+## Značky nad budovami služby
+
+Autor u mapy dosahu dodal: „takhle já vůbec netuším, kde tu hasičskou stanici
+mám." Mapa pokrytí ukazuje kruh, ale ne jeho střed.
+
+Když je zapnutá mapa dosahu, nad každou budovou té třídy se objeví špendlík
+s toutéž ikonou, jakou nese přepínač vrstvy. Kreslí se **nad budovami**, ne na
+střeše: střešní symbol zapadne mezi domy stejné výšky a při oddálení zmizí.
+
+Tepelné mapy značky nemají — ukazovaly by na budovu, která s tou veličinou
+nemusí souviset.
+
+## Odmítnutí říká proč
+
+Autor u hlášky „Na tenhle terén se to postavit nedá" napsal: „pokud něco nejde,
+měl by systém také říct proč".
+
+Odmítnutí, která to teď nesou:
+
+| dřív | teď |
+|---|---|
+| Na tenhle terén se to postavit nedá. | Nejde to — tady je skála. Povolený povrch: tráva, písek. |
+| Musí sousedit se silnicí. | Musí sousedit se silnicí. Nejbližší je o 2 dlaždice dál. |
+| (totéž, když silnice nikde není) | …a široko daleko žádná nevede. Dovez sem cestu. |
+| Celý půdorys musí ležet ve stejné zóně. | …v jedné zóně: obytná zóna. Tady je nezónovaná půda. |
+| Potřebuje připojení k proudu. | …Dotáhni sem silnici nebo vedení od elektrárny — po silnici teče proud taky. |
+| Na tenhle terén… (na vodě) | Na vodu se stavět nedá. Nejdřív most nebo jiná parcela. |
+
+Jména terénů a zón předává simulace jako **lokalizační klíče**, ne jako text
+(§10). `I18n.t` je umí přeložit i po **čárkami odděleném seznamu** — bez toho by
+seznam povolených povrchů znamenal tolik variant hlášky, kolik má hra povrchů.
+
+Terén má na to vlastní sadu klíčů `ui.terrain.plain.*`. Karta parcely jméno
+vypisuje samostatně („Tráva"), hláška ho vkládá doprostřed věty — a čeština si
+tam žádá jiný tvar. Věty jsou proto schválně skládané tak, aby vystačily
+s prvním pádem: „tady je skála", ne „na skálu".
+
+Vzdálenost k silnici se hledá jen do šesti dlaždic od půdorysu. Dál už není co
+poradit a průchod celou mapou při každém odmítnutém kliknutí by hru zdržoval.

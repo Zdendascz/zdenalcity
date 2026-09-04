@@ -1,5 +1,5 @@
 import type { BuildingCatalogue } from '../catalogue';
-import { coarseCellsOf, coarseIndex, coarseSizeOf } from '../coarse';
+import { COARSE_FACTOR, coarseCellsOf, coarseIndex, coarseSizeOf } from '../coarse';
 import { strongestModifier } from '../disasters/effects';
 import { serviceFunding } from '../world';
 import type { WorldState } from '../world';
@@ -89,12 +89,25 @@ export function createServiceSystem(catalogue: BuildingCatalogue): System {
   };
 }
 
+/**
+ * Rozprostře pokrytí kolem budovy.
+ *
+ * `radius` je **v dlaždicích**, protože tak se čte zadání („hasičárna dosáhne
+ * deset dlaždic daleko"). Pole je ale na hrubé mřížce, takže se dělí
+ * `COARSE_FACTOR`.
+ *
+ * Do T91 se poloměr bral **jako počet buněk** a to byla čtyřnásobná chyba:
+ * hasičárna s hodnotou 10 dosáhla čtyřicet dlaždic, tedy přes půl mapy, a velká
+ * s šestnácti pokryla celé město. Autor to nahlásil větou „mám jednu nebo dvě
+ * hasičské stanice a dosah přes 3/4 mapy". Čísla v obsahu zůstala, změnila se
+ * jednotka, ve které se čtou.
+ */
 function addCoverage(
   field: Float32Array,
   size: number,
   building: { x: number; y: number },
   footprint: readonly [number, number],
-  radius: number,
+  radiusTiles: number,
   strength: number,
 ): void {
   const coarseSize = coarseSizeOf(size);
@@ -109,6 +122,7 @@ function addCoverage(
   const originX = origin % coarseSize;
   const originY = (origin - originX) / coarseSize;
 
+  const radius = radiusTiles / COARSE_FACTOR;
   const reach = Math.ceil(radius);
   for (let dy = -reach; dy <= reach; dy++) {
     for (let dx = -reach; dx <= reach; dx++) {

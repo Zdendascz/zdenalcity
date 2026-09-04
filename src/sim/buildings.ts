@@ -1,6 +1,6 @@
 import type { Definition } from '@/content/schema';
 import { isFlatTile } from './heights';
-import { inBounds, index, sizeOfLayer, TERRAIN } from './layers';
+import { inBounds, index, ROAD, sizeOfLayer, TERRAIN, terrainNameKey, ZONE } from './layers';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
@@ -64,7 +64,12 @@ export function checkFootprint(
         options.requireZone !== undefined &&
         world.layers.zone[tile] !== options.requireZone
       ) {
-        return reject('error.wrongZone');
+        // Řekne se **která zóna** je potřeba a co tam je teď. „Celý půdorys
+        // musí ležet ve stejné zóně" hráči neporadí, kterým směrem to spravit.
+        return reject('error.wrongZone', {
+          needed: zoneNameKey(options.requireZone),
+          found: zoneNameKey(world.layers.zone[tile] ?? ZONE.none),
+        });
       }
       if (world.layers.road[tile] !== 0) {
         return reject('error.roadInTheWay');
@@ -81,10 +86,22 @@ export function checkFootprint(
         // silnice vypsal syrové zástupné symboly.
         return reject('error.occupiedFootprint', { width, depth });
       }
+      // Voda se hlásí zvlášť od ostatních terénů: „na vodu se stavět nedá" je
+      // úplná odpověď, kdežto u skály nebo lesa hráč potřebuje vědět, co ta
+      // budova vlastně chce.
+      if ((world.layers.terrain[tile] ?? 0) === TERRAIN.water) {
+        return reject('error.water');
+      }
 
       const terrain = world.layers.terrain[tile] ?? 0;
       if (!definition.construction.allowedTerrain.includes(terrain)) {
-        return reject('error.terrainNotAllowed');
+        // **Co tam je a co by tam šlo.** Samotné „na tenhle terén se to
+        // postavit nedá" autor nahlásil jako nedostatečné: neřekne ani co je
+        // pod tím, ani kam s tím jít místo toho.
+        return reject('error.terrainNotAllowed', {
+          terrain: terrainNameKey(terrain),
+          allowed: definition.construction.allowedTerrain.map(terrainNameKey).join(','),
+        });
       }
 
       // Budova stojí na rovině (§7 fáze 3). Na svahu by visela jedním rohem ve
@@ -108,7 +125,12 @@ export function checkFootprint(
     !options.skipRoadCheck &&
     !touchesRoad(world, definition, x, y)
   ) {
-    return reject('error.needsRoad');
+    // Vzdálenost k nejbližší vozovce mění radu z „musí sousedit se silnicí" na
+    // „posuň se o dvě dlaždice" — nebo „sem žádná nevede".
+    const distance = roadDistance(world, definition, x, y);
+    return distance === null
+      ? reject('error.needsRoadFar')
+      : reject('error.needsRoad', { distance });
   }
   if (definition.construction.requiresPower && !touchesPower(world, definition, x, y)) {
     return reject('error.needsPower');
@@ -125,6 +147,46 @@ export function checkFootprint(
 
   return OK;
 }
+
+/** Lokalizační klíč jména zóny. Prázdná zóna má vlastní jméno, ne prázdno. */
+function zoneNameKey(zone: number): string {
+  const names = ['ui.zone.none', 'ui.zone.residential', 'ui.zone.commercial', 'ui.zone.industrial'];
+  return names[zone] ?? 'ui.zone.none';
+}
+
+/**
+ * Kolik dlaždic chybí k nejbližší silnici. `null`, když v dosahu žádná není.
+ *
+ * Hledá se **do `ROAD_SEARCH` dlaždic od půdorysu**, ne po celé mapě: dál už
+ * není co poradit a průchod mapou při každém odmítnutém kliknutí by hru
+ * zdržoval. Měří se v krocích po mřížce, protože tak se i staví.
+ */
+function roadDistance(
+  world: WorldState,
+  definition: Definition,
+  x: number,
+  y: number,
+): number | null {
+  const [width, depth] = definition.footprint;
+  let best: number | null = null;
+
+  for (let ty = y - ROAD_SEARCH; ty < y + depth + ROAD_SEARCH; ty++) {
+    for (let tx = x - ROAD_SEARCH; tx < x + width + ROAD_SEARCH; tx++) {
+      if (!inBounds(tx, ty, world.size)) continue;
+      if ((world.layers.road[index(tx, ty, world.size)] ?? ROAD.none) === ROAD.none) continue;
+
+      // Vzdálenost od okraje půdorysu, ne od jeho rohu.
+      const dx = Math.max(0, x - tx, tx - (x + width - 1));
+      const dy = Math.max(0, y - ty, ty - (y + depth - 1));
+      const steps = Math.max(dx, dy);
+      if (best === null || steps < best) best = steps;
+    }
+  }
+  return best;
+}
+
+/** Jak daleko od půdorysu se ještě hledá silnice, když chybí. */
+const ROAD_SEARCH = 6;
 
 /** Je pod půdorysem voda z vodovodu? Potrubí musí být položené, ne jen vedle. */
 export function hasWater(world: WorldState, definition: Definition, x: number, y: number): boolean {

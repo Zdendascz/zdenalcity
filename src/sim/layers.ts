@@ -41,6 +41,33 @@ export const TERRAIN = {
 export type TerrainType = (typeof TERRAIN)[keyof typeof TERRAIN];
 
 /**
+ * Lokalizační klíč jména terénu podle jeho hodnoty.
+ *
+ * Bydlí tady, protože odmítnutí příkazu musí umět **říct, co je pod tím** —
+ * „na tenhle terén se to postavit nedá" je odpověď, ze které hráč nepozná ani
+ * co tam je, ani co by tam šlo. Klíče v `sim/` už jsou zvykem: `reject` jimi
+ * vrací důvody a služby jimi hlásí své třídy.
+ *
+ * Jsou to **vlastní klíče `ui.terrain.plain.*`**, ne ty z karty parcely. Karta
+ * jméno vypisuje samostatně („Tráva"), hláška ho vkládá doprostřed věty —
+ * a čeština si tam žádá jiný tvar. Jedna sada by donutila skládat věty tak,
+ * aby vyhovovaly obojímu, a nevyhověla by ani jednomu.
+ */
+export const TERRAIN_NAME_KEYS: readonly string[] = [
+  'ui.terrain.plain.grass',
+  'ui.terrain.plain.water',
+  'ui.terrain.plain.sand',
+  'ui.terrain.plain.rock',
+  'ui.terrain.plain.forest',
+  'ui.terrain.plain.marsh',
+];
+
+/** Jméno terénu pro hlášku. Neznámá hodnota nemá klíč a vrací se prázdno. */
+export function terrainNameKey(terrain: number): string {
+  return TERRAIN_NAME_KEYS[terrain] ?? '';
+}
+
+/**
  * Hodnoty vrstvy `road` (R11 zadání fáze 3).
  *
  * Do fáze 2 nesla vrstva jen 0/1. Typ silnice určuje kapacitu, cenu i údržbu —

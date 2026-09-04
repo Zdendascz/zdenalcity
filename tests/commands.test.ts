@@ -181,14 +181,28 @@ describe('odmítnutí říká proč', () => {
     const world = worldWithCleanDirty();
     const catalogue = catalogueOf(TOWER);
 
+    // Daleko od všeho: hláška to musí říct, ne jen zopakovat pravidlo.
     expect(placeDefinition(world, catalogue, 'test:tower', 40, 40)).toEqual({
       ok: false,
-      reason: 'error.needsRoad',
+      reason: 'error.needsRoadFar',
     });
     expect(placeDefinition(world, catalogue, 'test:nic', 5, 5)).toEqual({
       ok: false,
       reason: 'error.unknownDefinition',
       params: { id: 'test:nic' },
+    });
+  });
+
+  it('u silnice o kus dál řekne, o kolik dlaždic', () => {
+    // Rozdíl proti `error.needsRoadFar`: tohle je rada „posuň se", ne
+    // „postav cestu". Autor si vyžádal, aby odmítnutí říkalo i proč a co s tím.
+    const world = worldWithCleanDirty();
+    buildRoad(world, 5, 5);
+
+    expect(placeDefinition(world, catalogueOf(TOWER), 'test:tower', 8, 5)).toEqual({
+      ok: false,
+      reason: 'error.needsRoad',
+      params: { distance: 3 },
     });
   });
 

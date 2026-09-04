@@ -7,6 +7,9 @@
  * má být při testování vidět, ne se tiše schovat za jiný text.
  */
 
+/** Čím se v parametru oddělují klíče seznamu. */
+const LIST_SEPARATOR = ',';
+
 export const FALLBACK_LANGUAGE = 'en';
 
 export type LocaleTable = Readonly<Record<string, string>>;
@@ -59,6 +62,12 @@ export class I18n {
    * skládá právě ona — jméno třídy služby tak předá jako klíč `ui.service.police`
    * a překlad se doplní tady. Kdo chce klíč vypsat doslova, ať ho nepojmenuje
    * jako existující klíč.
+   *
+   * **Čárkami oddělený seznam klíčů** se přeloží po kusech a spojí zpátky.
+   * Vzniklo to kvůli odmítnutím, která mají říct nejen co nejde, ale i co by
+   * šlo: „na skálu se to postavit nedá, chce trávu nebo písek". Seznam povolených
+   * terénů zná simulace, jejich jména ne — a jeden parametr na každý terén by
+   * znamenal tolik variant hlášky, kolik má hra povrchů.
    */
   t(key: string, params?: TranslateParams): string {
     const text = this.tables[this.language]?.[key] ?? this.tables[FALLBACK_LANGUAGE]?.[key];
@@ -66,9 +75,21 @@ export class I18n {
 
     const resolved: Record<string, string | number> = {};
     for (const [name, value] of Object.entries(params)) {
-      resolved[name] = typeof value === 'string' && this.has(value) ? this.t(value) : value;
+      resolved[name] = typeof value === 'string' ? this.resolve(value) : value;
     }
     return interpolate(text ?? key, resolved);
+  }
+
+  /**
+   * Hodnotu parametru přeloží, je-li to klíč nebo seznam klíčů. Jinak ji vrátí,
+   * jak přišla — hlášky obsahují i obyčejný text, třeba jméno města.
+   */
+  private resolve(value: string): string {
+    if (this.has(value)) return this.t(value);
+
+    const parts = value.split(LIST_SEPARATOR);
+    if (parts.length < 2 || !parts.every((part) => this.has(part))) return value;
+    return parts.map((part) => this.t(part)).join(this.t('ui.list.join'));
   }
 
   /** Existuje pro klíč překlad, nebo by `t()` vrátilo jen klíč? */

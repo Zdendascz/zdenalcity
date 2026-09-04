@@ -75,6 +75,7 @@ import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
 import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
+import { ServiceMarkers } from './serviceMarkers';
 import { TrafficOverlay } from './trafficOverlay';
 import { DebugOverlay } from './debugOverlay';
 import {
@@ -89,7 +90,7 @@ import {
   TRAFFIC_COLORS,
 } from './palette';
 import { pickTile } from './picking';
-import { gridToScreen, tileQuad } from './projection';
+import { gridToScreen, LEVEL_H, tileQuad } from './projection';
 
 /** Jeden krok kolečka = násobitel zoomu. */
 const ZOOM_STEP = 1.15;
@@ -530,6 +531,37 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
 }
 
 /**
+ * Ikony tříd služeb jako textury pro špendlíky nad budovami.
+ *
+ * Bere se **`coverage-<třída>`**, tedy tentýž symbol, který nosí přepínač
+ * vrstvy. Hráč tak vidí stejný obrázek na tlačítku i nad stanicí a nemusí
+ * hádat, čí dosah se kreslí.
+ */
+async function loadServiceIcons(
+  content: ContentRegistry,
+  serviceClasses: readonly string[],
+): Promise<Map<string, Texture>> {
+  const out = new Map<string, Texture>();
+  const jobs: Promise<void>[] = [];
+
+  for (const serviceClass of serviceClasses) {
+    const url = content.getIcons()[coverageIconOf(content, serviceClass)];
+    if (url === undefined) continue;
+    jobs.push(
+      Assets.load(url)
+        .then((texture: Texture) => {
+          out.set(serviceClass, texture);
+        })
+        // Chybějící ikona nechá jen špendlík — pořád je vidět, kde stanice je.
+        .catch(() => undefined),
+    );
+  }
+
+  await Promise.all(jobs);
+  return out;
+}
+
+/**
  * Načte materiály vozovky — **jeden obrázek na typ**, ne dlaždici na tvar.
  *
  * Tvar kreslí `RoadRenderer` z rohů dlaždice, obrázek nese jen povrch. Tři
@@ -797,6 +829,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   void loadSurfaces(content).then((surfaces) => {
     if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
   });
+  void loadServiceIcons(content, serviceClasses).then((icons) => {
+    serviceMarkers.setTextures(icons);
+  });
+
   void loadRoadMaterials(content).then((materials) => {
     if (materials.size > 0) roadRenderer.setTextures(materials);
   });
@@ -866,6 +902,24 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       values: () => simWorld.coverage.get(serviceClass),
     })),
   ]);
+
+  /**
+   * Značky nad budovami služby, jejíž dosah se zrovna kreslí.
+   *
+   * Mapa pokrytí ukazuje kruh, ale ne jeho střed — autor napsal, že netuší, kde
+   * hasičskou stanici vůbec má. Rozměry i třída jdou z obsahu (P5), takže třídu
+   * z modu to obslouží stejně.
+   */
+  const serviceMarkers = new ServiceMarkers(world, worldContainer);
+  serviceMarkers.setLookup(
+    (definitionId) => {
+      const definition = content.get(definitionId);
+      if (!definition) return undefined;
+      const [width, depth] = definition.footprint;
+      return { x: 0, y: 0, width, depth, height: definition.graphics.heightLevels * LEVEL_H };
+    },
+    (definitionId) => content.get(definitionId)?.service?.class,
+  );
 
   // Doprava má vlastní overlay: plné rozlišení, jen silnice.
   const trafficOverlay = new TrafficOverlay(
@@ -1312,6 +1366,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const coarseId = layerMode === 'power' || layerMode === 'traffic' ? 'none' : layerMode;
     coarseOverlay.setActive(coarseId);
     trafficOverlay.setVisible(layerMode === 'traffic');
+    // Špendlíky jen u mapy dosahu: tam se hráč ptá „kde ta stanice je".
+    // U tepelných map by ukazovaly na budovu, která s tou veličinou nesouvisí.
+    serviceMarkers.setActive(
+      layerMode.startsWith('coverage:') ? layerMode.slice('coverage:'.length) : null,
+    );
     showLegend();
     // Budovy v podzemním pohledu překáží — hráč se dívá pod ně.
     buildingRenderer.setVisible(viewMode !== 'underground');
@@ -1988,6 +2047,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     roadRenderer.update(dirty);
     buildingRenderer.update(dirty);
     coarseOverlay.update(dirty.coarseChanged);
+    // Značky se hýbou s budovami, ne s hrubou mřížkou.
+    serviceMarkers.update(dirty.fullRedraw || dirty.buildings.size > 0);
     trafficOverlay.update();
 
     // Šipky posouvají **konstantní rychlostí na obrazovce**, ne v souřadnicích
