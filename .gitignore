@@ -34,3 +34,4 @@ art/tiles/rejected/*.png
 # Bajtkód Pythonu. Do repa se dostal omylem s nástroji na sprity.
 __pycache__/
 *.pyc
+tools/.build/
