@@ -1,3 +1,10 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * `@/render/roads` si přitáhne `chunkRenderer` a s ním Pixi, které při importu
+ * sáhne na `navigator` (`isSafari`). Bez DOM se soubor vůbec nenačte. Pragma je
+ * na jeden soubor, ne globální nastavení — simulační testy zůstávají ve `node`.
+ */
 import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
