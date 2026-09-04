@@ -18,7 +18,7 @@ import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
 import type { CommandResult } from '@/sim/result';
-import { cornerIndex, tileCorners } from '@/sim/heights';
+import { cornerIndex, tileBaseHeight, tileCorners } from '@/sim/heights';
 import { DEFAULT_MAP_SIZE, TERRAIN, ZONE, index } from '@/sim/layers';
 import type { MapSize } from '@/sim/layers';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
@@ -75,6 +75,7 @@ import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
 import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
+import { DisasterScenes } from './disasterScenes';
 import { ServiceMarkers } from './serviceMarkers';
 import { TrafficOverlay } from './trafficOverlay';
 import { DebugOverlay } from './debugOverlay';
@@ -531,6 +532,24 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
 }
 
 /**
+ * Jeden obrázek dlaždice podle jména. `undefined`, když ho obsah nedodal —
+ * chybějící obrázek je vzhled, ne podmínka běhu (P5).
+ */
+async function loadTile(content: ContentRegistry, name: string): Promise<Texture | undefined> {
+  const [variant] = content.getTileVariants(name);
+  if (variant === undefined) return undefined;
+  const url = content.getTile(name, variant);
+  if (url === undefined) return undefined;
+  try {
+    const texture: Texture = await Assets.load(url);
+    sampleSmooth(texture);
+    return texture;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Ikony tříd služeb jako textury pro špendlíky nad budovami.
  *
  * Bere se **`coverage-<třída>`**, tedy tentýž symbol, který nosí přepínač
@@ -659,6 +678,51 @@ async function loadDecor(content: ContentRegistry): Promise<Map<number, TerrainD
   // Pořadí musí být stabilní: stahování dobíhá, jak přijde ze sítě, a losování
   // podle souřadnic by pak po každém spuštění padlo jinam.
   for (const list of out.values()) list.sort((a, b) => a.texture.label!.localeCompare(b.texture.label!));
+  return out;
+}
+
+/**
+ * Obrázky katastrof, které se odehrávají na ulici.
+ *
+ * Klíč je **druh katastrofy**, ne jméno spritu: renderer o `riot_crowd` nemá
+ * co vědět, ptá se na `riot`. Mod, který přidá svou katastrofu a k ní obrázek,
+ * ji tím dostane nakreslenou zadarmo (P5).
+ */
+const DISASTER_SCENES: readonly (readonly [string, string])[] = [
+  ['riot', 'riot_crowd'],
+  ['gangWar', 'riot_crowd'],
+  ['pileup', 'pileup_wreck'],
+];
+
+async function loadDisasterScenes(
+  content: ContentRegistry,
+): Promise<Map<string, TerrainDecor[]>> {
+  const out = new Map<string, TerrainDecor[]>();
+  const jobs: Promise<void>[] = [];
+
+  for (const [kind, id] of DISASTER_SCENES) {
+    for (const variant of content.getSpriteVariants(id)) {
+      const sprite = content.getSprite(id, variant);
+      if (sprite === undefined) continue;
+      jobs.push(
+        Assets.load(sprite.url)
+          .then((texture: Texture) => {
+            sampleSmooth(texture);
+            const list = out.get(kind) ?? [];
+            list.push({ texture, anchor: sprite.anchor, scale: sprite.scale });
+            out.set(kind, list);
+          })
+          .catch(() => undefined),
+      );
+    }
+  }
+
+  await Promise.all(jobs);
+  // Pořadí musí být stabilní: stahování dobíhá, jak přijde ze sítě, a výběr
+  // podle id katastrofy by pak po každém spuštění padl na jiný obrázek.
+  for (const list of out.values()) {
+    list.sort((a, b) => (a.texture.label ?? '').localeCompare(b.texture.label ?? ''));
+  }
   return out;
 }
 
@@ -833,6 +897,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     serviceMarkers.setTextures(icons);
   });
 
+  // Trosky: jeden obrázek, kreslí se do polygonu dlaždice jako povrch.
+  void loadTile(content, 'rubble').then((texture) => {
+    chunkRenderer.setRubble(texture);
+  });
+
+  void loadDisasterScenes(content).then((scenes) => {
+    if (scenes.size > 0) disasterScenes.setScenes(scenes);
+  });
+
   void loadRoadMaterials(content).then((materials) => {
     if (materials.size > 0) roadRenderer.setTextures(materials);
   });
@@ -910,6 +983,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * hasičskou stanici vůbec má. Rozměry i třída jdou z obsahu (P5), takže třídu
    * z modu to obslouží stejně.
    */
+  /**
+   * Scény katastrof leží **nad silnicí a pod domy**: dav stojí v ulici, ne na
+   * střeše, a zároveň nemá zmizet za prvním barákem.
+   */
+  const disasterScenes = new DisasterScenes(world, worldContainer);
+
   const serviceMarkers = new ServiceMarkers(world, worldContainer);
   serviceMarkers.setLookup(
     (definitionId) => {
@@ -1375,6 +1454,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Budovy v podzemním pohledu překáží — hráč se dívá pod ně.
     buildingRenderer.setVisible(viewMode !== 'underground');
     roadRenderer.setVisible(viewMode !== 'underground');
+    disasterScenes.setVisible(viewMode !== 'underground');
     buildingRenderer.setGhost(ghostBuildings);
     buildingRenderer.setDecorVisible(decorVisible);
   }
@@ -1756,7 +1836,19 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         break;
       case 'terraform': {
         if (action.delta === 0) {
-          dispatch({ type: 'level_area', x: tile.x, y: tile.y, w: 1, h: 1 });
+          // Srovnává se **na výšku dlaždice, kde tah začal**, ne na průměr
+          // každé dlaždice zvlášť. Autor to popsal takhle: „vezmu dlaždici
+          // a táhnu, okolní nižší se zvednou, vyšší se sníží." Bez pevné
+          // výšky se svah po tahu jen rozmazal — každá dlaždice si spočítala
+          // svůj průměr a výsledek byl zase svah, jen mírnější.
+          dispatch({
+            type: 'level_area',
+            x: tile.x,
+            y: tile.y,
+            w: 1,
+            h: 1,
+            ...(levelHeight === null ? {} : { height: levelHeight }),
+          });
           break;
         }
         // Zvedá se **nejbližší roh**, ne pevně ten severozápadní: hráč míří
@@ -1774,6 +1866,30 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       costPopup.show(viewX, viewY, i18n.t('ui.cost.spent', { amount: formatNumber(spent) }));
     }
   }
+
+  /**
+   * Na jakou výšku srovnává právě probíhající tah. `null` mimo tah.
+   *
+   * Zapíše se při stisku z dlaždice pod kurzorem a drží se do puštění, takže
+   * celý tah dá jednu rovinu.
+   */
+  let levelHeight: number | null = null;
+
+  /**
+   * Kde na obrazovce naposledy nástroj zabral.
+   *
+   * Slouží jako pojistka proti **dvojímu provedení jedním klikem**. Terén se
+   * po zvednutí rohu posune o patro nahoru, takže pod nehybným kurzorem je
+   * najednou jiná dlaždice — a kontrola „už jsem tuhle dlaždici maloval" to
+   * nepozná. Stačí přitom nepatrné cuknutí myší při kliku a zvedne se o dvě.
+   * Autor to nahlásil jako „velmi zhusta se mi stává, že jednou kliknu a
+   * provedou se dvě akce".
+   */
+  let lastPaintX = 0;
+  let lastPaintY = 0;
+
+  /** O kolik pixelů se musí ukazatel posunout, než nástroj zabere podruhé. */
+  const PAINT_STEP = 10;
 
   canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
@@ -1801,6 +1917,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     paintButton = event.button;
     lastPaintedTile = tile.y * world.size + tile.x;
+    lastPaintX = event.clientX;
+    lastPaintY = event.clientY;
+    levelHeight =
+      activeTool.action.kind === 'terraform' && activeTool.action.delta === 0
+        ? tileBaseHeight(simWorld.cornerHeight, tile.x, tile.y)
+        : null;
 
     // Nástroje s náhledem se použijí až při puštění; ostatní hned.
     if (dragKind() !== null) {
@@ -1826,8 +1948,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // stejný nástroj. Bez toho by se zóna vyznačovala klikáním po jedné.
     if (paintButton !== null && hoveredTile && dragAnchor === null) {
       const tile = hoveredTile.y * world.size + hoveredTile.x;
-      if (tile !== lastPaintedTile) {
+      // **Dvě podmínky, ne jedna.** Jiná dlaždice sama nestačí: terén se pod
+      // kurzorem hýbe, takže po zvednutí rohu ukazuje myš na jinou dlaždici,
+      // aniž by se hnula. Proto se ještě žádá skutečný posun ukazatele.
+      const moved =
+        Math.abs(event.clientX - lastPaintX) + Math.abs(event.clientY - lastPaintY);
+      if (tile !== lastPaintedTile && moved >= PAINT_STEP) {
         lastPaintedTile = tile;
+        lastPaintX = event.clientX;
+        lastPaintY = event.clientY;
         applyTool(hoveredTile, event.offsetX, event.offsetY);
       }
     }
@@ -1886,6 +2015,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     dragAnchor = null;
     paintButton = null;
     lastPaintedTile = -1;
+    levelHeight = null;
     if (dragPointerId !== event.pointerId) return;
     canvas.releasePointerCapture(event.pointerId);
     dragPointerId = null;
@@ -2049,6 +2179,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     coarseOverlay.update(dirty.coarseChanged);
     // Značky se hýbou s budovami, ne s hrubou mřížkou.
     serviceMarkers.update(dirty.fullRedraw || dirty.buildings.size > 0);
+    disasterScenes.update();
     trafficOverlay.update();
 
     // Šipky posouvají **konstantní rychlostí na obrazovce**, ne v souřadnicích

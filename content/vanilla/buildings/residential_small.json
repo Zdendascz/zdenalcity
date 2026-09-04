@@ -4,13 +4,19 @@
   "category": "residential",
   "name": "building.residential_small.name",
   "description": "building.residential_small.desc",
-  "footprint": [1, 1],
+  "footprint": [
+    1,
+    1
+  ],
   "construction": {
-    "cost": 100,
+    "cost": 300,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 6

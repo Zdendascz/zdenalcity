@@ -5,12 +5,18 @@
   "menu": "police",
   "name": "building.prison.name",
   "description": "building.prison.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "construction": {
-    "cost": 3000,
+    "cost": 9000,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 420

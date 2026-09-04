@@ -10,7 +10,7 @@
     1
   ],
   "construction": {
-    "cost": 300,
+    "cost": 900,
     "requiresRoad": true,
     "requiresPower": false,
     "allowedTerrain": [

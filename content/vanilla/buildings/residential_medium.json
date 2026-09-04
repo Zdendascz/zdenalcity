@@ -4,14 +4,20 @@
   "category": "residential",
   "name": "building.residential_medium.name",
   "description": "building.residential_medium.desc",
-  "footprint": [1, 1],
+  "footprint": [
+    1,
+    1
+  ],
   "level": 2,
   "construction": {
-    "cost": 180,
+    "cost": 540,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 10

@@ -5,19 +5,27 @@
   "menu": "transit",
   "name": "building.transit_stop.name",
   "description": "building.transit_stop.desc",
-  "footprint": [1, 1],
+  "footprint": [
+    1,
+    1
+  ],
   "construction": {
-    "cost": 150,
+    "cost": 450,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 30
   },
   "requirements": {
     "services": {},
-    "buildings": ["vanilla:transit_depot"]
+    "buildings": [
+      "vanilla:transit_depot"
+    ]
   },
   "transit": {
     "mode": "bus"

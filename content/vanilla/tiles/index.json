@@ -387,6 +387,12 @@
       "size": 256
     },
     {
+      "tile": "rubble",
+      "shape": "a",
+      "file": "rubble__a.png",
+      "size": 256
+    },
+    {
       "tile": "sand",
       "shape": "a",
       "file": "sand__a.png",

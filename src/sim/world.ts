@@ -61,7 +61,7 @@ export const MAX_TAX_RATE = 20;
  * hlídá test — jinak by se tichý default rozešel s obsahem.
  */
 export const DEFAULT_TAX_RATE = 7;
-export const STARTING_FUNDS = 20000;
+export const STARTING_FUNDS = 60000;
 
 /** Ekonomické počáteční hodnoty světa. Bere se z `balance.economy`. */
 export interface WorldEconomyDefaults {

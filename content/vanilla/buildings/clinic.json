@@ -5,12 +5,18 @@
   "menu": "health",
   "name": "building.clinic.name",
   "description": "building.clinic.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "construction": {
-    "cost": 600,
+    "cost": 1800,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 120

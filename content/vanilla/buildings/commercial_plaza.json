@@ -4,14 +4,20 @@
   "category": "commercial",
   "name": "building.commercial_plaza.name",
   "description": "building.commercial_plaza.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "level": 3,
   "construction": {
-    "cost": 4050,
+    "cost": 12150,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 202

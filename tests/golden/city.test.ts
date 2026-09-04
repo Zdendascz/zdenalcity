@@ -204,6 +204,18 @@ function findSite(world: WorldState): { x: number; y: number } {
  * silnicí a ta skončí v sedle. Rozbije se a nechá trosky — přesně to autor
  * chtěl. Vyhnout se tomu jde jen odmítnutím stavby a to by bylo horší.
  */
+/*
+ * Posun po zdražení (T92): kasa 7 834 → 8 686 → 31 686. Budov, obyvatel, práce
+ * ani hashů se to **nedotklo** — město vyšlo dlaždici po dlaždici stejné.
+ *
+ * Stavba zdražila třikrát, silnice a vodovod pětkrát, bourání desetkrát; aby
+ * šlo město vůbec založit, vyrostl startovní kapitál taky třikrát (elektrárna
+ * sama stojí 24 000 z původních 20 000). Scénář tím utratil o zhruba 17 tisíc
+ * víc a začal se čtyřiceti navíc, takže mu jich zbylo o 23 tisíc víc.
+ *
+ * Že se nehnulo nic jiného, je dobrá zpráva: ceny se v tomhle městě nikde
+ * nedotkly stropu, takže hashe měří dál růst a ne rozpočet.
+ */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
     const content = await vanilla();

@@ -5,12 +5,18 @@
   "menu": "fire",
   "name": "building.fire_station_large.name",
   "description": "building.fire_station_large.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "construction": {
-    "cost": 1300,
+    "cost": 3900,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 240

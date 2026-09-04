@@ -313,6 +313,37 @@ NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK.
 | **b** | TWO grey boulders lying side by side, one split, filling the picture. |
 | **c** | THREE rounded grey stones together, the biggest as tall as a man, filling the picture. |
 
+## Katastrofy na ulici
+
+Nepřírodní katastrofy se odehrávají **na silnici**: hromadná nehoda na
+křižovatce, nepokoje a stávka v ulici. Do T92 o nich mapa mlčela — hráč viděl
+jen ikonu u hodin a musel hádat kde. Autor navrhl to samé, co u trosek: „daly by
+se taky vytvořit formou obrázku, jako třeba u nepokojů izometrický obrázek
+protestujících na ulici".
+
+Jsou to **předměty, ne dlaždice**: vystřižený objekt s kotvou, který se posadí
+na místo, kde katastrofa vznikla. Stejná hlavička jako u stromů a balvanů —
+obrázek nesmí přinést vlastní zem, jinak by pod ním zmizela vozovka.
+
+Tři varianty na druh, aby dvě nehody vedle sebe nevypadaly jako jedna. Vybírá
+se **podle id katastrofy**, takže se varianta při překreslení nemění.
+
+### `riot_crowd`
+
+| | prompt |
+|---|---|
+| **a** | A CROWD OF ABOUT TWENTY PEOPLE standing close together in a protest, arms raised, holding plain blank banners on wooden poles, winter coats and hats, filling the picture. |
+| **b** | A CROWD OF ABOUT FIFTEEN PEOPLE in a protest around an overturned metal rubbish bin, a few holding plain blank placards, thin smoke drifting up, filling the picture. |
+| **c** | TWO GROUPS FACING EACH OTHER: a crowd of protesters on one side and a short line of policemen with plain riot shields on the other, filling the picture. |
+
+### `pileup_wreck`
+
+| | prompt |
+|---|---|
+| **a** | THREE small 1980s cars crashed into one another, crumpled bonnets, one door hanging open, broken glass and debris scattered around them, filling the picture. |
+| **b** | A BOX LORRY jack-knifed across the picture with two small 1980s cars crashed into its side, scattered debris, filling the picture. |
+| **c** | TWO small 1980s cars after a head-on crash, one tipped onto its side, a third car stopped behind them, debris on the ground, filling the picture. |
+
 ## Silnice
 
 **Šestnáct hotových dlaždic na typ se zahazuje.** Vygenerovaly se, změřily
@@ -410,6 +441,26 @@ jako u silnic a skládají se stejně.
 | `pipe` | A buried water main in an open trench: a grey concrete pipe on a bed of gravel, dark earth around it. |
 
 Věta o navazování je stejná, jen místo „carriageway" je „pipe".
+
+## Trosky
+
+Co zbude po zbouraném domě nebo po katastrofě. Do T92 to byla **plochá olivová
+výplň** přes celou dlaždici a autor ji nazval „hrůzným nesmyslem" — vypadala
+jako zorané pole uprostřed města, ne jako demolice.
+
+Je to **materiál, ne tvar**: kreslí se do téhož polygonu dlaždice jako povrch
+terénu, jen se vybere podle vrstvy `rubble`. Proto stačí jediný obrázek a proto
+má stejnou hlavičku jako povrchy — musí navazovat na sousední dlaždici bez
+viditelného švu.
+
+| id | prompt |
+|---|---|
+| `rubble` | Demolition debris seen from far above: broken slabs of grey concrete and cracked asphalt lying in churned brown dirt, with scattered bricks, splintered timber and dust. One even surface, the same everywhere, evenly lit. There is NO building, NO standing wall, NO vehicle, NO machine, NO road marking, NO kerb, NO grass, NO tree and NO person anywhere in the image: the debris reaches every edge. |
+
+Věta o tom, co v obrázku **nesmí** být, je tam ze stejného důvodu jako
+u asfaltu: bez ní si generátor slovo *demolition* přeloží jako *scéna
+demolice* — s bagrem, kusem stojící zdi a dělníkem v helmě. Vyjmenovat zákazy
+funguje, „one even surface" samo nestačí.
 
 ## Zrnitost a mipmapy
 

@@ -4,14 +4,20 @@
   "category": "residential",
   "name": "building.residential_terrace.name",
   "description": "building.residential_terrace.desc",
-  "footprint": [2, 1],
+  "footprint": [
+    2,
+    1
+  ],
   "level": 2,
   "construction": {
-    "cost": 360,
+    "cost": 1080,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 20

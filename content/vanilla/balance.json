@@ -1,17 +1,15 @@
 {
   "economy": {
     "taxableValuePerUnit": 70,
-    "startingFunds": 20000,
+    "startingFunds": 60000,
     "defaultTaxRate": 7
   },
-
   "demand": {
     "workerRatio": 0.5,
     "baseResidential": 20,
     "commercePerCapita": 0.2,
     "limit": 100
   },
-
   "map": {
     "seaLevel": 0.28,
     "rockLevel": 0.9,
@@ -24,7 +22,7 @@
     "forestScale": 14,
     "scrapIslandTiles": 24,
     "forestAbsorption": 0.5,
-    "clearForestCost": 12,
+    "clearForestCost": 120,
     "maxLevelledZoneTiles": 64,
     "minLandShare": 0.97,
     "maxHeight": 10,
@@ -32,26 +30,42 @@
     "rivers": 2,
     "riverSourceHeight": 5,
     "terraformCost": 8,
-    "clearRockCost": 60,
-    "fillMarshCost": 40
+    "clearRockCost": 600,
+    "fillMarshCost": 400
   },
-
   "traffic": {
     "roadTypes": [
-      { "id": "street", "capacity": 60, "cost": 10, "upkeep": 1 },
-      { "id": "avenue", "capacity": 180, "cost": 40, "upkeep": 3 },
-      { "id": "highway", "capacity": 480, "cost": 120, "upkeep": 8 }
+      {
+        "id": "street",
+        "capacity": 60,
+        "cost": 50,
+        "upkeep": 1
+      },
+      {
+        "id": "avenue",
+        "capacity": 180,
+        "cost": 200,
+        "upkeep": 3
+      },
+      {
+        "id": "highway",
+        "capacity": 480,
+        "cost": 600,
+        "upkeep": 8
+      }
     ],
     "attempts": 4,
     "maxSteps": 24,
     "maxBuildingsPerRun": 96,
     "smoothing": 0.3,
     "transitReduction": 0.6,
-    "bridgeCost": 150
+    "bridgeCost": 750
   },
-
-  "diffusion": { "spread": 0.4, "decay": 0.94, "passes": 2 },
-
+  "diffusion": {
+    "spread": 0.4,
+    "decay": 0.94,
+    "passes": 2
+  },
   "landValue": {
     "base": 40,
     "smoothing": 0.25,
@@ -68,11 +82,10 @@
       "health": 0.3,
       "education": 0.4,
       "parks": 0.5,
-    "culture": 0.45,
-    "social": 0.35
+      "culture": 0.45,
+      "social": 0.35
     }
   },
-
   "crime": {
     "smoothing": 0.25,
     "population": 0.6,
@@ -80,13 +93,20 @@
     "abandoned": 30,
     "police": 0.9
   },
-
-  "water": { "defaultRange": 24, "pipeCost": 6, "decayStep": 2, "abandonAfter": 12 },
-
-  "waste": { "perCitizen": 0.1, "toPollution": 0.02 },
-
-  "sewage": { "perCitizen": 0.14, "toPollution": 0.03 },
-
+  "water": {
+    "defaultRange": 24,
+    "pipeCost": 30,
+    "decayStep": 2,
+    "abandonAfter": 12
+  },
+  "waste": {
+    "perCitizen": 0.1,
+    "toPollution": 0.02
+  },
+  "sewage": {
+    "perCitizen": 0.14,
+    "toPollution": 0.03
+  },
   "happiness": {
     "base": 120,
     "smoothing": 0.2,
@@ -108,17 +128,21 @@
       "transit": 0.25
     }
   },
-
-
   "health": {
     "coverageThreshold": 20,
     "declineStep": 1,
     "recoveryStep": 1,
     "unservedRatio": 0.5
   },
-
   "levels": {
-    "thresholds": [0, 0, 90, 130, 170, 210],
+    "thresholds": [
+      0,
+      0,
+      90,
+      130,
+      170,
+      210
+    ],
     "hysteresis": 35,
     "cooldown": 60,
     "downgradeConfirm": 3,
@@ -127,14 +151,18 @@
     "decayPenalty": 25,
     "demandRelief": 25
   },
-
   "growth": {
     "exponent": 1.5,
     "demandPerAttempt": 8,
     "maxAttempts": 12,
     "neutralTaxRate": 7,
     "taxRange": 20,
-    "roadFactors": [1, 1, 0.6, 0.3],
+    "roadFactors": [
+      1,
+      1,
+      0.6,
+      0.3
+    ],
     "minAccessFactor": 0.15,
     "slopeFactor": 0.7
   },
@@ -164,7 +192,6 @@
       "blockTicks": 1800
     }
   },
-
   "transit": {
     "minStops": 2,
     "maxStops": 12,
@@ -193,13 +220,18 @@
       }
     }
   },
-
   "disasters": {
     "maxRiskMultiplier": 3,
-    "indicators": { "uncoveredBelow": 60, "denseLevel": 4, "ageTicks": 3600 },
-    "damage": { "highLevel": 3 },
+    "indicators": {
+      "uncoveredBelow": 60,
+      "denseLevel": 4,
+      "ageTicks": 3600
+    },
+    "damage": {
+      "highLevel": 3
+    },
     "rubble": {
-      "clearCost": 25,
+      "clearCost": 250,
       "crimeWeight": 1.5,
       "landValuePenalty": 30
     },
@@ -243,7 +275,6 @@
         "empty": 1
       }
     },
-
     "earthquake": {
       "magnitudeBase": 0.3,
       "magnitudeSpan": 0.7,
@@ -278,7 +309,6 @@
         "empty": 0
       }
     },
-
     "blast": {
       "resistance": {
         "industrial": 0.15,
@@ -315,7 +345,6 @@
         "happinessPerLoss": 3
       }
     },
-
     "pileup": {
       "durationBase": 4,
       "durationSpan": 6,
@@ -477,7 +506,10 @@
         "rubble": 4
       },
       "byClass": {
-        "parks": { "flammability": 0.05, "fuel": 4 }
+        "parks": {
+          "flammability": 0.05,
+          "fuel": 4
+        }
       }
     },
     "types": {
@@ -494,152 +526,394 @@
         "maxMonthlyChance": 0.2,
         "cooldownTicks": 10,
         "natural": false,
-        "concurrent": { "metric": "buildings", "divisor": 400, "min": 1, "max": 4 },
-        "scale": { "metric": "buildings", "curve": "sqrt", "divisor": 200, "offset": 0, "min": 0.5, "max": 3 },
+        "concurrent": {
+          "metric": "buildings",
+          "divisor": 400,
+          "min": 1,
+          "max": 4
+        },
+        "scale": {
+          "metric": "buildings",
+          "curve": "sqrt",
+          "divisor": 200,
+          "offset": 0,
+          "min": 0.5,
+          "max": 3
+        },
         "require": [],
         "risk": [
-          { "indicator": "uncovered:fire", "weight": 0.9 },
-          { "indicator": "crime", "weight": 0.6 },
-          { "indicator": "neglect", "weight": 0.7 },
-          { "indicator": "underfunded:fire", "weight": 0.5 },
-          { "indicator": "industryShare", "weight": 0.35 }
+          {
+            "indicator": "uncovered:fire",
+            "weight": 0.9
+          },
+          {
+            "indicator": "crime",
+            "weight": 0.6
+          },
+          {
+            "indicator": "neglect",
+            "weight": 0.7
+          },
+          {
+            "indicator": "underfunded:fire",
+            "weight": 0.5
+          },
+          {
+            "indicator": "industryShare",
+            "weight": 0.35
+          }
         ]
       },
-
       "flood": {
         "baseMonthlyChance": 0.008,
         "maxMonthlyChance": 0.03,
         "cooldownTicks": 720,
         "natural": true,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "coastTiles", "curve": "linear", "divisor": 400, "offset": 0, "min": 0.4, "max": 2.5 },
-        "season": { "from": 60, "to": 150, "inFactor": 2, "outFactor": 0.7 },
-        "require": [{ "metric": "coastTiles", "min": 1 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "coastTiles",
+          "curve": "linear",
+          "divisor": 400,
+          "offset": 0,
+          "min": 0.4,
+          "max": 2.5
+        },
+        "season": {
+          "from": 60,
+          "to": 150,
+          "inFactor": 2,
+          "outFactor": 0.7
+        },
+        "require": [
+          {
+            "metric": "coastTiles",
+            "min": 1
+          }
+        ],
         "risk": []
       },
-
       "tornado": {
         "baseMonthlyChance": 0.006,
         "maxMonthlyChance": 0.02,
         "cooldownTicks": 540,
         "natural": true,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "flatShare", "curve": "linear", "divisor": 1, "offset": 0.5, "min": 0.5, "max": 1.5 },
-        "season": { "from": 120, "to": 210, "inFactor": 2.2, "outFactor": 0.6 },
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "flatShare",
+          "curve": "linear",
+          "divisor": 1,
+          "offset": 0.5,
+          "min": 0.5,
+          "max": 1.5
+        },
+        "season": {
+          "from": 120,
+          "to": 210,
+          "inFactor": 2.2,
+          "outFactor": 0.6
+        },
         "require": [],
         "risk": []
       },
-
       "earthquake": {
         "baseMonthlyChance": 0.0025,
         "maxMonthlyChance": 0.004,
         "cooldownTicks": 2160,
         "natural": true,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
         "require": [],
         "risk": []
       },
-
       "pileup": {
         "baseMonthlyChance": 0.05,
         "maxMonthlyChance": 0.3,
         "cooldownTicks": 15,
         "natural": false,
-        "concurrent": { "metric": "roadTiles", "divisor": 600, "min": 1, "max": 3 },
-        "scale": { "metric": "roadTiles", "curve": "sqrt", "divisor": 300, "offset": 0, "min": 0.5, "max": 2.5 },
+        "concurrent": {
+          "metric": "roadTiles",
+          "divisor": 600,
+          "min": 1,
+          "max": 3
+        },
+        "scale": {
+          "metric": "roadTiles",
+          "curve": "sqrt",
+          "divisor": 300,
+          "offset": 0,
+          "min": 0.5,
+          "max": 2.5
+        },
         "require": [],
         "risk": [
-          { "indicator": "congestion", "weight": 1.1 },
-          { "indicator": "majorRoadShare", "weight": 0.5 },
-          { "indicator": "uncovered:health", "weight": 0.3 },
-          { "indicator": "underfunded:health", "weight": 0.3 }
+          {
+            "indicator": "congestion",
+            "weight": 1.1
+          },
+          {
+            "indicator": "majorRoadShare",
+            "weight": 0.5
+          },
+          {
+            "indicator": "uncovered:health",
+            "weight": 0.3
+          },
+          {
+            "indicator": "underfunded:health",
+            "weight": 0.3
+          }
         ]
       },
-
       "strike": {
         "baseMonthlyChance": 0.025,
         "maxMonthlyChance": 0.18,
         "cooldownTicks": 90,
         "natural": false,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 2, "max": 2 },
-        "scale": { "metric": "buildings", "curve": "sqrt", "divisor": 300, "offset": 0, "min": 0.5, "max": 2 },
-        "require": [{ "metric": "population", "min": 1800 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 2,
+          "max": 2
+        },
+        "scale": {
+          "metric": "buildings",
+          "curve": "sqrt",
+          "divisor": 300,
+          "offset": 0,
+          "min": 0.5,
+          "max": 2
+        },
+        "require": [
+          {
+            "metric": "population",
+            "min": 1800
+          }
+        ],
         "risk": [
-          { "indicator": "unemployment", "weight": 1.3 },
-          { "indicator": "unhappiness", "weight": 1 },
-          { "indicator": "taxBurden", "weight": 0.7 },
-          { "indicator": "underfunded:police", "weight": 0.6 }
+          {
+            "indicator": "unemployment",
+            "weight": 1.3
+          },
+          {
+            "indicator": "unhappiness",
+            "weight": 1
+          },
+          {
+            "indicator": "taxBurden",
+            "weight": 0.7
+          },
+          {
+            "indicator": "underfunded:police",
+            "weight": 0.6
+          }
         ]
       },
-
       "riot": {
         "baseMonthlyChance": 0.008,
         "maxMonthlyChance": 0.1,
         "cooldownTicks": 360,
         "natural": false,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "buildings", "curve": "sqrt", "divisor": 400, "offset": 0, "min": 0.5, "max": 2 },
-        "require": [{ "metric": "population", "min": 4000 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "buildings",
+          "curve": "sqrt",
+          "divisor": 400,
+          "offset": 0,
+          "min": 0.5,
+          "max": 2
+        },
+        "require": [
+          {
+            "metric": "population",
+            "min": 4000
+          }
+        ],
         "risk": [
-          { "indicator": "unhappiness", "weight": 1.4 },
-          { "indicator": "unemployment", "weight": 1 },
-          { "indicator": "crime", "weight": 0.8 },
-          { "indicator": "uncovered:police", "weight": 0.5 },
-          { "indicator": "taxBurden", "weight": 0.4 }
+          {
+            "indicator": "unhappiness",
+            "weight": 1.4
+          },
+          {
+            "indicator": "unemployment",
+            "weight": 1
+          },
+          {
+            "indicator": "crime",
+            "weight": 0.8
+          },
+          {
+            "indicator": "uncovered:police",
+            "weight": 0.5
+          },
+          {
+            "indicator": "taxBurden",
+            "weight": 0.4
+          }
         ]
       },
-
       "industrialAccident": {
         "baseMonthlyChance": 0.018,
         "maxMonthlyChance": 0.15,
         "cooldownTicks": 120,
         "natural": false,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "industrialBuildings", "curve": "sqrt", "divisor": 60, "offset": 0, "min": 0.4, "max": 2.5 },
-        "require": [{ "metric": "industrialBuildings", "min": 8 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "industrialBuildings",
+          "curve": "sqrt",
+          "divisor": 60,
+          "offset": 0,
+          "min": 0.4,
+          "max": 2.5
+        },
+        "require": [
+          {
+            "metric": "industrialBuildings",
+            "min": 8
+          }
+        ],
         "risk": [
-          { "indicator": "uncovered:fire", "weight": 1.2 },
-          { "indicator": "highLevelShare", "weight": 0.8 },
-          { "indicator": "underfunded:fire", "weight": 0.6 },
-          { "indicator": "neglectIndustry", "weight": 0.5 },
-          { "indicator": "waterless", "weight": 0.4 }
+          {
+            "indicator": "uncovered:fire",
+            "weight": 1.2
+          },
+          {
+            "indicator": "highLevelShare",
+            "weight": 0.8
+          },
+          {
+            "indicator": "underfunded:fire",
+            "weight": 0.6
+          },
+          {
+            "indicator": "neglectIndustry",
+            "weight": 0.5
+          },
+          {
+            "indicator": "waterless",
+            "weight": 0.4
+          }
         ]
       },
-
       "gangWar": {
         "baseMonthlyChance": 0.02,
         "maxMonthlyChance": 0.16,
         "cooldownTicks": 150,
         "natural": false,
-        "concurrent": { "metric": "buildings", "divisor": 900, "min": 1, "max": 3 },
-        "scale": { "metric": "residentialBuildings", "curve": "sqrt", "divisor": 250, "offset": 0, "min": 0.5, "max": 2.2 },
-        "require": [{ "metric": "population", "min": 2500 }],
+        "concurrent": {
+          "metric": "buildings",
+          "divisor": 900,
+          "min": 1,
+          "max": 3
+        },
+        "scale": {
+          "metric": "residentialBuildings",
+          "curve": "sqrt",
+          "divisor": 250,
+          "offset": 0,
+          "min": 0.5,
+          "max": 2.2
+        },
+        "require": [
+          {
+            "metric": "population",
+            "min": 2500
+          }
+        ],
         "risk": [
-          { "indicator": "crimeMax", "weight": 1.5 },
-          { "indicator": "uncovered:police", "weight": 0.9 },
-          { "indicator": "unemployment", "weight": 0.7 },
-          { "indicator": "neglect", "weight": 0.5 },
-          { "indicator": "underfunded:police", "weight": 0.4 }
+          {
+            "indicator": "crimeMax",
+            "weight": 1.5
+          },
+          {
+            "indicator": "uncovered:police",
+            "weight": 0.9
+          },
+          {
+            "indicator": "unemployment",
+            "weight": 0.7
+          },
+          {
+            "indicator": "neglect",
+            "weight": 0.5
+          },
+          {
+            "indicator": "underfunded:police",
+            "weight": 0.4
+          }
         ]
       },
-
       "explosion": {
         "baseMonthlyChance": 0.03,
         "maxMonthlyChance": 0.2,
         "cooldownTicks": 45,
         "natural": false,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "buildings", "curve": "sqrt", "divisor": 400, "offset": 0, "min": 0.4, "max": 2.2 },
-        "require": [{ "metric": "buildings", "min": 60 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "buildings",
+          "curve": "sqrt",
+          "divisor": 400,
+          "offset": 0,
+          "min": 0.4,
+          "max": 2.2
+        },
+        "require": [
+          {
+            "metric": "buildings",
+            "min": 60
+          }
+        ],
         "risk": [
-          { "indicator": "uncovered:fire", "weight": 1 },
-          { "indicator": "denseShare", "weight": 0.7 },
-          { "indicator": "neglect", "weight": 0.6 },
-          { "indicator": "underfunded:fire", "weight": 0.5 },
-          { "indicator": "waterless", "weight": 0.3 }
+          {
+            "indicator": "uncovered:fire",
+            "weight": 1
+          },
+          {
+            "indicator": "denseShare",
+            "weight": 0.7
+          },
+          {
+            "indicator": "neglect",
+            "weight": 0.6
+          },
+          {
+            "indicator": "underfunded:fire",
+            "weight": 0.5
+          },
+          {
+            "indicator": "waterless",
+            "weight": 0.3
+          }
         ]
       },
-
       "wildfire": {
         "burn": {
           "wildfire": true,
@@ -653,71 +927,200 @@
         "maxMonthlyChance": 0.08,
         "cooldownTicks": 90,
         "natural": true,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "forestTiles", "curve": "linear", "divisor": 500, "offset": 0, "min": 0.2, "max": 2.5 },
-        "season": { "from": 150, "to": 240, "inFactor": 2.5, "outFactor": 0.5 },
-        "require": [{ "metric": "forestTiles", "min": 40 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "forestTiles",
+          "curve": "linear",
+          "divisor": 500,
+          "offset": 0,
+          "min": 0.2,
+          "max": 2.5
+        },
+        "season": {
+          "from": 150,
+          "to": 240,
+          "inFactor": 2.5,
+          "outFactor": 0.5
+        },
+        "require": [
+          {
+            "metric": "forestTiles",
+            "min": 40
+          }
+        ],
         "risk": []
       },
-
       "blackout": {
         "baseMonthlyChance": 0.04,
         "maxMonthlyChance": 0.45,
         "cooldownTicks": 60,
         "natural": false,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "require": [{ "metric": "powerPlants", "min": 1 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "require": [
+          {
+            "metric": "powerPlants",
+            "min": 1
+          }
+        ],
         "risk": [
-          { "indicator": "powerReserve", "weight": 8, "below": 0.25 },
-          { "indicator": "singlePlantShare", "weight": 0.8 },
-          { "indicator": "neglect", "weight": 0.3 }
+          {
+            "indicator": "powerReserve",
+            "weight": 8,
+            "below": 0.25
+          },
+          {
+            "indicator": "singlePlantShare",
+            "weight": 0.8
+          },
+          {
+            "indicator": "neglect",
+            "weight": 0.3
+          }
         ]
       },
-
       "epidemic": {
         "baseMonthlyChance": 0.012,
         "maxMonthlyChance": 0.1,
         "cooldownTicks": 540,
         "natural": false,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "population", "curve": "sqrt", "divisor": 3000, "offset": 0, "min": 0.4, "max": 2.5 },
-        "season": { "from": 270, "to": 360, "inFactor": 1.8, "outFactor": 0.7 },
-        "require": [{ "metric": "population", "min": 3000 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "population",
+          "curve": "sqrt",
+          "divisor": 3000,
+          "offset": 0,
+          "min": 0.4,
+          "max": 2.5
+        },
+        "season": {
+          "from": 270,
+          "to": 360,
+          "inFactor": 1.8,
+          "outFactor": 0.7
+        },
+        "require": [
+          {
+            "metric": "population",
+            "min": 3000
+          }
+        ],
         "risk": [
-          { "indicator": "uncovered:health", "weight": 1.3 },
-          { "indicator": "density", "weight": 0.9 },
-          { "indicator": "waterless", "weight": 0.8 },
-          { "indicator": "pollution", "weight": 0.5 },
-          { "indicator": "underfunded:health", "weight": 0.5 }
+          {
+            "indicator": "uncovered:health",
+            "weight": 1.3
+          },
+          {
+            "indicator": "density",
+            "weight": 0.9
+          },
+          {
+            "indicator": "waterless",
+            "weight": 0.8
+          },
+          {
+            "indicator": "pollution",
+            "weight": 0.5
+          },
+          {
+            "indicator": "underfunded:health",
+            "weight": 0.5
+          }
         ]
       },
-
       "landslide": {
         "baseMonthlyChance": 0.02,
         "maxMonthlyChance": 0.06,
         "cooldownTicks": 180,
         "natural": true,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "riskySlopes", "curve": "linear", "divisor": 150, "offset": 0, "min": 0, "max": 3 },
-        "season": { "from": 60, "to": 150, "inFactor": 2, "outFactor": 0.6 },
-        "require": [{ "metric": "riskySlopes", "min": 1 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "riskySlopes",
+          "curve": "linear",
+          "divisor": 150,
+          "offset": 0,
+          "min": 0,
+          "max": 3
+        },
+        "season": {
+          "from": 60,
+          "to": 150,
+          "inFactor": 2,
+          "outFactor": 0.6
+        },
+        "require": [
+          {
+            "metric": "riskySlopes",
+            "min": 1
+          }
+        ],
         "risk": []
       },
-
       "chemicalSpill": {
         "baseMonthlyChance": 0.014,
         "maxMonthlyChance": 0.09,
         "cooldownTicks": 300,
         "natural": false,
-        "concurrent": { "metric": "none", "divisor": 1, "min": 1, "max": 1 },
-        "scale": { "metric": "heavyIndustry", "curve": "sqrt", "divisor": 25, "offset": 0, "min": 0.3, "max": 2.2 },
-        "require": [{ "metric": "heavyIndustry", "min": 5 }],
+        "concurrent": {
+          "metric": "none",
+          "divisor": 1,
+          "min": 1,
+          "max": 1
+        },
+        "scale": {
+          "metric": "heavyIndustry",
+          "curve": "sqrt",
+          "divisor": 25,
+          "offset": 0,
+          "min": 0.3,
+          "max": 2.2
+        },
+        "require": [
+          {
+            "metric": "heavyIndustry",
+            "min": 5
+          }
+        ],
         "risk": [
-          { "indicator": "neglectIndustry", "weight": 1.1 },
-          { "indicator": "uncovered:fire", "weight": 0.9 },
-          { "indicator": "underfunded:fire", "weight": 0.6 },
-          { "indicator": "waterless", "weight": 0.5 },
-          { "indicator": "equipmentAge", "weight": 0.4 }
+          {
+            "indicator": "neglectIndustry",
+            "weight": 1.1
+          },
+          {
+            "indicator": "uncovered:fire",
+            "weight": 0.9
+          },
+          {
+            "indicator": "underfunded:fire",
+            "weight": 0.6
+          },
+          {
+            "indicator": "waterless",
+            "weight": 0.5
+          },
+          {
+            "indicator": "equipmentAge",
+            "weight": 0.4
+          }
         ]
       }
     }

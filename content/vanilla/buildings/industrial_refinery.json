@@ -4,14 +4,20 @@
   "category": "industrial",
   "name": "building.industrial_refinery.name",
   "description": "building.industrial_refinery.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "level": 4,
   "construction": {
-    "cost": 8640,
+    "cost": 25920,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 518

@@ -5,19 +5,27 @@
   "menu": "transit",
   "name": "building.tram_stop.name",
   "description": "building.tram_stop.desc",
-  "footprint": [1, 1],
+  "footprint": [
+    1,
+    1
+  ],
   "construction": {
-    "cost": 400,
+    "cost": 1200,
     "requiresRoad": true,
     "requiresPower": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 60
   },
   "requirements": {
     "services": {},
-    "buildings": ["vanilla:transit_depot"]
+    "buildings": [
+      "vanilla:transit_depot"
+    ]
   },
   "transit": {
     "mode": "tram"

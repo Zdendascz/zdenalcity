@@ -269,6 +269,29 @@ describe('vykreslení', () => {
     expect(ROAD_FAMILIES[ROAD.none]).toBeUndefined();
   });
 
+  it('obsah dodává obrázek trosek', () => {
+    // Stejná past jako u asfaltu: obrázek ležel ve složce, ale bílá listina
+    // v `loader.ts` o něm nevěděla, takže se do hry nedostal. Kontroluje se
+    // proto **cesta, kterou jde hra**, ne složka.
+    const tiles = createVanillaSource().tiles ?? {};
+    expect(
+      Object.keys(tiles).some((key) => key.startsWith('rubble|')),
+      'obsah nedodává obrázek trosek',
+    ).toBe(true);
+  });
+
+  it('obsah dodává obrázky katastrof na ulici', () => {
+    // Hromadná nehoda a nepokoje se odehrávají na silnici a mapa o nich do T92
+    // mlčela. Sprity mají vlastní index, takže se hlídá zvlášť od dlaždic.
+    const sprites = createVanillaSource().sprites ?? {};
+    for (const id of ['riot_crowd', 'pileup_wreck']) {
+      expect(
+        Object.keys(sprites).some((key) => key.startsWith(`${id}|`)),
+        `obsah nedodává ${id}`,
+      ).toBe(true);
+    }
+  });
+
   it('šířka vozovky roste s typem a obruba se vejde do dlaždice', () => {
     // Přechod mezi typy se stane na hranici dlaždic: každá kreslí svou šířku.
     // Aby to dávalo smysl, musí šířky růst — a s obrubou se pořád vejít.

@@ -4,14 +4,20 @@
   "category": "residential",
   "name": "building.residential_spire.name",
   "description": "building.residential_spire.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "level": 5,
   "construction": {
-    "cost": 3040,
+    "cost": 9120,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 152

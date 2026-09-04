@@ -4,14 +4,20 @@
   "category": "industrial",
   "name": "building.industrial_foundry.name",
   "description": "building.industrial_foundry.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "level": 4,
   "construction": {
-    "cost": 3840,
+    "cost": 11520,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 230

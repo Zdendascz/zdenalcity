@@ -82,7 +82,14 @@ RUINS = {f'ruin_{n}x{n}': (n, n, 1) for n in (1, 2, 3, 4)}
 # přes dvacet metrů, jenže vedle herních domů to vypadá jako pralesní velikán.
 # Autorovo „stromy jsou proti domům moc obrovské". Zpátky na 1 × 1; přesnost
 # proti skutečnosti tu prohrává s tím, aby město šlo přečíst.
-DECOR = {'forest_clump': (1, 1, 3), 'boulders': (1, 1, 1)}
+DECOR = {
+    'forest_clump': (1, 1, 3),
+    'boulders': (1, 1, 1),
+    # Katastrofy na ulici. Dve dlazdice siroke: dav ani hromadna nehoda se do
+    # jedne osmimetrove dlazdice nevejde a namackany vypada jako hracka.
+    'riot_crowd': (2, 2, 2),
+    'pileup_wreck': (2, 2, 1),
+}
 
 # Kolik z té dlaždice předmět skutečně zabere.
 #

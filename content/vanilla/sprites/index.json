@@ -1521,6 +1521,39 @@
       ]
     },
     {
+      "building": "pileup_wreck",
+      "variant": "a",
+      "file": "pileup_wreck__a.png",
+      "width": 512,
+      "height": 448,
+      "anchor": [
+        256,
+        448
+      ]
+    },
+    {
+      "building": "pileup_wreck",
+      "variant": "b",
+      "file": "pileup_wreck__b.png",
+      "width": 512,
+      "height": 481,
+      "anchor": [
+        256,
+        481
+      ]
+    },
+    {
+      "building": "pileup_wreck",
+      "variant": "c",
+      "file": "pileup_wreck__c.png",
+      "width": 512,
+      "height": 486,
+      "anchor": [
+        256,
+        486
+      ]
+    },
+    {
       "building": "vanilla:plaza",
       "variant": "a",
       "file": "plaza__a.png",
@@ -2145,6 +2178,39 @@
       "anchor": [
         383,
         422
+      ]
+    },
+    {
+      "building": "riot_crowd",
+      "variant": "a",
+      "file": "riot_crowd__a.png",
+      "width": 512,
+      "height": 513,
+      "anchor": [
+        256,
+        513
+      ]
+    },
+    {
+      "building": "riot_crowd",
+      "variant": "b",
+      "file": "riot_crowd__b.png",
+      "width": 512,
+      "height": 505,
+      "anchor": [
+        256,
+        505
+      ]
+    },
+    {
+      "building": "riot_crowd",
+      "variant": "c",
+      "file": "riot_crowd__c.png",
+      "width": 512,
+      "height": 508,
+      "anchor": [
+        256,
+        508
       ]
     },
     {

@@ -10,7 +10,7 @@
     6
   ],
   "construction": {
-    "cost": 48000,
+    "cost": 144000,
     "requiresRoad": true,
     "requiresPower": false,
     "nearWater": true,

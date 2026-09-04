@@ -10,7 +10,7 @@
     1
   ],
   "construction": {
-    "cost": 100,
+    "cost": 300,
     "requiresRoad": false,
     "requiresPower": false,
     "allowsSlope": true,

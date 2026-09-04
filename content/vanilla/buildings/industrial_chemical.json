@@ -4,14 +4,20 @@
   "category": "industrial",
   "name": "building.industrial_chemical.name",
   "description": "building.industrial_chemical.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "level": 3,
   "construction": {
-    "cost": 2400,
+    "cost": 7200,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 152

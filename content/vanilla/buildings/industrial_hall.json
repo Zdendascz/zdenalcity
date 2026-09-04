@@ -4,14 +4,20 @@
   "category": "industrial",
   "name": "building.industrial_hall.name",
   "description": "building.industrial_hall.desc",
-  "footprint": [3, 2],
+  "footprint": [
+    3,
+    2
+  ],
   "level": 3,
   "construction": {
-    "cost": 3600,
+    "cost": 10800,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 216

@@ -4,14 +4,20 @@
   "category": "industrial",
   "name": "building.industrial_complex.name",
   "description": "building.industrial_complex.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "level": 3,
   "construction": {
-    "cost": 5400,
+    "cost": 16200,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 324

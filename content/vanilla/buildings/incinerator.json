@@ -5,12 +5,18 @@
   "menu": "waste",
   "name": "building.incinerator.name",
   "description": "building.incinerator.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "construction": {
-    "cost": 1500,
+    "cost": 4500,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 250

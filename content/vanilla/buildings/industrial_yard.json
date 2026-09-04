@@ -4,14 +4,20 @@
   "category": "industrial",
   "name": "building.industrial_yard.name",
   "description": "building.industrial_yard.desc",
-  "footprint": [2, 1],
+  "footprint": [
+    2,
+    1
+  ],
   "level": 2,
   "construction": {
-    "cost": 720,
+    "cost": 2160,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 50

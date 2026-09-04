@@ -5,12 +5,18 @@
   "menu": "police",
   "name": "building.police_large.name",
   "description": "building.police_large.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "construction": {
-    "cost": 1400,
+    "cost": 4200,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 260

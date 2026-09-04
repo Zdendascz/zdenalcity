@@ -4,14 +4,20 @@
   "category": "residential",
   "name": "building.residential_highrise.name",
   "description": "building.residential_highrise.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "level": 4,
   "construction": {
-    "cost": 1920,
+    "cost": 5760,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 96

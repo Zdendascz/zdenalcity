@@ -4,14 +4,20 @@
   "category": "residential",
   "name": "building.residential_quarter.name",
   "description": "building.residential_quarter.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "level": 3,
   "construction": {
-    "cost": 2700,
+    "cost": 8100,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 135

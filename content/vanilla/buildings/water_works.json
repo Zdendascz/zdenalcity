@@ -5,13 +5,19 @@
   "menu": "water",
   "name": "building.water_works.name",
   "description": "building.water_works.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "construction": {
-    "cost": 800,
+    "cost": 4000,
     "requiresRoad": true,
     "requiresPower": false,
     "nearWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 90

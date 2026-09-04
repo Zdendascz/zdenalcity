@@ -5,12 +5,18 @@
   "menu": "education",
   "name": "building.high_school.name",
   "description": "building.high_school.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "construction": {
-    "cost": 1800,
+    "cost": 5400,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 300

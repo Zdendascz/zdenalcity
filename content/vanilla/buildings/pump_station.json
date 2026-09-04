@@ -5,12 +5,18 @@
   "menu": "water",
   "name": "building.pump_station.name",
   "description": "building.pump_station.desc",
-  "footprint": [1, 1],
+  "footprint": [
+    1,
+    1
+  ],
   "construction": {
-    "cost": 250,
+    "cost": 1250,
     "requiresRoad": false,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 25

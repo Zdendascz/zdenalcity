@@ -4,14 +4,20 @@
   "category": "commercial",
   "name": "building.commercial_downtown.name",
   "description": "building.commercial_downtown.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "level": 5,
   "construction": {
-    "cost": 10260,
+    "cost": 30780,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 513

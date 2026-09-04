@@ -68,7 +68,24 @@ export type Command =
    * Svah tak nezmizí odkopáním, ale zavezením — hráč si tím rovná terasu
    * v úrovni horní krajiny (rozhodnutí autora, T41).
    */
-  | { type: 'level_area'; x: number; y: number; w: number; h: number; mode?: 'average' | 'fill' }
+  | {
+      type: 'level_area';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      mode?: 'average' | 'fill';
+      /**
+       * Na kterou výšku srovnat. Bez ní se bere průměr plochy.
+       *
+       * Slouží tažení štětcem: hráč vezme dlaždici a táhne, okolní se srovnají
+       * **na ni**. Bez pevné výšky si každá dlaždice počítala vlastní průměr,
+       * takže se svah po tahu jen rozmazal místo aby se srovnal — autor to
+       * nahlásil slovy „terén se musí rovnat dle dlaždice, od níž začalo
+       * rovnání".
+       */
+      height?: number;
+    }
   | { type: 'set_speed'; speed: number }
   /**
    * Linky MHD (§7 fáze 4).
@@ -869,8 +886,14 @@ export function estimateLevelArea(
   h: number,
   balance?: Balance,
   mode: LevelMode = 'average',
+  height?: number,
 ): TerraformEstimate {
-  const changes = mode === 'fill' ? planFilling(world, x, y, w, h) : planLevelling(world, x, y, w, h);
+  const changes =
+    height !== undefined
+      ? planLevelArea(world.cornerHeight, x, y, w, h, height)
+      : mode === 'fill'
+        ? planFilling(world, x, y, w, h)
+        : planLevelling(world, x, y, w, h);
   return estimate(changes, balance);
 }
 
@@ -911,9 +934,10 @@ export function levelArea(
   h: number,
   balance?: Balance,
   mode: LevelMode = 'average',
+  height?: number,
 ): CommandResult {
   if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
-  return commit(world, estimateLevelArea(world, x, y, w, h, balance, mode));
+  return commit(world, estimateLevelArea(world, x, y, w, h, balance, mode, height));
 }
 
 /* ------------------------------------------------------------------ MHD -- */

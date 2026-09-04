@@ -5,12 +5,18 @@
   "menu": "education",
   "name": "building.university.name",
   "description": "building.university.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "construction": {
-    "cost": 4200,
+    "cost": 12600,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 620

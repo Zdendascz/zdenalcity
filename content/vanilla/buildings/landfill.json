@@ -5,12 +5,18 @@
   "menu": "waste",
   "name": "building.landfill.name",
   "description": "building.landfill.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "construction": {
-    "cost": 300,
+    "cost": 900,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 60

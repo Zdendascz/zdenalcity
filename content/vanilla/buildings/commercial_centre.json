@@ -4,14 +4,20 @@
   "category": "commercial",
   "name": "building.commercial_centre.name",
   "description": "building.commercial_centre.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "level": 2,
   "construction": {
-    "cost": 1080,
+    "cost": 3240,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 56

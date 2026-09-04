@@ -102,6 +102,8 @@ def read_spec() -> dict:
     # Materiál vozovky a výkopu. Jeden obrázek na typ, ne šestnáct tvarů.
     materials = dict(TYPE_ROW.findall(section(text, 'Silnice')))
     materials.update(TYPE_ROW.findall(section(text, 'Potrubí')))
+    # Trosky jsou taky materiál: jeden obrázek, kreslí se do polygonu dlaždice.
+    materials.update(TYPE_ROW.findall(section(text, 'Trosky')))
     references = dict(REFERENCE_ROW.findall(section(text, 'Vzory')))
 
     return {
@@ -113,7 +115,12 @@ def read_spec() -> dict:
         'object_header': object_header,
         'objects': {
             name: dict(VARIANT_ROW.findall(body))
-            for name, body in SURFACE.findall(section(text, 'Objekty na terénu'))
+            for name, body in (
+                SURFACE.findall(section(text, 'Objekty na terénu'))
+                # Katastrofy na ulici jsou taky vystrizene objekty s kotvou,
+                # jen se nesazi do terenu, ale tam, kde nesteti nastalo.
+                + SURFACE.findall(section(text, 'Katastrofy na ulici'))
+            )
         },
     }
 
@@ -148,7 +155,7 @@ def plan(spec: dict) -> list[tuple[str, str, str | None]]:
 
 
 # Kam který obrázek patří. Objekty mezi sprity, zbytek mezi dlaždice.
-OBJECT_NAMES = ('forest_clump', 'boulders')
+OBJECT_NAMES = ('forest_clump', 'boulders', 'riot_crowd', 'pileup_wreck')
 
 
 def target_for(name: str) -> Path:

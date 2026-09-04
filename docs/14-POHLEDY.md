@@ -197,3 +197,82 @@ s prvním pádem: „tady je skála", ne „na skálu".
 
 Vzdálenost k silnici se hledá jen do šesti dlaždic od půdorysu. Dál už není co
 poradit a průchod celou mapou při každém odmítnutém kliknutí by hru zdržoval.
+
+## Obrázek trosek
+
+Autor o ploché olivové výplni, která po zbouraném domě zbývala: „místo toho
+hrůzného nesmyslu, co je teď". Vypadala jako zorané pole uprostřed města.
+
+Suť je teď **materiál jako povrch terénu**: vyplní se jí polygon dlaždice
+s maticí, otočený podle souřadnic, aby přes velké spáleniště nešel vidět pruh.
+Barva zůstává **pod** obrázkem — když se textura nedokreslí, má tam zbýt suť,
+ne díra.
+
+Vlastní setter `setRubble`, ne položka v `setSurfaces`: trosky nejsou druh
+terénu, jsou vrstva nad ním. Kdyby se vydávaly za terén, musela by se kvůli nim
+rozšířit `TERRAIN` a save by nesl hodnotu, která do něj nepatří.
+
+## Katastrofy na ulici mají obrázek
+
+Hromadná nehoda a nepokoje se odehrávají na silnici a mapa o nich mlčela — hráč
+viděl jen ikonu u hodin. Autor navrhl totéž co u trosek: „u nepokojů izometrický
+obrázek protestujících na ulici".
+
+Jsou to **vystřižené objekty s kotvou**, ne dlaždice: `riot_crowd` a
+`pileup_wreck`, tři varianty na druh. Varianta se vybírá **podle id
+katastrofy**, takže dvě nehody vedle sebe nevypadají jako jedna a při
+překreslení se obrázek nemění.
+
+Kreslí se **nad silnicí a pod domy**: dav stojí v ulici, ne na střeše, a
+zároveň nemá zmizet za prvním barákem. Přiřazení druh → obrázek je tabulka
+v `app.ts`, takže mod se svou katastrofou ji dostane nakreslenou zadarmo (P5).
+
+Přírodní katastrofy sem nepatří: nemají jedno místo, mají plochu, a tu už
+kreslí vlastní vrstvy.
+
+## Dvojí akce jedním klikem
+
+Autor: „velmi zhusta se mi stává, že při změně výšky povrchu jednou kliknu a
+provedou se dvě akce".
+
+Bylo to takhle: malování tažením se ptalo jen „je pod kurzorem jiná dlaždice než
+minule". Jenže zvednutí rohu **posune terén o patro nahoru**, takže pod nehybnou
+myší je najednou jiná dlaždice — a stačí nepatrné cuknutí při kliku, aby se
+zvedlo dvakrát.
+
+Podmínky jsou proto dvě: jiná dlaždice **a** skutečný posun ukazatele aspoň
+o deset pixelů. Táhnutí štětcem to nezdrží — deset pixelů je zlomek dlaždice.
+
+## Rovná se na dlaždici, kde tah začal
+
+Autor: „srovnání terénu musí nezbytně fungovat tak, že terén se rovná dle
+dlaždice, od níž začalo rovnání. Vezmu dlaždici a táhnu, okolní nižší se
+zvednou, vyšší se sníží."
+
+Do T92 si každá dlaždice počítala **vlastní průměr**, takže se svah po tahu jen
+rozmazal — výsledek byl zase svah, jen mírnější. Výška se teď zapíše při stisku
+z dlaždice pod kurzorem a drží se do puštění, takže celý tah dá jednu rovinu.
+`planLevelArea` cílovou výšku uměl přijmout už dřív; chybělo ji tam dostat.
+
+## Ceny
+
+Rozhodnutí autora: bourání ×10, výstavba ×3, silnice a vodovod ×5.
+
+| co | dřív | teď |
+|---|---|---|
+| ulice / třída / dálnice | 10 / 40 / 120 | 50 / 200 / 600 |
+| most | 150 | 750 |
+| trubka | 6 | 30 |
+| vodárna, úpravna, čerpací stanice | ×1 | ×5 |
+| ostatní budovy | ×1 | ×3 |
+| úklid trosek | 25 | 250 |
+| vykácení lesa / odtěžení skály / zavezení mokřadu | 12 / 60 / 40 | 120 / 600 / 400 |
+
+**Startovní kapitál vyrostl taky, na 60 000.** Není to změkčení: uhelná
+elektrárna sama stojí 24 000 z původních 20 000, takže by nešlo město vůbec
+založit. Příjmy se nezvedly, takže trojnásobek dál kouše — jen ne hned v první
+minutě.
+
+Bourání budovy a silnice je pořád **zdarma** a desetinásobek na tom nic nemění;
+zdražilo se všechno, co dnes za bourání něco stojí. Jestli má demolice domu
+stát peníze, je to nová mechanika, ne změna čísla.

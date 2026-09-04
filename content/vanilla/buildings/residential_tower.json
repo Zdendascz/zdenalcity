@@ -4,14 +4,20 @@
   "category": "residential",
   "name": "building.residential_tower.name",
   "description": "building.residential_tower.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "level": 3,
   "construction": {
-    "cost": 1200,
+    "cost": 3600,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 60

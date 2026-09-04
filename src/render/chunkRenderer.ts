@@ -97,6 +97,19 @@ interface SurfacePick {
  * jen **výřez dlaždice**, takže když se obrázek mapuje na celou dlaždici,
  * asfalt v rameni navazuje na asfalt v jádru sám od sebe.
  */
+/**
+ * Jak je obrázek trosek na téhle dlaždici otočený.
+ *
+ * Ze souřadnic, ne z `world.rng`: musí to vyjít stejně při každém překreslení
+ * i po načtení savu. Bez otočení mají všechny hromady kresbu ve stejném směru
+ * a přes velké spáleniště jde vidět pruh — táž past jako u trávy.
+ */
+function rubbleTurn(x: number, y: number): number {
+  let h = Math.imul((x * 0x2545f491) ^ (y * 0x9e3779b9), 0x85ebca6b) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0;
+  return h & 3;
+}
+
 function tileMatrix(
   x: number,
   y: number,
@@ -276,6 +289,8 @@ export class ChunkRenderer {
    * ve vodě, se šesti zmizely. Atlas ten strop obchází.
    */
   private surfacesByTerrain = new Map<number, Texture[]>();
+  /** Obrázek trosek. Bez něj se kreslí plná barva jako dřív. */
+  private rubbleTexture: Texture | undefined;
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
@@ -439,6 +454,18 @@ export class ChunkRenderer {
     }
   }
 
+  /**
+   * Nastaví obrázek trosek a překreslí.
+   *
+   * Vlastní setter, ne položka v `setSurfaces`: trosky nejsou druh terénu, jsou
+   * **vrstva nad ním**. Kdyby se vydávaly za terén, musela by se kvůli nim
+   * rozšířit `TERRAIN` a save by nesl hodnotu, která do něj nepatří.
+   */
+  setRubble(texture: Texture | undefined): void {
+    this.rubbleTexture = texture;
+    this.invalidateAll();
+  }
+
   /** Nastaví obrázky povrchu a překreslí, co je vidět. */
   setSurfaces(surfaces: ReadonlyMap<string, Texture>): void {
     // Losuje se **z toho, co přišlo**, ne z pevné trojice a/b/c. Kdyby některý
@@ -587,7 +614,23 @@ export class ChunkRenderer {
 
     // Trosky pod oheň: hořící suť má být vidět jako oheň, ne jako suť.
     if ((this.world.rubble[tileIndex] ?? 0) !== 0) {
+      // Barva zůstává **pod obrázkem**, ne místo něj: když se textura
+      // nedokreslí, má tam zbýt suť, ne díra. Do T92 tam byla jen ta barva —
+      // plochá olivová skvrna, kterou autor nazval „hrůzným nesmyslem",
+      // protože vypadala jako zorané pole uprostřed města.
       graphics.poly(points).fill({ color: RUBBLE_COLOR, alpha: RUBBLE_ALPHA });
+      if (this.rubbleTexture !== undefined) {
+        const turn = rubbleTurn(x, y);
+        const matrix = tileMatrix(x, y, corners, turn, this.rubbleTexture.width || 1);
+        graphics.poly(points).fill({
+          texture: this.rubbleTexture,
+          matrix,
+          // Tón je bílá ztlumená sklonem, stejně jako u povrchu: obrázek už
+          // šedohnědý je a vynásobit ho barvou suti znamená bláto.
+          color: shade(0xffffff, slopeLight(corners)),
+          textureSpace: 'global',
+        });
+      }
       this.drawRubbleMark(graphics, points, tileIndex);
     }
 

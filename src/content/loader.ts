@@ -69,6 +69,8 @@ export function createVanillaSource(): ContentSource {
     'asphalt_street',
     'asphalt_avenue',
     'asphalt_highway',
+    // Trosky nejsou terén, ale kreslí se stejně — jako výplň polygonu dlaždice.
+    'rubble',
   ]);
   const tileFiles = import.meta.glob('../../content/vanilla/tiles/*.png', {
     eager: true,

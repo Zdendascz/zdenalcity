@@ -5,13 +5,19 @@
   "menu": "water",
   "name": "building.water_treatment.name",
   "description": "building.water_treatment.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "construction": {
-    "cost": 1200,
+    "cost": 6000,
     "requiresRoad": true,
     "requiresPower": false,
     "nearWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 160

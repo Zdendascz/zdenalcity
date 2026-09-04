@@ -4,13 +4,19 @@
   "category": "industrial",
   "name": "building.industrial_small.name",
   "description": "building.industrial_small.desc",
-  "footprint": [1, 1],
+  "footprint": [
+    1,
+    1
+  ],
   "construction": {
-    "cost": 200,
+    "cost": 600,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 14

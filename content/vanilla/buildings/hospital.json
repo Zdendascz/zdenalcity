@@ -5,12 +5,18 @@
   "menu": "health",
   "name": "building.hospital.name",
   "description": "building.hospital.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "construction": {
-    "cost": 2200,
+    "cost": 6600,
     "requiresRoad": true,
     "requiresPower": false,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 380

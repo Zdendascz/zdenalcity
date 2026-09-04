@@ -4,14 +4,20 @@
   "category": "commercial",
   "name": "building.commercial_mall.name",
   "description": "building.commercial_mall.desc",
-  "footprint": [3, 3],
+  "footprint": [
+    3,
+    3
+  ],
   "level": 4,
   "construction": {
-    "cost": 6480,
+    "cost": 19440,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
-    "allowedTerrain": [0, 2]
+    "allowedTerrain": [
+      0,
+      2
+    ]
   },
   "economy": {
     "upkeep": 324

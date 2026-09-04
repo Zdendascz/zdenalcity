@@ -5,19 +5,26 @@
   "menu": "transit",
   "name": "building.metro_station.name",
   "description": "building.metro_station.desc",
-  "footprint": [2, 2],
+  "footprint": [
+    2,
+    2
+  ],
   "construction": {
-    "cost": 1600,
+    "cost": 4800,
     "requiresRoad": true,
     "requiresPower": true,
-    "allowedTerrain": [0]
+    "allowedTerrain": [
+      0
+    ]
   },
   "economy": {
     "upkeep": 180
   },
   "requirements": {
     "services": {},
-    "buildings": ["vanilla:transit_depot"]
+    "buildings": [
+      "vanilla:transit_depot"
+    ]
   },
   "transit": {
     "mode": "metro"
