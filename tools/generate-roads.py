@@ -110,8 +110,19 @@ def main() -> int:
     done = 0
     for name, prompt in batch:
         print(f'   {name} ... ', end='', flush=True)
+        # **Krizovatka je vzor pro celou rodinu.** Bez reference si kazdy
+        # obrazek zvoli vlastni sirku vozovky a na spoji je z toho schod --
+        # zmereno na prvni sade, kde se sirky lisily dvojnasobne. Stejny trik
+        # drzi pohromade sprity budov, viz `generate-sprites.py`.
+        family = name.partition('__')[0]
+        model_tile = OUT / f'{family}__nesw.png'
+        reference = (
+            model_tile.read_bytes()
+            if model_tile.exists() and not name.endswith('__nesw')
+            else None
+        )
         try:
-            blob = sprites.request(key, prompt, model, None, sprites.SIZE_SQUARE)
+            blob = sprites.request(key, prompt, model, reference, sprites.SIZE_SQUARE)
         except Exception as chyba:  # noqa: BLE001 - davka nesmi spadnout na jedne
             print(f'chyba: {chyba}')
             continue

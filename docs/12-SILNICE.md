@@ -35,12 +35,12 @@ masek se v ní rozpadne na **sedm oběžných drah**:
 
 | obrázek | maska | co z něj ještě vznikne |
 |---|---|---|
-| `ns` | rovinka | `ew` |
+| `ew` | rovinka | `ns` |
 | `ne` | zatáčka | `sw` |
-| `es` | zatáčka | `wn` |
-| `nes` | odbočka T | `esw`, `nsw`, `new` |
+| `wn` | zatáčka | `es` |
+| `new` | odbočka T | `nes`, `esw`, `nsw` |
 | `nesw` | křižovatka | — |
-| `n` | slepý konec | `e`, `s`, `w` |
+| `w` | slepý konec | `n`, `e`, `s` |
 | `0` | samota | — |
 
 Není to úspora peněz, ale **záruka**. Rovinka na sever a rovinka na východ
@@ -56,6 +56,24 @@ s křižovatkou se srovnají celé. Rovnoběžník je afinní obraz čtverce, ta
 něj sprite sedne přesně — stačí mu nastavit matici z rohů dlaždice. Kdyby byla
 dlaždice zkroucená do sedla, afinní zobrazení by nestačilo; po srovnání ale
 sedlo nevznikne.
+
+## Které strany jsou které
+
+Tohle stálo celou první sadu. Prompt mluví o **hranách obrázku**, protože
+„sever" si generátor přeloží jako směr k vrcholu kosočtverce. Jenže já ty
+hrany převedl na světové strany špatně. V izometrii platí:
+
+| hrana obrázku | směr v mřížce |
+|---|---|
+| vpravo nahoře | **sever** (`x`, `y − 1`) |
+| vpravo dole | **východ** (`x + 1`, `y`) |
+| vlevo dole | **jih** (`x`, `y + 1`) |
+| vlevo nahoře | **západ** (`x − 1`, `y`) |
+
+Plyne to z `gridToScreen`: soused na severu má `x` beze změny a `y` o jedna
+míň, což je na obrazovce **doprava a nahoru**. Obrázky z první sady byly
+v pořádku, jen se jmenovaly podle jiných stran — měření to ukázalo jako
+17 z 19 vadných dlaždic a stačilo je přejmenovat.
 
 ## Styl
 
@@ -97,34 +115,34 @@ kreslí renderer. Generátor to nikdy netrefí a přerušená čára je vidět v
 
 | id | prompt |
 |---|---|
-| `street__ns` | A narrow asphalt street crossing the tile straight through, entering at the middle of the upper-left edge and leaving at the middle of the lower-right edge. Grass on both sides. |
-| `street__ne` | A narrow asphalt street that enters at the middle of the upper-left edge and turns to leave at the middle of the upper-right edge, a smooth bend. Grass fills the rest. |
-| `street__es` | A narrow asphalt street that enters at the middle of the upper-right edge and turns to leave at the middle of the lower-right edge, a smooth bend. Grass fills the rest. |
-| `street__nes` | A narrow asphalt street crossing from the middle of the upper-left edge to the middle of the lower-right edge, with a third branch leaving at the middle of the upper-right edge: a T junction. Grass fills the rest. |
+| `street__ew` | A narrow asphalt street crossing the tile straight through, entering at the middle of the upper-left edge and leaving at the middle of the lower-right edge. Grass on both sides. |
+| `street__wn` | A narrow asphalt street that enters at the middle of the upper-left edge and turns to leave at the middle of the upper-right edge, a smooth bend. Grass fills the rest. |
+| `street__ne` | A narrow asphalt street that enters at the middle of the upper-right edge and turns to leave at the middle of the lower-right edge, a smooth bend. Grass fills the rest. |
+| `street__new` | A narrow asphalt street crossing from the middle of the upper-left edge to the middle of the lower-right edge, with a third branch leaving at the middle of the upper-right edge: a T junction. Grass fills the rest. |
 | `street__nesw` | A narrow asphalt crossroads: carriageways leave through the middle of all four edges and meet in the centre of the tile. Grass in the four pointed corners only. |
-| `street__n` | A narrow asphalt street entering at the middle of the upper-left edge and ending in the middle of the tile in a rounded dead end. Grass fills the rest. |
+| `street__w` | A narrow asphalt street entering at the middle of the upper-left edge and ending in the middle of the tile in a rounded dead end. Grass fills the rest. |
 | `street__0` | A small square of asphalt in the middle of the tile with a kerb all the way round, not touching any edge. Grass fills the rest. |
 
 ## Třída
 
 | id | prompt |
 |---|---|
-| `avenue__ns` | A wide asphalt avenue crossing the tile straight through, entering at the middle of the upper-left edge and leaving at the middle of the lower-right edge, darker and smoother than a side street. Narrow grass verges on both sides. |
-| `avenue__ne` | A wide asphalt avenue that enters at the middle of the upper-left edge and turns to leave at the middle of the upper-right edge, a broad sweeping bend. Grass fills the rest. |
-| `avenue__es` | A wide asphalt avenue that enters at the middle of the upper-right edge and turns to leave at the middle of the lower-right edge, a broad sweeping bend. Grass fills the rest. |
-| `avenue__nes` | A wide asphalt avenue crossing from the middle of the upper-left edge to the middle of the lower-right edge, with a third branch leaving at the middle of the upper-right edge: a T junction. Grass fills the rest. |
+| `avenue__ew` | A wide asphalt avenue crossing the tile straight through, entering at the middle of the upper-left edge and leaving at the middle of the lower-right edge, darker and smoother than a side street. Narrow grass verges on both sides. |
+| `avenue__wn` | A wide asphalt avenue that enters at the middle of the upper-left edge and turns to leave at the middle of the upper-right edge, a broad sweeping bend. Grass fills the rest. |
+| `avenue__ne` | A wide asphalt avenue that enters at the middle of the upper-right edge and turns to leave at the middle of the lower-right edge, a broad sweeping bend. Grass fills the rest. |
+| `avenue__new` | A wide asphalt avenue crossing from the middle of the upper-left edge to the middle of the lower-right edge, with a third branch leaving at the middle of the upper-right edge: a T junction. Grass fills the rest. |
 | `avenue__nesw` | A wide asphalt crossroads: carriageways leave through the middle of all four edges and meet in a large square junction in the centre. Grass in the four pointed corners only. |
-| `avenue__n` | A wide asphalt avenue entering at the middle of the upper-left edge and ending in the middle of the tile in a rounded dead end. Grass fills the rest. |
+| `avenue__w` | A wide asphalt avenue entering at the middle of the upper-left edge and ending in the middle of the tile in a rounded dead end. Grass fills the rest. |
 | `avenue__0` | A square of dark asphalt in the middle of the tile with a kerb all the way round, not touching any edge. Grass fills the rest. |
 
 ## Dálnice
 
 | id | prompt |
 |---|---|
-| `highway__ns` | A very wide fresh dark asphalt highway crossing the tile straight through, entering at the middle of the upper-left edge and leaving at the middle of the lower-right edge, with a low concrete crash barrier along both sides. Thin grass verges. |
-| `highway__ne` | A very wide fresh dark asphalt highway that enters at the middle of the upper-left edge and turns to leave at the middle of the upper-right edge, a long sweeping bend with a concrete crash barrier along both sides. Grass fills the rest. |
-| `highway__es` | A very wide fresh dark asphalt highway that enters at the middle of the upper-right edge and turns to leave at the middle of the lower-right edge, a long sweeping bend with a concrete crash barrier along both sides. Grass fills the rest. |
-| `highway__nes` | A very wide fresh dark asphalt highway crossing from the middle of the upper-left edge to the middle of the lower-right edge, with a third carriageway leaving at the middle of the upper-right edge: a large junction. Grass fills the rest. |
+| `highway__ew` | A very wide fresh dark asphalt highway crossing the tile straight through, entering at the middle of the upper-left edge and leaving at the middle of the lower-right edge, with a low concrete crash barrier along both sides. Thin grass verges. |
+| `highway__wn` | A very wide fresh dark asphalt highway that enters at the middle of the upper-left edge and turns to leave at the middle of the upper-right edge, a long sweeping bend with a concrete crash barrier along both sides. Grass fills the rest. |
+| `highway__ne` | A very wide fresh dark asphalt highway that enters at the middle of the upper-right edge and turns to leave at the middle of the lower-right edge, a long sweeping bend with a concrete crash barrier along both sides. Grass fills the rest. |
+| `highway__new` | A very wide fresh dark asphalt highway crossing from the middle of the upper-left edge to the middle of the lower-right edge, with a third carriageway leaving at the middle of the upper-right edge: a large junction. Grass fills the rest. |
 | `highway__nesw` | A very wide fresh dark asphalt highway crossroads: carriageways leave through the middle of all four edges and meet in a large open junction in the centre. Grass in the four pointed corners only. |
-| `highway__n` | A very wide fresh dark asphalt highway entering at the middle of the upper-left edge and ending in the middle of the tile in a blunt closed end with a concrete barrier across it. Grass fills the rest. |
+| `highway__w` | A very wide fresh dark asphalt highway entering at the middle of the upper-left edge and ending in the middle of the tile in a blunt closed end with a concrete barrier across it. Grass fills the rest. |
 | `highway__0` | A square of fresh dark asphalt in the middle of the tile with a concrete barrier all the way round, not touching any edge. Grass fills the rest. |
