@@ -17,6 +17,8 @@ export interface HudCallbacks {
   onSpeed(index: number): void;
   onTaxChange(zone: ZoneType, delta: number): void;
   onQuickSave(): void;
+  /** Uloží snímek herní plochy jako PNG. */
+  onScreenshot(): void;
   onQuickLoad(): void;
   onDownload(): void;
   onOpenFile(file: File): void;
@@ -617,7 +619,14 @@ export class Hud {
     open.append(iconSvg('open-file'), this.i18n.t('ui.save.open'));
     fileRow.append(download, open, input);
 
-    popover.panel.append(row, fileRow);
+    // Snímek patří sem, protože je to taky „vem, co je na obrazovce, a dej mi
+    // z toho soubor". Jen to není save, tak má vlastní řádek.
+    const shotRow = el('div', 'panel__row');
+    const shot = button('chip', () => this.callbacks.onScreenshot());
+    shot.append(iconSvg('screenshot'), this.i18n.t('ui.save.screenshot'));
+    shotRow.appendChild(shot);
+
+    popover.panel.append(row, fileRow, shotRow);
     this.controls.appendChild(popover.root);
   }
 

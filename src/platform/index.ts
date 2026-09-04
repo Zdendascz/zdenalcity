@@ -52,8 +52,14 @@ export interface SaveStorage {
 
 /** Předání souboru hráči a od hráče. */
 export interface FileTransfer {
-  /** Nabídne bajty ke stažení pod daným jménem. */
-  save(bytes: Uint8Array, fileName: string): void;
+  /**
+   * Nabídne bajty ke stažení pod daným jménem.
+   *
+   * `type` je MIME typ souboru. Výchozí je zip, protože tudy chodí hlavně
+   * savy; snímek obrazovky si řekne o `image/png`, jinak by ho prohlížeč
+   * uložil jako archiv a neotevřel.
+   */
+  save(bytes: Uint8Array, fileName: string, type?: string): void;
   /** Přečte, co hráč vybral. `File` sem dá rozhraní — výběr je věc UI. */
   read(file: File): Promise<Uint8Array>;
 }

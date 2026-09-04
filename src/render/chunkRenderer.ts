@@ -595,7 +595,12 @@ export class ChunkRenderer {
 
     const zone = this.world.layers.zone[tileIndex] ?? 0;
     const zoneColor = ZONE_COLOR_BY_VALUE[zone];
-    if (zone !== 0 && zoneColor !== undefined) {
+    // **Barva zóny jen na volné parcele.** Kde už budova stojí, je zóna
+    // splněná a nemá co ukazovat — od chvíle, kdy je krycí, by se pod domem
+    // prostíral barevný koberec a z města byla mozaika. Rozhodnutí autora:
+    // „ty barvy zón jen tam, kde v té parcele není budova".
+    const empty = (this.world.layers.buildingId[tileIndex] ?? 0) === 0;
+    if (zone !== 0 && zoneColor !== undefined && (empty || underground)) {
       // Pod zemí zůstává zóna vidět jen jako náznak: je to hlavní důvod, proč
       // se tam potrubí vede, takže úplně zmizet nesmí.
       //

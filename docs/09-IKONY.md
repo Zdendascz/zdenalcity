@@ -171,3 +171,4 @@ hvězdu, velká dvě. Zmenšit tentýž tvar by nešlo poznat.
 |---|---|
 | `hand` | A white open hand with the fingers together, centred on a grey rounded-square badge. |
 | `view-decor` | A white broadleaf tree with a thick diagonal line struck through it, centred on a grey rounded-square badge. |
+| `screenshot` | A white photo camera seen from the front with a round lens, centred on a grey rounded-square badge. |

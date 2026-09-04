@@ -105,8 +105,8 @@ function createLocalStorage(): SaveStorage {
 
 function createFileTransfer(): FileTransfer {
   return {
-    save: (bytes, fileName) => {
-      const blob = new Blob([bytes as unknown as BlobPart], { type: 'application/zip' });
+    save: (bytes, fileName, type = 'application/zip') => {
+      const blob = new Blob([bytes as unknown as BlobPart], { type });
       const url = URL.createObjectURL(blob);
 
       const anchor = document.createElement('a');

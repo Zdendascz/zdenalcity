@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics } from 'pixi.js';
+import { Application, Assets, Container, Graphics, RenderTexture } from 'pixi.js';
 import type { Texture } from 'pixi.js';
 import type { TerrainDecor } from './decor';
 import { sampleSmooth } from './textures';
@@ -590,6 +590,14 @@ const DECOR_VARIANT_LIMIT = 2;
  */
 const SURFACE_VARIANT_LIMIT = 1;
 
+/**
+ * Kolikrát jemněji než okno se kreslí snímek obrazovky.
+ *
+ * Dvojnásobek: z herního okna 1920 × 1080 vyjde 4K. Víc už nedává smysl —
+ * sprity jsou rastr a nad dvojnásobek se jen zvětší pixely.
+ */
+const SCREENSHOT_RESOLUTION = 2;
+
 /** Druhy terénu, ke kterým se hledá obrázek. Sedí na `TERRAIN` v `sim/layers.ts`. */
 const TERRAIN_NAMES = ['grass', 'water', 'sand', 'rock', 'forest', 'marsh'] as const;
 
@@ -907,6 +915,50 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       : { key: 'ui.save.storeFailed' };
   }
 
+  /**
+   * Uloží snímek herní plochy jako PNG.
+   *
+   * Bere se **obsah scény přes `extract`, ne plátno**. Plátno by šlo číst jen
+   * s `preserveDrawingBuffer`, a to zpomaluje každý snímek hry kvůli funkci,
+   * která se použije jednou za čas. `extract` si scénu překreslí zvlášť.
+   *
+   * Rozlišení je dvojnásobek okna: snímek z herního okna 1920 × 1080 vyjde
+   * ve 4K a dá se z něj něco vyříznout. HUD na něm není, protože je to DOM,
+   * ne Pixi — a na propagačním snímku stejně nemá co dělat.
+   */
+  async function saveScreenshot(): Promise<void> {
+    // **Kreslí se do vlastní textury o velikosti okna.**
+    // `extract` bez cíle si vezme obálku celého jeviště, a to je u mapy
+    // 256 × 256 přes třicet tisíc pixelů na šířku — prohlížeč to odmítl
+    // s „Array buffer allocation failed". Ani `frame` to nespravil: obálka se
+    // spočítá dřív. Textura dané velikosti je jistota.
+    const texture = RenderTexture.create({
+      width: app.screen.width,
+      height: app.screen.height,
+      resolution: SCREENSHOT_RESOLUTION,
+    });
+    app.renderer.render({ container: app.stage, target: texture });
+    const canvas = app.renderer.extract.canvas(texture);
+    texture.destroy(true);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        resolve(null);
+        return;
+      }
+      canvas.toBlob(resolve, 'image/png');
+    });
+    if (blob === null) {
+      message = { key: 'ui.save.screenshotFailed' };
+      return;
+    }
+
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    platform.files.save(bytes, `zdenalcity-${stamp}.png`, 'image/png');
+    message = { key: 'ui.save.screenshotSaved' };
+  }
+
   async function quickLoadNow(): Promise<void> {
     const bytes = await platform.storage.read('quick');
     if (!bytes) {
@@ -1192,6 +1244,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onOpenFile: (file) => {
       void platform.files.read(file).then(loadFromBytes);
     },
+    onScreenshot: () => void saveScreenshot(),
     onToggleLayer: toggleLayer,
     onSetView: setView,
     onToggleBudget: () => budgetPanel.toggle(),
