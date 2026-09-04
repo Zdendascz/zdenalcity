@@ -327,9 +327,19 @@ osmačtyřiceti:
 
 | id | prompt |
 |---|---|
-| `asphalt_street` | Worn asphalt seen from far above: one even grey surface, patched and cracked, the same everywhere. |
-| `asphalt_avenue` | Darker asphalt seen from far above: one even surface, smoother, the same everywhere. |
-| `asphalt_highway` | Fresh dark asphalt seen from far above: one even surface, the same everywhere. |
+| `asphalt_street` | Worn asphalt seen from far above: one even grey surface, patched and cracked, the same everywhere. This is bare road surface only. There is NO kerb, NO pavement, NO footpath, NO grass, NO tree, NO bush, NO road marking and NO junction anywhere in the image: the asphalt reaches every edge. |
+| `asphalt_avenue` | Darker asphalt seen from far above: one even surface, smoother, the same everywhere. This is bare road surface only. There is NO kerb, NO pavement, NO footpath, NO grass, NO tree, NO bush, NO road marking and NO junction anywhere in the image: the asphalt reaches every edge. |
+| `asphalt_highway` | Fresh dark asphalt seen from far above: one even surface, the same everywhere. This is bare road surface only. There is NO kerb, NO pavement, NO footpath, NO grass, NO tree, NO bush, NO road marking and NO junction anywhere in the image: the asphalt reaches every edge. |
+
+**Ta druhá věta tam být musí.** První pokus ji neměl a `asphalt_avenue` vyšla
+jako **celá scéna ulice** — zatáčka s obrubníkem, chodníkem, keři a stromy.
+„One even surface, the same everywhere" generátoru nestačí; slovo *asphalt* si
+přeloží jako *silnice i s okolím*. Vyjmenovat, co tam nesmí být, funguje —
+stejné poučení jako u vzorů z parku, kde se muselo zvlášť zakázat lavička
+a strom.
+
+Nešlo to přitom poznat, dokud se neopravilo mapování: při šestinásobném
+opakování na dlaždici byla z té scény jen šedá kaše.
 
 Platí pro ně totéž co pro povrchy: **z dálky, ne zblízka**, žádný směr, žádné
 místo, které by šlo poznat. Jednotlivá spára ani kámen v dlaždici vidět nejsou.
@@ -419,3 +429,30 @@ vydrželo. Stejná past jako u obrácené matice o dva týdny dřív.
 **Důsledek pro dřívější měření.** Zrnitost, kterou jsem měřil a „opravil“
 mipmapami, byla z velké části tohle. Mipmapy dávají smysl a zůstávají, ale
 zásluhu za lepší vzhled má tenhle řádek, ne ony.
+
+## Co zbývá: kostkovaný trávník
+
+Když mapování sedí, vyleze najevo další vada, kterou opakování schovávalo:
+**každá dlaždice má vlastní světlo přes celou plochu**, a protože se obrázek
+po dlaždicích otáčí, sousedi na sebe nenavazují. Z mapy je kostkovaná deka.
+
+Změřeno jako rozdíl nejsvětlejšího a nejtmavšího místa po silném rozostření,
+tedy „široký přechod přes dlaždici“:
+
+| dlaždice | široký přechod |
+|---|---|
+| `grass` | 57 |
+| `sand` | 47 |
+| `rock` | 32 |
+| `marsh` | 33 |
+| `forest` | 28 |
+| `asphalt_street` | 27 |
+| `asphalt_highway` | 22 |
+| `water` | 10 |
+| `asphalt_avenue` | 7 |
+
+Zadání to přitom už říká — „široká proměnlivost patří sklonu, ne kresbě“
+a „obrázek má být na celé ploše stejný“. Tráva a písek to nedodržely nejvíc
+a jsou to zrovna ty dva povrchy, kterých je na mapě vidět nejvíc. Voda
+a nová `asphalt_avenue` ukazují, že to generátor umí; je to tedy věc promptu,
+ne meze nástroje.
