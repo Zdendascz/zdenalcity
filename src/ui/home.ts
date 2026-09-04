@@ -38,10 +38,26 @@ const AUTHOR_EMAIL = 'jsem@zdendas.cz';
 
 /** Snímky ze hry pro hlavičku a karty. Leží v `public/shots/`. */
 const SHOTS = [
-  { file: 'centrum.jpg', titleKey: 'ui.home.shot.centre' },
-  { file: 'nabrezi.jpg', titleKey: 'ui.home.shot.waterfront' },
-  { file: 'sidliste.jpg', titleKey: 'ui.home.shot.estate' },
   { file: 'prehled.jpg', titleKey: 'ui.home.shot.overview' },
+  { file: 'nabrezi.jpg', titleKey: 'ui.home.shot.waterfront' },
+  { file: 'ctvrt.jpg', titleKey: 'ui.home.shot.quarter' },
+  { file: 'detail.jpg', titleKey: 'ui.home.shot.street' },
+] as const;
+
+/**
+ * Kreslené pohledy z úrovně očí. Leží v `public/scenes/`.
+ *
+ * **Nejsou to snímky ze hry** a nesmějí se za ně vydávat, proto mají vlastní
+ * řadu s vlastním nadpisem. Kamera hry je pevná a izometrická; ulici z úrovně
+ * chodníku z ní nedostaneš, tak se kreslí zvlášť (`docs/10-SCENY.md`).
+ */
+const SCENES = [
+  { file: 'ulice.jpg', titleKey: 'ui.home.scene.street' },
+  { file: 'prucelu.jpg', titleKey: 'ui.home.scene.facade' },
+  { file: 'namesti.jpg', titleKey: 'ui.home.scene.square' },
+  { file: 'sidliste.jpg', titleKey: 'ui.home.scene.estate' },
+  { file: 'zastavka.jpg', titleKey: 'ui.home.scene.stop' },
+  { file: 'prumysl.jpg', titleKey: 'ui.home.scene.works' },
 ] as const;
 
 /** Jak dlouho zůstane jeden snímek v hlavičce, než se prolne do dalšího. */
@@ -139,7 +155,8 @@ export function showHome(
 
   // --- řady karet ---------------------------------------------------------
 
-  root.appendChild(shotRow(t));
+  root.appendChild(cardRow(t, 'ui.home.fromTheGame', SHOTS, 'shots'));
+  root.appendChild(cardRow(t, 'ui.home.fromTheWorld', SCENES, 'scenes'));
   root.appendChild(aboutRow(t, root));
 
   parent.appendChild(root);
@@ -155,20 +172,25 @@ export function showHome(
   });
 }
 
-/** Řada se snímky ze hry. Posouvá se do strany, jako v katalogu filmů. */
-function shotRow(t: (key: string) => string): HTMLElement {
+/** Řada obrázků. Posouvá se do strany, jako v katalogu filmů. */
+function cardRow(
+  t: (key: string) => string,
+  titleKey: string,
+  items: readonly { file: string; titleKey: string }[],
+  folder: string,
+): HTMLElement {
   const section = el('section', 'home__row');
-  section.appendChild(el('h2', 'home__row-title', t('ui.home.fromTheGame')));
+  section.appendChild(el('h2', 'home__row-title', t(titleKey)));
 
   const strip = el('div', 'home__strip');
-  for (const shot of SHOTS) {
+  for (const item of items) {
     const card = el('figure', 'home__card');
     const image = el('img', 'home__card-image');
-    image.src = `shots/${shot.file}`;
-    image.alt = t(shot.titleKey);
+    image.src = `${folder}/${item.file}`;
+    image.alt = t(item.titleKey);
     image.loading = 'lazy';
     card.appendChild(image);
-    card.appendChild(el('figcaption', 'home__card-label', t(shot.titleKey)));
+    card.appendChild(el('figcaption', 'home__card-label', t(item.titleKey)));
     strip.appendChild(card);
   }
 

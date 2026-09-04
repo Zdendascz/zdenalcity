@@ -77,6 +77,8 @@ VARIANT = r'^\| \*\*([abc])\*\* \| (.+?) \|\s*$'
 # kreslí **na výšku**.
 SIZE_SQUARE = '1024x1024'
 SIZE_TALL = '1024x1536'
+# Na šířku. Používají to jen scény z ulice, sprity ani dlaždice ne.
+SIZE_WIDE = '1536x1024'
 
 # Kolik místa nad podstavou zbývá ve čtvercovém plátně.
 #
@@ -226,7 +228,14 @@ def multipart(fields: dict[str, str], files: dict[str, tuple[str, bytes]]) -> tu
     return b''.join(parts), f'multipart/form-data; boundary={boundary}'
 
 
-def request(key: str, prompt: str, model: str, reference: bytes | None, size: str) -> bytes:
+def request(
+    key: str,
+    prompt: str,
+    model: str,
+    reference: bytes | None,
+    size: str,
+    background: str = 'transparent',
+) -> bytes:
     """Jeden obrázek. Vrací PNG.
 
     S referencí jde požadavek na `images/edits`, bez ní na `images/generations`.
@@ -240,7 +249,10 @@ def request(key: str, prompt: str, model: str, reference: bytes | None, size: st
             'prompt': prompt,
             'size': size,
             'n': 1,
-            'background': 'transparent',
+            # Průhledné pozadí chtějí sprity a dlaždice, protože se lepí na
+            # mapu. Scéna z ulice vyplňuje celý rámeček a průhlednost by jí
+            # ubrala oblohu, takže si řekne o 'opaque'.
+            'background': background,
             'output_format': 'png',
         }).encode('utf-8')
         req = urllib.request.Request(

@@ -168,10 +168,10 @@ def main() -> int:
     print('ikony: 192, 512, maskable, favicon.png, favicon.ico')
 
     print('propagacni obrazky:')
-    promo('centrum.jpg', 'og-1200x630', (1200, 630), 'Stav město, které má smysl.')
+    promo('ctvrt.jpg', 'og-1200x630', (1200, 630), 'Stav město, které má smysl.')
     promo('nabrezi.jpg', 'ctverec-1080', (1080, 1080), 'Stav město, které má smysl.')
     promo('prehled.jpg', 'sirokouhly-1600x900', (1600, 900), 'Izometrický budovatel měst.')
-    promo('sidliste.jpg', 'pribeh-1080x1920', (1080, 1920), 'Izometrický budovatel měst.')
+    promo('detail.jpg', 'pribeh-1080x1920', (1080, 1920), 'Izometrický budovatel měst.')
     return 0
 
 
