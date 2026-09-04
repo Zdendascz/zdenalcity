@@ -756,7 +756,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const priceTag = new PriceTag(mount);
   const notifications = new Notifications(mount);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
-  const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance());
+  const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance(), (terrain) => {
+    // Náhled povrchu v rozboru parcely. Bere **první variantu**, ne tu, která
+    // na dlaždici padla: v panelu jde o materiál, ne o konkrétní kus mapy.
+    const name = TERRAIN_NAMES[terrain];
+    if (name === undefined) return undefined;
+    const [variant] = content.getTileVariants(name);
+    return variant === undefined ? undefined : content.getTile(name, variant);
+  });
   const financePanel = new FinancePanel(mount, i18n, dispatch);
   const transitPanel = new TransitPanel(mount, i18n, dispatch, {
     onPickStop: (lineId) => {

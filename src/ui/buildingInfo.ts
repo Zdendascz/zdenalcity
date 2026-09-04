@@ -3,11 +3,26 @@ import type { Definition } from '@/content/schema';
 import type { ParcelExplanation } from '@/sim/diagnostics';
 import { buildingMonthlyTax, buildingMonthlyUpkeep } from '@/sim/systems/economy';
 import type { Building, WorldState } from '@/sim/world';
+import { TERRAIN } from '@/sim/layers';
 import { iconSvg } from './icons';
 import { button, el } from './dom';
 import { formatNumber, landValueTermKeys } from './format';
 import { dateParts } from './hud';
 import type { I18n } from './i18n';
+
+/**
+ * Jméno povrchu pro překlad a pro obrázek. Index je hodnota vrstvy `terrain`,
+ * takže to musí sedět na `TERRAIN` v `sim/layers.ts` — na pořadí, ne na jméno
+ * konstanty.
+ */
+const TERRAIN_KEYS: Readonly<Record<number, string>> = {
+  [TERRAIN.grass]: 'grass',
+  [TERRAIN.water]: 'water',
+  [TERRAIN.sand]: 'sand',
+  [TERRAIN.rock]: 'rock',
+  [TERRAIN.forest]: 'forest',
+  [TERRAIN.marsh]: 'marsh',
+};
 
 /**
  * Stojí tu čerpací stanice, ke které voda nedoteče?
@@ -46,10 +61,23 @@ export class BuildingInfo {
   private readonly root: HTMLElement;
   private readonly i18n: I18n;
   private readonly balance: Balance;
+  /**
+   * Obrázek povrchu podle hodnoty vrstvy `terrain`. Panel si ho **nehledá
+   * sám**: o obsah se stará `ContentRegistry` a UI o něm nemá vědět nic víc
+   * než tuhle jednu funkci (P5). Když obrázek chybí, vrátí `undefined`
+   * a ukáže se jen jméno povrchu.
+   */
+  private readonly tileImage: (terrain: number) => string | undefined;
 
-  constructor(parent: HTMLElement, i18n: I18n, balance: Balance) {
+  constructor(
+    parent: HTMLElement,
+    i18n: I18n,
+    balance: Balance,
+    tileImage: (terrain: number) => string | undefined = () => undefined,
+  ) {
     this.i18n = i18n;
     this.balance = balance;
+    this.tileImage = tileImage;
     this.root = el('div', 'sheet sheet--info is-hidden');
     parent.appendChild(this.root);
   }
@@ -174,6 +202,30 @@ export class BuildingInfo {
   }
 
   /**
+   * Náhled povrchu: kosočtverec s texturou a jméno materiálu.
+   *
+   * Kosočtverec, ne čtverec — dlaždice je na mapě kosočtverec 2 : 1 a náhled
+   * má ukazovat **tu parcelu**, ne obrázek, ze kterého se kreslí. Ořez dělá
+   * `clip-path`, takže se nemusí vyrábět druhá sada obrázků.
+   *
+   * Bez obrázku zůstane jméno. Chybějící obrázek nesmí hru zastavit (P5).
+   */
+  private appendSurface(terrain: number): void {
+    const key = TERRAIN_KEYS[terrain];
+    if (key === undefined) return;
+
+    const row = el('div', 'sheet__surface');
+    const url = this.tileImage(terrain);
+    if (url !== undefined) {
+      const tile = el('div', 'sheet__surface-tile');
+      tile.style.backgroundImage = `url(${url})`;
+      row.appendChild(tile);
+    }
+    row.appendChild(el('span', 'sheet__surface-name', this.i18n.t(`ui.terrain.${key}`)));
+    this.root.appendChild(row);
+  }
+
+  /**
    * Rozpis parcely: cena půdy po sčítancích, dosah silnice a poptávka.
    *
    * Tohle je podle §12 jediná věc, která z fáze 2 dělá hru místo tabulky —
@@ -183,6 +235,7 @@ export class BuildingInfo {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
 
     this.root.appendChild(el('h3', 'sheet__subtitle', t('ui.parcel.title')));
+    this.appendSurface(parcel.terrain);
 
     // Nejdřív odpověď na otázku, se kterou sem hráč přišel: proč se tu nestaví.
     // Teprve pod ní čísla, ze kterých se to dá odvodit.

@@ -467,3 +467,30 @@ a „obrázek má být na celé ploše stejný“. Tráva a písek to nedodržel
 a jsou to zrovna ty dva povrchy, kterých je na mapě vidět nejvíc. Voda
 a nová `asphalt_avenue` ukazují, že to generátor umí; je to tedy věc promptu,
 ne meze nástroje.
+
+## Mřížka na vodě: lem po obvodu dlaždice
+
+Autor: „nejde nějak minimalizovat viditelnost té mřížky? kór na vodě je to
+dost rušivé". Nebyla to čára v rendereru — ta se u texturované dlaždice
+nekreslí. Byl to **měkký okraj samotné dlaždice**.
+
+`diamond_corners` hledá rohy z obálky krytí, takže padnou přesně na
+rozostřený okraj vygenerovaného kosočtverce. Narovnaný čtverec pak měl po
+obvodu průsvitný a tmavší lem — a protože ho měla každá dlaždice, složily se
+lemy přes celou mapu do sítě. Na vodě nejvíc, protože tam ji nemá co schovat.
+
+Změřený profil od okraje dovnitř (krytí):
+
+| px od okraje | voda | písek | dálnice |
+|---|---|---|---|
+| 0 | 242 | 160 | 129 |
+| 2 | 252 | 251 | 163 |
+| 8 | 253 | 252 | 249 |
+
+Lem je tedy hluboký 2 px u vody a písku a 8 px u dálnice. `EDGE_TRIM = 0,05`
+ořízne třináct pixelů z 256, tedy s rezervou, a výsledek se dokryje na 255.
+Po opravě je krytí na okraji i uvnitř 255 u všech dlaždic a rozdíl jasu klesl
+u dálnice z 43/65 na 62/66.
+
+Materiálu se tím neubere nic: je to plocha bez místa, takže na pěti procentech
+kraje nic není.

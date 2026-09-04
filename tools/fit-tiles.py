@@ -114,14 +114,40 @@ def diamond_corners(image: Image.Image) -> tuple[tuple[float, float], ...] | Non
     return ((mx, y0), (x1, my), (mx, y1), (x0, my))
 
 
+# O kolik se kosočtverec před narovnáním smrskne, v podílu poloúhlopříčky.
+#
+# Rohy se hledají z obálky krytí, takže leží přesně na **měkkém okraji**
+# vygenerovaného kosočtverce. Narovnaný čtverec pak měl po obvodu lem, který
+# byl průsvitný a tmavší — a protože ho měla každá dlaždice, skládala se z těch
+# lemů přes celou mapu mřížka. Nejvíc to bylo vidět na vodě, kde není co by ji
+# schovalo; autor to nahlásil.
+#
+# Změřeno na hotových dlaždicích jako profil od okraje dovnitř: u vody a písku
+# je lem hluboký 2 px, u dálnice 8 px (krytí 129 na okraji proti 249 uvnitř).
+# Pět procent z 256 je třináct pixelů, tedy s rezervou i na nejhorší případ.
+# Materiálu se tím neubere nic podstatného — je to plocha bez místa.
+EDGE_TRIM = 0.05
+
+
+def trim(corners: tuple[tuple[float, float], ...]) -> tuple[tuple[float, float], ...]:
+    """Smrskne kosočtverec ke středu, aby se vzorkovalo zevnitř, ne z okraje."""
+    cx = sum(x for x, _ in corners) / len(corners)
+    cy = sum(y for _, y in corners) / len(corners)
+    k = 1 - EDGE_TRIM
+    return tuple((cx + (x - cx) * k, cy + (y - cy) * k) for x, y in corners)
+
+
 def deskew(image: Image.Image, corners: tuple[tuple[float, float], ...]) -> Image.Image:
     """Kosočtverec na čtverec `SIZE × SIZE`.
 
     `Image.transform` s AFFINE počítá **zpětně**: pro výstupní pixel `(u, v)`
     si řekne o zdrojový `(a·u + b·v + c, d·u + e·v + f)`. Dosazuje se tedy
     rovnou zobrazení ze čtverce do kosočtverce, ne obráceně.
+
+    Vzorkuje se z **oříznutého** kosočtverce, viz `EDGE_TRIM`, a výsledek se
+    dokryje: dlaždice musí vyplnit celý polygon, jinak je z okrajů mřížka.
     """
-    top, right, _bottom, left = corners
+    top, right, _bottom, left = trim(corners)
     # (0,0) = severozápad = horní vrchol; +u míří k severovýchodu (pravý
     # vrchol), +v k jihozápadu (levý vrchol).
     a = (right[0] - top[0]) / SIZE
@@ -130,7 +156,9 @@ def deskew(image: Image.Image, corners: tuple[tuple[float, float], ...]) -> Imag
     d = (right[1] - top[1]) / SIZE
     e = (left[1] - top[1]) / SIZE
     f = top[1]
-    return image.transform((SIZE, SIZE), Image.AFFINE, (a, b, c, d, e, f), Image.BICUBIC)
+    square = image.transform((SIZE, SIZE), Image.AFFINE, (a, b, c, d, e, f), Image.BICUBIC)
+    square.putalpha(255)
+    return square
 
 
 def edge_band(square: Image.Image, edge: str) -> tuple[float, float] | None:

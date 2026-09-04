@@ -678,6 +678,28 @@ body {
   text-align: right;
 }
 
+.sheet__surface {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 6px 0 8px;
+}
+
+/* Kosočtverec 2 : 1, stejný tvar jako dlaždice na mapě. Obrázek je čtverec
+   a mapuje se na něj, takže náhled ukazuje totéž co hra. */
+.sheet__surface-tile {
+  flex: none;
+  width: 56px;
+  height: 28px;
+  background-position: center;
+  background-size: cover;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.sheet__surface-name {
+  font-size: 12px;
+}
+
 .sheet__note {
   margin: 8px 0 0;
   color: var(--text-dim);
