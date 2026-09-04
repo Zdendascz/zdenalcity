@@ -24,6 +24,7 @@ import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
+import type { ReadonlyWorldView } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
 import { DisasterRegistry } from '@/sim/disasters/registry';
 import { startDisaster } from '@/sim/disasters/scheduler';
@@ -204,6 +205,25 @@ export function createLayerOptions(content: ContentRegistry): OverlayOption[] {
       icon: coverageIconOf(content, serviceClass),
     })),
   ];
+}
+
+/**
+ * Kam se má podívat kamera: těžiště zástavby, nebo střed mapy.
+ *
+ * Průměr stačí — jde o „ukaž mi moje město", ne o přesný střed. Prázdný svět
+ * nemá těžiště, tam se vrací střed mapy.
+ */
+function cityCentre(world: ReadonlyWorldView): { x: number; y: number } {
+  let sumX = 0;
+  let sumY = 0;
+  let count = 0;
+  for (const building of world.buildings.values()) {
+    sumX += building.x;
+    sumY += building.y;
+    count++;
+  }
+  if (count === 0) return { x: world.size / 2, y: world.size / 2 };
+  return { x: sumX / count, y: sumY / count };
 }
 
 /**
@@ -880,8 +900,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   const camera = (() => {
-    const center = gridToScreen(world.size / 2, world.size / 2);
-    return createCamera(center.x, center.y, 1);
+    // **Na město, ne doprostřed mapy.** Načtený save otevřel pohled na střed
+    // čtverce, což je u města na kraji pevniny prázdná voda — hráč po načtení
+    // viděl jezero a musel své město hledat tažením. Když ve světě nic nestojí,
+    // zůstává střed mapy: nové město se zakládá kdekoli.
+    const centre = cityCentre(world);
+    const point = gridToScreen(centre.x, centre.y);
+    return createCamera(point.x, point.y, 1);
   })();
 
   let hoveredTile: { x: number; y: number } | null = null;

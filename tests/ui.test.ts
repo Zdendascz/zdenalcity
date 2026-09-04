@@ -167,14 +167,53 @@ describe('pohledy a vrstvy', () => {
   });
 
   it('dosah třídy bez vlastní ikony spadne na symbol její budovy', async () => {
-    const content = await vanilla();
-    const layers = createLayerOptions(content);
+    // Záloha se zkouší na **vymyšlené třídě**, ne na vanilla obsahu.
+    // Dřív se k tomu používala `social`, protože k ní obrázek nebyl — jenže
+    // v T80 dostaly `coverage-*` obrázek všechny a z testu se stal test toho,
+    // že se ikona nedodala. Přesně ten případ, na který míří i jeho komentář:
+    // třídu služby smí přinést mod, který ke své vrstvě žádnou nenakreslí.
+    const content = new ContentRegistry();
+    await content.load({
+      label: 'testmod',
+      manifest: {
+        id: 'testmod',
+        name: 'Test Mod',
+        version: '1.0.0',
+        gameVersion: '>=0.1.0',
+        dependencies: [],
+      },
+      definitions: [
+        {
+          path: 'buildings/shelter.json',
+          data: {
+            id: 'testmod:shelter',
+            type: 'building',
+            category: 'service',
+            menu: 'social',
+            name: 'building.shelter.name',
+            description: 'building.shelter.desc',
+            footprint: [1, 1],
+            construction: {
+              cost: 100,
+              requiresRoad: true,
+              requiresPower: false,
+              allowedTerrain: [0],
+            },
+            economy: { upkeep: 10 },
+            service: { class: 'shelter', strength: 10, radius: 8 },
+            graphics: { color: '#8fb4dd', heightLevels: 1, icon: 'heart' },
+          },
+        },
+      ],
+      locales: {
+        cs: { 'building.shelter.name': 'Útulek', 'building.shelter.desc': 'Útulek.' },
+      },
+    });
 
-    // `social` obrázek nemá — a nesmí kvůli tomu zůstat bez ikony, protože
-    // třídu služby smí přinést i mod, který ke své vrstvě žádnou nenakreslí.
-    const social = layers.find((layer) => layer.id === 'coverage:social');
-    expect(content.getIcons()['coverage-social']).toBeUndefined();
-    expect(social?.icon).toBe(content.get('vanilla:community_centre')?.graphics.icon);
+    const layers = createLayerOptions(content);
+    const shelter = layers.find((layer) => layer.id === 'coverage:shelter');
+    expect(content.getIcons()['coverage-shelter']).toBeUndefined();
+    expect(shelter?.icon).toBe('heart');
   });
 });
 
