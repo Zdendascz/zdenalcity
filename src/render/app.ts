@@ -208,22 +208,39 @@ export function createLayerOptions(content: ContentRegistry): OverlayOption[] {
 }
 
 /**
- * Kam se má podívat kamera: těžiště zástavby, nebo střed mapy.
+ * Kam se má podívat kamera: **nejhustší kus zástavby**, ne její průměr.
  *
- * Průměr stačí — jde o „ukaž mi moje město", ne o přesný střed. Prázdný svět
- * nemá těžiště, tam se vrací střed mapy.
+ * Průměr polohy budov zní jako správná odpověď a není: elektrárna na kraji
+ * mapy a čistička na druhém konci ho odtáhnou do prázdna mezi čtvrtěmi.
+ * Na ukázkovém městě o 777 budovách vyšel doprostřed lesa.
+ *
+ * Počítá se proto **hrubá mřížka po šestnácti dlaždicích** a bere se nejtěžší
+ * buňka; uvnitř ní pak průměr, ať pohled neskáče po hranách buněk. Prázdný
+ * svět nemá zástavbu, tam zůstává střed mapy.
  */
 function cityCentre(world: ReadonlyWorldView): { x: number; y: number } {
-  let sumX = 0;
-  let sumY = 0;
-  let count = 0;
+  const cell = 16;
+  const buckets = new Map<number, { x: number; y: number; count: number }>();
+  let best = -1;
+  let heaviest: { x: number; y: number; count: number } | undefined;
+
   for (const building of world.buildings.values()) {
-    sumX += building.x;
-    sumY += building.y;
-    count++;
+    const key =
+      Math.floor(building.y / cell) * Math.ceil(world.size / cell) +
+      Math.floor(building.x / cell);
+    const bucket = buckets.get(key) ?? { x: 0, y: 0, count: 0 };
+    bucket.x += building.x;
+    bucket.y += building.y;
+    bucket.count++;
+    buckets.set(key, bucket);
+    if (bucket.count > best) {
+      best = bucket.count;
+      heaviest = bucket;
+    }
   }
-  if (count === 0) return { x: world.size / 2, y: world.size / 2 };
-  return { x: sumX / count, y: sumY / count };
+
+  if (heaviest === undefined) return { x: world.size / 2, y: world.size / 2 };
+  return { x: heaviest.x / heaviest.count, y: heaviest.y / heaviest.count };
 }
 
 /**

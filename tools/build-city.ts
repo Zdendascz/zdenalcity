@@ -35,10 +35,16 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SIZE = MAP_SIZES[2] ?? 256;
 
 /** Seed mapy. Vybraný ručně: pevnina s jezerem a pobřežím, ne ostrov. */
-const SEED = 20260904;
+/**
+ * Seed mapy. **Vybraný měřením, ne od oka.** Šest seedů proti sobě při
+ * patnácti tisících ticích: 3407 dalo 20 388 obyvatel, další v pořadí 9 512
+ * a nejhorší 2 930. Rozhoduje ne velikost souše, ale kolik z ní je souvislá
+ * tráva — 3407 má 24 567 zastavitelných dlaždic v jednom kuse.
+ */
+const SEED = Number(process.env.CITY_SEED ?? 3407);
 
 /** Kolik tiků se nechá běžet. Město roste postupně, tohle je „pokročilé". */
-const TICKS = 20_000;
+const TICKS = Number(process.env.CITY_TICKS ?? 60_000);
 
 /** Peníze na start. Ukázkové město se nemá zaseknout na rozpočtu. */
 const FUNDS = 50_000_000;
@@ -181,62 +187,60 @@ function findCentre(world: WorldState): { x: number; y: number } {
 }
 
 /**
- * Jedna organická cesta.
+ * Uliční síť: **nepravidelná mřížka svázaná s tvarem pevniny.**
  *
- * Roste po dlaždicích a **občas zahne o jednu**, místo aby jela rovně. Mřížka
- * vypadá jako tabulka, kdežto tohle jako město, které rostlo. Když narazí na
- * vodu nebo na okraj, skončí — mosty se stavějí zvlášť a záměrně.
+ * Dvakrát jsem zkusil síť „růst" náhodnou procházkou a dvakrát to dopadlo
+ * špatně. Napoprvé se cesty zasekávaly o skálu a z 2431 dlaždic vozovky
+ * zbylo 198 parcel. Napodruhé uhýbaly, jenže tím se zacyklily: 32 530 dlaždic
+ * vozovky a 622 parcel, tedy pavučina bez domů.
  *
- * Vrací dlaždice, kterými prošla, aby se kolem nich dalo zónovat.
+ * Tohle je jednodušší a vypadá to líp. Ulice jdou rovně, ale **rozestupy jsou
+ * nepravidelné** (čtyři až sedm dlaždic) a každá se kreslí jen tam, kde je
+ * zastavitelná zem. Tvar města tak vykrojí krajina, ne generátor — a to je
+ * přesně to, co dělá skutečné město organickým. Každá čtvrtá je třída.
+ *
+ * Vrací dlaždice vozovky, kolem kterých se pak zónuje.
  */
-function growRoad(
+function layStreets(
   world: WorldState,
-  start: { x: number; y: number },
-  direction: { x: number; y: number },
-  length: number,
-  type: number,
+  centre: { x: number; y: number },
+  reach: number,
   random: () => number,
   balance: ReturnType<ContentRegistry['getBalance']>,
 ): { x: number; y: number }[] {
   const laid: { x: number; y: number }[] = [];
-  let { x, y } = start;
-  let dx = direction.x;
-  let dy = direction.y;
+  const min = Math.max(2, centre.x - reach);
+  const max = Math.min(SIZE - 3, centre.x + reach);
+  const top = Math.max(2, centre.y - reach);
+  const bottom = Math.min(SIZE - 3, centre.y + reach);
 
-  for (let step = 0; step < length; step++) {
-    if (!roadable(world, x, y)) break;
-    if (!hasRoad(world, x, y)) {
-      const result = buildRoad(world, x, y, type, balance);
-      if (!result.ok) break;
-    }
-    laid.push({ x, y });
-
-    // Zatáčka: jednou za čas se směr otočí o devadesát stupňů a hned zpátky,
-    // takže z přímky vznikne mírné vlnění místo schodů.
-    if (random() < 0.12) {
-      const turned = dx === 0 ? { x: random() < 0.5 ? -1 : 1, y: 0 } : { x: 0, y: random() < 0.5 ? -1 : 1 };
-      const nx = x + turned.x;
-      const ny = y + turned.y;
-      if (roadable(world, nx, ny)) {
-        if (!hasRoad(world, nx, ny)) buildRoad(world, nx, ny, type, balance);
-        laid.push({ x: nx, y: ny });
-        x = nx;
-        y = ny;
-      }
-    }
-
-    x += dx;
-    y += dy;
-    if (!roadable(world, x, y)) {
-      // Slepá ulice u vody: zkusí uhnout, než to vzdá.
-      const side = dx === 0 ? { x: random() < 0.5 ? -1 : 1, y: 0 } : { x: 0, y: random() < 0.5 ? -1 : 1 };
-      x = x - dx + side.x;
-      y = y - dy + side.y;
-      dx = side.x;
-      dy = side.y;
-      if (!roadable(world, x, y)) break;
-    }
+  /** Souřadnice ulic v jednom směru, s nepravidelnou roztečí. */
+  function lines(from: number, to: number): number[] {
+    const out: number[] = [];
+    for (let at = from; at <= to; at += 4 + Math.floor(random() * 4)) out.push(at);
+    return out;
   }
+
+  const rows = lines(top, bottom);
+  const columns = lines(min, max);
+
+  rows.forEach((y, order) => {
+    const type = order % 4 === 0 ? ROAD.avenue : ROAD.street;
+    for (let x = min; x <= max; x++) {
+      if (!buildable(world, x, y)) continue;
+      if (!hasRoad(world, x, y) && !buildRoad(world, x, y, type, balance).ok) continue;
+      laid.push({ x, y });
+    }
+  });
+
+  columns.forEach((x, order) => {
+    const type = order % 4 === 0 ? ROAD.avenue : ROAD.street;
+    for (let y = top; y <= bottom; y++) {
+      if (!buildable(world, x, y)) continue;
+      if (!hasRoad(world, x, y) && !buildRoad(world, x, y, type, balance).ok) continue;
+      laid.push({ x, y });
+    }
+  });
 
   return laid;
 }
@@ -302,51 +306,14 @@ function main(): void {
     const centre = findCentre(world);
     console.log(`střed města: ${centre.x}, ${centre.y}`);
 
-    // Páteř: čtyři třídy z centra do kříže, ale každá se cestou vlní.
-    const spines: { x: number; y: number }[] = [];
-    for (const direction of [
-      { x: 1, y: 0 },
-      { x: -1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 0, y: -1 },
-    ]) {
-      spines.push(
-        ...growRoad(world, centre, direction, 150, ROAD.avenue, random, balance),
-      );
-    }
+    const roads = layStreets(world, centre, 62, random, balance);
 
-    // Vedlejší ulice: odbočky z páteře, obě strany, různě dlouhé.
-    const streets: { x: number; y: number }[] = [];
-    for (const tile of spines) {
-      if (random() > 0.45) continue;
-      const along = random() < 0.5 ? { x: 1, y: 0 } : { x: 0, y: 1 };
-      const direction = random() < 0.5 ? along : { x: -along.x, y: -along.y };
-      const length = 14 + Math.floor(random() * 40);
-      streets.push(
-        ...growRoad(world, tile, direction, length, ROAD.street, random, balance),
-      );
-    }
-
-    // Ulice třetího řádu, aby vznikly bloky a ne hřeben.
-    const lanes: { x: number; y: number }[] = [];
-    for (const tile of streets) {
-      if (random() > 0.3) continue;
-      const along = random() < 0.5 ? { x: 1, y: 0 } : { x: 0, y: 1 };
-      const direction = random() < 0.5 ? along : { x: -along.x, y: -along.y };
-      lanes.push(
-        ...growRoad(world, tile, direction, 8 + Math.floor(random() * 16), ROAD.street, random, balance),
-      );
-    }
-
-    const roads = [...spines, ...streets, ...lanes];
     console.log(`silnic: ${roads.length} dlaždic`);
 
     // Vodovod po páteři: bez vody nevyroste nic (§8 fáze 3).
     // Potrubí **pod všechny silnice**. Vodovod je podmínka růstu (§8 fáze 3)
     // a s potrubím jen po páteři zůstala většina města suchá.
-    for (const tile of [...spines, ...streets, ...lanes]) {
-      buildPipe(world, tile.x, tile.y, balance);
-    }
+    for (const tile of roads) buildPipe(world, tile.x, tile.y, balance);
 
     // **Služby dřív než zóny.** Na zónovanou dlaždici se stavět nedá, takže
     // kdyby se zónovalo první, nezbylo by pro ně místo — první pokus tak
@@ -412,6 +379,29 @@ function main(): void {
     }
     console.log(`simulace ${Math.round((Date.now() - started) / 1000)} s`);
     report();
+
+    // **Prázdné zóny se uklidí.** Zónuje se s rezervou, aby mělo město kam
+    // růst, jenže co nevyroste, zůstane ležet jako plocha barvy — a od chvíle,
+    // kdy je zóna plně krycí, přebije nezastavěný plán celé město. Hráč by po
+    // sobě uklidil taky.
+    const built = new Set<number>();
+    for (const building of world.buildings.values()) {
+      const definition = content.get(building.definitionId);
+      if (definition === undefined) continue;
+      const [width, depth] = definition.footprint;
+      for (let dy = 0; dy < depth; dy++) {
+        for (let dx = 0; dx < width; dx++) {
+          built.add(index(building.x + dx, building.y + dy, world.size));
+        }
+      }
+    }
+    let cleared = 0;
+    for (let tile = 0; tile < world.layers.zone.length; tile++) {
+      if ((world.layers.zone[tile] ?? 0) === 0 || built.has(tile)) continue;
+      world.layers.zone[tile] = 0;
+      cleared++;
+    }
+    console.log(`uklizeno prázdných zón: ${cleared}`);
 
     const now = new Date().toISOString();
     const bytes = serializeSave(world, {
@@ -527,26 +517,13 @@ function placeServices(
     console.log(`  ${definitionId}: ${done}/${count}${done < count ? ` (${lastReason})` : ''}`);
   }
 
-  // Energie na kraji: nikdo nechce elektrárnu na náměstí.
-  const far = roads
-    .filter((tile) => Math.hypot(tile.x - centre.x, tile.y - centre.y) > 40)
-    .sort(() => random() - 0.5);
-  for (const definitionId of [
-    'vanilla:coal_power_plant',
-    'vanilla:coal_power_plant',
-    'vanilla:gas_power_plant',
-    'vanilla:gas_power_plant',
-    'vanilla:nuclear_power_plant',
-  ]) {
-    for (const tile of far) {
-      const x = tile.x + 1;
-      const y = tile.y + 1;
-      if (!free(x, y, 12, definitionId)) continue;
-      if (!placeDefinition(world, content, definitionId, x, y, balance).ok) continue;
-      placed.push({ x, y, id: definitionId });
-      break;
-    }
-  }
+  // Energie na kraji: nikdo nechce elektrárnu na náměstí. Kusů je hodně —
+  // dvacet tisíc obyvatel spotřebuje skoro půl milionu a s pěti elektrárnami
+  // svítilo 146 budov ze 777. Rozestup je velký, takže se stejně rozsypou po
+  // okraji a do centra se nedostanou.
+  spread('vanilla:coal_power_plant', 6, 30);
+  spread('vanilla:gas_power_plant', 8, 26);
+  spread('vanilla:nuclear_power_plant', 3, 60);
 
   // Vodárna musí k břehu (`nearWater`) a k silnici zároveň. Hledá se proto
   // **kolem každé silnice** jako u ostatních služeb, ne podle pevného odstupu
