@@ -1,21 +1,57 @@
 import { el } from './dom';
 
 /**
- * Hlášení problémů.
+ * Hlášení chyb.
  *
- * Hra nesmí mlčet — když klik nic neudělá nebo něco spadne, musí to být vidět.
- * Opakovaná stejná hláška se nehromadí, jen si přičte počet: malování silnice
- * přes vodu by jinak vysypalo padesát bublin.
+ * Hra nesmí mlčet — když něco spadne nebo hráč naráží na pravidlo, musí to být
+ * vidět. Opakovaná stejná hláška se nehromadí, jen si přičte počet: malování
+ * silnice přes vodu by jinak vysypalo padesát bublin.
+ *
+ * **Provozní hlášky sem nepatří.** Dřív se ukazovalo každé odmítnutí příkazu,
+ * takže tažení silnice přes už postavenou ulici vysypalo „Silnice už tady je"
+ * doprostřed obrazovky. Autor to nahlásil a má pravdu: že klik na obsazenou
+ * dlaždici nic neudělá, je vidět z toho, že se nic nestalo. Co která hláška je,
+ * rozhoduje `ROUTINE` — je to rozhodnutí o rozhraní, ne o pravidlech, takže
+ * bydlí tady a ne v `sim/`.
+ *
+ * Kreslí se **u pravého okraje**, ne uprostřed: uprostřed sedí kamera, karta
+ * parcely i okno pohromy a hláška je všem třem přes obraz.
  */
 
-export type NoticeKind = 'info' | 'error';
+/**
+ * Odmítnutí, která se **nehlásí**: hráč se jimi trefil vedle, nic se nerozbilo.
+ *
+ * Poznají se podle toho, že vzniknou při běžném tažení štětcem přes město —
+ * silnice už tam je, dlaždice je obsazená, mimo mapu. Všechno ostatní, včetně
+ * „nemáte dost peněz" a „chybí voda", je odpověď na otázku, kterou si hráč
+ * doopravdy položil, a ta se ukázat musí.
+ */
+export const ROUTINE_REASONS: ReadonlySet<string> = new Set([
+  'error.roadExists',
+  'error.pipeExists',
+  'error.roadInTheWay',
+  'error.rubbleInTheWay',
+  'error.occupied',
+  'error.occupiedFootprint',
+  'error.outOfBounds',
+  'error.nothingToBulldoze',
+  'error.terraformNoChange',
+  'error.notAZone',
+  'error.notAStop',
+  'error.stopAlreadyOnLine',
+  'error.stopNotOnLine',
+]);
 
-const AUTO_DISMISS_MS = { info: 4000, error: 12000 } as const;
+/** Je tohle odmítnutí jen provozní šum? */
+export function isRoutine(reason: string): boolean {
+  return ROUTINE_REASONS.has(reason);
+}
+
+const AUTO_DISMISS_MS = 12000;
 const MAX_VISIBLE = 6;
 
 interface Notice {
   text: string;
-  kind: NoticeKind;
   count: number;
   node: HTMLElement;
   countNode: HTMLElement;
@@ -31,8 +67,8 @@ export class Notifications {
     parent.appendChild(this.root);
   }
 
-  show(text: string, kind: NoticeKind = 'info'): void {
-    const existing = this.notices.find((notice) => notice.text === text && notice.kind === kind);
+  show(text: string): void {
+    const existing = this.notices.find((notice) => notice.text === text);
     if (existing) {
       existing.count++;
       existing.countNode.textContent = `×${existing.count}`;
@@ -41,12 +77,12 @@ export class Notifications {
       return;
     }
 
-    const node = el('div', `notice notice--${kind}`);
+    const node = el('div', 'notice');
     node.appendChild(el('span', 'notice__text', text));
     const countNode = el('span', 'notice__count is-hidden', '');
     node.appendChild(countNode);
 
-    const notice: Notice = { text, kind, count: 1, node, countNode, timer: 0 };
+    const notice: Notice = { text, count: 1, node, countNode, timer: 0 };
     node.addEventListener('click', () => this.dismiss(notice));
 
     this.root.appendChild(node);
@@ -62,7 +98,7 @@ export class Notifications {
 
   private restartTimer(notice: Notice): void {
     globalThis.clearTimeout(notice.timer);
-    notice.timer = globalThis.setTimeout(() => this.dismiss(notice), AUTO_DISMISS_MS[notice.kind]);
+    notice.timer = globalThis.setTimeout(() => this.dismiss(notice), AUTO_DISMISS_MS);
   }
 
   private dismiss(notice: Notice): void {

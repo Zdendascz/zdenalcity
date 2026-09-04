@@ -6,10 +6,10 @@ import {
   planCornerHeight,
   tileBaseHeight,
 } from '../heights';
-import { inBounds, index, ROAD, TERRAIN } from '../layers';
+import { inBounds, index, TERRAIN } from '../layers';
 import { applyHeightChanges } from '../world';
 import type { WorldState } from '../world';
-import { destroyTile, noLosses, reportLosses } from './damage';
+import { collapseUnsupportedRoads, destroyTile, noLosses, reportLosses } from './damage';
 import type { Losses } from './damage';
 import type { Disaster, DisasterContext } from './registry';
 
@@ -114,6 +114,11 @@ export function createLandslideDisaster(): Disaster {
       // Co stálo na hraně, spadne taky. Kaskáda hne rohy i mimo dráhu a budova,
       // které se podhrabal roh, není o nic zachovalejší než ta v dráze.
       collapseAroundChanges(context, changes, path, losses);
+
+      // Silnice se posuzuje **podle terénu, ne podle vzdálenosti**: sesuv jí
+      // mohl nechat rovinu, po které se dá dál jezdit, a pak nemá důvod padat.
+      // Když ne, rozbije se — stejným pravidlem jako po hráčově srovnávání.
+      collapseUnsupportedRoads(world, changes, losses);
 
       reportLosses(world, balance, losses, slide.happinessPerLoss);
     },
@@ -326,14 +331,10 @@ function collapseAroundChanges(
       if (!inBounds(x, y, world.size)) continue;
       const tile = index(x, y, world.size);
       if (inPath.has(tile)) continue;
-      // **Silnice padá stejně jako budova.** Sesuv hne rohy i mimo dráhu
-      // a dlaždice pod vozovkou přestane být rovnoběžník: vozovka na ní pak
-      // visí našikmo přes zlom. Autor to nahlásil obrázkem a má pravdu —
-      // taková silnice se nemá kreslit křivě, má být rozbitá a nepoužitelná.
-      const built =
-        (world.layers.buildingId[tile] ?? 0) !== 0 ||
-        (world.layers.road[tile] ?? ROAD.none) !== ROAD.none;
-      if (!built) continue;
+      // **Jen budovy.** Silnici řeší `collapseUnsupportedRoads` podle toho,
+      // jestli pod ní zbyla rovina — dům takovou možnost nemá, ten stojí na
+      // rovině ze zákona a nakloněný roh mu podhrabe základy vždycky.
+      if ((world.layers.buildingId[tile] ?? 0) === 0) continue;
       doomed.add(tile);
     }
   }

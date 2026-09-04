@@ -195,3 +195,48 @@ sebe schodovitě (drag přes dvě osy), zůstanou mezi nimi kosočtverce trávy
 uzavřené asfaltem kolem dokola. Není to chyba geometrie — je to poctivý výsledek
 dvou lomených tras vedle sebe. Kdyby to mělo vadit, řeší se to zaoblením zatáček,
 ne šířkou.
+
+## T89: silnice v sedle se rozbije
+
+Autor poslal obrázek silnice, která po sesuvu zůstala stát **našikmo přes
+zlom**, a napsal: „pokud k tomu dojde, musí být rozbitá, nepoužitelná".
+
+### Co je vada
+
+Ne sklon. Vozovka smí stoupat i být klopená — dlaždice je pak nakloněná rovina
+a nakreslí se i projede. Vadné je **sedlo**: čtyři rohy, které neleží v jedné
+rovině. Takový čtyřúhelník se láme po úhlopříčce a vozovka přes něj visí přes
+zlom. Pozná se podle toho, že se nerovnají součty protilehlých rohů
+(`nw + se ≠ ne + sw`); rovina ani rovnoběžný svah takový tvar nemají.
+
+Predikát je `roadFitsTerrain` v `sim/roads.ts`.
+
+**První pokus byl přísnější a byl špatně.** Ptal se na totéž, co vymáhá
+`planRoadGrade` při stavbě, tedy i na příčný spád. Jenže rovnání běží jen pro
+stavěnou dlaždici a její čtyři sousedy, kdežto kaskáda umí naklopit i silnici
+o dvě dlaždice dál — a taková se v každém odehraném městě běžně vyskytuje, byť
+se kreslí správně. Změřeno na fixturách savů: z 84 dlaždic sítě by po načtení
+zbylo 35. Proto se hlídá jen zkroucení.
+
+### Kdo couvne a komu se to rozbije
+
+| kdo hne terénem | co se stane |
+|---|---|
+| srovnání pod zónou | **couvne** — `reshapeBlocker` vrátí `road` a plocha se dělí na menší, stejně jako kolem budov |
+| stavba silnice | srovná si spád; co po tom zbude zkroucené, se rozbije |
+| stavba budovy, ruční terraform | adresný příkaz, couvat není kam — silnice se rozbije |
+| sesuv půdy | rozbije |
+| načtení savu | `repairUnsupportedRoads` projde mapu a rozbije, co je v sedle |
+
+Rozbitá silnice zmizí z vrstvy a **nechá trosky**, takže hráč pozná, kde vedla,
+a musí je uklidit, než postaví znovu. Hlásí se to tou hromadou, ne hláškou:
+hláška by přišla uprostřed tažení štětcem a hráč by ji překlikl.
+
+### Co to udělalo s referenčním městem
+
+Sesuv v savu autora měl na svědomí **11 dlaždic ze 448**. Fixtury savů ztratily
+dohromady 9 dlaždic, a jen jedna z osmi jich měla vůbec nějakou. Referenční
+město ve zlatém testu přišlo o **jednu z pětadvaceti** — od `placeDefinition`.
+Zbytek posunu v jeho číslech je tím, že se srovnávání pod zónami silnicím
+vyhýbá, takže se pod městem přestal přesypávat terén; podrobně v komentáři
+u `tests/golden/city.test.ts`.

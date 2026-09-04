@@ -590,3 +590,41 @@ describe('ZIP kontejner', () => {
     );
   });
 });
+
+describe('oprava po načtení', () => {
+  it('silnici, pod kterou v savu není rovina, po loadu rozbije', () => {
+    // Města uložená dřív, než pravidlo o nakloněné vozovce existovalo, nesou
+    // silnice ležící našikmo přes zlom po dávném sesuvu. Autor takový obrázek
+    // poslal; načíst zpátky do hry se ta vada nesmí.
+    const world = createWorld(7);
+    for (let y = 20; y <= 22; y++) {
+      expect(buildRoad(world, 20, y, 1).ok).toBe(true);
+    }
+
+    const save = migrate(unpackSave(serializeSave(world, OPTIONS)));
+
+    // Zkroucení se dopisuje **do savu**, ne do světa: simuluje se tím starý
+    // soubor, ne běh hry. Roh (20, 21) patří dlaždicím pod vozovkou.
+    const side = MAP_SIZE + 1;
+    save.heights[21 * side + 20] = 1;
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, save);
+
+    expect(restored.roadTiles.size, 'nakloněná vozovka přežila load').toBeLessThan(3);
+    // Trosky zůstanou, aby hráč našel, kde silnice byla.
+    expect(restored.rubble[index(20, 21, MAP_SIZE)]).toBe(1);
+  });
+
+  it('rovnou silnici load nechá být', () => {
+    const world = createWorld(7);
+    for (let y = 20; y <= 22; y++) {
+      expect(buildRoad(world, 20, y, 1).ok).toBe(true);
+    }
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(unpackSave(serializeSave(world, OPTIONS))));
+
+    expect(restored.roadTiles.size).toBe(3);
+  });
+});

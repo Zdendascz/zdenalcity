@@ -188,6 +188,22 @@ function findSite(world: WorldState): { x: number; y: number } {
  * Roli hraje i pořadí ve scénáři: odbočka se staví **až po zónování**, takže
  * srovná terén pod hotovou zónou. Hráč silnice normálně klade dřív, než zónuje.
  */
+/*
+ * Posun po pravidle „zkroucená silnice se rozbije" (T89): budov 29 → 32,
+ * obyvatel 52 → 58, kasa 7 834 → 8 686. Práce beze změny.
+ *
+ * Změna je v terénu, ne v ekonomice. Srovnávání pod zónou se od teď silnicím
+ * **vyhne**: `reshapeBlocker` hlásí `road`, když by plán nechal vozovku
+ * v sedle, a plocha se rozdělí na menší — stejně jako se odjakživa dělí kolem
+ * budov. Referenční město si tím nechalo rohy, které se pod ním dřív
+ * přesypávaly, a jak popisuje zápis výš, na pár rohů u kraje zóny je citlivé
+ * takhle silně samo o sobě.
+ *
+ * Jedna dlaždice vozovky z pětadvaceti se přesto ztratí, a je to od
+ * `placeDefinition`: stavba si srovná půdorys, kaskáda hne rohem pod sousední
+ * silnicí a ta skončí v sedle. Rozbije se a nechá trosky — přesně to autor
+ * chtěl. Vyhnout se tomu jde jen odmítnutím stavby a to by bylo horší.
+ */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
     const content = await vanilla();

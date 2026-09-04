@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
-import { index, ROAD, TERRAIN } from '../layers';
+import { inBounds, index, ROAD, TERRAIN } from '../layers';
+import { roadFitsTerrain } from '../roads';
 import { markTileDirty, removeBuilding } from '../world';
 import type { WorldState } from '../world';
 import { spawnRubble } from './rubble';
@@ -124,6 +125,21 @@ export function destroyTile(
     return;
   }
 
+  destroyInfrastructure(world, tile, losses);
+}
+
+/**
+ * Zničí silnici a potrubí na dlaždici. Budovy se netýká.
+ *
+ * Vlastní funkce, protože o ni nestojí jen katastrofy: silnici umí podhrabat
+ * i terén, který se pod ní pohnul (`collapseUnsupportedRoads`), a ta se má
+ * rozpadnout přesně stejně — včetně trosek, které pak musí hráč uklidit.
+ */
+export function destroyInfrastructure(
+  world: WorldState,
+  tile: number,
+  losses: Losses,
+): void {
   const hadRoad = (world.layers.road[tile] ?? ROAD.none) !== ROAD.none;
   const hadPipe = (world.layers.pipe[tile] ?? 0) !== 0;
   if (!hadRoad && !hadPipe) return;
@@ -141,6 +157,83 @@ export function destroyTile(
   markTileAt(world, tile);
   losses.infrastructure++;
 }
+
+/**
+ * Rozbije silnice, kterým se pod nohama pohnul terén.
+ *
+ * Volá se **po každé změně výšek**, ne jen po sesuvu: roh drží čtyři dlaždice,
+ * takže srovnání parcely vedle silnice jí nakloní vozovku úplně stejně jako
+ * utržený svah. Do T89 taková silnice zůstala stát a kreslila se našikmo přes
+ * zlom; autor to nahlásil obrázkem se slovy, že pokud k tomu dojde, musí být
+ * rozbitá a nepoužitelná.
+ *
+ * Prochází se **jen okolí změněných rohů**, ne celá mapa — a i tam se ptáme
+ * `roadFitsTerrain`, takže silnice, které se nic nestalo, zůstane stát.
+ *
+ * Bere `changes` jako plán, který se **už aplikoval**: kontroluje se stav po
+ * změně, ne před ní.
+ */
+export function collapseUnsupportedRoads(
+  world: WorldState,
+  changes: ReadonlyMap<number, number>,
+  losses: Losses,
+): number {
+  const side = world.size + 1;
+  const doomed = new Set<number>();
+
+  for (const corner of changes.keys()) {
+    const cx = corner % side;
+    const cy = (corner - cx) / side;
+    for (const [dx, dy] of AROUND_CORNER) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (!inBounds(x, y, world.size)) continue;
+      const tile = index(x, y, world.size);
+      if ((world.layers.road[tile] ?? ROAD.none) === ROAD.none) continue;
+      if (roadFitsTerrain(world, x, y)) continue;
+      doomed.add(tile);
+    }
+  }
+
+  // Setříděné, aby pořadí bourání nezáviselo na pořadí v mapě změn (P2).
+  for (const tile of [...doomed].sort((a, b) => a - b)) {
+    destroyInfrastructure(world, tile, losses);
+  }
+  return doomed.size;
+}
+
+/**
+ * Projde **celou mapu** a rozbije silnice, které pod sebou nemají rovinu.
+ *
+ * Volá se po načtení savu. Města uložená dřív, než pravidlo existovalo, nesou
+ * vozovky nakloněné přes zlom po dávném sesuvu — přesně ten obrázek, který
+ * autor poslal. Nechat je stát by znamenalo, že se stejná chyba dá načíst
+ * zpátky do hry, kde už být nemůže.
+ *
+ * Vrací počet rozbitých dlaždic, aby to volající uměl ohlásit.
+ */
+export function repairUnsupportedRoads(world: WorldState, losses: Losses): number {
+  const doomed: number[] = [];
+  for (const tile of world.roadTiles) {
+    const x = tile % world.size;
+    if (roadFitsTerrain(world, x, (tile - x) / world.size)) continue;
+    doomed.push(tile);
+  }
+
+  // Setříděné, ať pořadí nezávisí na pořadí v množině (P2).
+  for (const tile of doomed.sort((a, b) => a - b)) {
+    destroyInfrastructure(world, tile, losses);
+  }
+  return doomed.length;
+}
+
+/** Dlaždice, které se dotýkají rohu. */
+const AROUND_CORNER = [
+  [-1, -1],
+  [0, -1],
+  [-1, 0],
+  [0, 0],
+] as const;
 
 /**
  * Sníží budovu o úroveň. Vrací `true`, když se to povedlo.

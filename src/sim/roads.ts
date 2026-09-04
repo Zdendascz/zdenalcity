@@ -1,4 +1,4 @@
-import { applyCornerChanges, planRoadGrade } from './heights';
+import { applyCornerChanges, planRoadGrade, tileCorners } from './heights';
 import { index, inBounds, ROAD } from './layers';
 
 /**
@@ -85,4 +85,34 @@ export function planRoadGradeAround(
     if ((world.cornerHeight[k] ?? 0) === v) changes.delete(k);
   }
   return changes;
+}
+
+/**
+ * Unese terén pod dlaždicí ještě vozovku?
+ *
+ * Ptá se na **zkroucení, ne na sklon**. Vozovka smí stoupat i klopit se —
+ * dlaždice je pak nakloněná rovina a nakreslí se i projede bez potíží. Co
+ * nejde, je **sedlo**: čtyři rohy, které neleží v jedné rovině. Takový
+ * čtyřúhelník se láme po úhlopříčce a vozovka přes něj visí našikmo přes zlom.
+ * Přesně tenhle obrázek poslal autor se slovy, že pokud k tomu dojde, silnice
+ * musí být rozbitá a nepoužitelná.
+ *
+ * Poznávací znamení sedla je, že se **nerovnají součty protilehlých rohů**;
+ * rovina i rovnoběžný svah je mají stejné. Totéž pravidlo vymáhá
+ * `planRoadGrade`, když staví osamocenou dlaždici — jen z druhé strany.
+ *
+ * **Není to opak `planRoadGrade` celý, a schválně.** Rovnání jde dál a ruší
+ * i příčný spád, jenže dělá to jen pro stavěnou dlaždici a její čtyři sousedy;
+ * kaskáda přitom umí naklopit i silnici o dvě dlaždice dál, a ta se v každém
+ * dosud odehraném městě běžně vyskytuje. Vymáhat tady celé rovnání by po
+ * načtení savu rozbilo polovinu sítě — změřeno na fixturách: z 84 dlaždic by
+ * jich zbylo 35. Kreslí se přitom správně. Rozbíjí se tedy jen to, co je
+ * doopravdy nakreslené špatně.
+ */
+export function roadFitsTerrain(world: RoadGradeView, x: number, y: number): boolean {
+  if (!inBounds(x, y, world.size)) return true;
+  if ((world.layers.road[index(x, y, world.size)] ?? ROAD.none) === ROAD.none) return true;
+
+  const [nw, ne, sw, se] = tileCorners(world.cornerHeight, x, y);
+  return nw + se === ne + sw;
 }

@@ -31,6 +31,7 @@ import type {
   SaveTransitState,
 } from './format';
 import { rememberPopulation } from '@/sim/finance';
+import { noLosses, repairUnsupportedRoads } from '@/sim/disasters/damage';
 import { countBurning } from '@/sim/disasters/fire';
 import type { Modifier } from '@/sim/disasters/state';
 
@@ -736,6 +737,13 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   applyDisastersToWorld(world, save, size);
   applyTransitToWorld(world, save);
   applyFinanceToWorld(world, save);
+
+  // Silnice, kterým pod nohama zmizela rovina, se **rozbijí i po loadu**.
+  // Města uložená dřív, než to pravidlo existovalo, nesou vozovky nakloněné
+  // přes zlom po dávném sesuvu — autor takový obrázek poslal a je to zjevná
+  // vada, ne historie, kterou by mělo cenu zachovat. Trosky po nich zůstanou,
+  // takže je hráč najde a může postavit znovu.
+  repairUnsupportedRoads(world, noLosses());
 
   // Po loadu se kreslí všechno a síť se přepočítá znovu.
   world.dirty = { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true };

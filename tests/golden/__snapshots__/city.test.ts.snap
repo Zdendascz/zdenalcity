@@ -2,11 +2,11 @@
 
 exports[`golden: město po 1000 tikách > pevný seed a plná sestava systémů dají stabilní hashe 1`] = `
 {
-  "buildings": 29,
-  "coarse": "981ca368",
-  "funds": 7834,
+  "buildings": 32,
+  "coarse": "e8800d06",
+  "funds": 8686,
   "jobs": 50,
-  "layers": "c5140f91",
-  "population": 52,
+  "layers": "4884d570",
+  "population": 58,
 }
 `;

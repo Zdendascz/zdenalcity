@@ -27,6 +27,7 @@ import {
 import { needsClearing } from './terrain';
 import { createLine, findLine, modeOf, removeLine, stopMode } from './transit';
 import { extinguishTile } from './disasters/fire';
+import { collapseUnsupportedRoads, noLosses } from './disasters/damage';
 import { clearRubble } from './disasters/rubble';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
@@ -207,6 +208,12 @@ export function buildRoad(
 
   setRoadTile(world, tile, type);
   markRoadNeighbourhoodDirty(world, x, y);
+
+  // Rozbití okolních silnic se řeší **až po položení**, ne přes `reshapeTerrain`.
+  // `planRoadGradeAround` totiž počítá spád podle masky, ve které nová dlaždice
+  // už je; kdyby se kontrolovalo dřív, ptali bychom se na tvar, který ještě
+  // neplatí, a odbočka by při stavbě zbořila ulici, do které se napojuje.
+  if (grade && grade.size > 0) collapseUnsupportedRoads(world, grade, noLosses());
   markPowerNetworkDirty(world); // silnice je vodič
   return OK;
 }
@@ -406,7 +413,7 @@ export function placeDefinition(
   }
 
   world.economy.funds -= plan.total;
-  if (plan.changes.size > 0) applyHeightChanges(world, plan.changes);
+  reshapeTerrain(world, plan.changes);
   placeBuilding(world, definition, x, y);
   return OK;
 }
@@ -482,7 +489,7 @@ export function zoneArea(
   }
 
   world.economy.funds -= cost;
-  if (changes.size > 0) applyHeightChanges(world, changes);
+  reshapeTerrain(world, changes);
 
   for (const tile of toZone) {
     const tileX = tile % world.size;
@@ -792,6 +799,24 @@ export interface TerraformEstimate {
  *
  * Voda pořád ano: zvednutý roh u hladiny by udělal souš pod vodou.
  */
+/**
+ * Změní terén a rozbije silnice, které pod sebou přišly o rovinu.
+ *
+ * Roh drží čtyři dlaždice, takže srovnání parcely vedle silnice nakloní i
+ * vozovku. Do T89 tam taková silnice zůstala stát a kreslila se našikmo přes
+ * zlom; autor to nahlásil obrázkem a chce to jednoznačně — rozbitou, ne
+ * křivou. Platí to i pro hráčovo vlastní srovnávání, ne jen pro sesuv: nakloněná
+ * vozovka je nakloněná bez ohledu na to, kdo za to může.
+ *
+ * Hlásí se to **troskami na dlaždici**, ne hláškou. Hláška by přišla uprostřed
+ * tažení štětcem a hráč by ji překlikl; hromada suti zůstane, dokud ji neuklidí.
+ */
+function reshapeTerrain(world: WorldState, changes: ReadonlyMap<number, number>): void {
+  if (changes.size === 0) return;
+  applyHeightChanges(world, changes);
+  collapseUnsupportedRoads(world, changes, noLosses());
+}
+
 function checkTerraform(world: WorldState, changes: ReadonlyMap<number, number>): CommandResult {
   if (reshapeBlocker(world, changes) === 'water') return reject('error.terraformWater');
   return OK;
@@ -860,7 +885,7 @@ function commit(world: WorldState, plan: TerraformEstimate): CommandResult {
   }
   world.economy.funds -= plan.cost;
 
-  applyHeightChanges(world, plan.changes);
+  reshapeTerrain(world, plan.changes);
   return OK;
 }
 

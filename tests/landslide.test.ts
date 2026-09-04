@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
-import { buildRoad, placeDefinition } from '@/sim/commands';
+import { buildRoad, placeDefinition, terraformCorner } from '@/sim/commands';
 import {
   createLandslideDisaster,
   isFreshlyTerraformed,
   steepestDescent,
 } from '@/sim/disasters/landslide';
 import type { ActiveDisaster } from '@/sim/disasters/state';
-import { cornerIndex, countViolations, planCornerHeight, tileCorners } from '@/sim/heights';
+import { cornerIndex, countViolations, planCornerHeight } from '@/sim/heights';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
+import { roadFitsTerrain } from '@/sim/roads';
 import { applyHeightChanges, createWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
@@ -337,16 +338,41 @@ it('silnici, které sesuv podhrabal roh, zboří', async () => {
     await run(w, 24, 30);
 
     // **Nestačí, že něco spadlo.** Silnice v dráze boural sesuv i předtím;
-    // vada byla v kaskádě, která hne rohy vedle dráhy. Testuje se proto
-    // pravidlo, ne počet: po sesuvu nesmí zůstat vozovka na zkroucené
-    // dlaždici. Zkroucená je ta, které se nerovnají součty protilehlých rohů
-    // — rovina ani rovnoběžný svah takový tvar nemají.
+    // vada byla v kaskádě, která hne rohy vedle dráhy. Testuje se proto celé
+    // pravidlo, ne počet a ne jen zkroucení: po sesuvu nesmí zůstat vozovka na
+    // dlaždici, která by se pod ni už nesměla postavit.
     for (let tile = 0; tile < w.layers.road.length; tile++) {
       if ((w.layers.road[tile] ?? ROAD.none) === ROAD.none) continue;
       const x = tile % MAP_SIZE;
       const y = (tile - x) / MAP_SIZE;
-      const [nw, ne, sw, se] = tileCorners(w.cornerHeight, x, y);
-      expect(nw + se, `dlaždice ${x}, ${y} je zkroucená`).toBe(ne + sw);
+      expect(roadFitsTerrain(w, x, y), `dlaždice ${x}, ${y} neunese vozovku`).toBe(true);
+    }
+  });
+
+  it('silnici, kterou podhrabalo hráčovo srovnávání, taky zboří', async () => {
+    // Roh drží čtyři dlaždice, takže srovnání parcely **vedle** silnice nakloní
+    // i vozovku. Sesuv za to nemůže a výsledek je stejný: vozovka přes zlom.
+    // Pravidlo proto nesmí být v katastrofě, ale u každé změny terénu.
+    const w = world();
+    slope(w, 20, 6);
+
+    for (let y = 28; y <= 32; y++) {
+      expect(buildRoad(w, 29, y, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    }
+    const before = countRoads(w);
+    expect(before).toBe(5);
+
+    // Zvednutí rohu na hranici mezi dlaždicí 28 a 29: patří dlaždici pod
+    // vozovkou i té vedle ní.
+    const corner = cornerIndex(29, 30, CORNER_SIZE);
+    const current = w.cornerHeight[corner] ?? 0;
+    expect(
+      terraformCorner(w, 29, 30, current + 1 <= 6 ? 1 : -1, VANILLA_BALANCE).ok,
+    ).toBe(true);
+
+    expect(countRoads(w)).toBeLessThan(before);
+    for (let y = 28; y <= 32; y++) {
+      expect(roadFitsTerrain(w, 29, y), `dlaždice 29, ${y} neunese vozovku`).toBe(true);
     }
   });
 

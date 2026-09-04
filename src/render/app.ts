@@ -54,7 +54,7 @@ import { FinancePanel } from '@/ui/financePanel';
 import { TransitPanel } from '@/ui/transitPanel';
 import { CostPopup } from '@/ui/costPopup';
 import { PriceTag } from '@/ui/priceTag';
-import { Notifications } from '@/ui/notifications';
+import { isRoutine, Notifications } from '@/ui/notifications';
 import { formatNumber } from '@/ui/format';
 import { Hud } from '@/ui/hud';
 import { setIconImages } from '@/ui/icons';
@@ -893,15 +893,25 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   /**
    * Hra nesmí mlčet. Odmítnutý příkaz i spadlý kód se musí objevit na obrazovce —
    * ve vývoji obzvlášť, protože jinak se chyba pozná až po hodině hraní.
+   *
+   * **Provozní odmítnutí se ale zahazují** (`isRoutine`). Že klik na obsazenou
+   * dlaždici nic neudělal, je vidět z toho, že se nic nestalo; hláška o tom byla
+   * jen šum přes obraz.
    */
   function dispatch(cmd: Command): CommandResult {
     const result = host.dispatch(cmd);
-    if (!result.ok) notifications.show(i18n.t(result.reason, result.params));
+    if (!result.ok) report(result);
     return result;
   }
 
+  /** Ukáže důvod odmítnutí, pokud to není provozní šum. */
+  function report(result: Extract<CommandResult, { ok: false }>): void {
+    if (isRoutine(result.reason)) return;
+    notifications.show(i18n.t(result.reason, result.params));
+  }
+
   function reportCrash(message: string): void {
-    notifications.show(i18n.t('error.crash', { message }), 'error');
+    notifications.show(i18n.t('error.crash', { message }));
   }
 
   window.addEventListener('error', (event) => reportCrash(event.message));
@@ -940,7 +950,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       if (warnings.waterlessBuildings > 0) {
         notifications.show(
           i18n.t('ui.save.noWaterNetwork', { count: warnings.waterlessBuildings }),
-          'error',
         );
       }
     } catch (error) {
@@ -1490,7 +1499,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (worst === 'ui.parcel.blocked.noDemand') return;
 
     reportedBlockers.add(worst);
-    notifications.show(i18n.t('ui.notice.nothingGrows', { reason: i18n.t(worst) }), 'error');
+    notifications.show(i18n.t('ui.notice.nothingGrows', { reason: i18n.t(worst) }));
   }
 
   /** Poslední pozice kurzoru — cenovka se překresluje každý snímek. */
@@ -1725,9 +1734,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           ? { type: 'build_pipe', x: tile.x, y: tile.y }
           : { type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType };
       const result = host.dispatch(command);
-      if (!result.ok && !complained) {
+      if (!result.ok && !complained && !isRoutine(result.reason)) {
         complained = true;
-        notifications.show(i18n.t(result.reason, result.params));
+        report(result);
       }
     }
   }
@@ -2041,7 +2050,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const broke = world.economy.funds < 0;
     if (broke !== wasBroke) {
       wasBroke = broke;
-      if (broke) notifications.show(i18n.t('ui.notice.bankrupt'), 'error');
+      if (broke) notifications.show(i18n.t('ui.notice.bankrupt'));
     }
 
     // Výroba a spotřeba proudu. Hráč do teď viděl jen zlomek „65/86" a neměl
@@ -2069,7 +2078,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
             produced: formatNumber(powerProduced),
             needed: formatNumber(powerNeeded),
           }),
-          'error',
         );
       }
     }

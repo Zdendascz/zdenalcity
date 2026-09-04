@@ -631,6 +631,8 @@ export interface ReshapeView {
   readonly layers: {
     readonly buildingId: Readonly<Uint16Array>;
     readonly terrain: Readonly<Uint8Array>;
+    /** Silnice: srovnávání se jí musí vyhnout, aby ji nezkroutilo. */
+    readonly road: Readonly<Uint8Array>;
   };
 }
 
@@ -667,17 +669,44 @@ export function tilesAroundCorner(world: ReshapeView, corner: number): number[] 
 export function reshapeBlocker(
   world: ReshapeView,
   changes: ReadonlyMap<number, number>,
-): 'building' | 'water' | null {
+): 'building' | 'water' | 'road' | null {
   for (const [corner, target] of changes) {
     const current = world.cornerHeight[corner] ?? 0;
 
     for (const tile of tilesAroundCorner(world, corner)) {
       if (world.layers.buildingId[tile] !== 0) return 'building';
       if (target > current && world.layers.terrain[tile] === TERRAIN.water) return 'water';
+      // Silnice se **nesmí zkroutit**. Vozovka přes sedlo se láme po úhlopříčce
+      // a kreslí se našikmo přes zlom — autor to nahlásil obrázkem. Kdo umí
+      // couvnout (srovnávání pod zónou to umí, dělí plochu na menší), couvne;
+      // kdo ne, tomu silnici rozbije `collapseUnsupportedRoads`.
+      if (world.layers.road[tile] !== 0 && wouldTwist(world, changes, tile)) return 'road';
     }
   }
 
   return null;
+}
+
+/**
+ * Nechal by plán dlaždici zkroucenou?
+ *
+ * Počítá se **z plánu, ne ze světa**: ptáme se na tvar po změně, a ta se ještě
+ * nestala. Zkroucená je dlaždice, jejíž protilehlé rohy nemají stejný součet —
+ * rovina ani rovnoběžný svah takový tvar nemají, sedlo ano.
+ */
+function wouldTwist(
+  world: ReshapeView,
+  changes: ReadonlyMap<number, number>,
+  tile: number,
+): boolean {
+  const cornerSize = world.size + 1;
+  const x = tile % world.size;
+  const y = (tile - x) / world.size;
+  const at = (cx: number, cy: number): number => {
+    const corner = cy * cornerSize + cx;
+    return changes.get(corner) ?? world.cornerHeight[corner] ?? 0;
+  };
+  return at(x, y) + at(x + 1, y + 1) !== at(x + 1, y) + at(x, y + 1);
 }
 
 export function applyHeightChanges(

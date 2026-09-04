@@ -9,10 +9,11 @@ import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { checkFootprint } from '@/sim/buildings';
-import { buildRoad, bulldoze } from '@/sim/commands';
-import { index, ROAD, TERRAIN } from '@/sim/layers';
+import { buildRoad, bulldoze, terraformCorner, zoneArea } from '@/sim/commands';
+import { index, ROAD, TERRAIN, ZONE } from '@/sim/layers';
 import { tileQuad } from '@/render/projection';
 import { roadMask, roadPolygons } from '@/render/roads';
+import { roadFitsTerrain } from '@/sim/roads';
 import { ROAD_FAMILIES } from '@/render/roadRenderer';
 import { ROAD_COLORS, ROAD_WIDTHS } from '@/render/palette';
 import { computeBudget } from '@/sim/systems/economy';
@@ -274,5 +275,95 @@ describe('vykreslení', () => {
     expect(ROAD_WIDTHS[ROAD.avenue]).toBeGreaterThan(ROAD_WIDTHS[ROAD.street]!);
     expect(ROAD_WIDTHS[ROAD.highway]).toBeGreaterThan(ROAD_WIDTHS[ROAD.avenue]!);
     expect(ROAD_WIDTHS[ROAD.highway]).toBeLessThan(1);
+  });
+});
+
+describe('terén pod vozovkou', () => {
+  /** Rovný svět s jednou silnicí v ose. */
+  function withRoad(cells: readonly [number, number][]): ReturnType<typeof createWorld> {
+    const w = createWorld(1);
+    for (const [x, y] of cells) {
+      expect(buildRoad(w, x, y, ROAD.street, VANILLA_BALANCE).ok).toBe(true);
+    }
+    return w;
+  }
+
+  /** Zvedne jeden roh **bez kaskády**, ať se testuje přesně jeden tvar. */
+  function raise(w: ReturnType<typeof createWorld>, cx: number, cy: number, by: number): void {
+    const side = MAP_SIZE + 1;
+    const corner = cy * side + cx;
+    w.cornerHeight[corner] = (w.cornerHeight[corner] ?? 0) + by;
+  }
+
+  it('rovná dlaždice unese vozovku', () => {
+    const w = withRoad([
+      [10, 10],
+      [10, 11],
+      [10, 12],
+    ]);
+    for (let y = 10; y <= 12; y++) expect(roadFitsTerrain(w, 10, y)).toBe(true);
+  });
+
+  it('rovnoběžný svah unese vozovku taky — klopená vozovka je pořád rovina', () => {
+    // Sklon se **netrestá**. Silnice smí stoupat i být klopená; nakreslí se
+    // i projede. Kdyby se bral jako vada, po načtení savu by ze sítě zbyla
+    // půlka — změřeno na fixturách.
+    const w = withRoad([[10, 10]]);
+    raise(w, 10, 11, 1);
+    raise(w, 11, 11, 1);
+    expect(roadFitsTerrain(w, 10, 10)).toBe(true);
+  });
+
+  it('sedlo vozovku neunese', () => {
+    // Čtyři rohy, které neleží v jedné rovině. Čtyřúhelník se láme po
+    // úhlopříčce a vozovka přes něj visí našikmo přes zlom — přesně ten
+    // obrázek, který poslal autor.
+    const w = withRoad([[10, 10]]);
+    raise(w, 11, 11, 1);
+    expect(roadFitsTerrain(w, 10, 10)).toBe(false);
+  });
+
+  it('prázdná dlaždice se neposuzuje', () => {
+    const w = createWorld(1);
+    raise(w, 11, 11, 1);
+    expect(roadFitsTerrain(w, 10, 10)).toBe(true);
+  });
+
+  it('srovnávání pod zónou se silnici vyhne', () => {
+    // Zóna umí couvnout: plocha se dělí na menší, dokud nepřestane vadit —
+    // stejně jako se odjakživa dělí kolem budov. Silnice tím zůstane stát.
+    const w = withRoad([
+      [10, 10],
+      [10, 11],
+      [10, 12],
+    ]);
+    raise(w, 12, 11, 2);
+    expect(zoneArea(w, 11, 10, 3, 3, ZONE.residential, VANILLA_BALANCE).ok).toBe(true);
+
+    expect(w.roadTiles.size, 'zónování zbořilo silnici').toBe(3);
+    for (let y = 10; y <= 12; y++) {
+      expect(roadFitsTerrain(w, 10, y), `dlaždice 10, ${y}`).toBe(true);
+    }
+  });
+
+  it('srovnávání rohu pod silnicí ji rozbije a nechá trosky', () => {
+    // Kdo couvnout neumí — ruční terraform je adresný příkaz — tomu se silnice
+    // rozbije. Autor to chtěl jednoznačně: nakloněná vozovka ne, rozbitá ano.
+    const w = withRoad([
+      [10, 10],
+      [10, 11],
+      [10, 12],
+    ]);
+    expect(terraformCorner(w, 10, 11, 1, VANILLA_BALANCE).ok).toBe(true);
+
+    for (let y = 10; y <= 12; y++) {
+      expect(roadFitsTerrain(w, 10, y), `dlaždice 10, ${y}`).toBe(true);
+    }
+    expect(w.roadTiles.size, 'nic se nerozbilo, test nic neměří').toBeLessThan(3);
+    for (let y = 10; y <= 12; y++) {
+      const tile = index(10, y, MAP_SIZE);
+      if ((w.layers.road[tile] ?? ROAD.none) !== ROAD.none) continue;
+      expect(w.rubble[tile], `po silnici 10, ${y} nezůstaly trosky`).toBe(1);
+    }
   });
 });
