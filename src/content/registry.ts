@@ -45,6 +45,8 @@ export interface ContentSource {
   readonly tiles?: Readonly<Record<string, string>>;
   /** Dlaždice vozovky pod klíčem `rodina__tvar`. */
   readonly roads?: Readonly<Record<string, string>>;
+  /** Materiály podezdívek pod klíčem `kategorie__varianta`. */
+  readonly skirts?: Readonly<Record<string, string>>;
   /**
    * Balanc. Zdroj ho mít nemusí; když ho má, musí být úplný a přepíše ten
    * dosavadní — tak mod přeladí hru bez zásahu do definic.
@@ -101,6 +103,7 @@ export class ContentRegistry {
   private readonly sprites = new Map<string, SpriteImage>();
   private readonly tiles = new Map<string, string>();
   private readonly roads = new Map<string, string>();
+  private readonly skirts = new Map<string, string>();
   private balance: Balance | null = null;
 
   /**
@@ -191,6 +194,9 @@ export class ContentRegistry {
     for (const [key, url] of Object.entries(source.roads ?? {})) {
       this.roads.set(key, url);
     }
+    for (const [key, url] of Object.entries(source.skirts ?? {})) {
+      this.skirts.set(key, url);
+    }
     for (const [key, url] of Object.entries(source.tiles ?? {})) {
       this.tiles.set(key, url);
     }
@@ -229,6 +235,11 @@ export class ContentRegistry {
   /** Všechny dlaždice vozovky, které obsah dodal. Klíč je `rodina__tvar`. */
   getRoads(): Record<string, string> {
     return Object.fromEntries(this.roads);
+  }
+
+  /** Všechny materiály podezdívek. Klíč je `kategorie__varianta`. */
+  getSkirts(): Record<string, string> {
+    return Object.fromEntries(this.skirts);
   }
 
   getIcons(): Record<string, string> {

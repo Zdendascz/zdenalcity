@@ -51,6 +51,13 @@ export interface BuildingAppearance {
     readonly anchor: readonly [number, number];
     readonly scale: number;
   };
+  /**
+   * Klíč materiálu podezdívky, například `residential__b`.
+   *
+   * Vybírá ho `createAppearanceLookup` z kategorie definice a z id budovy,
+   * takže se po načtení savu ani po překreslení nezmění.
+   */
+  skirt?: string;
 }
 
 /**
@@ -82,6 +89,8 @@ export class BuildingRenderer {
   private readonly world: ReadonlyWorldView;
   private readonly container: Container;
   private readonly appearance: AppearanceLookup;
+  /** Materiály podezdívek pod klíčem `kategorie__varianta`. */
+  private skirtTextures: ReadonlyMap<string, Texture> = new Map();
   private readonly views = new Map<number, Graphics | Sprite>();
   /**
    * Podezdívky spritů. Sprite polygony kreslit neumí, takže terénní úprava pod
@@ -148,6 +157,14 @@ export class BuildingRenderer {
     // Terén se mění zřídka (terraforming, kácení), ale když se změní, musí se
     // stromy přepočítat celé: mizí i přibývají a jejich id nejsou v `dirty`.
     if (dirty.fullRedraw || dirty.tiles.size > 0) this.rebuildDecor();
+    this.reorder();
+  }
+
+  /** Nastaví materiály podezdívek a překreslí je. */
+  setSkirtTextures(textures: ReadonlyMap<string, Texture>): void {
+    this.skirtTextures = textures;
+    for (const skirt of this.skirts.values()) skirt.clear();
+    this.refreshAll({ tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: false });
     this.reorder();
   }
 
@@ -465,6 +482,14 @@ export class BuildingRenderer {
    * zmenšený, aby se sousední domy neslily, ale obrázek svůj pozemek vyplňuje
    * celý — odsazená podezdívka by pod ním nechala mezeru.
    */
+  /** Materiál podezdívky pro budovu, pokud ho obsah dodal. */
+  private skirtTextureFor(id: number): Texture | undefined {
+    const building = this.world.buildings.get(id);
+    if (building === undefined) return undefined;
+    const key = this.appearance(building.definitionId, id)?.skirt;
+    return key === undefined ? undefined : this.skirtTextures.get(key);
+  }
+
   private drawSkirt(
     id: number,
     x: number,
@@ -493,11 +518,26 @@ export class BuildingRenderer {
       groundHeightAt(this.world.cornerHeight, fx, fy),
     );
     skirt.clear();
-    skirt
-      .poly(faces.right)
-      .fill({ color: shade(FOUNDATION_COLOR, WALL_RIGHT_SHADE) })
-      .poly(faces.left)
-      .fill({ color: shade(FOUNDATION_COLOR, WALL_LEFT_SHADE) });
+
+    const texture = this.skirtTextureFor(id);
+    for (const [face, tone] of [
+      [faces.right, WALL_RIGHT_SHADE],
+      [faces.left, WALL_LEFT_SHADE],
+    ] as const) {
+      // Barva se kreslí **vždycky, i pod obrázek** — stejně jako u terénu.
+      // Když materiál chybí nebo se nedokreslí, zůstane kámen, ne díra.
+      skirt.poly(face).fill({ color: shade(FOUNDATION_COLOR, tone) });
+      if (texture === undefined) continue;
+      // `textureSpace: 'local'` roztáhne materiál přes obálku stěny. U zdi to
+      // stačí a matici to ušetří: materiál je schválně bez směru a bez
+      // přechodu, takže na roztažení není co poznat. U terénu to nejde —
+      // tam se obrázek musí trefit na rohy dlaždice.
+      skirt.poly(face).fill({
+        texture,
+        textureSpace: 'local',
+        color: shade(0xffffff, tone),
+      });
+    }
   }
 
   /**

@@ -96,6 +96,18 @@ export function createVanillaSource(): ContentSource {
     roads[name] = roadFiles[absolute] as string;
   }
 
+  // Materiály podezdívek. Klíč je `kategorie__varianta`.
+  const skirtFiles = import.meta.glob('../../content/vanilla/skirts/*.png', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  });
+  const skirts: Record<string, string> = {};
+  for (const absolute of Object.keys(skirtFiles).sort()) {
+    const name = relativePath(absolute).slice('skirts/'.length).replace(/\.png$/, '');
+    skirts[name] = skirtFiles[absolute] as string;
+  }
+
   let manifest: unknown = undefined;
   let spriteIndex: unknown = undefined;
   let balance: unknown = undefined;
@@ -130,6 +142,7 @@ export function createVanillaSource(): ContentSource {
     sprites: buildSprites(spriteIndex, spriteUrls),
     tiles,
     roads,
+    skirts,
   };
 }
 

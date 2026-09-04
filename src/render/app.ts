@@ -155,6 +155,32 @@ export function variantFor(variants: readonly string[], buildingId: number): str
   return variants[((h ^ (h >>> 16)) >>> 0) % variants.length];
 }
 
+/**
+ * Kategorie budovy, ke kterým existuje materiál podezdívky.
+ *
+ * Služby a sítě mají podezdívku po bydlení: panelák i škola stojí na téže
+ * omítnuté patce a vyrábět pro ně zvlášť materiál by bylo plýtvání.
+ */
+const SKIRT_CATEGORIES = new Set(['residential', 'commercial', 'industrial']);
+
+/** Kolik variant má každá kategorie. Sedí na `docs/13-PODEZDIVKY.md`. */
+const SKIRT_VARIANTS = ['a', 'b', 'c'] as const;
+
+/**
+ * Materiál podezdívky pro budovu.
+ *
+ * Losuje se **z id budovy**, ne z `world.rng`: musí vyjít stejně po načtení
+ * savu i po překreslení. A ne stejnou míchačkou jako varianta spritu — jinak
+ * by měl dům se světlou fasádou vždycky tutéž podezdívku.
+ */
+function skirtFor(category: string, buildingId: number): string {
+  const family = SKIRT_CATEGORIES.has(category) ? category : 'residential';
+  let hash = Math.imul(buildingId ^ 0x27d4eb2d, 0x165667b1) >>> 0;
+  hash = Math.imul(hash ^ (hash >>> 15), 0x9e3779b1) >>> 0;
+  const variant = SKIRT_VARIANTS[(hash >>> 8) % SKIRT_VARIANTS.length] ?? 'a';
+  return `${family}__${variant}`;
+}
+
 function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
   return (definitionId, buildingId) => {
     const definition = content.get(definitionId);
@@ -169,6 +195,7 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
       heightLevels: definition.graphics.heightLevels,
       footprint: definition.footprint,
       consumesPower: (definition.power?.consumption ?? 0) > 0,
+      skirt: skirtFor(definition.category, buildingId),
       ...(icon === undefined ? {} : { icon }),
       ...(sprite === undefined ? {} : { sprite }),
     };
@@ -539,6 +566,32 @@ async function loadRoadTiles(content: ContentRegistry): Promise<Map<string, Text
 }
 
 /**
+ * Načte materiály podezdívek. Klíč je `kategorie__varianta`.
+ *
+ * Devět obrázků: tři kategorie po třech variantách. Kreslí se jako výplň
+ * v `Graphics` každé budovy, takže se nesčítají do jedné dávky jako povrchy
+ * terénu — každá zeď si nese svůj jeden materiál.
+ */
+async function loadSkirts(content: ContentRegistry): Promise<Map<string, Texture>> {
+  const out = new Map<string, Texture>();
+  const jobs: Promise<void>[] = [];
+
+  for (const [key, url] of Object.entries(content.getSkirts())) {
+    jobs.push(
+      Assets.load(url)
+        .then((texture: Texture) => {
+          sampleSmooth(texture);
+          out.set(key, texture);
+        })
+        .catch(() => undefined),
+    );
+  }
+
+  await Promise.all(jobs);
+  return out;
+}
+
+/**
  * Předměty, které stojí na terénu: strom na lese, balvan na skále.
  *
  * Rozhodnutí autora — a je za ním měření: jako **materiál** skála i les
@@ -758,6 +811,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   });
   void loadDecor(content).then((decor) => {
     if (decor.size > 0) buildingRenderer.setDecor(decor);
+  });
+  void loadSkirts(content).then((skirts) => {
+    if (skirts.size > 0) buildingRenderer.setSkirtTextures(skirts);
   });
   // Silnice leží **mezi terénem a budovami**: kreslí se po chunku, ale pod
   // domy. Vlastní kontejner, ne řazení podle hloubky — vozovka je země.
