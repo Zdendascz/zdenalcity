@@ -1,6 +1,7 @@
 import { Application, Assets, Container, Graphics } from 'pixi.js';
 import type { Texture } from 'pixi.js';
 import type { TerrainDecor } from './decor';
+import { sampleSmooth } from './textures';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import type { Definition } from '@/content/schema';
@@ -452,11 +453,7 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
       jobs.push(
         Assets.load(url)
           .then((texture: Texture) => {
-            // **Natažení okraje, ne opakování.** Na svahu není dlaždice
-            // rovnoběžník, takže afinní matice sáhne kousek za okraj textury.
-            // S výchozím režimem tam karta vrátí průhlednou (černé klíny
-            // u pobřeží), s opakováním skočí na protější okraj a udělá šev.
-            texture.source.addressMode = 'clamp-to-edge';
+            sampleSmooth(texture);
             out.set(`${terrain}|${variant}`, texture);
           })
           .catch(() => undefined),
@@ -491,7 +488,7 @@ async function loadRoadSurfaces(content: ContentRegistry): Promise<Map<string, T
     jobs.push(
       Assets.load(url)
         .then((texture: Texture) => {
-          texture.source.addressMode = 'clamp-to-edge';
+          sampleSmooth(texture);
           out.set(name, texture);
         })
         .catch(() => undefined),
@@ -530,7 +527,7 @@ async function loadDecor(content: ContentRegistry): Promise<Map<number, TerrainD
       jobs.push(
         Assets.load(sprite.url)
           .then((texture: Texture) => {
-            texture.source.addressMode = 'clamp-to-edge';
+            sampleSmooth(texture);
             const list = out.get(terrain) ?? [];
             list.push({ texture, anchor: sprite.anchor, scale: sprite.scale });
             out.set(terrain, list);

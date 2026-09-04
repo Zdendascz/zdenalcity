@@ -2,6 +2,7 @@ import { Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import { iconShape } from './icons';
+import { sampleSmooth } from './textures';
 import {
   ABANDONED_COLOR,
   ICON_ALPHA,
@@ -445,6 +446,9 @@ export class BuildingRenderer {
       void Assets.load(image.url).then((loaded: Texture) => {
         // Než se textura donačte, mohla budova zmizet nebo dostat jiný obrázek.
         if (this.views.get(id) !== sprite) return;
+        // Mipmapy i tady: při odzoomování je budova na obrazovce menší než její
+        // obrázek a bez nich se z fasády stane zrno, stejně jako z povrchu.
+        sampleSmooth(loaded);
         sprite.texture = loaded;
       });
     }

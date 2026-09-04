@@ -368,3 +368,29 @@ jako u silnic a skládají se stejně.
 | `pipe` | A buried water main in an open trench: a grey concrete pipe on a bed of gravel, dark earth around it. |
 
 Věta o navazování je stejná, jen místo „carriageway" je „pipe".
+
+## Zrnitost a mipmapy
+
+Autor se zeptal, „proč je všechno tak zrnité". Nebyl to vzhled obrázků, ale
+**vzorkování**: dlaždice má obrázek 256 px, na obrazovce je široká 64, takže
+každý pixel bral jeden texel ze šestnácti a zbytek zahodil. Jemná kresba se tím
+nerozmaže, ale rozsype na jiskření.
+
+Změřeno na trávě jako směrodatná odchylka vysokých frekvencí:
+
+| co | zrno |
+|---|---|
+| obrázek 256 px, jak je | 20,1 |
+| zmenšený na 64 px bez filtru (co dělala karta) | 22,2 |
+| zmenšený na 64 px s průměrováním (co dělá mipmapa) | 9,2 |
+| vzor z parku, který autor chválil | 15,0 |
+
+Podstatné je to druhé číslo: **zmenšením zrno neubylo, přibylo.** Bez mipmapy
+se šum nezprůměruje, jen se přeloží na jinou frekvenci.
+
+Vzor z parku má navíc jen 128 px na dlaždici, tedy **poloviční hustotu** proti
+našim 256. Část rozdílu je tedy i v tom, že do stejného místa cpeme dvakrát víc
+kresby, než kolik je jí vidět.
+
+Zapíná se to v `src/render/textures.ts` a platí pro povrchy, materiály vozovky,
+terénní objekty i budovy — jiskřilo to všude stejně.
