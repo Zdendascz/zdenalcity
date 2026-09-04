@@ -490,7 +490,7 @@
   "ui.home.shot.waterfront": "U vody",
   "ui.home.shot.overview": "Celé město",
   "ui.authors.game": "Zdenalcity — izometrický budovatel měst. Beta verze, hra se ještě mění.",
-  "ui.authors.author": "Autor a zadavatel: Zdeněk Klusák.",
+  "ui.authors.author": "Autor: Zdeněk „Zdendas\" Klusák",
   "ui.authors.code": "Kód: psáno ve dvojici s Claude Code od Anthropicu.",
   "ui.authors.art": "Grafika: budovy, povrchy a ikony generované přes OpenAI Images, doladěné vlastními nástroji v repozitáři.",
   "ui.authors.engine": "Běží na Pixi.js a Vite. Bez enginu, bez frameworku.",
@@ -507,5 +507,9 @@
   "ui.home.scene.works": "Průmyslová zóna",
   "ui.parcel.roadTiles": "{distance} dlaždice",
   "ui.parcel.landValueTitle": "Z čeho je cena půdy",
-  "ui.parcel.servicesTitle": "Služby v okolí"
+  "ui.parcel.servicesTitle": "Služby v okolí",
+  "ui.authors.dedication": "Věnováno tátovi.",
+  "ui.home.gallery": "Galerie",
+  "ui.home.previous": "Předchozí",
+  "ui.home.next": "Další"
 }

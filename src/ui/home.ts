@@ -36,29 +36,34 @@ export interface HomeOptions {
 /** Kam se hlásí chyby. Adresa autora, ne obecná schránka. */
 const AUTHOR_EMAIL = 'jsem@zdendas.cz';
 
-/** Snímky ze hry pro hlavičku a karty. Leží v `public/shots/`. */
-const SHOTS = [
-  { file: 'prehled.jpg', titleKey: 'ui.home.shot.overview' },
-  { file: 'nabrezi.jpg', titleKey: 'ui.home.shot.waterfront' },
-  { file: 'ctvrt.jpg', titleKey: 'ui.home.shot.quarter' },
-  { file: 'detail.jpg', titleKey: 'ui.home.shot.street' },
+/**
+ * Obrázky do hlavičky i do galerie.
+ *
+ * **Střídá se snímek ze hry a kreslená scéna.** Snímky leží v `public/shots/`
+ * a jsou to opravdové záběry z hraní; scény v `public/scenes/` jsou kreslené
+ * pohledy z úrovně očí, které z izometrické kamery nejdou vyrobit
+ * (`docs/10-SCENY.md`). Odkud obrázek je, se pozná v lightboxu — v řadě jsou
+ * popisky pryč, rozhodnutí autora.
+ */
+const GALLERY = [
+  { file: 'shots/prehled.jpg', titleKey: 'ui.home.shot.overview', game: true },
+  { file: 'scenes/ulice.jpg', titleKey: 'ui.home.scene.street', game: false },
+  { file: 'shots/ctvrt.jpg', titleKey: 'ui.home.shot.quarter', game: true },
+  { file: 'scenes/prucelu.jpg', titleKey: 'ui.home.scene.facade', game: false },
+  { file: 'shots/nabrezi.jpg', titleKey: 'ui.home.shot.waterfront', game: true },
+  { file: 'scenes/namesti.jpg', titleKey: 'ui.home.scene.square', game: false },
+  { file: 'shots/detail.jpg', titleKey: 'ui.home.shot.street', game: true },
+  { file: 'scenes/sidliste.jpg', titleKey: 'ui.home.scene.estate', game: false },
+  { file: 'scenes/zastavka.jpg', titleKey: 'ui.home.scene.stop', game: false },
+  { file: 'scenes/prumysl.jpg', titleKey: 'ui.home.scene.works', game: false },
 ] as const;
 
 /**
- * Kreslené pohledy z úrovně očí. Leží v `public/scenes/`.
- *
- * **Nejsou to snímky ze hry** a nesmějí se za ně vydávat, proto mají vlastní
- * řadu s vlastním nadpisem. Kamera hry je pevná a izometrická; ulici z úrovně
- * chodníku z ní nedostaneš, tak se kreslí zvlášť (`docs/10-SCENY.md`).
+ * Co se prolíná v hlavičce: **šest obrázků, tři ze hry a tři z ulice.**
+ * Celá galerie by běžela moc dlouho, jeden snímek zase neukáže, že hra má
+ * obojí. Pořadí se střídá, takže po celku přijde detail.
  */
-const SCENES = [
-  { file: 'ulice.jpg', titleKey: 'ui.home.scene.street' },
-  { file: 'prucelu.jpg', titleKey: 'ui.home.scene.facade' },
-  { file: 'namesti.jpg', titleKey: 'ui.home.scene.square' },
-  { file: 'sidliste.jpg', titleKey: 'ui.home.scene.estate' },
-  { file: 'zastavka.jpg', titleKey: 'ui.home.scene.stop' },
-  { file: 'prumysl.jpg', titleKey: 'ui.home.scene.works' },
-] as const;
+const HERO = GALLERY.slice(0, 6);
 
 /** Jak dlouho zůstane jeden snímek v hlavičce, než se prolne do dalšího. */
 const HERO_MS = 7000;
@@ -78,9 +83,9 @@ export function showHome(
   // --- hlavička -----------------------------------------------------------
 
   const hero = el('div', 'home__hero');
-  const layers = SHOTS.map((shot, order) => {
+  const layers = HERO.map((shot, order) => {
     const layer = el('div', 'home__hero-shot');
-    layer.style.backgroundImage = `url(shots/${shot.file})`;
+    layer.style.backgroundImage = `url(${shot.file})`;
     if (order === 0) layer.classList.add('is-visible');
     hero.appendChild(layer);
     return layer;
@@ -155,8 +160,7 @@ export function showHome(
 
   // --- řady karet ---------------------------------------------------------
 
-  root.appendChild(cardRow(t, 'ui.home.fromTheGame', SHOTS, 'shots'));
-  root.appendChild(cardRow(t, 'ui.home.fromTheWorld', SCENES, 'scenes'));
+  root.appendChild(galleryRow(t, root));
   root.appendChild(aboutRow(t, root));
 
   parent.appendChild(root);
@@ -172,30 +176,100 @@ export function showHome(
   });
 }
 
-/** Řada obrázků. Posouvá se do strany, jako v katalogu filmů. */
-function cardRow(
-  t: (key: string) => string,
-  titleKey: string,
-  items: readonly { file: string; titleKey: string }[],
-  folder: string,
-): HTMLElement {
+/**
+ * Jedna řada obrázků, **bez popisků**.
+ *
+ * Popisky pod kartami zabíraly řádek a nic neříkaly — co je na obrázku, je
+ * vidět. Zůstávají v `alt` kvůli odečítačkám a ukážou se v lightboxu, kde je
+ * na ně místo a kde teprve dávají smysl.
+ */
+function galleryRow(t: (key: string) => string, root: HTMLElement): HTMLElement {
   const section = el('section', 'home__row');
-  section.appendChild(el('h2', 'home__row-title', t(titleKey)));
+  section.appendChild(el('h2', 'home__row-title', t('ui.home.gallery')));
 
   const strip = el('div', 'home__strip');
-  for (const item of items) {
-    const card = el('figure', 'home__card');
+  GALLERY.forEach((item, order) => {
+    const card = button('home__card home__card--plain', () => showLightbox(root, t, order));
     const image = el('img', 'home__card-image');
-    image.src = `${folder}/${item.file}`;
+    image.src = item.file;
     image.alt = t(item.titleKey);
     image.loading = 'lazy';
     card.appendChild(image);
-    card.appendChild(el('figcaption', 'home__card-label', t(item.titleKey)));
     strip.appendChild(card);
-  }
+  });
 
   section.appendChild(strip);
   return section;
+}
+
+/**
+ * Lightbox: obrázek přes celou obrazovku a šipky mezi nimi.
+ *
+ * Karty v řadě jsou malé a na snímku ze hry v nich není vidět nic. Zvětšení
+ * je proto jediný způsob, jak si je prohlédnout — a je to i místo, kde se
+ * hráč dozví, **jestli kouká na hru, nebo na kreslený pohled**. V řadě to
+ * nikde napsané není.
+ */
+function showLightbox(parent: HTMLElement, t: (key: string) => string, from: number): void {
+  let at = from;
+
+  const overlay = el('div', 'lightbox');
+  const figure = el('figure', 'lightbox__figure');
+  const image = el('img', 'lightbox__image');
+  const caption = el('figcaption', 'lightbox__caption');
+  figure.append(image, caption);
+  overlay.appendChild(figure);
+
+  function draw(): void {
+    const item = GALLERY[at];
+    if (item === undefined) return;
+    image.src = item.file;
+    image.alt = t(item.titleKey);
+    caption.textContent = `${t(item.titleKey)} — ${t(item.game ? 'ui.home.fromTheGame' : 'ui.home.fromTheWorld')}`;
+  }
+
+  function step(delta: number): void {
+    at = (at + delta + GALLERY.length) % GALLERY.length;
+    draw();
+  }
+
+  function close(): void {
+    overlay.remove();
+    window.removeEventListener('keydown', onKey);
+  }
+
+  function onKey(event: KeyboardEvent): void {
+    if (event.key === 'Escape') close();
+    else if (event.key === 'ArrowRight') step(1);
+    else if (event.key === 'ArrowLeft') step(-1);
+  }
+
+  for (const [css, delta, label] of [
+    ['lightbox__step lightbox__step--prev', -1, 'ui.home.previous'],
+    ['lightbox__step lightbox__step--next', 1, 'ui.home.next'],
+  ] as const) {
+    const node = button(css, () => step(delta));
+    node.textContent = delta < 0 ? '‹' : '›';
+    node.title = t(label);
+    node.setAttribute('aria-label', t(label));
+    overlay.appendChild(node);
+  }
+
+  const close_ = button('lightbox__close', close);
+  close_.textContent = '×';
+  close_.title = t('ui.home.back');
+  close_.setAttribute('aria-label', t('ui.home.back'));
+  overlay.appendChild(close_);
+
+  // Klik mimo obrázek zavírá. Klik na obrázek ne — hráč na něj míří, když si
+  // ho chce prohlédnout, ne když chce pryč.
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay || event.target === figure) close();
+  });
+  window.addEventListener('keydown', onKey);
+
+  draw();
+  parent.appendChild(overlay);
 }
 
 /** Řada s odkazy: zatím autoři, časem přibude nápověda a novinky. */
@@ -244,6 +318,9 @@ function showAuthors(parent: HTMLElement, t: (key: string) => string): void {
   mail.textContent = AUTHOR_EMAIL;
   contact.appendChild(mail);
   panel.appendChild(contact);
+
+  // Věnování stojí samo a jinak než zbytek: není to údaj, je to důvod.
+  panel.appendChild(el('p', 'home__dedication', t('ui.authors.dedication')));
 
   const close = button('home__button home__button--primary', () => overlay.remove());
   close.textContent = t('ui.home.back');
