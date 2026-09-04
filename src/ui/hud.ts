@@ -287,10 +287,15 @@ export class Hud {
     this.viewButtons.clear();
     this.fundingInputs.clear();
 
-    this.buildStats();
+    // Rychlost patří **nahoru za datum**, ne dolů mezi ovládání: mění se
+    // často a hráč ji hledá u času, ne u nástrojů. Rozhodnutí autora.
+    // Statistiky a rychlost proto sedí v jednom shluku vlevo, poptávka vpravo.
+    const left = el('div', 'hud__top-left');
+    this.top.appendChild(left);
+    this.buildStats(left);
+    this.buildSpeed(left);
     this.buildDemand();
 
-    this.buildSpeed();
     this.buildViews();
     this.buildGhost();
     this.buildDecor();
@@ -304,7 +309,7 @@ export class Hud {
     this.buildMessage();
   }
 
-  private buildStats(): void {
+  private buildStats(parent: HTMLElement): void {
     const group = el('div', 'stats');
     for (const [key, labelKey] of [
       ['funds', 'ui.hud.funds'],
@@ -325,7 +330,7 @@ export class Hud {
       this.values.set(key, value);
       group.appendChild(stat);
     }
-    this.top.appendChild(group);
+    parent.appendChild(group);
   }
 
   private buildDemand(): void {
@@ -351,8 +356,12 @@ export class Hud {
     this.top.appendChild(panel);
   }
 
-  /** Rychlost je jediná věc z ovládání, která je pořád vidět — mění se často. */
-  private buildSpeed(): void {
+  /**
+   * Rychlost běhu času. Stojí **nahoře za datem**, ne dole mezi nástroji:
+   * patří k času, se kterým se čte, a mění se ze všech ovládacích prvků
+   * nejčastěji.
+   */
+  private buildSpeed(parent: HTMLElement): void {
     const group = el('div', 'segmented');
     this.speeds.forEach((speed, index) => {
       const label = speed === 0 ? this.i18n.t('ui.speed.pause') : this.i18n.t('ui.speed.value', { speed });
@@ -371,7 +380,7 @@ export class Hud {
       group.appendChild(node);
       this.speedButtons.push(node);
     });
-    this.controls.appendChild(group);
+    parent.appendChild(group);
   }
 
   /**

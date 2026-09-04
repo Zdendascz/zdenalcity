@@ -77,6 +77,14 @@ body {
   align-items: flex-end;
 }
 
+/* Statistiky a rychlost drží pohromadě vlevo nahoře; poptávka zůstává vpravo. */
+.hud__top-left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
 .hud__message {
   order: -1;
   width: 100%;
