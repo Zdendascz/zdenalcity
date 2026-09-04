@@ -3,6 +3,24 @@
   "size": 256,
   "tiles": [
     {
+      "tile": "asphalt_avenue",
+      "shape": "a",
+      "file": "asphalt_avenue__a.png",
+      "size": 256
+    },
+    {
+      "tile": "asphalt_highway",
+      "shape": "a",
+      "file": "asphalt_highway__a.png",
+      "size": 256
+    },
+    {
+      "tile": "asphalt_street",
+      "shape": "a",
+      "file": "asphalt_street__a.png",
+      "size": 256
+    },
+    {
       "tile": "avenue",
       "shape": "0",
       "file": "avenue__0.png",
@@ -252,6 +270,12 @@
       "tile": "pipe",
       "shape": "0",
       "file": "pipe__0.png",
+      "size": 256
+    },
+    {
+      "tile": "pipe",
+      "shape": "a",
+      "file": "pipe__a.png",
       "size": 256
     },
     {

@@ -45,11 +45,10 @@ VARIANT_ROW = re.compile(r'^\| \*\*([abc])\*\* \| (.+?) \|\s*$', re.M)
 # Řádek tabulky vzorů: `| grass | park_small__a.png | ... |`.
 REFERENCE_ROW = re.compile(r'^\| `([a-z_]+)` \| `([a-z0-9_]+\.png)` \| .+? \|\s*$', re.M)
 
-# Řádky tabulek typů a tvarů: `| id | popis |` a `| maska | id | popis |`.
+# Řádek tabulky materiálů: `| id | prompt |`. Tvary vozovky se negenerují —
+# tvar se počítá z rohů dlaždice, obrázek dodá jen povrch. Proč, viz „Silnice"
+# v zadání: šestnáct tvarů na typ se nevejde do jedné kreslicí dávky.
 TYPE_ROW = re.compile(r'^\| `([a-z_]+)` \| (.+?) \|\s*$', re.M)
-# Tvar bez napojení má id `0`, takže i číslice — jinak z šestnácti tvarů
-# projde patnáct a chybí zrovna ten osamocený.
-SHAPE_ROW = re.compile(r'^\| (\d+) \| `([a-z0-9]+)` \| (.+?) \|\s*$', re.M)
 
 PARAGRAPH = '''
 
@@ -92,9 +91,6 @@ def read_spec() -> dict:
     header = fence('Styl')
     reference_note = fence('Vzory')
     object_header = fence('Objekty na terénu')
-    road_seam = fence('Silnice')
-    # Věta o navazování je u potrubí stejná, jen jiné slovo — říká to dokument.
-    pipe_seam = road_seam.replace('carriageway', 'pipe')
 
     surfaces: dict[str, dict[str, str]] = {}
     for name, body in SURFACE.findall(section(text, 'Povrchy')):
@@ -103,23 +99,15 @@ def read_spec() -> dict:
             raise SystemExit(f'{SPEC.name}: povrch „{name}" nemá varianty a/b/c')
         surfaces[name] = rows
 
-    roads = section(text, 'Silnice')
-    types = dict(TYPE_ROW.findall(roads))
-    shapes = {shape: prompt for _, shape, prompt in SHAPE_ROW.findall(roads)}
-    if len(shapes) != 16:
-        raise SystemExit(f'{SPEC.name}: čekám 16 tvarů vozovky, mám {len(shapes)}')
-
-    pipes = dict(TYPE_ROW.findall(section(text, 'Potrubí')))
+    # Materiál vozovky a výkopu. Jeden obrázek na typ, ne šestnáct tvarů.
+    materials = dict(TYPE_ROW.findall(section(text, 'Silnice')))
+    materials.update(TYPE_ROW.findall(section(text, 'Potrubí')))
     references = dict(REFERENCE_ROW.findall(section(text, 'Vzory')))
 
     return {
         'header': header,
-        'road_seam': road_seam,
-        'pipe_seam': pipe_seam,
         'surfaces': surfaces,
-        'types': types,
-        'shapes': shapes,
-        'pipes': pipes,
+        'materials': materials,
         'references': references,
         'reference_note': reference_note,
         'object_header': object_header,
@@ -150,14 +138,11 @@ def plan(spec: dict) -> list[tuple[str, str, str | None]]:
                 None,
             ))
 
-    for family, seam in (('types', 'road_seam'), ('pipes', 'pipe_seam')):
-        for name, popis in spec[family].items():
-            for shape, tvar in spec['shapes'].items():
-                jobs.append((
-                    f'{name}__{shape}',
-                    PARAGRAPH.join([spec['header'], popis, tvar, spec[seam]]),
-                    None,
-                ))
+    # Materiál je jeden obrázek, ale jméno má tvar `id__varianta` jako všechno
+    # ostatní — `fit-tiles.py` i `index.json` počítají s tím, že za dvěma
+    # podtržítky je varianta.
+    for name, prompt in spec['materials'].items():
+        jobs.append((f'{name}__a', PARAGRAPH.join([spec['header'], prompt]), None))
 
     return jobs
 

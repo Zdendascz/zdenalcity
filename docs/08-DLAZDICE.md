@@ -310,6 +310,16 @@ dálnice 0,86.
 Dneska se ty polygony vyplňují plochou barvou z `ROAD_COLORS`. Návrh je jediná
 změna: **místo barvy textura**, přesně jak to od T72 dělá povrch terénu.
 
+**Hotovo.** Tři materiály se vygenerovaly, změřily a jsou zapojené. Kolik
+textur se do dávky vejde, už není odhad: `MAX_TEXTURE_IMAGE_UNITS` je na tomhle
+stroji **16**, takže šest povrchů plus tři asfalty (devět) projde s rezervou —
+a taky prošlo, bez jediné skvrny. Šestnáct tvarů na typ by bylo osmačtyřicet
+textur, tedy trojnásobek stropu; sedí to na to, co se dřív jen pozorovalo
+(s osmnácti skvrny byly, se šesti ne).
+
+Jas změřený na hotových dlaždicích: ulice 121, třída 97, dálnice 64. Vychází
+z toho, co prompty říkají — ulice je vyšlapaná a šedá, dálnice čerstvá a tmavá.
+
 ### Co se generuje
 
 Ne šestnáct tvarů, ale **jeden materiál na typ vozovky**. Tři obrázky místo
@@ -326,11 +336,17 @@ místo, které by šlo poznat. Jednotlivá spára ani kámen v dlaždici vidět 
 
 ### Co se kreslí, a ne generuje
 
-Všechno, co musí lícovat:
+Všechno, co musí lícovat. **Zatím nic z toho hotové není** — vozovka má materiál,
+ale ještě ne obrubu ani čáry:
 
 - **obrubník** — obtah kolem polygonu vozovky, ne kresba v obrázku,
 - **vodicí čára** u třídy a dálnice — úsečka po ose ramene,
 - **přechody a zebry**, pokud je někdy budeme chtít.
+
+U obruby je jeden háček, na který se přijde až u kreslení: `roadPolygons` vrací
+**jádro a ramena zvlášť**, takže obtáhnout každý polygon zvlášť by nakreslilo
+čáru i po vnitřních spárách mezi jádrem a ramenem, tedy mřížku přes silnici.
+Obrys musí vzniknout jen z **vnějších** hran.
 
 Generovaný obrázek by je nikdy nenavázal přes hranici dlaždice; spočítaná
 úsečka ano.

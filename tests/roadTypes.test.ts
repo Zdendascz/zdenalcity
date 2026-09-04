@@ -6,6 +6,7 @@ import { buildRoad, bulldoze } from '@/sim/commands';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { tileQuad } from '@/render/projection';
 import { roadMask, roadPolygons } from '@/render/roads';
+import { ROAD_NAMES } from '@/render/chunkRenderer';
 import { ROAD_COLORS, ROAD_WIDTHS } from '@/render/palette';
 import { computeBudget } from '@/sim/systems/economy';
 import type { BuildingCatalogue } from '@/sim/catalogue';
@@ -14,6 +15,7 @@ import { VANILLA_BALANCE } from './support/balance';
 import { MAP_SIZE } from './support/grid';
 
 const EMPTY: BuildingCatalogue = { get: () => undefined, byCategory: () => [] };
+
 
 function world() {
   return createWorld(1, VANILLA_BALANCE.economy);
@@ -230,5 +232,32 @@ describe('vykreslení', () => {
 
     expect(narrow).toHaveLength(wide.length);
     expect(narrow[0]).not.toEqual(wide[0]);
+  });
+
+  it('materiál má každý typ silnice a obsah ho dodává', () => {
+    // Kdyby přibyl typ silnice a materiál se k němu nedoplnil, vozovka by se
+    // tiše kreslila plochou barvou — a to je přesně ten druh vady, které si
+    // nikdo nevšimne, protože pod obrázkem barva zůstává schválně.
+    //
+    // Kontroluje se **cesta, kterou jde hra**, ne složka: obrázky se berou přes
+    // bílou listinu v `loader.ts` a právě ta byla poprvé špatně. Soubory ve
+    // složce ležely a stejně se nekreslily.
+    const tiles = createVanillaSource().tiles ?? {};
+    for (const [name, roadType] of [
+      ['ulice', ROAD.street],
+      ['třída', ROAD.avenue],
+      ['dálnice', ROAD.highway],
+    ] as const) {
+      const material = ROAD_NAMES[roadType];
+      expect(material, name).toBeDefined();
+      expect(
+        Object.keys(tiles).some((key) => key.startsWith(`${material}|`)),
+        `${name}: obsah nedodává materiál ${material}`,
+      ).toBe(true);
+    }
+
+    // Nula je „žádná silnice" a obrázek mít nesmí, jinak by se materiál sáhl
+    // i na prázdné dlaždici.
+    expect(ROAD_NAMES[ROAD.none]).toBeUndefined();
   });
 });

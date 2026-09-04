@@ -70,16 +70,80 @@ const TERRAIN_NAMES: readonly (string | undefined)[] = [
   'marsh',
 ];
 
+/**
+ * Jména materiálů vozovky. Index je hodnota vrstvy `road`, takže to musí sedět
+ * na `ROAD` v `sim/layers.ts`. Nula je „žádná silnice" a obrázek nemá.
+ *
+ * Materiál je **jeden na typ**, ne šestnáct tvarů: tvar vozovky se počítá
+ * z rohů dlaždice (`roadPolygons`) a obrázek dodá jen povrch. Hotové dlaždice
+ * na tvar se zkoušely a zahodily — do jedné kreslicí dávky se jich tolik
+ * nevejde. Měření je v `docs/08-DLAZDICE.md`.
+ */
+export const ROAD_NAMES: readonly (string | undefined)[] = [
+  undefined,
+  'asphalt_street',
+  'asphalt_avenue',
+  'asphalt_highway',
+];
+
 /** Co padlo na dlaždici: obrázek a o kolik čtvrtin otočený. */
 interface SurfacePick {
   texture: Texture;
   turn: number;
 }
 
-/** Co padlo na dlaždici: obrázek a o kolik čtvrtin otočený. */
-interface SurfacePick {
-  texture: Texture;
-  turn: number;
+/**
+ * O kolik čtvrtin se otočí asfalt na téhle dlaždici.
+ *
+ * Materiál je jen jeden, takže bez otočení by měly všechny dlaždice kresbu ve
+ * stejném směru a slily by se v pruh — přesně to, co u trávy dopadlo jako
+ * „manšestr". Asfalt žádný směr nemá, takže otočit se smí bez ohledu na to,
+ * kudy silnice vede.
+ *
+ * Losuje se ze **souřadnic**, ne z `world.rng`: musí to vyjít stejně při každém
+ * překreslení i po načtení savu.
+ */
+function roadTurn(x: number, y: number): number {
+  let h = Math.imul((x * 0x9e3779b1) ^ (y * 0x7feb352d), 0x846ca68b) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0;
+  return h & 3;
+}
+
+/**
+ * Matice, která položí čtvercový obrázek na dlaždici.
+ *
+ * Vede **z textury do plochy**: obrázek 256 px na dlaždici širokou 64. Obracet
+ * ji nemá, a dělal jsem to — kresba pak byla osmkrát zvětšená a na trávě to
+ * nešlo poznat, protože zvětšený trávník je pořád trávník. Prozradil to až
+ * písek, který vyšel rozmazaný, a strom, ze kterého zbyl svislý proužek.
+ *
+ * Otočení se dělá **výběrem rohů**, ne otáčením obrázku: který roh je počátek
+ * a kterými dvěma vedou osy, to o čtvrtinu otočí celou kresbu zadarmo. Rohy
+ * chodí po směru hodin, takže `turn` je počet čtvrtin.
+ *
+ * Používá ji terén i vozovka. U vozovky je to podstatné: polygon vozovky je
+ * jen **výřez dlaždice**, takže když se obrázek mapuje na celou dlaždici,
+ * asfalt v rameni navazuje na asfalt v jádru sám od sebe.
+ */
+function tileMatrix(
+  x: number,
+  y: number,
+  corners: readonly [number, number, number, number],
+  turn: number,
+  size: number,
+): Matrix {
+  const quad = surfaceCorners(x, y, corners);
+  const origin = quad[turn]!;
+  const alongU = quad[(turn + 1) & 3]!;
+  const alongV = quad[(turn + 3) & 3]!;
+  return new Matrix(
+    (alongU[0] - origin[0]) / size,
+    (alongU[1] - origin[1]) / size,
+    (alongV[0] - origin[0]) / size,
+    (alongV[1] - origin[1]) / size,
+    origin[0],
+    origin[1],
+  );
 }
 
 /**
@@ -240,6 +304,8 @@ export class ChunkRenderer {
    * ve vodě, se šesti zmizely. Atlas ten strop obchází.
    */
   private surfacesByTerrain = new Map<number, Texture[]>();
+  /** Materiál vozovky podle typu. Jeden obrázek na typ, viz `ROAD_NAMES`. */
+  private roadSurfaces = new Map<number, Texture>();
 
   constructor(world: ReadonlyWorldView, parent: Container, roofIcon?: RoofIconLookup) {
     this.world = world;
@@ -423,6 +489,24 @@ export class ChunkRenderer {
   }
 
   /**
+   * Nastaví materiál vozovky a překreslí, co je vidět.
+   *
+   * Klíč je jméno materiálu z `ROAD_NAMES`, ne typ silnice: obsah o vrstvě
+   * `road` nic neví a dodává obrázky pod jmény (P5).
+   */
+  setRoadSurfaces(surfaces: ReadonlyMap<string, Texture>): void {
+    this.roadSurfaces = new Map();
+    for (let roadType = 0; roadType < ROAD_NAMES.length; roadType++) {
+      const name = ROAD_NAMES[roadType];
+      if (name === undefined) continue;
+      const texture = surfaces.get(name);
+      if (texture !== undefined) this.roadSurfaces.set(roadType, texture);
+    }
+
+    this.invalidateAll();
+  }
+
+  /**
    * Který obrázek padne na tuhle dlaždici.
    *
    * Losuje se ze **souřadnic**, ne z `world.rng`: musí to vyjít stejně při
@@ -479,33 +563,17 @@ export class ChunkRenderer {
     // když obrázek chybí nebo se nedokreslí, zůstane terén, ne díra.
     graphics.poly(points).fill({ color });
 
+    // Tón je **bílá ztlumená sklonem**, ne barva terénu: obrázek už zelený je
+    // a vynásobit ho zelenou znamená bahno. Zůstat musí jen světlo, jinak by
+    // ze svahu zmizel stín a kopec by vypadal jako rovina.
+    const light = shade(
+      0xffffff,
+      slopeLight(corners) * (underground ? UNDERGROUND_TERRAIN_SHADE : 1),
+    );
+
     const surface = this.surfaceFor(terrain, x, y);
     if (surface !== undefined) {
-      const size = surface.texture.width || 1;
-      // Otočení se dělá **výběrem rohů**, ne otáčením obrázku: který roh je
-      // počátek a kterými dvěma vedou osy, to o čtvrtinu otočí celou kresbu
-      // zadarmo. Rohy chodí po směru hodin, takže `turn` je počet čtvrtin.
-      const quad = surfaceCorners(x, y, corners);
-      const origin = quad[surface.turn]!;
-      const alongU = quad[(surface.turn + 1) & 3]!;
-      const alongV = quad[(surface.turn + 3) & 3]!;
-      // Matice vede **z textury do plochy**: obrázek 256 px na dlaždici širokou
-      // 64. Obracet ji nemá, a dělal jsem to — kresba pak byla osmkrát zvětšená
-      // a na trávě to nešlo poznat, protože zvětšený trávník je pořád trávník.
-      // Prozradil to až písek, který vyšel rozmazaný, a strom, ze kterého zbyl
-      // svislý proužek.
-      const matrix = new Matrix(
-        (alongU[0] - origin[0]) / size,
-        (alongU[1] - origin[1]) / size,
-        (alongV[0] - origin[0]) / size,
-        (alongV[1] - origin[1]) / size,
-        origin[0],
-        origin[1],
-      );
-      // Tón je **bílá ztlumená sklonem**, ne barva terénu: obrázek už zelený je
-      // a vynásobit ho zelenou znamená bahno. Zůstat musí jen světlo, jinak by
-      // ze svahu zmizel stín a kopec by vypadal jako rovina.
-      const light = shade(0xffffff, slopeLight(corners) * (underground ? UNDERGROUND_TERRAIN_SHADE : 1));
+      const matrix = tileMatrix(x, y, corners, surface.turn, surface.texture.width || 1);
       graphics.poly(points).fill({ texture: surface.texture, matrix, color: light });
     } else {
       // Obrys jen u barevné dlaždice. Na obrázku by z něj byla světlá mřížka
@@ -541,10 +609,22 @@ export class ChunkRenderer {
       // Bitmask se počítá z „je tam jakákoli silnice" — všechny typy se
       // navzájem napojují (§4). Šířku a barvu určuje typ vlastní dlaždice.
       const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
+      // Na mostě zůstává barva: most není asfalt na zemi, ale konstrukce nad
+      // vodou, a musí být poznat, kde silnice opouští břeh (§7 fáze 3).
+      const asphalt = bridge ? undefined : this.roadSurfaces.get(roadType);
+      const matrix =
+        asphalt === undefined
+          ? undefined
+          : tileMatrix(x, y, corners, roadTurn(x, y), asphalt.width || 1);
       for (const polygon of roadPolygons(points, mask, ROAD_WIDTHS[roadType])) {
+        // Barva se kreslí **vždycky, i pod obrázek** — stejně jako u terénu.
+        // Když obrázek chybí nebo se nedokreslí, zůstane vozovka, ne díra.
         graphics
           .poly(polygon)
           .fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[roadType] ?? ROAD_COLOR) });
+        if (asphalt !== undefined && matrix !== undefined) {
+          graphics.poly(polygon).fill({ texture: asphalt, matrix, color: light });
+        }
       }
     }
 

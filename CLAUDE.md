@@ -24,8 +24,11 @@ Sprity **budou** — rozhodnutí autora se dvakrát změnilo, tak pozor na pořa
   Zadání a prompty jsou v `docs/06-SPRITY-SLUZEB.md`.
 - **T72:** obrázek povrchu mají **všechny druhy terénu**, v `content/vanilla/tiles/`.
   Kreslí se jako výplň polygonu s maticí, ne přes mesh, takže chunkové pečení
-  zůstalo. **Silnice a potrubí zůstávají procedurální** — spoj u nich sedí jen
-  u 22 dlaždic ze 64. Měření je v `docs/08-DLAZDICE.md`.
+  zůstalo. **Silnice mají materiál, ne tvar**: tvar vozovky se počítá z rohů
+  dlaždice a obrázek dodá jen povrch, jeden na typ. Hotové dlaždice na každý
+  tvar se zkoušely a zahodily — spoj sedí jen u 22 ze 64 a hlavně se jich tolik
+  nevejde do jedné kreslicí dávky. **Potrubí zůstává procedurální.** Měření je
+  v `docs/08-DLAZDICE.md`.
 
 Vše jde přes `ContentSource`, aby to mod směl přidat i přepsat (P5). Chybějící
 obrázek nesmí hru zastavit — kreslí se kvádr jako dřív.

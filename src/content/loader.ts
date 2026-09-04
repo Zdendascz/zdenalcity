@@ -52,10 +52,24 @@ export function createVanillaSource(): ContentSource {
 
   // Povrchy. Jméno souboru je `<druh>__<varianta>.png` a klíč `<druh>|<varianta>`,
   // takže se rejstřík `tiles/index.json` k ničemu nepotřebuje: rozměr je vždycky
-  // čtverec a kotva u dlaždice nedává smysl. Silnice a potrubí se **neberou** —
-  // jejich obrázky sice ve složce leží, ale mají vadné spoje a vozovka by na
-  // každém styku uskakovala (`docs/08-DLAZDICE.md`).
-  const SURFACES = new Set(['grass', 'water', 'sand', 'rock', 'forest', 'marsh']);
+  // čtverec a kotva u dlaždice nedává smysl.
+  //
+  // Je to **bílá listina, ne co leží ve složce**: dlaždice silnic a potrubí na
+  // tvar (`street__ns` a spol.) ve složce pořád jsou, ale nepoužívají se —
+  // 42 ze 64 má vozovku jinde, než má, a hlavně by se jich tolik nevešlo do
+  // jedné kreslicí dávky (`docs/08-DLAZDICE.md`). Asfalt je něco jiného: je to
+  // **materiál**, jeden obrázek na typ silnice, a tvar vozovky se počítá.
+  const SURFACES = new Set([
+    'grass',
+    'water',
+    'sand',
+    'rock',
+    'forest',
+    'marsh',
+    'asphalt_street',
+    'asphalt_avenue',
+    'asphalt_highway',
+  ]);
   const tileFiles = import.meta.glob('../../content/vanilla/tiles/*.png', {
     eager: true,
     query: '?url',

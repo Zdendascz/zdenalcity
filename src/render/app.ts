@@ -469,6 +469,40 @@ async function loadSurfaces(content: ContentRegistry): Promise<Map<string, Textu
 }
 
 /**
+ * Načte materiál vozovky — **jeden obrázek na typ silnice**.
+ *
+ * Tvar vozovky se počítá z rohů dlaždice, obrázek dodá jen povrch. Hotové
+ * dlaždice na každý tvar se zkoušely a zahodily: šestnáct tvarů na typ je
+ * čtyřicet osm textur navíc a do jedné dávky se nevejdou ani zdaleka, viz
+ * `loadSurfaces`. Tři materiály jsou proti tomu levné.
+ *
+ * Klíčem je jméno materiálu, ne typ silnice: o vrstvu `road` se stará
+ * `ChunkRenderer`, obsah dodává obrázky pod jmény (P5).
+ */
+async function loadRoadSurfaces(content: ContentRegistry): Promise<Map<string, Texture>> {
+  const out = new Map<string, Texture>();
+  const jobs: Promise<void>[] = [];
+
+  for (const name of ROAD_SURFACE_NAMES) {
+    const [variant] = content.getTileVariants(name);
+    if (variant === undefined) continue;
+    const url = content.getTile(name, variant);
+    if (url === undefined) continue;
+    jobs.push(
+      Assets.load(url)
+        .then((texture: Texture) => {
+          texture.source.addressMode = 'clamp-to-edge';
+          out.set(name, texture);
+        })
+        .catch(() => undefined),
+    );
+  }
+
+  await Promise.all(jobs);
+  return out;
+}
+
+/**
  * Předměty, které stojí na terénu: strom na lese, balvan na skále.
  *
  * Rozhodnutí autora — a je za ním měření: jako **materiál** skála i les
@@ -524,6 +558,12 @@ const SURFACE_VARIANT_LIMIT = 1;
 
 /** Druhy terénu, ke kterým se hledá obrázek. Sedí na `TERRAIN` v `sim/layers.ts`. */
 const TERRAIN_NAMES = ['grass', 'water', 'sand', 'rock', 'forest', 'marsh'] as const;
+
+/**
+ * Materiály vozovky. Pořadí je jedno — přiřazení k typu silnice dělá
+ * `ROAD_NAMES` v `chunkRenderer.ts`, tady jde jen o to, co stáhnout.
+ */
+const ROAD_SURFACE_NAMES = ['asphalt_street', 'asphalt_avenue', 'asphalt_highway'] as const;
 
 export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Obsah se načítá první. Nevalidní definice má spadnout dřív, než se objeví
@@ -653,11 +693,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // a nemá kde počkat, takže se do té doby kreslí barva. Když obsah obrázky
   // nemá, zůstane barva navždy a hra běží dál (P5).
   //
-  // Silnice a potrubí se sem **záměrně nedávají**. Jejich dlaždice existují,
-  // ale 42 ze 64 má vozovku jinde, než má, takže by na každém spoji uskakovala.
-  // Rozhodnutí, co s tím, je v `docs/08-DLAZDICE.md`.
+  // Silnice mají **materiál, ne tvar**: tvar vozovky se počítá z rohů dlaždice.
+  // Hotové dlaždice na každý tvar v repu leží, ale 42 ze 64 má vozovku jinde,
+  // než má — a hlavně by se jich tolik nevešlo do jedné dávky. Proč, viz
+  // `docs/08-DLAZDICE.md`. Potrubí zatím zůstává procedurální.
   void loadSurfaces(content).then((surfaces) => {
     if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
+  });
+  void loadRoadSurfaces(content).then((surfaces) => {
+    if (surfaces.size > 0) chunkRenderer.setRoadSurfaces(surfaces);
   });
   void loadDecor(content).then((decor) => {
     if (decor.size > 0) buildingRenderer.setDecor(decor);
