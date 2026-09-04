@@ -223,9 +223,30 @@ Písek jako v pískovišti, odkud je vzor.
 
 | | prompt |
 |---|---|
-| **a** | Open water seen from far above: one flat even blue-green surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom — only a very faint fine texture. |
-| **b** | Deep open water seen from far above: one flat even dark blue surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom — only a very faint fine texture. |
-| **c** | Open water seen from far above: one flat even lighter blue surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom — only a very faint fine texture. |
+| **a** | Open water seen from far above: one flat even blue-green surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom. The light is perfectly flat and even across the whole image: NO shadow, NO vignette, NO darker corner, NO darker band, NO gradient from one side to the other. Every part of the image is exactly as bright as every other part. The surface carries a fine even mottling with no direction, like still water seen from a height. |
+| **b** | Deep open water seen from far above: one flat even dark blue surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom. The light is perfectly flat and even across the whole image: NO shadow, NO vignette, NO darker corner, NO darker band, NO gradient from one side to the other. Every part of the image is exactly as bright as every other part. The surface carries a fine even mottling with no direction, like still water seen from a height. |
+| **c** | Open water seen from far above: one flat even lighter blue surface, the same everywhere. No waves, no white crests, no sun glitter, no foam, no shore, no bottom. The light is perfectly flat and even across the whole image: NO shadow, NO vignette, NO darker corner, NO darker band, NO gradient from one side to the other. Every part of the image is exactly as bright as every other part. The surface carries a fine even mottling with no direction, like still water seen from a height. |
+
+**Voda je nejcitlivější povrch na mapě a je za tím jedno číslo.** Ořez okraje
+spravil mřížku všude kromě ní — autor to popsal přesně: „na trávu a hlínu to
+zabralo skvěle, ale na vodu vůbec". Rozhoduje poměr **širokého přechodu ke
+kontrastu uvnitř dlaždice**:
+
+| povrch | široký přechod | kontrast | poměr |
+|---|---|---|---|
+| tráva | 6 | 20,3 | 0,3 |
+| mokřad | 33 | 25,1 | 1,3 |
+| písek | 29 | 11,4 | 2,5 |
+| voda | 10 | 3,7 | **2,7** |
+
+Vodě stačí přechod 10, aby byla nejhorší z celé sady: nemá **žádnou vlastní
+kresbu**, která by ho schovala. „Only a very faint fine texture" v prvním
+promptu udělalo přesně to — hladkou plochu, na které je pak vidět každý
+přechod, a otáčení po dlaždicích z něj udělá schod na každém spoji.
+
+Prompt proto dělá dvě věci naráz: zakazuje přechod jmenovitě, jako u trávy,
+a zároveň žádá **jemné nesměrové mramorování** místo „skoro nic". Vlny,
+hřebeny a jiskření zůstávají zakázané — ty tu už jednou udělaly manšestr.
 
 ## Objekty na terénu
 
