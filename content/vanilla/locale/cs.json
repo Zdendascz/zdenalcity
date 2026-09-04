@@ -497,5 +497,6 @@
   "ui.authors.code": "Kód: psáno ve dvojici s Claude Code od Anthropicu.",
   "ui.authors.art": "Grafika: budovy, povrchy a ikony generované přes OpenAI Images, doladěné vlastními nástroji v repozitáři.",
   "ui.authors.engine": "Běží na Pixi.js a Vite. Bez enginu, bez frameworku.",
-  "ui.authors.thanks": "Díky všem, kdo hru zkoušeli a hlásili, co je špatně."
+  "ui.authors.thanks": "Díky všem, kdo hru zkoušeli a hlásili, co je špatně.",
+  "ui.authors.bugs": "Našel jsi chybu nebo máš nápad? Napiš na"
 }

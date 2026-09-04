@@ -33,6 +33,9 @@ export interface HomeOptions {
   readFile: (file: File) => Promise<Uint8Array>;
 }
 
+/** Kam se hlásí chyby. Adresa autora, ne obecná schránka. */
+const AUTHOR_EMAIL = 'jsem@zdendas.cz';
+
 /** Snímky ze hry pro hlavičku a karty. Leží v `public/shots/`. */
 const SHOTS = [
   { file: 'centrum.jpg', titleKey: 'ui.home.shot.centre' },
@@ -210,6 +213,15 @@ function showAuthors(parent: HTMLElement, t: (key: string) => string): void {
   ]) {
     panel.appendChild(el('p', 'home__panel-line', t(key)));
   }
+
+  // Adresa je **odkaz, ne text**: hráč, který právě narazil na chybu, nemá
+  // opisovat e-mail z obrazovky. `mailto:` otevře jeho poštu rovnou.
+  const contact = el('p', 'home__panel-line', `${t('ui.authors.bugs')} `);
+  const mail = el('a', 'home__mail');
+  mail.href = `mailto:${AUTHOR_EMAIL}`;
+  mail.textContent = AUTHOR_EMAIL;
+  contact.appendChild(mail);
+  panel.appendChild(contact);
 
   const close = button('home__button home__button--primary', () => overlay.remove());
   close.textContent = t('ui.home.back');

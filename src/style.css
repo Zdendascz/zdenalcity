@@ -1159,3 +1159,8 @@ body {
 .home__panel .home__button {
   margin-top: 14px;
 }
+
+/* Adresa v autorech. Jantarová jako tlačítka, ať je poznat, že je to odkaz. */
+.home__mail {
+  color: #f0a020;
+}
