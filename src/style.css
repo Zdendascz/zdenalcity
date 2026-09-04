@@ -1497,3 +1497,9 @@ body {
 .lightbox__close:hover {
   border-color: #eef3f5;
 }
+
+/* Odznak typu silnice v rozboru parcely. Kosočtverec jako u povrchu, ale
+   plná barva — obrázek vozovky je průhledný a na kartičce by nebyl vidět. */
+.sheet__surface-tile--road {
+  background: #4a4b52;
+}

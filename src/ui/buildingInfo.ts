@@ -3,7 +3,7 @@ import type { Definition } from '@/content/schema';
 import type { ParcelExplanation } from '@/sim/diagnostics';
 import { buildingMonthlyTax, buildingMonthlyUpkeep } from '@/sim/systems/economy';
 import type { Building, WorldState } from '@/sim/world';
-import { TERRAIN } from '@/sim/layers';
+import { ROAD, TERRAIN } from '@/sim/layers';
 import { iconSvg } from './icons';
 import { button, el } from './dom';
 import { formatNumber, landValueTermKeys } from './format';
@@ -15,6 +15,19 @@ import type { I18n } from './i18n';
  * takže to musí sedět na `TERRAIN` v `sim/layers.ts` — na pořadí, ne na jméno
  * konstanty.
  */
+/**
+ * Jméno typu silnice pro překlad. Index je hodnota vrstvy `road`.
+ *
+ * Ukazuje se **jen když na dlaždici silnice opravdu je**. Autor si stěžoval,
+ * že u divně vypadající vozovky nepozná, jestli je vadný obrázek, nebo jen
+ * jiný typ — bez tohohle řádku se to z panelu vyčíst nedalo.
+ */
+const ROAD_KEYS: Readonly<Record<number, string>> = {
+  [ROAD.street]: 'street',
+  [ROAD.avenue]: 'avenue',
+  [ROAD.highway]: 'highway',
+};
+
 const TERRAIN_KEYS: Readonly<Record<number, string>> = {
   [TERRAIN.grass]: 'grass',
   [TERRAIN.water]: 'water',
@@ -307,6 +320,14 @@ export class BuildingInfo {
 
     parent.appendChild(el('h3', 'sheet__subtitle', t('ui.parcel.title')));
     this.appendSurface(parent, parcel.terrain);
+
+    const road = ROAD_KEYS[parcel.road];
+    if (road !== undefined) {
+      const row = el('div', 'sheet__surface');
+      const badge = el('div', 'sheet__surface-tile sheet__surface-tile--road');
+      row.append(badge, el('span', 'sheet__surface-name', t(`ui.road.${road}`)));
+      parent.appendChild(row);
+    }
 
     // Nejdřív odpověď na otázku, se kterou sem hráč přišel: proč se tu nestaví.
     // Teprve pod ní čísla, ze kterých se to dá odvodit.

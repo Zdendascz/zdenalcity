@@ -286,6 +286,11 @@ export interface ParcelExplanation {
   x: number;
   y: number;
   terrain: number;
+  /**
+   * Typ silnice **na téhle dlaždici**, ne u nejbližší. Nula znamená „tady
+   * silnice není" a je to jiná informace než `roadDistance`.
+   */
+  road: number;
   zone: number;
   category: RciCategory | null;
   /** Vzdálenost k nejbližší silnici; `null` znamená „dál, než kam růst sahá". */
@@ -457,6 +462,7 @@ export function explainParcel(
     x,
     y,
     terrain: world.layers.terrain[tile] ?? TERRAIN.grass,
+    road: world.layers.road[tile] ?? 0,
     zone,
     category,
     roadDistance: roadFactor > 0 ? distance : null,

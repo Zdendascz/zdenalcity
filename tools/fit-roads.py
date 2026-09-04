@@ -20,7 +20,7 @@ import sys
 from collections import defaultdict
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW = os.path.join(ROOT, 'art', 'roads', 'raw')
@@ -35,6 +35,18 @@ ALPHA_FLOOR = 8
 
 # Jak hluboko od hrany se meri. Uplne na hrane je antialiasing.
 PROBE = 6
+
+# Zelen, pod kterou je pixel jiste vozovka, a nad kterou jiste trava.
+#
+# **Zmereno, ne odhadnuto.** V krizovatce ma asfalt zelen od -20 do -5, trava
+# od 15 vys; mezi tim lezi obrubnik kolem nuly. Prah 0 az 9 je proto rozdeli
+# a obrubnik nechá cely. Prvni odhad 4 az 16 nechal polovinu travy
+# polopruhlednou a vypadalo to jako plisen.
+GRASS_LOW = 0
+GRASS_HIGH = 9
+
+# Jak daleko se kouka do okoli. Sest pixelu z 512 je asi metr skutecne zeme.
+GRASS_BLUR = 6
 
 # Vetsi odchylka od medianu rodiny uz je vada, kterou je videt jako schod.
 TOLERANCE = 0.08
@@ -64,8 +76,11 @@ def to_tile(image, corners):
     """
     top, right, bottom, left = corners
     box = (int(left[0]), int(top[1]), int(right[0]) + 1, int(bottom[1]) + 1)
-    tile = image.crop(box).resize((WIDTH, HEIGHT), Image.LANCZOS)
+    return image.crop(box).resize((WIDTH, HEIGHT), Image.LANCZOS).convert('RGBA')
 
+
+def diamond_mask():
+    """Maska presneho kosoctverce. Tvar delame my, ne generator."""
     # Maska se kresli ve ctyrnasobku a zmensi, jinak jsou hrany zubate.
     scale = 4
     mask = Image.new('L', (WIDTH * scale, HEIGHT * scale), 0)
@@ -78,25 +93,40 @@ def to_tile(image, corners):
         ],
         fill=255,
     )
-    mask = mask.resize((WIDTH, HEIGHT), Image.LANCZOS)
-
-    out = tile.convert('RGBA')
-    out.putalpha(mask)
-    return out
+    return mask.resize((WIDTH, HEIGHT), Image.LANCZOS)
 
 
-def is_grass(rgb):
-    """Je pixel trava?
+def cut_grass(tile):
+    """Vyrizne travu: zustane jen vozovka, obrubnik a uzka krajnice.
 
-    **Zelen, ne sytost.** Sytost trava a asfalt rozlisi jen zhruba: vysprávka
-    v asfaltu je nahnedla a projde jako trava, kdezto seda dlazba u obrubniku
-    projde jako vozovka. Zelen je jednoznacna -- travu pozna podle toho, ze ma
-    zelenou slozku vyssi nez obe ostatni, a nic jineho na dlazdici takove neni.
+    **Kazda dlazdice si nesla vlastni travnik** a travniky se mezi obrazky
+    lisily odstinem i hustotou, takze byla na mape videt mrizka dlazdic. Autor
+    to nahlasil slovy "silnice jsou moc dlazdicove".
+
+    Trava je zelena, asfalt i beton ne. Prechod je mekky pres nekolik urovni
+    zelene, aby okraj krajnice nebyl vystrizeny nuzkami.
     """
-    r = rgb[:, :, 0].astype(int)
-    g = rgb[:, :, 1].astype(int)
-    b = rgb[:, :, 2].astype(int)
-    return (g - r > 12) & (g - b > 12)
+    array = np.asarray(tile).astype(int)
+    r, g, b = array[:, :, 0], array[:, :, 1], array[:, :, 2]
+    green = g - np.maximum(r, b)
+
+    # **Rozhoduje okoli, ne jeden pixel.** V trave jsou zlute kvitky a suche
+    # stebla, ktere same zelene nejsou; po prahovani po pixelech z nich zustaly
+    # tecky rozsypane kolem silnice. Rozmazani je utopi v zeleni kolem, kdezto
+    # asfalt zustane sedy -- je ho souvisla plocha.
+    smooth = np.asarray(
+        Image.fromarray(np.clip(green + 128, 0, 255).astype('uint8'), 'L').filter(
+            ImageFilter.GaussianBlur(GRASS_BLUR)
+        )
+    ).astype(int) - 128
+
+    # Pod GRASS_LOW je to jiste vozovka, nad GRASS_HIGH jiste trava.
+    keep = np.clip((GRASS_HIGH - smooth) / (GRASS_HIGH - GRASS_LOW), 0.0, 1.0)
+    alpha = (np.asarray(tile)[:, :, 3] * keep).astype('uint8')
+
+    out = tile.copy()
+    out.putalpha(Image.fromarray(alpha, 'L'))
+    return out
 
 
 def edge_band(tile, edge):
@@ -105,10 +135,13 @@ def edge_band(tile, edge):
     Jde se **rovnobezne s hranou**, kousek dovnitr. Kosoctverec ma hrany sikmo,
     takze se vzorkuje po usecce mezi dvema vrcholy posunute ke stredu.
     """
+    # **Meri se podle kryti, ne podle barvy.** Po vyrezu travy je vozovka
+    # jedine, co na dlazdici zbylo, takze "je tu silnice?" je totez co "je tu
+    # neco?". Barevne detektory pred tim selhavaly: sytost brala vysprávku
+    # v asfaltu jako travu, zelen zase obrubnik jako silnici.
     array = np.asarray(tile)
-    rgb = array[:, :, :3]
     alpha = array[:, :, 3]
-    grass = is_grass(rgb)
+    solid = alpha > 160
 
     corners = {
         'n': ((WIDTH / 2, 0), (WIDTH - 1, HEIGHT / 2)),
@@ -131,9 +164,7 @@ def edge_band(tile, edge):
         py = int(round(y + (cy - y) / length * PROBE))
         if not (0 <= px < WIDTH and 0 <= py < HEIGHT):
             continue
-        if alpha[py, px] < 128:
-            continue
-        hits.append((t, not bool(grass[py, px])))
+        hits.append((t, bool(solid[py, px])))
 
     # **Nejdelsi souvisly usek**, ne rozpeti od prvniho k poslednimu pixelu.
     # U krizovatky lezi u vrcholu kosoctverce obrubnik sousedniho ramene a do
@@ -164,6 +195,7 @@ def main():
         return 1
 
     os.makedirs(OUT, exist_ok=True)
+    mask = diamond_mask()
     measured = {}
     done = 0
 
@@ -177,7 +209,18 @@ def main():
             print(f'  {stem}: nenasel jsem kosoctverec')
             continue
 
-        tile = to_tile(image, corners)
+        # **Trava se rezе pred maskou.** Rozostreni saha do okoli, a kdyby uz
+        # bylo za hranou kosoctverce pruhledno, vysla by tam zelen niz a po
+        # obvodu dlazdice by zustal zeleny lem -- tedy presne ta mrizka, kvuli
+        # ktere se trava reze.
+        tile = cut_grass(to_tile(image, corners))
+        tile.putalpha(
+            Image.fromarray(
+                (np.asarray(tile)[:, :, 3].astype(int) * np.asarray(mask).astype(int) // 255)
+                .astype('uint8'),
+                'L',
+            )
+        )
         tile.save(os.path.join(OUT, name))
         done += 1
 

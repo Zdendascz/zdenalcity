@@ -542,5 +542,8 @@
   "ui.alert.story.blackout": "A blackout. The whole quarter is dark, lifts have stopped, fridges are thawing and nothing works in the shops.\n\nThe grid could not carry what was asked of it. Either add supply or cut demand — otherwise another one is coming.",
   "ui.alert.story.epidemic": "An epidemic. Ambulances are queuing outside the hospital, a white tent has gone up on the lawn and people only go out when they must.\n\nA city with few doctors and high density pays twice: first in health, then in mood.",
   "ui.alert.story.chemicalSpill": "A chemical spill. An overturned tanker has emptied onto the road and from there into the drain. You can smell it three streets away.\n\nThe water here is unusable until it is cleaned up. And the works that draws from it will not deliver a drop.",
-  "ui.alert.story.landslide": "A landslide. The slope tore away and lay down across the road, together with the trees and a piece of the garden above it. Nothing gets through.\n\nHills look nice on the map. Cut into them and they occasionally answer back."
+  "ui.alert.story.landslide": "A landslide. The slope tore away and lay down across the road, together with the trees and a piece of the garden above it. Nothing gets through.\n\nHills look nice on the map. Cut into them and they occasionally answer back.",
+  "ui.road.street": "Street",
+  "ui.road.avenue": "Avenue",
+  "ui.road.highway": "Highway"
 }
