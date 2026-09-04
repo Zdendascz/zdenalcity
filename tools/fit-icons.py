@@ -30,6 +30,11 @@ RADIUS = 0.22
 # Pod timhle krytim se pixel bere jako pozadi, ne jako stitek.
 ALPHA_FLOOR = 24
 
+# Co ve slozce lezi, ale ikona rozhrani to neni. Logo hry ma vlastni hlavicku
+# bez stitku a hru ho bere z `public/brand/`; zaoblit ho do stitku by z nej
+# udelalo neco jineho, a v `content/vanilla/icons/` by se jen povalovalo.
+SKIP = {'logo'}
+
 
 def trim(image: Image.Image) -> Image.Image:
     """Orizne pruhledny lem. Kdyz je obrazek krycí cely, vrati ho beze zmeny."""
@@ -76,6 +81,8 @@ def main() -> int:
 
     for name in sorted(os.listdir(RAW)):
         if not name.endswith('.png'):
+            continue
+        if name[:-4] in SKIP:
             continue
         image = Image.open(os.path.join(RAW, name)).convert('RGBA')
         image = square(trim(image)).resize((SIZE, SIZE), Image.LANCZOS)

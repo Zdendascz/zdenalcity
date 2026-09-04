@@ -30,7 +30,18 @@ import type { System } from './systems';
 import { createDirtySet, tickWorld } from './world';
 import type { Building, DemandState, DirtySet, EconomyState, WorldState } from './world';
 
-export const TICK_MS = 250; // 1 tick = 1 herní den při rychlosti 1×
+/**
+ * Délka jednoho herního dne při rychlosti 1×.
+ *
+ * Bylo 250 ms a autor to zavrhl: „letí to strašně rychle, člověk nestíhá nic
+ * udělat". Sekunda na den znamená herní rok za šest minut při 1× a za 45 vteřin
+ * při 8×, což je pořád svižné, ale zóna se stihne zaplnit dřív, než hráč doklikne
+ * silnici k ní.
+ *
+ * Mění to **jen tempo v reálném čase**, ne simulaci: systémy počítají na tiky,
+ * takže město za tisíc dní vyjde stejně jako dřív. Zlaté testy se proto nehnou.
+ */
+export const TICK_MS = 1000; // 1 tick = 1 herní den při rychlosti 1×
 export const SPEEDS = [0, 1, 2, 4, 8] as const; // pauza, 1×, 2×, 4×, 8×
 export const MAX_TICKS_PER_FRAME = 8; // ochrana proti spirále smrti
 

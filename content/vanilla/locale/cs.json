@@ -546,5 +546,21 @@
   "ui.road.street": "Ulice",
   "ui.road.avenue": "Třída",
   "ui.road.highway": "Dálnice",
-  "ui.parcel.term.rubble": "Trosky"
+  "ui.parcel.term.rubble": "Trosky",
+  "ui.legend.worst": "strašné",
+  "ui.legend.best": "skvělé",
+  "ui.legend.dirty": "zamořeno",
+  "ui.legend.clean": "čisto",
+  "ui.legend.cheap": "bezcenná",
+  "ui.legend.pricey": "drahá",
+  "ui.legend.safe": "bezpečno",
+  "ui.legend.dangerous": "nebezpečno",
+  "ui.legend.miserable": "zoufalí",
+  "ui.legend.content": "spokojení",
+  "ui.legend.coverage.area": "kam služba dosáhne",
+  "ui.legend.coverage.good": "dostatečné pokrytí",
+  "ui.legend.coverage.edge": "hranice dosahu",
+  "ui.overlay.risk": "Riziko katastrof",
+  "ui.legend.atRisk": "ohroženo",
+  "ui.parcel.risk": "Pozor: v téhle čtvrti hrozí {name}."
 }

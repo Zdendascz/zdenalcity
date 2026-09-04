@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hashLayers, index } from '@/sim/layers';
-import { createSimHost } from '@/sim/simHost';
+import { createSimHost, TICK_MS } from '@/sim/simHost';
 import { createWorld } from '@/sim/world';
 import { MAP_SIZE } from '../support/grid';
 
@@ -37,7 +37,7 @@ describe('golden: silniční síť', () => {
     host.dispatch({ type: 'bulldoze', x: 0, y: 0 });
 
     for (let i = 0; i < 500; i++) {
-      host.step(250); // 250 ms při 1× = přesně jeden tik
+      host.step(TICK_MS); // délka herního dne při 1× = přesně jeden tik
     }
 
     const snapshot = host.getSnapshot();

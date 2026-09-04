@@ -557,6 +557,135 @@ body {
   background: rgb(107 168 232 / 25%);
 }
 
+/* --- ikony běžících pohrom ---------------------------------------------- */
+
+/*
+ * Řada u hodin. Souběh je normální stav — hoří a zároveň stávkuje — takže se
+ * ikony řadí vedle sebe a je jich klidně víc.
+ */
+.hud__disasters {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.hud__disaster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #ff7a63;
+  border-radius: 6px;
+  background: rgb(217 72 58 / 22%);
+  cursor: pointer;
+  /* Horní lišta je klikací skrz; ovládací prvky si příjem kliků zapínají samy. */
+  pointer-events: auto;
+  /* Pomalé bliknutí: musí to táhnout oko, ale ne bránit ve čtení zbytku HUD. */
+  animation: disaster-pulse 1.8s ease-in-out infinite;
+}
+
+.hud__disaster:hover {
+  background: rgb(217 72 58 / 45%);
+}
+
+/* Ikona přijde jako `<img>` i jako `<svg>` podle toho, co dodal obsah. */
+.hud__disaster svg,
+.hud__disaster img {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+@keyframes disaster-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(255 122 99 / 0%);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgb(255 122 99 / 35%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud__disaster {
+    animation: none;
+  }
+}
+
+/* --- legenda diagnostických pohledů -------------------------------------- */
+
+/*
+ * Vlevo nad lištou nástrojů. Vpravo sedí hlášení a ukazatele, uprostřed město —
+ * a legenda musí být vidět zároveň s mapou, kterou vysvětluje.
+ */
+.legend {
+  position: absolute;
+  bottom: 116px;
+  left: 12px;
+  z-index: 20;
+  width: 210px;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgb(20 23 28 / 92%);
+  pointer-events: none;
+}
+
+.legend__title {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.legend__bar {
+  height: 10px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 3px;
+}
+
+.legend__ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--text-dim);
+}
+
+.legend__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 5px;
+}
+
+.legend__swatch {
+  flex: none;
+  width: 22px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend__swatch--area {
+  background: rgb(95 182 217 / 45%);
+}
+
+/* Vnitřní čára: dostatečné pokrytí. Tenčí a matnější než hranice dosahu. */
+.legend__swatch--good {
+  border-bottom: 1px solid rgb(255 255 255 / 65%);
+  background: rgb(95 182 217 / 70%);
+}
+
+/* Vnější hranice dosahu. Plná bílá, stejně jako na mapě. */
+.legend__swatch--edge {
+  border: 2px solid #fff;
+  background: transparent;
+}
+
+.legend__label {
+  color: var(--text-dim);
+}
+
 /* --- hlášení ------------------------------------------------------------ */
 
 /*

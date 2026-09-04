@@ -64,6 +64,16 @@ export const POLLUTION_MAX_ALPHA = 0.8;
 
 /** Overlay ceny půdy. Zlatá se nepere se zónami ani s vozovkou. */
 export const LAND_VALUE_COLOR = 0xf0c060;
+
+/**
+ * Od jaké ceny půdy je čtvrť na tepelné mapě zelená.
+ *
+ * Není to 255. Cena půdy se ve zdravém městě drží hluboko pod stropem — na
+ * parcelách referenčního města vycházela kolem stovky — takže na plnou stupnici
+ * by byla mapa celá rudá a hráč by z ní nepoznal nic. Tahle hodnota odpovídá
+ * parcele, která uživí zástavbu na nejvyšší úrovni.
+ */
+export const LAND_VALUE_GOOD = 160;
 export const LAND_VALUE_MAX_ALPHA = 0.75;
 
 /** Overlay kriminality. */
@@ -89,28 +99,80 @@ export const HAPPINESS_MAX_ALPHA = 0.75;
 export const HAPPINESS_CLEAN_AT = 200;
 
 /**
- * Spokojenost → síla, kterou ji overlay maluje.
- *
- * Vlastní funkce, ne dva řádky v `app.ts`: první verze škálovala od 128 a
- * mapa vyšla skoro prázdná, protože reálné hodnoty se drží kolem stovky.
- * Vyšlo to najevo až měřením pixelů ve hře — s funkcí to chytne test.
- */
-export function unhappinessValue(happiness: number): number {
-  const above = HAPPINESS_CLEAN_AT - happiness;
-  if (above <= 0) return 0;
-  return Math.min(255, Math.round(above * (255 / HAPPINESS_CLEAN_AT)));
-}
-
-/**
  * Overlay dopravy: od volné zelené po ucpanou červenou. Škála má stupně, ne
  * plynulý přechod — hráč potřebuje poznat „tady už je zle", ne odhadovat odstín.
  */
 export const TRAFFIC_COLORS = [0x4caf50, 0xa8c93a, 0xe0c33a, 0xe08b3a, 0xd9483a] as const;
 export const TRAFFIC_MAX_ALPHA = 0.85;
 
-/** Overlay pokrytí službami. */
+/**
+ * Tepelná mapa diagnostických pohledů: zelená „skvělé" → rudá „strašné".
+ *
+ * Nahradila jednu barvu se sílou v průhlednosti. Ta měla vadu, kterou autor
+ * shrnul jednou větou: „z těch pohledů znečištění, spokojenosti atd není
+ * v podstatě co poznat". Fialový závoj přes město totiž říká jen „něco tu je" —
+ * hráč z něj nepozná, jestli je hodnota zlá, nebo v pořádku, protože slabý
+ * závoj vypadá stejně jako čistá dlaždice pod hustou zástavbou.
+ *
+ * Škála má **pět stupňů, ne plynulý přechod**. Hráč potřebuje poznat „tady už
+ * je zle", ne odhadovat odstín; mezi stupni se interpoluje, aby nevznikly
+ * schody přes celé čtvrti.
+ *
+ * Směr určuje každý pohled sám: u znečištění je vysoká hodnota zlá, u ceny půdy
+ * dobrá. Proto se do `heatColor` nedává hodnota, ale **jak dobře na tom
+ * dlaždice je**.
+ */
+export const HEAT_STOPS = [0xd9483a, 0xe08b3a, 0xe8d24a, 0x9fc63b, 0x3fa85c] as const;
+
+/** Jak neprůhledná je tepelná mapa. Musí přebít terén, jinak se zase nic nepozná. */
+export const HEAT_ALPHA = 0.78;
+
+/**
+ * Barva pro „jak dobře na tom je" v rozsahu 0 (strašné) až 1 (skvělé).
+ *
+ * Interpoluje se po složkách RGB. Není to perceptuálně správné míchání, zato je
+ * to předvídatelné: mezi zelenou a žlutou nevznikne nic, co by tam nepatřilo,
+ * a stupně jsou vybrané tak, aby šly rozeznat i vedle sebe.
+ */
+export function heatColor(goodness: number): number {
+  const clamped = Math.max(0, Math.min(1, goodness));
+  const scaled = clamped * (HEAT_STOPS.length - 1);
+  const low = Math.floor(scaled);
+  const high = Math.min(HEAT_STOPS.length - 1, low + 1);
+  return mixColor(HEAT_STOPS[low] ?? 0, HEAT_STOPS[high] ?? 0, scaled - low);
+}
+
+/** Lineární míchání dvou barev po složkách. */
+export function mixColor(from: number, to: number, amount: number): number {
+  const t = Math.max(0, Math.min(1, amount));
+  const r = Math.round(((from >> 16) & 0xff) * (1 - t) + ((to >> 16) & 0xff) * t);
+  const g = Math.round(((from >> 8) & 0xff) * (1 - t) + ((to >> 8) & 0xff) * t);
+  const b = Math.round((from & 0xff) * (1 - t) + (to & 0xff) * t);
+  return (r << 16) | (g << 8) | b;
+}
+
+/**
+ * Pokrytí službou. **Hranice dosahu je bílá čára**, ne jen sytější závoj.
+ *
+ * Autor chtěl vidět, „kam třeba dosáhne policie" — a to je otázka na hranici,
+ * ne na odstín. Závoj uvnitř zůstává, aby šlo poznat i sílu pokrytí; čára říká,
+ * kde to končí, a podle ní se staví další stanice.
+ */
+export const COVERAGE_EDGE_COLOR = 0xffffff;
+export const COVERAGE_EDGE_WIDTH = 2;
+/** Od jaké síly se pokrytí počítá za dostatečné. Uvnitř je druhá, tenčí hranice. */
+export const COVERAGE_GOOD = 140;
+
+/**
+ * Overlay pokrytí službami.
+ *
+ * Sytost začíná na `COVERAGE_MIN_ALPHA`, ne na nule: reálné pokrytí se drží
+ * kolem třetiny stupnice, takže čistě poměrný závoj byl na mapě sotva vidět.
+ * Hráč se nejdřív ptá, **jestli** je dlaždice pokrytá, a teprve pak jak silně.
+ */
 export const COVERAGE_COLOR = 0x5fb6d9;
-export const COVERAGE_MAX_ALPHA = 0.7;
+export const COVERAGE_MIN_ALPHA = 0.2;
+export const COVERAGE_MAX_ALPHA = 0.62;
 
 /** Overlay elektřiny (klávesa P): vodič s proudem a vodič bez proudu. */
 export const POWER_ON_COLOR = 0xf2d857;

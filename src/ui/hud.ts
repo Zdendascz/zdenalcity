@@ -33,6 +33,14 @@ export interface HudCallbacks {
   onToggleTransit(): void;
   /** Zprůhlednit budovy, aby šlo vidět a klikat na to pod nimi. */
   onToggleGhost(): void;
+  /**
+   * Klik na ikonu běžící katastrofy u hodin.
+   *
+   * Otevře **tutéž kartu, která se ukázala při vzniku**. Autor si to vyžádal
+   * a je to jediná cesta zpátky k té zprávě: kdo ji jednou zavřel, neměl jak
+   * si přečíst, co se vlastně děje, ani kde.
+   */
+  onDisasterClick(kind: string, x: number, y: number): void;
   onToggleDecor(): void;
   onFundingChange(serviceClass: string, funding: number): void;
   onLanguageChange(language: string): void;
@@ -83,6 +91,14 @@ export interface HudState {
   funding: ReadonlyMap<string, number>;
   /** Už přeložená hláška o uložení či načtení. Prázdná = nic nezobrazovat. */
   message: string;
+}
+
+/** Běžící pohroma tak, jak ji HUD potřebuje: ikona a místo, kam skočit. */
+export interface HudDisaster {
+  readonly id: number;
+  readonly kind: string;
+  readonly x: number;
+  readonly y: number;
 }
 
 const TAX_ROWS: readonly { zone: ZoneType; labelKey: string; category: 'residential' | 'commercial' | 'industrial' }[] = [
@@ -139,6 +155,10 @@ export class Hud {
   private readonly serviceClasses: readonly string[];
   /** Druhy katastrof, které umí registr spustit. Prázdné = menu se neukáže. */
   private readonly disasters: readonly string[];
+  /** Ikony běžících pohrom u hodin. */
+  private disasterBadges: HTMLElement | null = null;
+  /** Podle čeho se pozná, že se řada ikon musí přestavět. */
+  private badgeKey = '';
   private readonly fundingInputs = new Map<string, HTMLInputElement>();
   private lastState: HudState = {
     speedIndex: 1,
@@ -218,6 +238,7 @@ export class Hud {
       `+${formatNumber(economy.lastIncome)} / −${formatNumber(economy.lastExpenses)}`,
     );
     this.setValue('date', this.i18n.t('ui.hud.date', dateParts(tick)));
+    this.syncDisasters();
     // Zlomek sám o sobě neřekne, co s tím: „65/86" může znamenat chybějící
     // vedení i chybějící elektrárnu. Čísla vedle sebe to rozhodnou.
     this.setValue('powered', `${state.poweredBuildings}/${buildings.size}`);
@@ -295,6 +316,13 @@ export class Hud {
     const left = el('div', 'hud__top-left');
     this.top.appendChild(left);
     this.buildStats(left);
+    // Ikony běžících pohrom **hned za datem**: patří k času („jak dlouho to
+    // ještě potrvá") a hráč je má vidět bez otevírání čehokoli. Rozhodnutí
+    // autora poté, co si zavřel hlášení a neměl se jak vrátit k tomu, co se
+    // vlastně děje.
+    this.disasterBadges = el('div', 'hud__disasters');
+    left.appendChild(this.disasterBadges);
+    this.badgeKey = '';
     this.buildSpeed(left);
     this.buildDemand();
 
@@ -309,6 +337,38 @@ export class Hud {
     this.buildSave();
     this.buildLanguage();
     this.buildMessage();
+  }
+
+  /**
+   * Srovná ikony běžících pohrom se skutečností.
+   *
+   * Přestavuje se **jen když se řada změnila**, ne každý snímek: jinak by se
+   * tlačítko pod kurzorem každých šestnáct milisekund vyhodilo a nahradilo
+   * novým, takže by nešlo kliknout.
+   *
+   * Souběh je normální stav, ne výjimka — hoří a zároveň stávkuje se běžně,
+   * proto je to řada a ne jedna ikona.
+   */
+  private syncDisasters(): void {
+    const badges = this.disasterBadges;
+    if (!badges) return;
+
+    const active = this.view.disasters.active.filter((disaster) => !disaster.finished);
+    const key = active.map((disaster) => `${disaster.id}:${disaster.kind}`).join(',');
+    if (key === this.badgeKey) return;
+    this.badgeKey = key;
+
+    badges.replaceChildren();
+    for (const disaster of active) {
+      const name = this.i18n.t(`ui.disaster.${disaster.kind}`);
+      const node = button('hud__disaster', () =>
+        this.callbacks.onDisasterClick(disaster.kind, disaster.x, disaster.y),
+      );
+      node.title = name;
+      node.setAttribute('aria-label', name);
+      node.appendChild(iconSvg(disaster.kind));
+      badges.appendChild(node);
+    }
   }
 
   private buildStats(parent: HTMLElement): void {

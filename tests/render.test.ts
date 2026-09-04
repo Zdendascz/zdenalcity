@@ -35,10 +35,11 @@ import {
   tileVariation,
 } from '@/render/projection';
 import {
-  HAPPINESS_CLEAN_AT,
   shade,
   TERRAIN_COLORS,
-  unhappinessValue,
+  heatColor,
+  HEAT_STOPS,
+  mixColor,
 } from '@/render/palette';
 import {
   roadMask,
@@ -525,24 +526,38 @@ describe('symboly na střechách', () => {
   });
 });
 
-describe('overlay spokojenosti', () => {
-  it('spokojenou čtvrť nemaluje vůbec', () => {
-    expect(unhappinessValue(HAPPINESS_CLEAN_AT)).toBe(0);
-    expect(unhappinessValue(255)).toBe(0);
+describe('tepelná mapa', () => {
+  it('nula je rudá, jednička zelená', () => {
+    // Směr škály je celý smysl toho pohledu: autor si stěžoval, že ze starých
+    // overlayů „není v podstatě co poznat". Kdyby se otočila, hráč by stavěl
+    // policii do nejklidnější čtvrti.
+    expect(heatColor(0)).toBe(HEAT_STOPS[0]);
+    expect(heatColor(1)).toBe(HEAT_STOPS[HEAT_STOPS.length - 1]);
   });
 
-  it('čím hůř, tím silněji', () => {
-    const řada = [190, 128, 76, 0].map(unhappinessValue);
-    for (let i = 1; i < řada.length; i++) {
-      expect(řada[i]).toBeGreaterThan(řada[i - 1] ?? 0);
-    }
-    expect(unhappinessValue(0)).toBe(255);
+  it('mezi stupni interpoluje, takže nevznikají schody přes čtvrť', () => {
+    const between = heatColor(0.125);
+    expect(between).not.toBe(HEAT_STOPS[0]);
+    expect(between).not.toBe(HEAT_STOPS[1]);
   });
 
-  it('běžné hodnoty využijí většinu stupnice', () => {
-    // Toho si všimlo až měření pixelů: první verze škálovala od 128, takže
-    // rozdíl mezi „ujde to“ a „zle“ byl v obrázku skoro neviditelný.
-    expect(unhappinessValue(76) - unhappinessValue(130)).toBeGreaterThan(60);
+  it('zelená složka roste s tím, jak je na tom čtvrť líp', () => {
+    const green = (color: number): number => (color >> 8) & 0xff;
+    const řada = [0, 0.25, 0.5, 0.75, 1].map((g) => green(heatColor(g)));
+    // Rudá má zelené složky málo, zelená hodně. Prostřední žlutá je maximum,
+    // takže se nekontroluje monotonie, ale krajní rozdíl.
+    expect(řada[řada.length - 1] ?? 0).toBeGreaterThan(řada[0] ?? 0);
+  });
+
+  it('hodnoty mimo rozsah se ořežou, ne zabalí', () => {
+    expect(heatColor(-5)).toBe(HEAT_STOPS[0]);
+    expect(heatColor(9)).toBe(HEAT_STOPS[HEAT_STOPS.length - 1]);
+  });
+
+  it('míchání barev je po složkách a symetrické', () => {
+    expect(mixColor(0x000000, 0xffffff, 0)).toBe(0x000000);
+    expect(mixColor(0x000000, 0xffffff, 1)).toBe(0xffffff);
+    expect(mixColor(0x000000, 0xff0000, 0.5)).toBe(0x800000);
   });
 });
 

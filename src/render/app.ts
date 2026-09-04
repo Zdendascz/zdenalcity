@@ -46,7 +46,7 @@ import {
   createIndustrialAccidentDisaster,
 } from '@/sim/disasters/blast';
 import { computeBudget } from '@/sim/systems/economy';
-import { coarseCellsOf } from '@/sim/coarse';
+import { coarseCellsOf, coarseIndex } from '@/sim/coarse';
 import { createWorld, NEUTRAL_HAPPINESS } from '@/sim/world';
 import { BudgetPanel } from '@/ui/budgetPanel';
 import { BuildingInfo } from '@/ui/buildingInfo';
@@ -64,6 +64,7 @@ import type { LocaleTables } from '@/ui/i18n';
 import { createBrowserPlatform } from '@/platform';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
 import { showHome } from '@/ui/home';
+import { Legend } from '@/ui/legend';
 import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
 import { BuildingRenderer } from './buildingRenderer';
@@ -73,25 +74,19 @@ import { ChunkRenderer, viewportFor } from './chunkRenderer';
 import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
+import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
 import { TrafficOverlay } from './trafficOverlay';
 import { DebugOverlay } from './debugOverlay';
 import {
   BACKGROUND_COLOR,
-  COVERAGE_COLOR,
-  COVERAGE_MAX_ALPHA,
-  CRIME_COLOR,
-  CRIME_MAX_ALPHA,
-  HAPPINESS_COLOR,
-  HAPPINESS_MAX_ALPHA,
+  HAPPINESS_CLEAN_AT,
+  HEAT_STOPS,
   HOVER_BLOCKED_COLOR,
   HOVER_COLOR,
   HOVER_FILL_ALPHA,
   HOVER_LINE_ALPHA,
-  LAND_VALUE_COLOR,
-  LAND_VALUE_MAX_ALPHA,
-  POLLUTION_COLOR,
-  POLLUTION_MAX_ALPHA,
-  unhappinessValue,
+  LAND_VALUE_GOOD,
+  TRAFFIC_COLORS,
 } from './palette';
 import { pickTile } from './picking';
 import { gridToScreen, tileQuad } from './projection';
@@ -225,6 +220,9 @@ export function createLayerOptions(content: ContentRegistry): OverlayOption[] {
     { id: 'crime', labelKey: 'ui.overlay.crime', icon: 'layer-crime' },
     { id: 'happiness', labelKey: 'ui.overlay.happiness', icon: 'layer-happiness' },
     { id: 'traffic', labelKey: 'ui.overlay.traffic', icon: 'layer-traffic' },
+    // Riziko nepřírodních katastrof. Přírodní se nepočítají: hráč s nimi nic
+    // neudělá, takže varování před nimi by nenesla radu.
+    { id: 'risk', labelKey: 'ui.overlay.risk', icon: 'layer-risk' },
     // Dosah služby má vlastní ikonu `coverage:<třída>`, když ji obsah dodal.
     // Jinak se sáhne po symbolu, který nosí na střeše první budova té třídy —
     // hráč tak pořád pozná, čí dosah svítí, i u třídy, kterou přinesl mod (P5).
@@ -763,20 +761,21 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const serviceClasses = serviceClassesOf(content);
 
   /**
-   * Nespokojenost pro overlay: `HAPPINESS_CLEAN_AT` a výš je nula, odtud to
-   * lineárně roste až k 255 na dně stupnice.
+   * Spokojenost pro overlay. Kopie, protože `world.happiness` může být kratší
+   * než hrubá mřížka, dokud město nezačne počítat.
    *
-   * Overlaye v téhle hře kreslí problémy — kdyby tenhle maloval spokojenost,
-   * nejsilněji by svítily čtvrti, se kterými není co dělat, a ta jediná, kde
-   * se něco děje, by zůstala prázdná.
+   * **Kreslí se spokojenost, ne nespokojenost.** Do T90 to bylo obráceně, a byl
+   * to důsledek toho, že overlay uměl jednu barvu se sílou v průhlednosti:
+   * musel malovat problém, jinak by nejsilněji svítily čtvrti, se kterými není
+   * co dělat. Tepelná mapa tuhle past nemá — zelená a rudá jsou obě vidět —
+   * takže se ukazuje rovnou stav.
    */
-  const unhappiness = new Uint8Array(coarseCellsOf(world.size));
-  const unhappinessLayer = (): Uint8Array => {
-    for (let cell = 0; cell < unhappiness.length; cell++) {
-      const value = world.happiness[cell] ?? NEUTRAL_HAPPINESS;
-      unhappiness[cell] = unhappinessValue(value);
+  const happinessCells = new Uint8Array(coarseCellsOf(world.size));
+  const happinessLayer = (): Uint8Array => {
+    for (let cell = 0; cell < happinessCells.length; cell++) {
+      happinessCells[cell] = world.happiness[cell] ?? NEUTRAL_HAPPINESS;
     }
-    return unhappiness;
+    return happinessCells;
   };
 
   const chunkRenderer = new ChunkRenderer(
@@ -817,32 +816,53 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     createAppearanceLookup(content),
   );
 
+  // Tepelné mapy: barva říká **jak je na tom čtvrť**, ne jak velké je číslo.
+  // Směr se proto zadává u každé zvlášť — u znečištění je vysoká hodnota zlá,
+  // u ceny půdy dobrá.
   const coarseOverlay = new CoarseOverlay(world, worldContainer, [
     {
       id: 'pollution',
-      color: POLLUTION_COLOR,
-      maxAlpha: POLLUTION_MAX_ALPHA,
+      kind: 'heat',
+      goodness: (value) => 1 - value / 255,
       values: () => world.coarse.pollution,
     },
     {
       id: 'landValue',
-      color: LAND_VALUE_COLOR,
-      maxAlpha: LAND_VALUE_MAX_ALPHA,
+      kind: 'heat',
+      // Cena půdy se ve zdravém městě drží hluboko pod stropem, takže na plnou
+      // stupnici by byla mapa celá rudá. `LAND_VALUE_GOOD` je hodnota, u které
+      // už parcela roste na nejvyšší úroveň — nad ní je zelená zasloužená.
+      goodness: (value) => Math.min(1, value / LAND_VALUE_GOOD),
       values: () => world.coarse.landValue,
     },
-    { id: 'crime', color: CRIME_COLOR, maxAlpha: CRIME_MAX_ALPHA, values: () => world.coarse.crime },
+    {
+      id: 'crime',
+      kind: 'heat',
+      goodness: (value) => 1 - value / 255,
+      values: () => world.coarse.crime,
+    },
+    {
+      id: 'risk',
+      kind: 'heat',
+      // Vysoké riziko je zlé, takže se stupnice otáčí. Přepočítává se **až při
+      // překreslení**: je to průchod celou mapou a nikdo jiný než tenhle pohled
+      // ho nepotřebuje.
+      goodness: (value) => 1 - value / 255,
+      values: () => computeRiskMap(simWorld, content, content.getBalance()).values,
+    },
     {
       id: 'happiness',
-      color: HAPPINESS_COLOR,
-      maxAlpha: HAPPINESS_MAX_ALPHA,
-      values: unhappinessLayer,
+      kind: 'heat',
+      // Nula je dno stupnice, `HAPPINESS_CLEAN_AT` je čtvrť, se kterou není co
+      // řešit. Rozdíl mezi „ujde to" a „zle" tak zabere většinu barev.
+      goodness: (value) => Math.min(1, value / HAPPINESS_CLEAN_AT),
+      values: happinessLayer,
     },
     // Dosah každé třídy, která ve hře existuje. Seznam jde z obsahu, ne z kódu —
     // mod se svou třídou dostane přepínač zadarmo (P5).
     ...serviceClasses.map((serviceClass) => ({
       id: `coverage:${serviceClass}`,
-      color: COVERAGE_COLOR,
-      maxAlpha: COVERAGE_MAX_ALPHA,
+      kind: 'coverage' as const,
       values: () => simWorld.coverage.get(serviceClass),
     })),
   ]);
@@ -863,6 +883,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const costPopup = new CostPopup(mount);
   const priceTag = new PriceTag(mount);
   const notifications = new Notifications(mount);
+  const legend = new Legend(mount, i18n);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
   const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance(), (terrain) => {
     // Náhled povrchu v rozboru parcely. Bere **první variantu**, ne tu, která
@@ -1257,7 +1278,21 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       building ? content.get(building.definitionId) : undefined,
       growthBlocker(simWorld, content, content.getBalance(), tile.x, tile.y),
       spriteUrl,
+      riskAt(tile.x, tile.y),
     );
+  }
+
+  /**
+   * Co v téhle čtvrti hrozí, když je riziko nad prahem. `null` jinak.
+   *
+   * Počítá se **na kliknutí, ne v tiku**: je to průchod celou mapou a nikdo ho
+   * nepotřebuje častěji než ve chvíli, kdy si hráč parcelu otevře.
+   */
+  function riskAt(x: number, y: number): string | null {
+    const map = computeRiskMap(simWorld, content, content.getBalance());
+    const cell = coarseIndex(x, y, simWorld.size);
+    if ((map.values[cell] ?? 0) < RISK_WARNING) return null;
+    return map.kinds[cell] ?? null;
   }
 
   const views = createViewOptions();
@@ -1277,11 +1312,50 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const coarseId = layerMode === 'power' || layerMode === 'traffic' ? 'none' : layerMode;
     coarseOverlay.setActive(coarseId);
     trafficOverlay.setVisible(layerMode === 'traffic');
+    showLegend();
     // Budovy v podzemním pohledu překáží — hráč se dívá pod ně.
     buildingRenderer.setVisible(viewMode !== 'underground');
     roadRenderer.setVisible(viewMode !== 'underground');
     buildingRenderer.setGhost(ghostBuildings);
     buildingRenderer.setDecorVisible(decorVisible);
+  }
+
+  /**
+   * Popisek k zapnutému pohledu.
+   *
+   * Konce stupnice se pojmenovávají **podle veličiny**, ne obecným „zle/dobře":
+   * u znečištění je to „čisto" a „zamořeno", u ceny půdy „bezcenná" a „drahá".
+   * Obecné popisky by hráči neřekly, na co se vlastně dívá.
+   */
+  function showLegend(): void {
+    const ends: Record<string, [string, string]> = {
+      pollution: ['ui.legend.dirty', 'ui.legend.clean'],
+      landValue: ['ui.legend.cheap', 'ui.legend.pricey'],
+      crime: ['ui.legend.dangerous', 'ui.legend.safe'],
+      happiness: ['ui.legend.miserable', 'ui.legend.content'],
+      risk: ['ui.legend.atRisk', 'ui.legend.safe'],
+      traffic: ['ui.legend.worst', 'ui.legend.best'],
+    };
+
+    const labelKey = layers.find((option) => option.id === layerMode)?.labelKey;
+    if (labelKey === undefined) {
+      legend.hide();
+      return;
+    }
+    if (layerMode.startsWith('coverage:')) {
+      legend.showCoverage(labelKey);
+      return;
+    }
+
+    const pair = ends[layerMode];
+    if (pair === undefined) {
+      legend.hide();
+      return;
+    }
+    // Doprava má vlastní stupnici v plném rozlišení, ale čte se stejně:
+    // zelená volno, rudá ucpáno.
+    const stops = layerMode === 'traffic' ? [...TRAFFIC_COLORS] : [...HEAT_STOPS];
+    legend.showHeat(labelKey, { stops, worstKey: pair[0], bestKey: pair[1] });
   }
 
   function setView(id: string): void {
@@ -1342,6 +1416,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onArmDisaster: (kind) => {
       armedDisaster = kind;
       message = { key: 'ui.disaster.armed', params: { name: i18n.t(`ui.disaster.${kind}`) } };
+    },
+    // Klik na ikonu u hodin vrátí **tutéž kartu, která přišla při vzniku**.
+    // Hra se u ní znovu zastaví: kdo si ji otevřel, chce číst, ne dohánět.
+    onDisasterClick: (kind, x, y) => {
+      if (alert.open(kind, x, y)) setSpeed(0);
     },
   });
 

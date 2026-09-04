@@ -546,5 +546,21 @@
   "ui.road.street": "Street",
   "ui.road.avenue": "Avenue",
   "ui.road.highway": "Highway",
-  "ui.parcel.term.rubble": "Rubble"
+  "ui.parcel.term.rubble": "Rubble",
+  "ui.legend.worst": "terrible",
+  "ui.legend.best": "great",
+  "ui.legend.dirty": "polluted",
+  "ui.legend.clean": "clean",
+  "ui.legend.cheap": "worthless",
+  "ui.legend.pricey": "expensive",
+  "ui.legend.safe": "safe",
+  "ui.legend.dangerous": "dangerous",
+  "ui.legend.miserable": "miserable",
+  "ui.legend.content": "content",
+  "ui.legend.coverage.area": "where the service reaches",
+  "ui.legend.coverage.good": "adequate coverage",
+  "ui.legend.coverage.edge": "edge of reach",
+  "ui.overlay.risk": "Disaster risk",
+  "ui.legend.atRisk": "at risk",
+  "ui.parcel.risk": "Warning: this district is at risk of {name}."
 }

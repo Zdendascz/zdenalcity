@@ -154,6 +154,15 @@ export class BuildingInfo {
      * účel splnila a v panelu nemá co dělat.
      */
     spriteUrl: string | null = null,
+    /**
+     * Co v téhle čtvrti hrozí, když je riziko vysoké. `null` = nic nad práh.
+     *
+     * Je to **varování, ne statistika**: autor si vyžádal, aby tam, kde hrozí
+     * nepřírodní katastrofa s vysokou pravděpodobností, bylo vidět co. Číslo
+     * se neukazuje — hráč nepotřebuje vědět, že riziko je 187, potřebuje vědět,
+     * že tady chybí hasiči.
+     */
+    risk: string | null = null,
   ): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
@@ -185,7 +194,7 @@ export class BuildingInfo {
     if (!building) {
       this.root.classList.add('sheet--single');
       columns.appendChild(right);
-      this.appendParcel(right, parcel, blocker);
+      this.appendParcel(right, parcel, blocker, risk);
       return;
     }
 
@@ -195,7 +204,7 @@ export class BuildingInfo {
     if (!definition) {
       // Budova z chybějícího modu — save ji drží, ale nevíme o ní nic (§8).
       left.appendChild(el('p', 'sheet__note', t('ui.info.unknownDefinition')));
-      this.appendParcel(right, parcel, blocker);
+      this.appendParcel(right, parcel, blocker, risk);
       return;
     }
 
@@ -278,7 +287,7 @@ export class BuildingInfo {
       left.appendChild(el('p', 'sheet__warning', t('ui.info.dryRelayWarning')));
     }
 
-    this.appendParcel(right, parcel, blocker);
+    this.appendParcel(right, parcel, blocker, risk);
   }
 
   /**
@@ -315,6 +324,7 @@ export class BuildingInfo {
     parent: HTMLElement,
     parcel: ParcelExplanation,
     blocker: string | null,
+    risk: string | null,
   ): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
 
@@ -333,6 +343,14 @@ export class BuildingInfo {
     // Teprve pod ní čísla, ze kterých se to dá odvodit.
     if (blocker !== null) {
       parent.appendChild(el('p', 'sheet__warning', t(blocker)));
+    }
+
+    // Hned za tím, co se **teprve stane**. Katastrofa se ohlásí, až uhodí;
+    // tohle je jediné místo, kde jde přečíst, že se na ni čtvrť sama nachystala.
+    if (risk !== null) {
+      parent.appendChild(
+        el('p', 'sheet__warning', t('ui.parcel.risk', { name: t(`ui.disaster.${risk}`) })),
+      );
     }
 
     // **Co má strop, dostane pruh.** Cena půdy, spokojenost i dosah silnice

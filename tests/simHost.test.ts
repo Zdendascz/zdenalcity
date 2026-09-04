@@ -31,17 +31,19 @@ function recorder(interval: number, offset: number): System & { ticks: number[] 
 }
 
 describe('akumulátor', () => {
-  it('step(1000) při 1× odsimuluje přesně 4 tiky', () => {
+  it('step(1000) při 1× odsimuluje přesně jeden tik', () => {
     const host = createSimHost(createWorld(1), [], NO_CONTENT);
     host.step(1000);
     expect(host.getSnapshot().tick).toBe(1000 / TICK_MS);
   });
 
   it('zbytek se přenáší mezi voláními', () => {
+    // Počítá se z `TICK_MS`, ne z napsaných čísel: délka dne se od T90
+    // zčtyřnásobila a test, který si ji píše natvrdo, by hlídal jen sám sebe.
     const host = createSimHost(createWorld(1), [], NO_CONTENT);
-    host.step(300); // 1 tick, zbývá 50 ms
+    host.step(TICK_MS * 1.2); // 1 tik, zbývá pětina
     expect(host.getSnapshot().tick).toBe(1);
-    host.step(200); // 50 + 200 = 250 → 1 tick
+    host.step(TICK_MS * 0.8); // 0,2 + 0,8 = 1 → další tik
     expect(host.getSnapshot().tick).toBe(2);
   });
 
@@ -55,14 +57,15 @@ describe('akumulátor', () => {
   it('při 8× je jeden snímek zastropován na MAX_TICKS_PER_FRAME', () => {
     const host = createSimHost(createWorld(1), [], NO_CONTENT);
     host.dispatch({ type: 'set_speed', speed: 4 }); // index 4 = 8×
-    host.step(1000); // 8000 ms herního času = 32 tiků, kdyby se nestropovalo
+    // Tolik herního času, že by bez stropu přišlo dvakrát víc tiků, než se smí.
+    host.step(TICK_MS * MAX_TICKS_PER_FRAME * 2 / 8);
     expect(host.getSnapshot().tick).toBe(MAX_TICKS_PER_FRAME);
   });
 
   it('po zastropování se skluz zahodí, ne dohání', () => {
     const host = createSimHost(createWorld(1), [], NO_CONTENT);
     host.dispatch({ type: 'set_speed', speed: 4 });
-    host.step(1000);
+    host.step(TICK_MS * MAX_TICKS_PER_FRAME * 2 / 8);
     host.dispatch({ type: 'set_speed', speed: 1 }); // 1×
     host.step(TICK_MS); // kdyby zbytek zůstal v akumulátoru, přijde víc než 1 tick
     expect(host.getSnapshot().tick).toBe(MAX_TICKS_PER_FRAME + 1);
@@ -72,21 +75,21 @@ describe('akumulátor', () => {
     // Bez téhle pojistky zůstane akumulátor NaN, žádné porovnání s TICK_MS už
     // neprojde a hra se navždy zastaví, aniž by cokoli zahlásilo chybu.
     const host = createSimHost(createWorld(1), [], NO_CONTENT);
-    host.step(1000);
+    host.step(TICK_MS);
 
     expect(() => host.step(Number.NaN)).toThrow();
     expect(() => host.step(undefined as unknown as number)).toThrow();
 
     // A po pokusu je hra pořád živá.
-    host.step(1000);
-    expect(host.getSnapshot().tick).toBe(8);
+    host.step(TICK_MS);
+    expect(host.getSnapshot().tick).toBe(2);
   });
 
   it('ignoruje nesmyslný index rychlosti', () => {
     const host = createSimHost(createWorld(1), [], NO_CONTENT);
     host.dispatch({ type: 'set_speed', speed: SPEEDS.length }); // mimo rozsah
-    host.step(1000);
-    expect(host.getSnapshot().tick).toBe(4); // zůstala výchozí 1×
+    host.step(TICK_MS);
+    expect(host.getSnapshot().tick).toBe(1); // zůstala výchozí 1×
   });
 });
 
@@ -178,8 +181,8 @@ describe('snapshot', () => {
   it('je živý pohled, ne kopie', () => {
     const host = createSimHost(createWorld(1), [], NO_CONTENT);
     const snapshot = host.getSnapshot();
-    host.step(1000);
-    expect(snapshot.tick).toBe(4);
+    host.step(TICK_MS);
+    expect(snapshot.tick).toBe(1);
   });
 
   it('je typově read-only', () => {
