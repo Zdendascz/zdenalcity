@@ -152,24 +152,29 @@ export class RoadRenderer {
 
     // Vodorovné překlopení prohodí sever se západem a východ s jihem, svislé
     // sever s jihem a východ se západem — přesně jako v masce.
-    // **Kam který roh obrázku patří.** Překlopení se dělá výběrem cíle, ne
-    // otáčením spritu: sprite otočený o devadesát stupňů by z kosočtverce
-    // 2 : 1 udělal 1 : 2, a to není totéž.
+    // **Kam který roh obrázku patří.**
     //
-    // Vodorovné překlopení prohodí sever se západem a východ s jihem, svislé
-    // sever s jihem a východ se západem — přesně jako v masce. Obojí naráz se
-    // složí: sever jde přes západ na východ.
+    // Tady jsem to jednou spletl a stálo to celou sadu: transformace **hran**
+    // není totéž co transformace **rohů**. `roadShapes` počítá s hranami,
+    // protože maska mluví o sousedech; kreslení potřebuje rohy.
     //
-    // | překlopení | sever obrázku | východ obrázku | západ obrázku |
-    // |---|---|---|---|
-    // | žádné | sever | východ | západ |
-    // | vodorovné | západ | jih | sever |
-    // | svislé | jih | západ | východ |
-    // | obojí | východ | sever | jih |
+    // Vodorovné zrcadlení prohodí levý a pravý roh (horní a dolní zůstanou)
+    // a na hranách z toho vyjde sever ↔ západ, východ ↔ jih. Druhé překlopení
+    // v `roadShapes` je ve skutečnosti **otočení o sto osmdesát stupňů** —
+    // prohodí obě dvojice rohů a na hranách dá sever ↔ jih, východ ↔ západ.
+    // Obojí naráz je pak svislé zrcadlení, tedy prohození horního a dolního
+    // rohu.
+    //
+    // | vodorovné | otočení | sever obrázku | východ obrázku | západ obrázku |
+    // |---|---|---|---|---|
+    // | ne | ne | sever | východ | západ |
+    // | ano | ne | sever | západ | východ |
+    // | ne | ano | jih | západ | východ |
+    // | ano | ano | jih | východ | západ |
     const [n, e, w] = mirrorX
       ? mirrorY
-        ? [east, north, south]
-        : [west, south, north]
+        ? [south, east, west]
+        : [north, west, east]
       : mirrorY
         ? [south, west, east]
         : [north, east, west];
