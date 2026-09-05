@@ -12,6 +12,7 @@ import {
   tileBaseHeight,
   tileCorners,
 } from '@/sim/heights';
+import { gridToScreen, skirtFaces } from '@/render/projection';
 import { index } from '@/sim/layers';
 import { applyHeightChanges, createWorld } from '@/sim/world';
 import { MAP_SIZE, CORNER_SIZE, CORNER_CELLS } from './support/grid';
@@ -201,5 +202,51 @@ describe('překreslení po změně výšky (T30)', () => {
     applyHeightChanges(world, planCornerHeight(world.cornerHeight, 50, 50, 2));
 
     expect(world.dirty.buildings.has(7)).toBe(true);
+  });
+});
+
+/**
+ * Podezdívka pod budovou na svahu.
+ *
+ * Kreslí se ze dvou stěn a **jde jen dolů**. Když terén na viditelné straně
+ * stoupá nad podlahu, není co dozdívat — dům se do svahu zařezává. Bez
+ * zastropení se polygon obrátil a vysázel šedou zeď přes svah a přes fasádu;
+ * autor to hlásil jako „podezdívky bez textur" a jako „baráky mimo pozici",
+ * protože ta zeď vypadá jako špatně posazený dům.
+ */
+describe('podezdívka nikdy neleze nad podlahu', () => {
+  /** Nejvyšší bod polygonu na obrazovce. Menší `y` je výš. */
+  function highest(face: readonly number[]): number {
+    return Math.min(...face.filter((_, i) => i % 2 === 1));
+  }
+
+  it('na stoupajícím svahu zůstane pod podlahou', () => {
+    // Podlaha ve výšce 2, terén na jihu vystoupá na 4 — tedy nad ni.
+    const faces = skirtFaces(0, 0, 1, 1, 2, (_fx, fy) => (fy >= 1 ? 4 : 0));
+    const floor = gridToScreen(0, 1, 2).y;
+
+    // Před opravou sahal polygon 32 px (dvě úrovně) nad podlahu.
+    expect(highest(faces.left)).toBeGreaterThanOrEqual(floor - 0.01);
+    expect(highest(faces.right)).toBeGreaterThanOrEqual(gridToScreen(1, 0, 2).y - 0.01);
+  });
+
+  it('na klesajícím svahu dozdívá až k zemi, jak má', () => {
+    // Opačný případ: terén klesá, podezdívka ho musí doplnit celý. Zastropení
+    // se ho nesmí dotknout — jinak by oprava vypnula podezdívku úplně.
+    const faces = skirtFaces(0, 0, 1, 1, 4, (_fx, fy) => (fy >= 1 ? 0 : 4));
+    const lowest = Math.max(...faces.left.filter((_, i) => i % 2 === 1));
+
+    // Jižní hrana leží na terénu ve výšce nula, tedy o čtyři úrovně níž.
+    expect(lowest).toBeCloseTo(gridToScreen(1, 1, 0).y, 1);
+    expect(lowest - gridToScreen(1, 1, 4).y).toBeCloseTo(4 * 16, 1);
+  });
+
+  it('sedlo: stoupá na jedné straně a klesá na druhé', () => {
+    // Nejhorší případ a přesně ten, který autor popsal slovy „nejvíc to
+    // hapruje tam, kde jsou dvě strany z kopce".
+    const faces = skirtFaces(0, 0, 2, 2, 3, (fx, fy) => (fx + fy > 2 ? 0 : 5));
+
+    expect(highest(faces.left)).toBeGreaterThanOrEqual(gridToScreen(0, 2, 3).y - 0.01);
+    expect(highest(faces.right)).toBeGreaterThanOrEqual(gridToScreen(2, 0, 3).y - 0.01);
   });
 });

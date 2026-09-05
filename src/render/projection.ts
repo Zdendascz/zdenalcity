@@ -235,6 +235,13 @@ export function cuboidFaces(
  *
  * `groundAt(fx, fy)` vrací výšku terénu v libovolném bodě mřížky, tedy i mezi
  * rohy — půdorys je zasazený dovnitř dlaždice, takže na celé rohy nepadne.
+ *
+ * **Podezdívka jde jen dolů, nikdy nahoru.** Když terén na viditelné straně
+ * stoupá nad podlahu, není co dozdívat — dům se do svahu zařezává. Bez
+ * zastropení se polygon obrátil a vysázel šedou zeď přes svah a přes fasádu;
+ * změřeno na dlaždici s podlahou ve výšce 2 a terénem 4, kde stěna vylezla
+ * 32 px nad podlahu. Autor to hlásil jako „podezdívky bez textur" a jako
+ * „baráky mimo pozici", protože ta zeď vypadá jako špatně posazený dům.
  */
 export function skirtFaces(
   x: number,
@@ -249,7 +256,8 @@ export function skirtFaces(
     return [point.x, point.y];
   };
   const drop = (fx: number, fy: number): [number, number] => {
-    const point = gridToScreen(fx, fy, groundAt(fx, fy));
+    // Zastropeno podlahou: nad ni podezdivka nesmi, viz komentar u funkce.
+    const point = gridToScreen(fx, fy, Math.min(top, groundAt(fx, fy)));
     return [point.x, point.y];
   };
 
