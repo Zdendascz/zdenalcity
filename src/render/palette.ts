@@ -315,6 +315,24 @@ export const WATER_SUPPLY_ALPHA = 0.4;
 export const BRIDGE_RAIL_COLOR = 0xb4b7c2;
 
 /** Pozadí mimo mapu. */
+/**
+ * Čtvercová síť po rozích dlaždic.
+ *
+ * Dvě barvy, protože pod zemí a nad zemí je pozadí opačné: na trávě a na
+ * silnici je vidět černá, nad tmavým podzemním pohledem bílá. Vyžádal si to
+ * autor a je to totéž rozhodnutí jako u bílé hranice mapy dosahu — linka musí
+ * mít kontrast proti tomu, přes co leží, ne jednu barvu napořád.
+ */
+export const GRID_COLOR_SURFACE = 0x000000;
+export const GRID_COLOR_UNDERGROUND = 0xffffff;
+/**
+ * Slabě schválně. Síť je pomůcka na zarovnání, ne kresba: v plné sytosti
+ * překreslí terén a z města je milimetrový papír.
+ */
+export const GRID_ALPHA = 0.35;
+/** Šířka v pixelech obrazovky. Dělí se měřítkem, aby při přiblížení netloustla. */
+export const GRID_WIDTH = 1;
+
 export const BACKGROUND_COLOR = 0x14161a;
 
 /** Zvýraznění dlaždic pod kurzorem — u větších budov celý půdorys. */

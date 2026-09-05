@@ -189,7 +189,13 @@ export class BuildingRenderer {
   setSkirtTextures(textures: ReadonlyMap<string, Texture>): void {
     this.skirtTextures = textures;
     for (const skirt of this.skirts.values()) skirt.clear();
-    this.refreshAll({ tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: false });
+    this.refreshAll({
+      tiles: new Set(),
+      buildings: new Set(),
+      fullRedraw: true,
+      coarseChanged: false,
+      heightsChanged: false,
+    });
     this.reorder();
   }
 

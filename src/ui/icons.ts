@@ -315,6 +315,22 @@ function ring(cx: number, cy: number, inner: number, outer: number, points = 16)
   return shape;
 }
 
+/**
+ * Čtvercová síť — přepínač hranic dlaždic.
+ *
+ * Rovná mřížka, ne izometrická. Na osmnácti pixelech je kosočtverec k nerozeznání
+ * od diamantu zóny; křížení svislých a vodorovných čar pozná každý.
+ */
+const GRID: Shape = (() => {
+  const lines = [0.1, 0.36, 0.62, 0.88];
+  const shape: Shape[0][] = [];
+  for (const at of lines) {
+    shape.push(bar(at - 0.035, 0.065, at + 0.035, 0.935));
+    shape.push(bar(0.065, at - 0.035, 0.935, at + 0.035));
+  }
+  return shape;
+})();
+
 /** Tři tečky — „a další". Přepínač schované části lišty. */
 const MORE: Shape = [circle(0.2, 0.5, 0.1), circle(0.5, 0.5, 0.1), circle(0.8, 0.5, 0.1)];
 
@@ -457,6 +473,7 @@ const UI_SHAPES: Readonly<Record<string, Shape>> = {
   chart: CHART,
   globe: GLOBE,
   gear: GEAR,
+  'view-grid': GRID,
   'zoom-in': magnifier(1),
   'zoom-out': magnifier(-1),
   more: MORE,

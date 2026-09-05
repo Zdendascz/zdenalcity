@@ -610,5 +610,6 @@
   "ui.toolbar.more": "More",
   "ui.hud.moreStats": "More numbers",
   "ui.zoom.in": "Zoom in",
-  "ui.zoom.out": "Zoom out"
+  "ui.zoom.out": "Zoom out",
+  "ui.view.grid": "Tile grid"
 }

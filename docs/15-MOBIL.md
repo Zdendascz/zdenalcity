@@ -124,3 +124,9 @@ Pacička je teď druhá výjimka vedle buldozeru.
   cesta zpátky ke zprávě o katastrofě (viz `docs/14-POHLEDY.md`).
 - **Gesta.** Přiblížení dvěma prsty se nepřidávalo. Autor si vyžádal tlačítka
   a ta stačí; gesto by se navíc pralo s tažením, kterým se staví.
+
+## Přibylo později: čtvercová síť
+
+Autor si ji vyžádal **„na mobilu i na pc"**, takže stojí ve stálé řadě vedle
+průhlednosti a stromů — v úsporné liště se neschovává. Popis je
+v `docs/14-POHLEDY.md`.

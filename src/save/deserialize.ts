@@ -746,7 +746,13 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   repairUnsupportedRoads(world, noLosses());
 
   // Po loadu se kreslí všechno a síť se přepočítá znovu.
-  world.dirty = { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true };
+  world.dirty = {
+    tiles: new Set(),
+    buildings: new Set(),
+    fullRedraw: true,
+    coarseChanged: true,
+    heightsChanged: true,
+  };
   world.powerNetworkDirty = true;
 }
 

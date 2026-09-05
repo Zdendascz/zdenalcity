@@ -43,6 +43,14 @@ export interface HudCallbacks {
   onDisasterClick(kind: string, x: number, y: number): void;
   onToggleDecor(): void;
   /**
+   * Zapnout či vypnout čtvercovou síť po hranicích dlaždic.
+   *
+   * **Pohledem to nehýbe.** Autor si to vyžádal doslova: kdo si síť zapne pod
+   * zemí, musí pod zemí zůstat. Barvu si síť řídí sama podle toho, nad čím
+   * zrovna leží.
+   */
+  onToggleGrid(): void;
+  /**
    * Otevře nápovědu.
    *
    * Musí být **i ve hře**, ne jen na domovské stránce: otázka „proč mi to
@@ -106,6 +114,8 @@ export interface HudState {
   ghost: boolean;
   /** Kreslí se stromy a balvany? */
   decor: boolean;
+  /** Je zapnutá čtvercová síť? */
+  grid: boolean;
   poweredBuildings: number;
   /** Kolik proudu město vyrábí a kolik ho potřebuje. */
   powerProduced: number;
@@ -207,6 +217,7 @@ export class Hud {
   private disastersShown: boolean | null = null;
   private ghostButton: HTMLButtonElement | null = null;
   private decorButton: HTMLButtonElement | null = null;
+  private gridButton: HTMLButtonElement | null = null;
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
   private readonly views: readonly OverlayOption[];
@@ -229,6 +240,7 @@ export class Hud {
     disastersEnabled: true,
     ghost: false,
     decor: true,
+    grid: false,
     poweredBuildings: 0,
     powerProduced: 0,
     powerNeeded: 0,
@@ -368,6 +380,7 @@ export class Hud {
     // Aktivní je tlačítko, když jsou stromy **schované** — svítí to, co hráč
     // zapnul, ne výchozí stav.
     this.decorButton?.classList.toggle('is-active', !state.decor);
+    this.gridButton?.classList.toggle('is-active', state.grid);
 
     // Text přepínače závisí na stavu, který HUD sám nedrží — přijde ve `state`.
     if (state.disastersEnabled !== this.disastersShown) {
@@ -429,6 +442,7 @@ export class Hud {
     this.buildViews();
     this.buildGhost();
     this.buildDecor();
+    this.buildGrid();
     this.buildLayers();
     this.buildDisasters();
     this.buildTaxes();
@@ -671,6 +685,20 @@ export class Hud {
     node.title = label;
     node.setAttribute('aria-label', label);
     this.decorButton = node;
+    this.slot(true).appendChild(node);
+  }
+
+  /**
+   * Čtvercová síť. Vedle průhlednosti a stromů, protože je to totéž zrnem —
+   * a **zůstává v liště i na telefonu**: autor si vyžádal obojí.
+   */
+  private buildGrid(): void {
+    const label = this.i18n.t('ui.view.grid');
+    const node = button('toolbar__button', () => this.callbacks.onToggleGrid());
+    node.appendChild(iconSvg('view-grid'));
+    node.title = label;
+    node.setAttribute('aria-label', label);
+    this.gridButton = node;
     this.slot(true).appendChild(node);
   }
 

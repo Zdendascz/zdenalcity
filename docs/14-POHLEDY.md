@@ -320,3 +320,53 @@ Produkce nahlásila dvě věci:
    `no-cache` a assetům s hashem naopak rok. Zabere jen s `AllowOverride
    FileInfo`; před Apachem si navíc TTL řídí Cloudflare sám a potřebuje vlastní
    Cache Rule. Postup na ověření je v `docs/DEPLOY.md`.
+
+## Čtvercová síť
+
+Autor: „tlačítko pro vypnutí a zapnutí čtvercové sítě. v podzemí bílé linky na
+povrchu černé. Když v podzemí linky zapnu, musím zůstat v podzemí a naopak."
+
+V izometrii není poznat, kde jedna dlaždice končí a druhá začíná, dokud na ni
+nenajedeš myší — a na telefonu ani pak. Síť to řekne.
+
+**Kopíruje terén**, není to mřížka přes obrazovku. Vede přes rohy dlaždic i s
+jejich výškami, takže na svahu jde s kopcem. Rovná mřížka by lhala přesně tam,
+kde je zarovnání nejtěžší.
+
+Barva se řídí **pohledem, ne přepínačem**: na povrchu černá, pod zemí bílá.
+Je to totéž rozhodnutí jako u bílé hranice mapy dosahu — linka musí mít kontrast
+proti tomu, přes co leží.
+
+Přepnutí sítě **pohledem nehne**. Není to nástroj, je to zobrazení, takže
+`gridOverlay.ts` nikde nevolá `setView`. Opačný směr platí taky: přepnutí
+pohledu síť nezhasne, jen jí změní barvu.
+
+Leží **nad zemí a pod domy**, ze stejného důvodu jako vozovka: je to hranice
+pozemku, ne kresba přes město. V podzemním pohledu jsou domy schované, takže
+tam je vidět celá.
+
+### Kdy se překresluje
+
+Jen ze tří důvodů: změnil se terén, hráč odjel o blok jinam, nebo se změnilo
+měřítko (šířka čáry se jím dělí, aby zůstala vlasová).
+
+Změnu terénu hlásí **vlastní příznak** `DirtySet.heightsChanged`, ne `tiles`.
+Zóna, silnice i vyrostlý dům špiní dlaždice, ale s výškami nehnou — a
+překreslovat kvůli nim síť by znamenalo přestavět ji několikrát za sekundu
+v každém živém městě. Nastavuje se na jediném místě, v `applyReshape`, kudy
+jde každá změna terénu.
+
+Posun se měří **po blocích osmi dlaždic**, jinak by se síť přestavovala každý
+snímek tažení. Osm je velikost chunku — stejná úvaha, stejné číslo.
+
+### Co to stojí
+
+Kreslí se **lomené čáry po celých řadách**, ne úsečka na každou hranu: úseček je
+stejně, ale cesta je jedna na řadu místo jedné na dlaždici. Při pohledu na celou
+mapu je to 258 cest místo 33 tisíc.
+
+Změřeno na mapě 128×128 (`node`, celý výřez, 50 běhů): sestavení geometrie
+**0,26 ms** na 33 282 bodů; běžný výřez 32×32 dlaždic 0,008 ms. Tesselace
+v Pixi změřená není — v prohlížeči se to při plném oddálení kreslí bez zadrhnutí
+a mezní případ je jediný snímek po zapnutí, takže se strop podle měřítka
+nezaváděl.

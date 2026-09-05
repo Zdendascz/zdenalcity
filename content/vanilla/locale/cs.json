@@ -610,5 +610,6 @@
   "ui.toolbar.more": "Další",
   "ui.hud.moreStats": "Další čísla",
   "ui.zoom.in": "Přiblížit",
-  "ui.zoom.out": "Oddálit"
+  "ui.zoom.out": "Oddálit",
+  "ui.view.grid": "Čtvercová síť"
 }

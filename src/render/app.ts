@@ -77,6 +77,7 @@ import { ChunkRenderer, viewportFor } from './chunkRenderer';
 import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
+import { GridOverlay } from './gridOverlay';
 import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
 import { DisasterScenes } from './disasterScenes';
 import { ServiceMarkers } from './serviceMarkers';
@@ -988,6 +989,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // domy. Vlastní kontejner, ne řazení podle hloubky — vozovka je země.
   const roadRenderer = new RoadRenderer(world, worldContainer);
 
+  // Čtvercová síť leží **nad zemí a pod domy**, ze stejného důvodu jako
+  // vozovka: je to hranice pozemku, ne kresba přes město. V podzemním pohledu
+  // jsou domy schované, takže tam je vidět celá.
+  const gridOverlay = new GridOverlay(world, worldContainer);
+
   const buildingRenderer = new BuildingRenderer(
     world,
     worldContainer,
@@ -1517,6 +1523,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let layerMode = 'none';
   let ghostBuildings = false;
   let decorVisible = true;
+  let gridVisible = false;
 
   function applyViewAndLayer(): void {
     // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu
@@ -1539,6 +1546,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     disasterScenes.setVisible(viewMode !== 'underground');
     buildingRenderer.setGhost(ghostBuildings);
     buildingRenderer.setDecorVisible(decorVisible);
+    // Barva sítě se řídí pohledem, ne přepínačem: pod zemí bílá, nad zemí
+    // černá. Přepnutí sítě naopak pohledem nehne — viz `gridOverlay.ts`.
+    gridOverlay.setUnderground(viewMode === 'underground');
   }
 
   /**
@@ -1636,6 +1646,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onToggleDecor: () => {
       decorVisible = !decorVisible;
       applyViewAndLayer();
+    },
+    onToggleGrid: () => {
+      gridVisible = !gridVisible;
+      gridOverlay.setVisible(gridVisible);
     },
     onFundingChange: (serviceClass, funding) =>
       dispatch({ type: 'set_service_funding', serviceClass, funding }),
@@ -2266,15 +2280,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     announceDisasters();
 
     const dirty = host.consumeDirty();
+    const viewport = viewportFor(
+      camera.x,
+      camera.y,
+      camera.zoom,
+      app.screen.width,
+      app.screen.height,
+    );
     chunkRenderer.update(dirty);
     // Peče se až tady a jen to, na co je vidět (R20). Musí to být po
     // `update()`, aby se změna z tohohle tiku promítla ještě v tomhle snímku.
-    chunkRenderer.cull(
-      viewportFor(camera.x, camera.y, camera.zoom, app.screen.width, app.screen.height),
-    );
+    chunkRenderer.cull(viewport);
     roadRenderer.update(dirty);
     buildingRenderer.update(dirty);
     coarseOverlay.update(dirty.coarseChanged);
+    // Síť se překresluje jen při změně terénu, posunu o blok nebo změně
+    // měřítka — proto ten vlastní příznak vedle `tiles`.
+    gridOverlay.update(dirty.heightsChanged, viewport, camera.zoom);
     // Značky se hýbou s budovami, ne s hrubou mřížkou.
     serviceMarkers.update(dirty.fullRedraw || dirty.buildings.size > 0);
     disasterScenes.update();
@@ -2463,6 +2485,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       disastersEnabled: simWorld.disasters.enabled,
       ghost: ghostBuildings,
       decor: decorVisible,
+      grid: gridVisible,
       poweredBuildings,
       funding: simWorld.serviceFunding,
       message: message ? i18n.t(message.key, message.params) : '',

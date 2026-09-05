@@ -55,6 +55,7 @@ function callbacks(): HudCallbacks & { zoomed: number[] } {
     onToggleGhost: () => {},
     onDisasterClick: () => {},
     onToggleDecor: () => {},
+    onToggleGrid: () => {},
     onHelp: () => {},
     onFundingChange: () => {},
     onLanguageChange: () => {},
@@ -75,6 +76,7 @@ const STATE: HudState = {
   disastersEnabled: true,
   ghost: false,
   decor: true,
+  grid: false,
   poweredBuildings: 0,
   powerProduced: 0,
   powerNeeded: 0,
@@ -143,13 +145,25 @@ describe('úsporná lišta', () => {
     expect(root.querySelector('.hud')).toBeNull();
   });
 
-  it('na telefonu zůstanou v liště jen pohledy, průhlednost, stromy, uložení a lupa', async () => {
+  it('na telefonu zůstanou v liště jen pohledy, průhlednost, stromy, síť, uložení a lupa', async () => {
     const { root } = await hudFor(true);
 
-    // Lupa, pohledy, průhlednost, stromy, uložení a přepínač vysunuté řady.
-    expect(widgets(root, '.hud__row:not(.hud__row--drawer)')).toBe(6);
+    // Lupa, pohledy, průhlednost, stromy, síť, uložení a přepínač vysunuté řady.
+    expect(widgets(root, '.hud__row:not(.hud__row--drawer)')).toBe(7);
     // Vrstvy, katastrofy, daně, financování, rozpočet, půjčky, MHD, nápověda, jazyk.
     expect(widgets(root, '.hud__row--drawer')).toBe(9);
+  });
+
+  it('čtvercová síť je v liště na obojím — na telefonu i na počítači', async () => {
+    // Autor si vyžádal doslova „na mobilu i na pc". Na telefonu to znamená
+    // stálou řadu, ne vysunutou.
+    const compact = await hudFor(true);
+    const full = await hudFor(false);
+    for (const { root } of [compact, full]) {
+      expect(
+        root.querySelector('.hud__row:not(.hud__row--drawer) [aria-label="Čtvercová síť"]'),
+      ).not.toBeNull();
+    }
   });
 
   it('lupa je jen na telefonu — na počítači je kolečko', async () => {

@@ -108,10 +108,25 @@ export interface DirtySet {
    * a překreslit se to musí jen tehdy, když je zrovna zapnutý příslušný overlay.
    */
   coarseChanged: boolean;
+  /**
+   * Změnila se výška některého rohu terénu?
+   *
+   * Vlastní příznak vedle `tiles`, protože **tvar terénu se mění mnohem
+   * vzácněji než dlaždice**. Zóna, silnice i vyrostlý dům špiní dlaždici, ale
+   * s výškami nehnou — a překreslovat kvůli nim čtvercovou síť, která kopíruje
+   * rohy, by znamenalo přestavět ji několikrát za sekundu v každém živém městě.
+   */
+  heightsChanged: boolean;
 }
 
 export function createDirtySet(): DirtySet {
-  return { tiles: new Set(), buildings: new Set(), fullRedraw: false, coarseChanged: false };
+  return {
+    tiles: new Set(),
+    buildings: new Set(),
+    fullRedraw: false,
+    coarseChanged: false,
+    heightsChanged: false,
+  };
 }
 
 export interface WorldState {
@@ -450,7 +465,13 @@ export function createWorld(
     demand: { residential: 0, commercial: 0, industrial: 0 },
     rng: new Rng(seed),
     // Čerstvý svět renderer ještě neviděl.
-    dirty: { tiles: new Set(), buildings: new Set(), fullRedraw: true, coarseChanged: true },
+    dirty: {
+      tiles: new Set(),
+      buildings: new Set(),
+      fullRedraw: true,
+      coarseChanged: true,
+      heightsChanged: true,
+    },
     coverage: new Map(),
     serviceFunding: new Map(),
     coverageDirty: false,
@@ -732,6 +753,9 @@ export function applyHeightChanges(
 
       const tile = index(x, y, world.size);
       world.dirty.tiles.add(tile);
+      // Tudy jde **každá** změna terénu, takže je to jediné místo, kde se
+      // příznak nastavuje.
+      world.dirty.heightsChanged = true;
       // Čerstvě přesypaná půda drží hůř (T54). Zapisuje se **tady**, protože
       // tudy jde každá změna terénu — ruční i ta, kterou si udělá silnice
       // nebo zóna sama.
