@@ -602,5 +602,6 @@
   "ui.help.saving.body": "Hra se ukládá sama do prohlížeče a domovská stránka pak nabídne „Pokračovat ve městě\". Vyčištění dat webu ho smaže.\n\nRychlé uložení a načtení drží jednu pozici v prohlížeči. Uložit do souboru vyrobí soubor .city, který si můžeš schovat, přenést jinam nebo poslat autorovi, když něco nefunguje.\n\nSave z novější verze hry starší verze odmítne a řekne to nahlas. Starší save si novější hra zmigruje sama.\n\nHra běží i jako aplikace: v prohlížeči se dá nainstalovat na plochu a pak funguje i bez sítě.",
   "ui.home.discord": "Discord",
   "ui.home.discordNote": "Ptej se, nadávej, posílej města.",
-  "ui.authors.projects": "Další projekty"
+  "ui.authors.projects": "Další projekty",
+  "ui.version.dev": "Vývojový běh — verze se ukazuje až v hotovém buildu."
 }

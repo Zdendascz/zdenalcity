@@ -3,7 +3,7 @@ import { button, el } from './dom';
 import { showHelp } from './help';
 import type { I18n } from './i18n';
 import { showNewGameDialog } from './newGameDialog';
-import { BUILD_COMMIT, buildAge, buildDate } from './version';
+import { BUILD_COMMIT, buildAge, buildDate, IS_DEV } from './version';
 import type { NewGame } from './newGameDialog';
 
 /**
@@ -180,13 +180,20 @@ export function showHome(
   // Značka sestavení. Datum samo neodpoví na otázku „je to staré?", tak se
   // vypisuje i stáří slovy — a hash, aby šlo nahlášenou chybu přiřadit
   // ke konkrétní verzi.
+  //
+  // **Ve vývoji se hash ani stáří nevypisuje.** Vite je doplňuje při startu
+  // serveru a od té chvíle se nemění, kdežto kód se přenačítá s každou úpravou.
+  // Vypsaná verze by tedy lhala — a lhala přesně tím směrem, který mate:
+  // tvrdila by, že lokál je starší než produkce, i když je napřed.
   const age = buildAge(t);
   hero.appendChild(
     el(
       'p',
       'home__version',
-      `${t('ui.version.label')} ${BUILD_COMMIT} · ${buildDate(i18n.getLanguage())}` +
-        (age === '' ? '' : ` · ${age}`),
+      IS_DEV
+        ? t('ui.version.dev')
+        : `${t('ui.version.label')} ${BUILD_COMMIT} · ${buildDate(i18n.getLanguage())}` +
+          (age === '' ? '' : ` · ${age}`),
     ),
   );
 

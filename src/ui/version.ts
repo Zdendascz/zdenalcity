@@ -15,6 +15,20 @@ export const BUILD_COMMIT: string =
 export const BUILD_TIME: string =
   typeof __BUILD_TIME__ === 'string' ? __BUILD_TIME__ : new Date().toISOString();
 
+/**
+ * Je to vývojový běh, ne hotový build?
+ *
+ * Rozdíl není kosmetický. `define` vyhodnotí Vite **jednou, při startu dev
+ * serveru**, kdežto samotný kód se pak přenačítá při každé úpravě. Hash i čas
+ * tak zůstanou viset na commitu, který byl v gitu ve chvíli, kdy server
+ * naběhl — a hráč čte „verze stará dvě hodiny" nad kódem, který vznikl před
+ * minutou. Autor to nahlásil tím, že měl na lokále starší verzi než
+ * na produkci, ačkoli lokál byl napřed.
+ *
+ * V hotovém buildu je to naopak přesné: build a commit vzniknou v jeden okamžik.
+ */
+export const IS_DEV: boolean = import.meta.env.DEV;
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;

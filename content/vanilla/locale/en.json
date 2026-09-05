@@ -602,5 +602,6 @@
   "ui.help.saving.body": "The game saves itself into the browser and the home page then offers to continue. Clearing site data deletes it.\n\nQuick save and load hold one slot in the browser. Save to file makes a .city file you can keep, move elsewhere, or send to the author when something breaks.\n\nA save from a newer version is refused loudly by an older one. An older save is migrated by a newer game itself.\n\nThe game also runs as an app: it can be installed to the desktop from the browser and then works offline.",
   "ui.home.discord": "Discord",
   "ui.home.discordNote": "Ask, complain, send cities.",
-  "ui.authors.projects": "Other projects"
+  "ui.authors.projects": "Other projects",
+  "ui.version.dev": "Development run — the version shows in a real build."
 }
