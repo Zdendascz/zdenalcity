@@ -439,3 +439,20 @@ kliknout na zastávku".
 Rozhoduje se to až na **puštění** tlačítka, protože do posledního okamžiku mohl
 klik být začátkem tažení mapy. Pořadí je pak stejné jako u ostatních nástrojů:
 katastrofa, zastávka, teprve pak rozbor parcely.
+
+## Scéna katastrofy pokrývá dlaždici, nestojí na ní
+
+Poslední kus téhož problému. Scéna se sázela **doprostřed dlaždice**, jako by
+to byl předmět, který na ní stojí. Jenže to je obrázek, který dlaždici
+**pokrývá**: tři vraky přes celou křižovatku, dav přes celou ulici. Spodní
+hrana obrázku je proto přední cíp té plochy, ne její střed — a posazená
+doprostřed vyšla celá plocha o půl dlaždice (šestnáct pixelů) na sever.
+Nehoda ležela vedle silnice, přestože ji plánovač vybral **na** silnici
+(`pickBusyRoad`). Hlásil to autor.
+
+Kotva jde tedy na **jižní roh dlaždice**, `gridToScreen(x + 1, y + 1)` —
+totéž pravidlo jako u budov, které taky nesou vlastní pozemek.
+
+**Strom, balvan ani hromada suti sem nespadají.** Ty se země dotýkají v jednom
+bodě a patří do středu dlaždice; kdyby se posunuly na roh, stály by na hranici
+mezi dvěma parcelami.

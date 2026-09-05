@@ -69,16 +69,27 @@ export class DisasterScenes {
       node.anchor.set(scene.anchor[0] / scene.texture.width, scene.anchor[1] / scene.texture.height);
       node.scale.set(1 / scene.scale);
 
-      // Na zem **přesně pod středem dlaždice**, ne na nejvyšší roh.
-      //
-      // Nejvyšší roh tu byl proto, aby scéna na svahu nezapadla do kopce —
-      // jenže tím se přehoupla na druhou stranu a visela až o celou úroveň
-      // (šestnáct pixelů) nad zemí. Správně je výška terénu v tom bodě, kde
-      // scéna stojí; ta leží mezi nejnižším a nejvyšším rohem sama od sebe.
+      /*
+       * Kotva jde na **jižní roh dlaždice**, ne do jejího středu.
+       *
+       * Scéna není předmět, který na dlaždici stojí — je to obrázek, který
+       * dlaždici **pokrývá**: tři vraky přes celou křižovatku, dav přes celou
+       * ulici. Spodní hrana obrázku je proto přední cíp té plochy, ne její
+       * střed. Posazená doprostřed vyšla celá plocha o půl dlaždice (šestnáct
+       * pixelů) na sever a nehoda ležela vedle silnice — hlásil to autor.
+       *
+       * Je to totéž pravidlo jako u budov, které taky nesou vlastní pozemek:
+       * `gridToScreen(x + šířka, y + hloubka)`. Strom ani balvan sem nespadají,
+       * ty se země dotýkají v jednom bodě a patří do středu.
+       *
+       * Výška je terén v tom rohu. Nejvyšší roh tu byl proto, aby scéna na
+       * svahu nezapadla do kopce, jenže tím se přehoupla na druhou stranu
+       * a visela až celou úroveň nad zemí.
+       */
       const point = gridToScreen(
-        disaster.x + 0.5,
-        disaster.y + 0.5,
-        groundHeightAt(this.world.cornerHeight, disaster.x + 0.5, disaster.y + 0.5),
+        disaster.x + 1,
+        disaster.y + 1,
+        groundHeightAt(this.world.cornerHeight, disaster.x + 1, disaster.y + 1),
       );
       node.position.set(point.x, point.y);
 
