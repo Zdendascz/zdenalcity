@@ -120,6 +120,8 @@ def read_spec() -> dict:
                 # Katastrofy na ulici jsou taky vystrizene objekty s kotvou,
                 # jen se nesazi do terenu, ale tam, kde nesteti nastalo.
                 + SURFACE.findall(section(text, 'Katastrofy na ulici'))
+                # Zpustla zastavba a sut: objekty misto sedych kvadru a textury.
+                + SURFACE.findall(section(text, 'Zpustlá zástavba a suť'))
             )
         },
     }
@@ -155,7 +157,16 @@ def plan(spec: dict) -> list[tuple[str, str, str | None]]:
 
 
 # Kam který obrázek patří. Objekty mezi sprity, zbytek mezi dlaždice.
-OBJECT_NAMES = ('forest_clump', 'boulders', 'riot_crowd', 'pileup_wreck')
+OBJECT_NAMES = (
+    'forest_clump',
+    'boulders',
+    'riot_crowd',
+    'pileup_wreck',
+    'derelict_residential',
+    'derelict_commercial',
+    'derelict_industrial',
+    'rubble_pile',
+)
 
 
 def target_for(name: str) -> Path:

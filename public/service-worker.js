@@ -6,10 +6,16 @@
  * neodinstaluje worker. Takhle dostane vždycky to nové, když je připojený,
  * a to poslední stažené, když není.
  *
- * Verze v názvu keše je jediné, co se musí měnit při vydání: stará keš se pak
- * smaže sama.
+ * Verze v názvu keše **se doplňuje při buildu** (`stampServiceWorker` ve
+ * `vite.config.ts`): zástupný text níž se nahradí hashem commitu a datem.
+ * Ručně číslovaná verze fungovala jen do prvního zapomenutí — produkce
+ * nahlásila, že po dvou nasazeních pořád stálo `v1`, takže se keš neuklízela
+ * a nabalovala sprity ze všech verzí.
+ *
+ * Ve vývoji zůstane zástupný text, jak je. Vadit to nemůže: `vite dev` worker
+ * neregistruje a jméno keše se nikde jinde nečte.
  */
-const CACHE = 'zdenalcity-v1';
+const CACHE = 'zdenalcity-__BUILD_VERSION__';
 
 /**
  * Co se stáhne dopředu, aby šla hra spustit hned po instalaci.

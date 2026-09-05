@@ -280,6 +280,24 @@ describe('vykreslení', () => {
     ).toBe(true);
   });
 
+  it('obsah dodává obrázky zpustlé zástavby a suti', () => {
+    // Zpustlá budova se do T93 kreslila jako šedý kvádr a suť jako plochá
+    // textura; autor obojí zavrhl. Kontroluje se **cesta, kterou jde hra**,
+    // ne složka: na bílé listině v `loader.ts` se to už jednou zaseklo.
+    const sprites = createVanillaSource().sprites ?? {};
+    for (const id of [
+      'derelict_residential',
+      'derelict_commercial',
+      'derelict_industrial',
+      'rubble_pile',
+    ]) {
+      expect(
+        Object.keys(sprites).some((key) => key.startsWith(`${id}|`)),
+        `obsah nedodává ${id}`,
+      ).toBe(true);
+    }
+  });
+
   it('obsah dodává obrázky katastrof na ulici', () => {
     // Hromadná nehoda a nepokoje se odehrávají na silnici a mapa o nich do T92
     // mlčela. Sprity mají vlastní index, takže se hlídá zvlášť od dlaždic.

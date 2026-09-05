@@ -313,6 +313,56 @@ NO TEXT, NO LETTERS, NO NUMBERS, NO WATERMARK.
 | **b** | TWO grey boulders lying side by side, one split, filling the picture. |
 | **c** | THREE rounded grey stones together, the biggest as tall as a man, filling the picture. |
 
+## Zpustlá zástavba a suť
+
+Do T93 se **opuštěná budova kreslila jako šedý kvádr** a rozbitá dlaždice jako
+plochá textura. Autor obojí zavrhl: „místo šedých kvádrů nějaké pěkné
+brownfieldové hrůzy… místo zbořených obytných zón nějaké odpudivé slumy" a
+„u těch rozbitých věcí místo té textury udělej obrázky".
+
+Jsou to **vystřižené objekty s kotvou**, stejná hlavička jako u stromů — obrázek
+nesmí přinést vlastní zem, jinak by pod ním zmizel terén i vozovka.
+
+Zpustlá budova má **jednu velikost na kategorii**, ne jednu na každý půdorys.
+Renderer ji posadí doprostřed parcely a zmenší, když je parcela menší; roztáhnout
+by ji nesměl, protože by tím rozbil izometrii. U ruiny navíc nikdo nepozná, jak
+velký dům tam stál — a to je celý důvod, proč devět obrázků stačí místo třiceti.
+
+### `derelict_residential`
+
+| | prompt |
+|---|---|
+| **a** | A DERELICT THREE-STOREY BLOCK OF FLATS: grey panels streaked with damp, every window broken or boarded, balconies rusted through, graffiti along the ground floor, weeds growing out of the roof, filling the picture. |
+| **b** | A ROW OF THREE ABANDONED HOUSES sagging into each other, roofs half fallen in, windows dark and empty, fence collapsed, rubbish and nettles in the front gardens, filling the picture. |
+| **c** | A SQUALID SHANTY: two derelict brick houses with corrugated iron nailed over the windows, lean-to sheds of scrap and tarpaulin against the walls, washing lines, piles of junk, filling the picture. |
+
+### `derelict_commercial`
+
+| | prompt |
+|---|---|
+| **a** | AN ABANDONED SHOP TERRACE: shutters down and rusted, fascia signs blank and peeling, a smashed display window, litter and pallets on the forecourt, filling the picture. |
+| **b** | A DEAD SUPERMARKET: flat-roofed concrete box with a torn awning, boarded entrance, an empty car park with cracked tarmac and weeds through it, an overturned trolley, filling the picture. |
+| **c** | A GUTTED OFFICE BUILDING: four storeys of stained concrete, window frames empty, a hoarding fence around it, scaffolding half dismantled, filling the picture. |
+
+### `derelict_industrial`
+
+| | prompt |
+|---|---|
+| **a** | A BROWNFIELD FACTORY: a long brick hall with a caved-in sawtooth roof, broken windows, a rusted chimney, oil-stained concrete and rusting drums around it, filling the picture. |
+| **b** | A DEAD WORKS YARD: two rusted steel silos, a collapsed conveyor, twisted pipework, heaps of scrap metal and a puddle of black sludge, filling the picture. |
+| **c** | AN ABANDONED WAREHOUSE: corrugated steel walls rusted through in patches, roof panels missing, a loading bay with a broken roller door, weeds bursting through the concrete apron, filling the picture. |
+
+### `rubble_pile`
+
+Suť po zbourané budově, jedna hromada na dlaždici. Hnědá textura pod ní zůstává
+jako rozrytá zem; hromada je to, co z toho dělá demolici a ne pole.
+
+| | prompt |
+|---|---|
+| **a** | A HEAP OF DEMOLITION RUBBLE: broken concrete slabs with bent reinforcing bars sticking out, shattered bricks and grey dust, about as tall as a man, filling the picture. |
+| **b** | A LOW SPREAD OF DEMOLITION DEBRIS: cracked concrete, splintered roof timbers, a bent radiator and a twisted window frame lying among broken bricks, filling the picture. |
+| **c** | A HEAP OF RUBBLE AND SCRAP: broken masonry, a crumpled sheet of corrugated iron, coils of wire and shattered tiles, about as tall as a man, filling the picture. |
+
 ## Katastrofy na ulici
 
 Nepřírodní katastrofy se odehrávají **na silnici**: hromadná nehoda na

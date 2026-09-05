@@ -85,10 +85,19 @@ RUINS = {f'ruin_{n}x{n}': (n, n, 1) for n in (1, 2, 3, 4)}
 DECOR = {
     'forest_clump': (1, 1, 3),
     'boulders': (1, 1, 1),
-    # Katastrofy na ulici. Dve dlazdice siroke: dav ani hromadna nehoda se do
-    # jedne osmimetrove dlazdice nevejde a namackany vypada jako hracka.
-    'riot_crowd': (2, 2, 2),
-    'pileup_wreck': (2, 2, 1),
+    # Katastrofy na ulici. **Sirka ulice, ne dvou dlazdic.** Prvni pokus mel
+    # 2x2 a autor to zavrhl: dav pres tri baraky vypadal jako obri. Ulice je
+    # jedna dlazdice, takze scena musi byt zhruba tak siroka.
+    'riot_crowd': (1, 1, 1),
+    'pileup_wreck': (1, 1, 1),
+    # Zpustla zastavba. **Jedna velikost na kategorii**, ne jedna na kazdy
+    # pudorys: renderer ji posadi doprostred parcely a zmensi, kdyz je parcela
+    # mensi. U ruiny nikdo nepozna, jak velky dum tam stal.
+    'derelict_residential': (2, 2, 3),
+    'derelict_commercial': (2, 2, 3),
+    'derelict_industrial': (2, 2, 3),
+    # Sut: jedna hromada na dlazdici.
+    'rubble_pile': (1, 1, 1),
 }
 
 # Kolik z té dlaždice předmět skutečně zabere.
@@ -97,7 +106,15 @@ DECOR = {
 # jinak by ho `trim` stejně ořízl na jeho obrys. Rozdíl mezi stromem a balvanem
 # se proto dělá až tady. Balvan přes celou dlaždici je osm metrů vysoký kámen
 # a vedle domu vypadá jako skála.
-DECOR_SHARE = {'boulders': 0.45}
+DECOR_SHARE = {
+    'boulders': 0.45,
+    # Dav se vejde do sirky ulice a kousek pretece na chodnik.
+    'riot_crowd': 0.85,
+    # Naklacak je delsi nez auto, takze skoro cela dlazdice.
+    'pileup_wreck': 0.95,
+    # Hromada suti neni pres celou dlazdici: kolem ni ma byt videt rozryta zem.
+    'rubble_pile': 0.8,
+}
 
 
 def load_definitions() -> dict[str, dict]:

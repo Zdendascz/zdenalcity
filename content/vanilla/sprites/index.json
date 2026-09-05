@@ -630,6 +630,105 @@
       ]
     },
     {
+      "building": "derelict_commercial",
+      "variant": "a",
+      "file": "derelict_commercial__a.png",
+      "width": 512,
+      "height": 448,
+      "anchor": [
+        256,
+        448
+      ]
+    },
+    {
+      "building": "derelict_commercial",
+      "variant": "b",
+      "file": "derelict_commercial__b.png",
+      "width": 512,
+      "height": 457,
+      "anchor": [
+        256,
+        457
+      ]
+    },
+    {
+      "building": "derelict_commercial",
+      "variant": "c",
+      "file": "derelict_commercial__c.png",
+      "width": 512,
+      "height": 488,
+      "anchor": [
+        256,
+        488
+      ]
+    },
+    {
+      "building": "derelict_industrial",
+      "variant": "a",
+      "file": "derelict_industrial__a.png",
+      "width": 512,
+      "height": 512,
+      "anchor": [
+        256,
+        512
+      ]
+    },
+    {
+      "building": "derelict_industrial",
+      "variant": "b",
+      "file": "derelict_industrial__b.png",
+      "width": 512,
+      "height": 506,
+      "anchor": [
+        256,
+        506
+      ]
+    },
+    {
+      "building": "derelict_industrial",
+      "variant": "c",
+      "file": "derelict_industrial__c.png",
+      "width": 512,
+      "height": 477,
+      "anchor": [
+        256,
+        477
+      ]
+    },
+    {
+      "building": "derelict_residential",
+      "variant": "a",
+      "file": "derelict_residential__a.png",
+      "width": 512,
+      "height": 512,
+      "anchor": [
+        256,
+        512
+      ]
+    },
+    {
+      "building": "derelict_residential",
+      "variant": "b",
+      "file": "derelict_residential__b.png",
+      "width": 512,
+      "height": 453,
+      "anchor": [
+        256,
+        453
+      ]
+    },
+    {
+      "building": "derelict_residential",
+      "variant": "c",
+      "file": "derelict_residential__c.png",
+      "width": 512,
+      "height": 481,
+      "anchor": [
+        256,
+        481
+      ]
+    },
+    {
       "building": "vanilla:fire_station",
       "variant": "a",
       "file": "fire_station__a.png",
@@ -1524,33 +1623,33 @@
       "building": "pileup_wreck",
       "variant": "a",
       "file": "pileup_wreck__a.png",
-      "width": 512,
-      "height": 448,
+      "width": 243,
+      "height": 213,
       "anchor": [
-        256,
-        448
+        121,
+        213
       ]
     },
     {
       "building": "pileup_wreck",
       "variant": "b",
       "file": "pileup_wreck__b.png",
-      "width": 512,
-      "height": 481,
+      "width": 243,
+      "height": 228,
       "anchor": [
-        256,
-        481
+        121,
+        228
       ]
     },
     {
       "building": "pileup_wreck",
       "variant": "c",
       "file": "pileup_wreck__c.png",
-      "width": 512,
-      "height": 486,
+      "width": 243,
+      "height": 231,
       "anchor": [
-        256,
-        486
+        121,
+        231
       ]
     },
     {
@@ -2184,33 +2283,66 @@
       "building": "riot_crowd",
       "variant": "a",
       "file": "riot_crowd__a.png",
-      "width": 512,
-      "height": 513,
+      "width": 218,
+      "height": 218,
       "anchor": [
-        256,
-        513
+        109,
+        218
       ]
     },
     {
       "building": "riot_crowd",
       "variant": "b",
       "file": "riot_crowd__b.png",
-      "width": 512,
-      "height": 505,
+      "width": 218,
+      "height": 215,
       "anchor": [
-        256,
-        505
+        109,
+        215
       ]
     },
     {
       "building": "riot_crowd",
       "variant": "c",
       "file": "riot_crowd__c.png",
-      "width": 512,
-      "height": 508,
+      "width": 218,
+      "height": 216,
       "anchor": [
-        256,
-        508
+        109,
+        216
+      ]
+    },
+    {
+      "building": "rubble_pile",
+      "variant": "a",
+      "file": "rubble_pile__a.png",
+      "width": 205,
+      "height": 200,
+      "anchor": [
+        102,
+        200
+      ]
+    },
+    {
+      "building": "rubble_pile",
+      "variant": "b",
+      "file": "rubble_pile__b.png",
+      "width": 205,
+      "height": 172,
+      "anchor": [
+        102,
+        172
+      ]
+    },
+    {
+      "building": "rubble_pile",
+      "variant": "c",
+      "file": "rubble_pile__c.png",
+      "width": 205,
+      "height": 192,
+      "anchor": [
+        102,
+        192
       ]
     },
     {

@@ -23,6 +23,18 @@ import type { TerrainDecor } from './decor';
 import { index, TERRAIN } from '@/sim/layers';
 import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
 
+/** Na kolik dlaždic je nakreslená zpustlá budova. Viz `DECOR` ve `fit-sprites.py`. */
+const DERELICT_TILES = 2;
+
+/** Obrázek budovy tak, jak ho popisuje `sprites/index.json`. */
+export interface SpriteImage {
+  readonly url: string;
+  readonly width: number;
+  readonly height: number;
+  readonly anchor: readonly [number, number];
+  readonly scale: number;
+}
+
 /**
  * Co renderer potřebuje vědět o definici budovy. Úzké rozhraní, aby `render/`
  * nezávisel na tvaru content registru — barvu z hexu na číslo převádí volající.
@@ -44,13 +56,19 @@ export interface BuildingAppearance {
    * dům nemá vypadat jako nová škola, takže se u ní vzhled zahodí ještě dřív,
    * než se sem dostane.
    */
-  sprite?: {
-    readonly url: string;
-    readonly width: number;
-    readonly height: number;
-    readonly anchor: readonly [number, number];
-    readonly scale: number;
-  };
+  sprite?: SpriteImage;
+  /**
+   * Obrázek zpustlé budovy podle kategorie (T93).
+   *
+   * Do té doby se opuštěná budova kreslila jako **šedý kvádr** a autor to
+   * zavrhl: „místo šedých kvádrů nějaké pěkné brownfieldové hrůzy… místo
+   * zbořených obytných zón nějaké odpudivé slumy".
+   *
+   * Je jeden na kategorii, ne jeden na každý půdorys: renderer ho posadí
+   * doprostřed parcely a **zmenší**, když je parcela menší. Roztáhnout ho
+   * nesmí — tím by rozbil izometrii.
+   */
+  derelict?: SpriteImage;
   /**
    * Klíč materiálu podezdívky, například `residential__b`.
    *
@@ -113,6 +131,8 @@ export class BuildingRenderer {
    * unese — naměřeno 2,1 ms na 2 500 krabicích a přerovnává se jen při změně.
    */
   private decorByTerrain = new Map<number, TerrainDecor[]>();
+  /** Hromady suti. Kreslí se na dlaždice s troskami, jedna na dlaždici. */
+  private rubblePiles: readonly TerrainDecor[] = [];
   /**
    * Kreslí se stromy a balvany?
    *
@@ -156,7 +176,12 @@ export class BuildingRenderer {
     this.refreshAll(dirty);
     // Terén se mění zřídka (terraforming, kácení), ale když se změní, musí se
     // stromy přepočítat celé: mizí i přibývají a jejich id nejsou v `dirty`.
-    if (dirty.fullRedraw || dirty.tiles.size > 0) this.rebuildDecor();
+    if (dirty.fullRedraw || dirty.tiles.size > 0) {
+      this.rebuildDecor();
+      // Suť přibývá i mizí po jedné dlaždici a její id v `dirty.buildings`
+      // nejsou. Průchod mapou je levný a děje se jen při stavbě nebo bourání.
+      this.rebuildRubble();
+    }
     this.reorder();
   }
 
@@ -173,6 +198,19 @@ export class BuildingRenderer {
     if (this.decorVisible === visible) return;
     this.decorVisible = visible;
     this.rebuildDecor();
+    this.reorder();
+  }
+
+  /**
+   * Nastaví obrázky hromad suti a postaví je znovu.
+   *
+   * Do T93 byly trosky **jen textura pod nohama** a autor to zavrhl: „u těch
+   * rozbitých věcí místo té textury udělej obrázky". Textura zůstala jako
+   * rozrytá zem, hromada je to, co z toho dělá demolici a ne pole.
+   */
+  setRubblePiles(piles: readonly TerrainDecor[]): void {
+    this.rubblePiles = piles;
+    this.rebuildRubble();
     this.reorder();
   }
 
@@ -213,6 +251,34 @@ export class BuildingRenderer {
 
         this.placeDecor(-(tile + 1), x, y, decor);
       }
+    }
+  }
+
+  /**
+   * Rozestaví hromady suti.
+   *
+   * Id jsou záporná jako u stromů, ale **posunutá o velikost mapy**, aby se
+   * s nimi nesrazila: obojí bydlí v téže mapě uzlů a řadí je totéž porovnání.
+   */
+  private rebuildRubble(): void {
+    const size = this.world.size;
+    const offset = size * size;
+    for (const id of [...this.views.keys()]) {
+      if (id <= -offset) this.remove(id);
+    }
+    if (this.rubblePiles.length === 0) return;
+
+    const rubble = this.world.rubble;
+    for (let tile = 0; tile < rubble.length; tile++) {
+      if ((rubble[tile] ?? 0) === 0) continue;
+      const x = tile % size;
+      const y = (tile - x) / size;
+      // Varianta ze souřadnic, ne z `world.rng`: musí vyjít stejně při každém
+      // překreslení i po načtení savu, jinak by se suť při každém pohledu
+      // přeskládala.
+      const pile = this.rubblePiles[decorPick(x, y) % this.rubblePiles.length];
+      if (pile === undefined) continue;
+      this.placeDecor(-(tile + 1 + offset), x, y, pile);
     }
   }
 
@@ -305,7 +371,14 @@ export class BuildingRenderer {
     // hráč dozvěděl jen z detailu budovy, jednu po druhé.
     const unpowered = !building.abandoned && found.consumesPower === true && !building.powered;
     const appearance: BuildingAppearance = building.abandoned
-      ? { color: ABANDONED_COLOR, heightLevels: 1, footprint: found.footprint }
+      ? {
+          color: ABANDONED_COLOR,
+          heightLevels: 1,
+          footprint: found.footprint,
+          // Obrázek zpustlé budovy, když ho obsah dodal. Bez něj zůstane šedý
+          // kvádr jako dřív — chybějící obrázek hru nezastaví (P5).
+          ...(found.derelict === undefined ? {} : { sprite: found.derelict }),
+        }
       : unpowered
         ? {
             ...found,
@@ -318,7 +391,12 @@ export class BuildingRenderer {
     const [width, depth] = appearance.footprint;
 
     if (appearance.sprite) {
-      this.drawSprite(id, building.x, building.y, width, depth, appearance.sprite);
+      // Zpustlá budova má obrázek pro dvě dlaždice na dvě. Na menší parcele
+      // se **zmenší celý**, ne zúží: roztažením by se rozešla izometrie.
+      const fit = building.abandoned
+        ? Math.min(1, (width + depth) / (DERELICT_TILES * 2))
+        : 1;
+      this.drawSprite(id, building.x, building.y, width, depth, appearance.sprite, fit);
       return;
     }
 
@@ -423,6 +501,8 @@ export class BuildingRenderer {
     width: number,
     depth: number,
     image: NonNullable<BuildingAppearance['sprite']>,
+    /** Dodatečné zmenšení. Jednička je přirozená velikost obrázku. */
+    fit = 1,
   ): void {
     let view = this.views.get(id);
     if (view instanceof Graphics) {
@@ -442,7 +522,7 @@ export class BuildingRenderer {
     // Rozměry jdou z manifestu, ne z textury: ta nemusí být načtená a kotva
     // spočítaná z nuly by budovu posadila do rohu obrazovky.
     sprite.anchor.set(image.anchor[0] / image.width, image.anchor[1] / image.height);
-    sprite.scale.set(1 / image.scale);
+    sprite.scale.set(fit / image.scale);
 
     const { min, pad } = areaHeightRange(this.world.cornerHeight, x, y, width, depth);
     const front = gridToScreen(x + width, y + depth, pad);

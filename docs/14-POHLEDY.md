@@ -276,3 +276,47 @@ minutě.
 Bourání budovy a silnice je pořád **zdarma** a desetinásobek na tom nic nemění;
 zdražilo se všechno, co dnes za bourání něco stojí. Jestli má demolice domu
 stát peníze, je to nová mechanika, ne změna čísla.
+
+## Zpustlá zástavba, suť a velikost scén
+
+Tři věci z jednoho kola připomínek.
+
+**Scény katastrof byly moc velké.** Dav i hromadná nehoda měly půdorys dvě
+dlaždice na dvě, takže se přes tři baráky roztáhly a vypadaly jako obří. Autor:
+„zmenši to na velikost ulice, dodrž perspektivu". Jsou teď na jednu dlaždici
+(`DECOR` ve `fit-sprites.py`) a doladěné podílem: dav 0,85 dlaždice, nehoda
+0,95, protože náklaďák je delší než auto. Zmenšuje se **celý obrázek**, ne jen
+jeho šířka — roztažením by se rozešla izometrie.
+
+**Suť má obrázky, ne jen texturu.** Textura zůstala jako rozrytá zem; na ni se
+posadí hromada `rubble_pile` (tři varianty, vybírá se ze souřadnic, takže se
+při překreslení nepřeskládá). Autor předtím: „u těch rozbitých věcí místo té
+textury udělej obrázky".
+
+**Zpustlá budova není šedý kvádr.** Dostala obrázek podle **kategorie**:
+`derelict_residential` (slum), `derelict_commercial` (mrtvá provozovna),
+`derelict_industrial` (brownfield). Jeden na kategorii, ne jeden na každý
+půdorys — renderer ho posadí doprostřed parcely a **zmenší**, když je parcela
+menší. U ruiny stejně nikdo nepozná, jak velký dům tam stál, a devět obrázků
+tak nahradí třicet. Kategorie bez záznamu (služby, elektrárny) zůstávají
+u kvádru: opuštěná nemocnice je vzácnost.
+
+Hromady suti nesou **záporná id posunutá o velikost mapy**, aby se nesrazila
+s id stromů — obojí bydlí v téže mapě uzlů a řadí je totéž porovnání hloubky.
+
+## Keš service workeru
+
+Produkce nahlásila dvě věci:
+
+1. `CACHE = 'zdenalcity-v1'` zůstávalo přes dvě nasazení, takže se stará keš
+   neuklízela a nabalovala sprity ze všech verzí. Ručně číslovaná verze funguje
+   jen do prvního zapomenutí, takže se **razítkuje při buildu**: plugin
+   `stampServiceWorker` ve `vite.config.ts` nahradí v `dist/service-worker.js`
+   zástupný text hashem commitu a datem. Ve vývoji zástupný text zůstane a
+   nevadí — `vite dev` worker neregistruje.
+2. `service-worker.js` chodí s `max-age=14400`. To je u workeru nejhorší možná
+   hodnota: prohlížeč si nový vezme až za čtyři hodiny. V buildu je od té doby
+   `public/.htaccess`, které workeru, `index.html` a manifestu nastaví
+   `no-cache` a assetům s hashem naopak rok. Zabere jen s `AllowOverride
+   FileInfo`; před Apachem si navíc TTL řídí Cloudflare sám a potřebuje vlastní
+   Cache Rule. Postup na ověření je v `docs/DEPLOY.md`.

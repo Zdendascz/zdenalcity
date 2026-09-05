@@ -21,8 +21,10 @@ Vyžaduje Node `^20.19.0 || >=22.12.0`.
 cd D:/Projekty/citybuilder && npm run build
 ```
 
-Vznikne `dist/` — 19 souborů, 641 kB (178 kB zabalených). Obsah hry
-(`content/vanilla/**.json`) je přibalený v bundlu, nic se nedotahuje ze sítě.
+Vznikne `dist/`. Počet souborů roste s obsahem — dnes je jich přes pět set,
+protože přibyly sprity budov, dlaždice a obrázky událostí. Definice
+(`content/vanilla/**.json`) jsou přibalené v bundlu, obrázky jsou samostatné
+soubory a stahují se, až si o ně hra řekne.
 
 **Kontrola, bez které to nemá cenu nahrávat:**
 
@@ -69,7 +71,8 @@ ssh zdendas@88.222.220.200 'test -d WEBROOT/zdenalcity && mv WEBROOT/zdenalcity 
 ssh zdendas@88.222.220.200 'mkdir -p WEBROOT/zdenalcity && tar -xzf /tmp/zdenalcity-build.tar.gz -C WEBROOT/zdenalcity && chmod -R a+rX WEBROOT/zdenalcity && find WEBROOT/zdenalcity -type f | wc -l'
 ```
 
-Poslední příkaz musí vypsat **19**. Apache nepotřebuje restart ani žádnou
+Poslední příkaz musí vypsat **tolik souborů, kolik jich má `dist/`** — porovnej
+s `find dist -type f | wc -l` na svém stroji. Apache nepotřebuje restart ani žádnou
 konfiguraci navíc: `DirectoryIndex index.html` je výchozí, hra nemá routing,
 takže žádné rewrite pravidlo není potřeba.
 
@@ -102,6 +105,40 @@ neznamená, že hra běží:
 4. `read_console_messages` musí být bez chyb.
 5. `globalThis.__city` musí být **`undefined`** — ladicí handle je jen pro
    vývojový build a v produkci se vytřepe. Kdyby existoval, nahrál se dev build.
+
+## 5b. Hlavičky keše
+
+Produkce nahlásila dvě věci a obě se týkají toho, jakou verzi hráč doopravdy
+dostane:
+
+1. **`CACHE` v service workeru zůstávalo na `v1`** přes dvě nasazení, takže se
+   stará keš neuklízela a nabalovala sprity ze všech verzí. Opraveno v kódu:
+   jméno keše se **razítkuje při buildu** hashem commitu a datem
+   (`stampServiceWorker` ve `vite.config.ts`). Ověřit jde na hotovém buildu:
+
+   ```bash
+   grep -n "const CACHE" D:/Projekty/citybuilder/dist/service-worker.js
+   ```
+
+   Musí tam být `zdenalcity-<hash>-<datum>`, ne `zdenalcity-__BUILD_VERSION__`.
+
+2. **`service-worker.js` chodí s `max-age=14400`.** To je u workeru nejhorší
+   možná hodnota: prohlížeč si nový vezme až za čtyři hodiny, takže po nasazení
+   běží starý ještě půl dne. V buildu je od té doby `public/.htaccess`, které
+   workeru, `index.html` a manifestu nastaví `no-cache` a assetům s hashem
+   naopak rok.
+
+   `.htaccess` zabere, **jen když má vhost `AllowOverride FileInfo` nebo `All`**.
+   Ověřit zvenčí:
+
+   ```bash
+   curl -sI "https://games.zdendas.cz/zdenalcity/service-worker.js" | grep -i "cache-control\|cf-cache-status"
+   ```
+
+   Čekáme `no-cache`. Když tam pořád je `max-age=14400`, hlavičku nastavuje
+   něco výš — buď vhost (pak patří do jeho konfigurace), nebo **Cloudflare**,
+   který si TTL řídí sám a `.htaccess` ho nezajímá. Tam je potřeba Cache Rule
+   na `games.zdendas.cz/zdenalcity/service-worker.js` s „Bypass cache".
 
 ## 6. Cloudflare
 

@@ -186,6 +186,19 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
     const variant = variantFor(content.getSpriteVariants(definitionId), buildingId);
     const sprite = variant === undefined ? undefined : content.getSprite(definitionId, variant);
 
+    // Zpustlá budova: obrázek podle **kategorie**, ne podle definice. Slum
+    // vypadá jako slum, ať v něm stál řadový dům nebo činžák, a devět obrázků
+    // tak nahradí třicet.
+    const derelictId = DERELICT_SPRITES[definition.category];
+    const derelictVariant =
+      derelictId === undefined
+        ? undefined
+        : variantFor(content.getSpriteVariants(derelictId), buildingId);
+    const derelict =
+      derelictId === undefined || derelictVariant === undefined
+        ? undefined
+        : content.getSprite(derelictId, derelictVariant);
+
     return {
       color: Number.parseInt(definition.graphics.color.slice(1), 16),
       heightLevels: definition.graphics.heightLevels,
@@ -194,9 +207,23 @@ function createAppearanceLookup(content: ContentRegistry): AppearanceLookup {
       skirt: skirtFor(definition.category, buildingId),
       ...(icon === undefined ? {} : { icon }),
       ...(sprite === undefined ? {} : { sprite }),
+      ...(derelict === undefined ? {} : { derelict }),
     };
   };
 }
+
+/**
+ * Obrázek zpustlé budovy podle kategorie.
+ *
+ * Kategorie bez záznamu — služby, elektrárny — zůstane u šedého kvádru.
+ * Opuštěná nemocnice je vzácnost a vlastní obrázek by za ni nestál; slum
+ * a brownfield jsou to, co hráč v zanedbané čtvrti opravdu vidí.
+ */
+const DERELICT_SPRITES: Readonly<Record<string, string>> = {
+  residential: 'derelict_residential',
+  commercial: 'derelict_commercial',
+  industrial: 'derelict_industrial',
+};
 
 /**
  * Pohled na svět: povrch, nebo podzemí.
@@ -682,6 +709,34 @@ async function loadDecor(content: ContentRegistry): Promise<Map<number, TerrainD
 }
 
 /**
+ * Všechny varianty jednoho vystřiženého objektu jako předměty na terénu.
+ *
+ * Pořadí je stabilní: stahování dobíhá, jak přijde ze sítě, a výběr podle
+ * souřadnic by pak po každém spuštění padl na jiný obrázek.
+ */
+async function loadObject(content: ContentRegistry, id: string): Promise<TerrainDecor[]> {
+  const out: TerrainDecor[] = [];
+  const jobs: Promise<void>[] = [];
+
+  for (const variant of content.getSpriteVariants(id)) {
+    const sprite = content.getSprite(id, variant);
+    if (sprite === undefined) continue;
+    jobs.push(
+      Assets.load(sprite.url)
+        .then((texture: Texture) => {
+          sampleSmooth(texture);
+          out.push({ texture, anchor: sprite.anchor, scale: sprite.scale });
+        })
+        .catch(() => undefined),
+    );
+  }
+
+  await Promise.all(jobs);
+  out.sort((a, b) => (a.texture.label ?? '').localeCompare(b.texture.label ?? ''));
+  return out;
+}
+
+/**
  * Obrázky katastrof, které se odehrávají na ulici.
  *
  * Klíč je **druh katastrofy**, ne jméno spritu: renderer o `riot_crowd` nemá
@@ -904,6 +959,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   void loadDisasterScenes(content).then((scenes) => {
     if (scenes.size > 0) disasterScenes.setScenes(scenes);
+  });
+
+  void loadObject(content, 'rubble_pile').then((piles) => {
+    if (piles.length > 0) buildingRenderer.setRubblePiles(piles);
   });
 
   void loadRoadMaterials(content).then((materials) => {

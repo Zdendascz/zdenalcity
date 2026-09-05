@@ -1,0 +1,29 @@
+# Hlavičky keše pro statický build hry.
+#
+# Produkce nahlásila, že `service-worker.js` chodí s `max-age=14400`. To je
+# u service workeru ta nejhorší možná hodnota: prohlížeč si nový worker vezme
+# až za čtyři hodiny, takže po nasazení běží starý ještě půl dne a hráč do té
+# doby dostává z keše mix staré a nové verze.
+#
+# Apache si tenhle soubor přečte, jen když má vhost `AllowOverride FileInfo`
+# (nebo `All`). Když ne, musí tytéž hlavičky nastavit vhost přímo — a Cloudflare
+# před ním navíc potřebuje Cache Rule, protože si svoje TTL řídí sám.
+<IfModule mod_headers.c>
+  # Worker a rozcestník: **nikdy z keše bez zeptání**. Jsou to dva malé soubory
+  # a jsou to jediné dva, které rozhodují, jakou verzi hráč uvidí.
+  <FilesMatch "^(service-worker\.js|index\.html|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # Assety mají v názvu hash, takže se nikdy nezmění pod rukama a smí se
+  # kešovat natvrdo. Rok je běžná hodnota pro obsah adresovaný hashem.
+  <FilesMatch "\.(js|css|png|jpg|webp|woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # …ale worker a rozcestník do té skupiny nesmí spadnout podruhé. Pravidla se
+  # vyhodnocují shora dolů a poslední vyhrává, takže se ta přísná zopakuje.
+  <FilesMatch "^(service-worker\.js|index\.html|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>
