@@ -68,8 +68,14 @@ export interface PopoverOptions {
 export class Popover {
   readonly root: HTMLElement;
   readonly panel: HTMLElement;
-
-  private readonly trigger: HTMLButtonElement;
+  /**
+   * Tlačítko, které panel otevírá.
+   *
+   * Veřejné kvůli statistikám na telefonu: autor si vyžádal, aby **kasa
+   * a bilance samy byly tím tlačítkem** místo ikonky grafu vedle nich. Volající
+   * si obsah tlačítka přepíše; otevírání zůstává na Popoveru.
+   */
+  readonly trigger: HTMLButtonElement;
   private readonly iconSlot: HTMLElement;
   private isOpen = false;
 

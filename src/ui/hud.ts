@@ -92,6 +92,17 @@ export interface HudCallbacks {
   onReload(): void;
 }
 
+/**
+ * Kam si paleta nástrojů odloží schované nabídky a jak řadu zavře.
+ *
+ * Řadu vlastní HUD, ne paleta: je společná pro nástroje i ovládání a otevírá
+ * ji jedna trojtečka.
+ */
+export interface ToolbarOverflow {
+  readonly host: HTMLElement;
+  close(): void;
+}
+
 /** Položka nabídky pohledů nebo vrstev. Popisek je lokalizační klíč. */
 export interface OverlayOption {
   id: string;
@@ -194,6 +205,15 @@ export class Hud {
   /** Úsporná lišta pro telefon, viz `ui/layout.ts`. */
   private compact: boolean;
 
+  /**
+   * Kam si `app.ts` pověsí grafickou paletu a co k ní na telefonu přibude.
+   *
+   * Autor si vyžádal, aby síť, uložení a trojtečka stály **v jedné řadě
+   * s pacičkou a silnicí**, ne v řadě nad nimi. `barExtras` je ta část řady,
+   * kterou plní HUD; paleta si plní `toolsSlot` vedle.
+   */
+  private readonly barExtras: HTMLElement;
+
   /** Kořen HUDu. Nese třídu `hud--compact`, podle které se řídí CSS. */
   private readonly root: HTMLElement;
   private readonly top: HTMLElement;
@@ -202,11 +222,26 @@ export class Hud {
   private readonly controlRow: HTMLElement;
   /** Řada nad ní, kterou si hráč na telefonu vysouvá. */
   private readonly controlDrawer: HTMLElement;
+  /** Část vysunuté řady, kam si paleta odkládá schované nabídky nástrojů. */
+  private readonly toolDrawer: HTMLElement;
+  /** Část vysunuté řady pro ovládání. */
+  private readonly controlDrawerGroup: HTMLElement;
 
   private readonly values = new Map<string, HTMLElement>();
   private readonly speedButtons: HTMLButtonElement[] = [];
   /** Rychlejší stupně na telefonu. `null` v plné verzi — tam jsou v liště. */
   private speedMenu: Menu | null = null;
+  /** Pauza a běh v jednom tlačítku. Jen na telefonu. */
+  private playButton: HTMLButtonElement | null = null;
+  /**
+   * Poslední rychlost, na které čas běžel.
+   *
+   * Sjednocené tlačítko pauzy musí vědět, **kam se vrátit**: kdo si pustil
+   * čtyřikrát a dal pauzu, chce po odpauzování zase čtyřikrát, ne jedenkrát.
+   */
+  private lastRunning = 1;
+  /** Povrch a podzemí v jednom tlačítku. Jen na telefonu. */
+  private viewToggle: HTMLButtonElement | null = null;
   private readonly viewButtons = new Map<string, HTMLButtonElement>();
   private layerMenu: Menu | null = null;
   private budgetButton: HTMLButtonElement | null = null;
@@ -273,14 +308,26 @@ export class Hud {
     this.root = parent;
     this.top = el('div', 'hud__top');
     const bottom = el('div', 'hud__bottom');
+
+    // Spodní řada: paleta nástrojů a hned za ní to, co k ní autor chtěl mít —
+    // síť, uložení a trojtečka. Jeden řádek, ne dva nad sebou.
+    const toolsRow = el('div', 'hud__tools-row');
     this.toolsSlot = el('div', 'hud__tools');
+    this.barExtras = el('div', 'hud__extras');
+    toolsRow.append(this.toolsSlot, this.barExtras);
+
     this.controls = el('div', 'hud__controls');
     // Vysunutá řada je nad tou stálou: pod lištou už je jen okraj displeje.
+    // Trojtečka je **jedna** a otevírá obojí — nástroje i ovládání. Dvě vedle
+    // sebe, každá s jiným obsahem, by hráč neměl jak rozeznat.
     this.controlDrawer = el('div', 'hud__row hud__row--drawer is-hidden');
+    this.toolDrawer = el('div', 'hud__drawer-group');
+    this.controlDrawerGroup = el('div', 'hud__drawer-group');
+    this.controlDrawer.append(this.toolDrawer, this.controlDrawerGroup);
     this.controlRow = el('div', 'hud__row');
     this.controls.append(this.controlDrawer, this.controlRow);
 
-    bottom.append(this.toolsSlot, this.controls);
+    bottom.append(toolsRow, this.controls);
     parent.append(this.top, bottom);
 
     this.build();
@@ -288,6 +335,19 @@ export class Hud {
       this.build();
       this.update(this.lastState);
     });
+  }
+
+  /**
+   * Kam si paleta nástrojů odkládá to, co se do lišty nevešlo, a jak to zavře.
+   *
+   * Vysunutou řadu vlastní HUD, protože je společná: jsou v ní schované
+   * nástroje **i** schované ovládání a otevírá je jedna trojtečka.
+   */
+  get overflow(): ToolbarOverflow {
+    return {
+      host: this.toolDrawer,
+      close: () => this.controlDrawer.classList.add('is-hidden'),
+    };
   }
 
   /**
@@ -357,10 +417,14 @@ export class Hud {
     this.speedButtons.forEach((node, index) => {
       node.classList.toggle('is-active', index === state.speedIndex);
     });
+    // Kam se vrátit po odpauzování. Pamatuje se **poslední běžící** rychlost,
+    // ne ta výchozí.
+    if (state.speedIndex > 0) this.lastRunning = state.speedIndex;
+    this.reflectPlayPause();
     // Zrychlení, které v liště není: roletka se rozsvítí a vezme si jeho ikonu,
     // aby hráč po zavření poznal, že mu čas pořád letí.
     this.speedMenu?.setSelected(
-      state.speedIndex >= this.speedButtons.length ? String(state.speedIndex) : null,
+      state.speedIndex >= Math.max(2, this.speedButtons.length) ? String(state.speedIndex) : null,
     );
     for (const [serviceClass, input] of this.fundingInputs) {
       const percent = Math.round((state.funding.get(serviceClass) ?? 1) * 100);
@@ -372,6 +436,7 @@ export class Hud {
     for (const [id, node] of this.viewButtons) {
       node.classList.toggle('is-active', id === state.view);
     }
+    this.viewToggle?.classList.toggle('is-active', state.view === 'underground');
     this.layerMenu?.setSelected(state.layer);
     this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
     this.financeButton?.classList.toggle('is-active', state.financeVisible);
@@ -403,22 +468,30 @@ export class Hud {
    * Kam tlačítko patří.
    *
    * V plné verzi je všechno v jedné řadě. Na telefonu zůstávají v liště jen
-   * pohledy, průhlednost, stromy, uložení a lupa — zadání autora. Zbytek čeká
-   * ve vysunuté řadě, protože se k němu hráč vrací jednou za čas.
+   * pohled, průhlednost, stromy a lupa; síť, uložení a trojtečka jdou dolů
+   * k paletě (zadání autora) a zbytek čeká ve vysunuté řadě.
    */
   private slot(primary: boolean): HTMLElement {
-    return !this.compact || primary ? this.controlRow : this.controlDrawer;
+    return !this.compact || primary ? this.controlRow : this.controlDrawerGroup;
+  }
+
+  /** Na telefonu do řady s paletou, jinak mezi ostatní ovládání. */
+  private barSlot(): HTMLElement {
+    return this.compact ? this.barExtras : this.controlRow;
   }
 
   private build(): void {
     this.root.classList.toggle('hud--compact', this.compact);
     this.top.replaceChildren();
     this.controlRow.replaceChildren();
-    this.controlDrawer.replaceChildren();
+    this.controlDrawerGroup.replaceChildren();
+    this.barExtras.replaceChildren();
     this.controlDrawer.classList.add('is-hidden');
     this.values.clear();
     this.speedButtons.length = 0;
     this.speedMenu = null;
+    this.playButton = null;
+    this.viewToggle = null;
     this.viewButtons.clear();
     this.fundingInputs.clear();
 
@@ -460,7 +533,7 @@ export class Hud {
    * vpravo — tam, kde ho na telefonu chytí palec.
    */
   private buildMore(): void {
-    if (!this.compact || this.controlDrawer.childElementCount === 0) return;
+    if (!this.compact) return;
     const label = this.i18n.t('ui.toolbar.more');
     const node = button('toolbar__button', () => {
       this.controlDrawer.classList.toggle('is-hidden');
@@ -468,7 +541,7 @@ export class Hud {
     node.appendChild(iconSvg('more'));
     node.title = label;
     node.setAttribute('aria-label', label);
-    this.controlRow.appendChild(node);
+    this.barExtras.appendChild(node);
   }
 
   /**
@@ -539,11 +612,17 @@ export class Hud {
       if (this.compact && row.primary !== true) continue;
       group.appendChild(this.stat(row.key, row.labelKey));
     }
-    parent.appendChild(group);
 
-    if (!this.compact) return;
+    if (!this.compact) {
+      parent.appendChild(group);
+      return;
+    }
 
-    const popover = new Popover({ icon: 'chart', label: this.i18n.t('ui.hud.moreStats') });
+    // Na telefonu **není ikonka grafu**: tlačítkem je rovnou kasa s bilancí.
+    // Vyžádal si to autor a je to úspora celého jednoho tlačítka v liště, kde
+    // se počítá každé.
+    const popover = new Popover({ icon: 'chart', label: this.i18n.t('ui.hud.moreStats'), className: 'popover--stats' });
+    popover.trigger.replaceChildren(group);
     popover.panel.classList.add('panel--stats');
     for (const row of STAT_ROWS) {
       if (row.primary === true) continue;
@@ -590,11 +669,13 @@ export class Hud {
    * nejčastěji.
    */
   private buildSpeed(parent: HTMLElement): void {
+    if (this.compact) {
+      this.buildPlayPause(parent);
+      return;
+    }
+
     const group = el('div', 'segmented');
-    // Na telefonu zůstanou v liště jen pauza a normální běh — zadání autora.
-    // Zrychlení je věc, kterou hráč zapne, nechá běžet a zase vypne; pauza je
-    // to, co mačká, když se něco děje.
-    const inBar = this.compact ? 2 : this.speeds.length;
+    const inBar = this.speeds.length;
 
     this.speeds.forEach((speed, index) => {
       if (index >= inBar) return;
@@ -615,24 +696,58 @@ export class Hud {
     });
     parent.appendChild(group);
 
-    if (inBar >= this.speeds.length) return;
+  }
 
-    // Roletka **nemá zamčenou ikonu**: hráč po zavření vidí, jak rychle mu
-    // čas běží, i když je tlačítko jen jedno.
-    const menu = new Menu({
-      icon: speedIcon(this.speeds[inBar] ?? 2),
-      label: this.i18n.t('ui.speed.label'),
+  /**
+   * Pauza a běh v jednom tlačítku, zrychlení pod trojtečkou vedle.
+   *
+   * Zadání autora. Dvě tlačítka na totéž jsou v liště, kde se počítá každé
+   * místo, plýtvání: běží–neběží je jeden stav a jeden přepínač.
+   *
+   * Odpauzování se vrací **na tu rychlost, na které čas běžel**. Kdo si pustil
+   * osmkrát a dal pauzu, chce po odpauzování zase osmkrát.
+   */
+  private buildPlayPause(parent: HTMLElement): void {
+    const group = el('div', 'segmented');
+    const node = button('segmented__button segmented__button--icon', () => {
+      this.callbacks.onSpeed(this.lastState.speedIndex === 0 ? this.lastRunning : 0);
     });
+    this.playButton = node;
+    group.appendChild(node);
+    parent.appendChild(group);
+
+    // Trojtečka, dokud běží pauza nebo normální rychlost; jakmile si hráč
+    // pustí něco rychlejšího, vezme si tlačítko jeho ikonu, aby po zavření
+    // bylo poznat, že čas letí.
+    const menu = new Menu({ icon: 'more', label: this.i18n.t('ui.speed.label') });
     menu.setItems(
-      this.speeds.slice(inBar).map((speed, offset) => ({
-        id: String(inBar + offset),
+      this.speeds.slice(2).map((speed, offset) => ({
+        id: String(2 + offset),
         label: this.speedLabel(speed),
         icon: speedIcon(speed),
-        onSelect: () => this.callbacks.onSpeed(inBar + offset),
+        onSelect: () => this.callbacks.onSpeed(2 + offset),
       })),
     );
     this.speedMenu = menu;
     parent.appendChild(menu.root);
+
+    this.reflectPlayPause();
+  }
+
+  /** Ikona i popisek přepínače podle toho, jestli čas zrovna běží. */
+  private reflectPlayPause(): void {
+    const node = this.playButton;
+    if (!node) return;
+    const paused = this.lastState.speedIndex === 0;
+    // Na tlačítku je **to, co se stane po stisku**, ne to, co zrovna platí:
+    // tak to má každý přehrávač a hráč to nemusí luštit.
+    const label = paused
+      ? this.speedLabel(this.speeds[this.lastRunning] ?? 1)
+      : this.i18n.t('ui.speed.pause');
+    node.replaceChildren(iconSvg(paused ? 'speed-1' : 'speed-pause'));
+    node.title = `${this.i18n.t('ui.speed.label')}: ${label}`;
+    node.setAttribute('aria-label', label);
+    node.classList.toggle('is-active', !paused);
   }
 
   private speedLabel(speed: number): string {
@@ -645,6 +760,21 @@ export class Hud {
    * zvlášť a ne v seznamu diagnostických vrstev, kam to dřív bylo naskládané.
    */
   private buildViews(): void {
+    if (this.compact) {
+      // Jedno tlačítko místo dvou — zadání autora. Znamená vždycky „pohled
+      // pod zem"; rozsvícené je, když se hráč pod zemí zrovna dívá.
+      const label = this.i18n.t('ui.view.underground');
+      const node = button('toolbar__button', () => {
+        this.callbacks.onSetView(this.lastState.view === 'underground' ? 'surface' : 'underground');
+      });
+      node.appendChild(iconSvg('view-underground'));
+      node.title = label;
+      node.setAttribute('aria-label', label);
+      this.viewToggle = node;
+      this.controlRow.appendChild(node);
+      return;
+    }
+
     const group = el('div', 'segmented');
     for (const view of this.views) {
       const label = this.i18n.t(view.labelKey);
@@ -699,7 +829,7 @@ export class Hud {
     node.title = label;
     node.setAttribute('aria-label', label);
     this.gridButton = node;
-    this.slot(true).appendChild(node);
+    this.barSlot().appendChild(node);
   }
 
   private buildLayers(): void {
@@ -908,7 +1038,7 @@ export class Hud {
       popover.panel.appendChild(updateRow);
     }
 
-    this.slot(true).appendChild(popover.root);
+    this.barSlot().appendChild(popover.root);
   }
 
   /** Nápověda. Poslední v řadě, hned u jazyka — obojí je o hře, ne o městě. */

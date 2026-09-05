@@ -1,6 +1,7 @@
 import { button, el } from './dom';
 import { formatNumber } from './format';
 import { iconSvg } from './icons';
+import type { ToolbarOverflow } from './hud';
 import type { I18n } from './i18n';
 import { Menu } from './popover';
 import type { ToolOption } from './tools';
@@ -18,6 +19,10 @@ import type { ToolOption } from './tools';
  *
  * Na telefonu se ani těch osm roletek nevejde (viz `layout.ts`): v liště pak
  * zůstane jen `COMPACT_GROUPS` a zbytek čeká ve vysouvací řadě nad ní.
+ *
+ * Tu řadu **vlastní HUD**, ne paleta: je společná pro schované nástroje
+ * i schované ovládání a otevírá je jedna trojtečka. Paleta o ní ví jen tolik,
+ * kam si své nabídky pověsit a jak ji po výběru zavřít (`ToolbarOverflow`).
  */
 export class Toolbar {
   readonly root: HTMLElement;
@@ -28,8 +33,7 @@ export class Toolbar {
   private readonly menus: Menu[] = [];
   private readonly singles = new Map<string, HTMLButtonElement>();
   private readonly bar: HTMLElement;
-  private readonly drawer: HTMLElement;
-  private moreButton: HTMLButtonElement | null = null;
+  private readonly overflow: ToolbarOverflow | null;
   private activeId: string;
   private compact: boolean;
 
@@ -39,6 +43,7 @@ export class Toolbar {
     tools: readonly ToolOption[],
     activeId: string,
     compact: boolean,
+    overflow: ToolbarOverflow | null,
     onSelect: (tool: ToolOption) => void,
   ) {
     this.i18n = i18n;
@@ -46,13 +51,10 @@ export class Toolbar {
     this.onSelect = onSelect;
     this.activeId = activeId;
     this.compact = compact;
+    this.overflow = overflow;
 
-    this.root = el('div', 'toolbar-stack');
-    // Vysunutá řada je **nad** lištou, ne pod ní: lišta stojí u dolní hrany
-    // a pod ní už je jen okraj displeje.
-    this.drawer = el('div', 'toolbar toolbar--drawer is-hidden');
-    this.bar = el('div', 'toolbar');
-    this.root.append(this.drawer, this.bar);
+    this.root = el('div', 'toolbar');
+    this.bar = this.root;
     parent.appendChild(this.root);
 
     this.build();
@@ -77,42 +79,25 @@ export class Toolbar {
     for (const [toolId, node] of this.singles) {
       node.classList.toggle('is-active', toolId === this.activeId);
     }
-    // Když má hráč v ruce nástroj ze schované části, musí to být poznat
-    // i po zavření řady — jinak neví, čím kliká.
-    this.moreButton?.classList.toggle(
-      'is-active',
-      this.compact && !this.tools.some((tool) => tool.id === this.activeId && this.inBar(tool)),
-    );
   }
 
   private inBar(tool: ToolOption): boolean {
-    return !this.compact || COMPACT_GROUPS.includes(tool.groupKey);
+    return COMPACT_GROUPS.includes(tool.groupKey);
   }
 
   private build(): void {
     this.bar.replaceChildren();
-    this.drawer.replaceChildren();
-    this.drawer.classList.add('is-hidden');
+    this.overflow?.host.replaceChildren();
     this.menus.length = 0;
     this.singles.clear();
-    this.moreButton = null;
 
     for (const group of groupTools(this.tools)) {
       const first = group.tools[0];
       if (!first) continue;
-      this.buildGroup(group, this.inBar(first) ? this.bar : this.drawer);
-    }
-
-    if (this.compact && this.drawer.childElementCount > 0) {
-      const label = this.i18n.t('ui.toolbar.more');
-      const more = button('toolbar__button', () => {
-        this.drawer.classList.toggle('is-hidden');
-      });
-      more.appendChild(iconSvg('more'));
-      more.title = label;
-      more.setAttribute('aria-label', label);
-      this.moreButton = more;
-      this.bar.appendChild(more);
+      // Bez místa, kam schované pověsit, zůstane v liště všechno. Radši
+      // zalomená lišta než nástroje, ke kterým nevede tlačítko.
+      const hidden = this.compact && !this.inBar(first) && this.overflow !== null;
+      this.buildGroup(group, hidden ? (this.overflow?.host ?? this.bar) : this.bar);
     }
 
     this.reflect();
@@ -156,7 +141,7 @@ export class Toolbar {
    * seznam, který mu na telefonu zabírá půlku obrazovky.
    */
   private pick(tool: ToolOption): void {
-    this.drawer.classList.add('is-hidden');
+    this.overflow?.close();
     this.onSelect(tool);
   }
 

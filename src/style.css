@@ -70,7 +70,10 @@ body {
 
 /* Nástroje vlevo, ovládání vpravo — mezi nimi je vidět mapa. */
 .hud__tools,
+.hud__tools-row,
+.hud__extras,
 .hud__controls,
+.hud__drawer-group,
 .hud__row {
   display: flex;
   flex-wrap: wrap;
@@ -117,6 +120,7 @@ body {
 .popover__panel,
 .toolbar,
 .hud__row > .toolbar__button,
+.hud__extras > .toolbar__button,
 .segmented {
   pointer-events: auto;
   padding: 6px 10px;
@@ -593,25 +597,15 @@ body {
 }
 
 /* Vysunutá řada. Odsazená od stálé, ať je poznat, že je to něco navíc. */
-.toolbar--drawer,
 .hud__row--drawer {
-  margin-bottom: 2px;
-}
-
-.toolbar-stack {
-  display: flex;
   flex-direction: column;
-  gap: 4px;
-  align-items: flex-start;
-}
-
-/*
- * Vysunutá řada ovládání potřebuje vlastní podklad: tlačítka v ní mají každé
- * to svoje, ale mezi nimi by prosvítala mapa a řada by se rozpadla na hromádku
- * ikon bez souvislosti.
- */
-.hud__row--drawer {
+  align-items: flex-end;
+  margin-bottom: 2px;
   padding: 4px;
+  /*
+   * Vlastní podklad: tlačítka v ní mají každé to svoje, ale mezi nimi by
+   * prosvítala mapa a řada by se rozpadla na hromádku ikon bez souvislosti.
+   */
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   background: var(--panel-bg);
@@ -619,7 +613,17 @@ body {
   pointer-events: auto;
 }
 
-.hud__row--drawer > .toolbar__button {
+/* Nástroje a ovládání ve vysunuté řadě zvlášť, ať se nepromíchají. */
+.hud__drawer-group {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.hud__drawer-group:empty {
+  display: none;
+}
+
+.hud__row--drawer .toolbar__button {
   border: 1px solid transparent;
   background: none;
 }
@@ -634,10 +638,83 @@ body {
  * Rozsvícená a otevřená se vynechává: ty mají barvu vlastní a je důležitější.
  */
 .hud--compact .hud__top-left > .popover > .popover__trigger:not(.is-active):not(.is-open),
+.hud--compact .hud__extras > .popover > .popover__trigger:not(.is-active):not(.is-open),
 .hud--compact .hud__row:not(.hud__row--drawer) > .popover > .popover__trigger:not(.is-active):not(.is-open) {
   border-color: var(--panel-border);
   background: var(--panel-bg);
   backdrop-filter: blur(2px);
+}
+
+/*
+ * Na telefonu se tlačítka o kousek zúží.
+ *
+ * Autor chtěl síť, uložení a trojtečku **v jedné řadě s paletou**. Osm tlačítek
+ * po 46 pixelech je i s mezerami 378 pixelů — víc, než má nejužší běžný telefon
+ * (360) k dispozici, takže by se řada zalomila, tedy přesně to, čemu se mělo
+ * předejít. Se čtyřiceti to vyjde na 328. Na výšku 44 zůstává, takže je to
+ * pořád terč, na který se dá trefit prstem.
+ */
+.hud--compact .toolbar__button,
+.hud--compact .popover__trigger {
+  min-width: 40px;
+  padding: 0 3px;
+}
+
+.hud--compact .toolbar__button .icon--image,
+.hud--compact .popover__trigger .icon--image,
+.hud--compact .segmented__button--icon .icon--image {
+  width: 32px;
+  height: 32px;
+}
+
+/*
+ * Mezery se na telefonu smrsknou na dva pixely. Osm tlačítek po 42 pixelech
+ * plus sedm šestipixelových mezer je 378 — o devatenáct víc, než kolik má
+ * telefon na šířku. Se dvěma to vyjde na 350 a řada se nezalomí.
+ */
+.hud--compact .toolbar {
+  gap: 0;
+  /* Vodorovné odsazení panelu jde taky pryč — na 360pixelovém displeji
+     rozhoduje posledních pár pixelů. */
+  padding: 4px 1px;
+}
+
+.hud--compact .hud__tools-row,
+.hud--compact .hud__extras {
+  gap: 2px;
+}
+
+/*
+ * Statistiky **jsou** tím tlačítkem. Ikonka grafu vedle nich zmizela na přání
+ * autora: kasa s bilancí je dost velký terč a ušetří to celé jedno tlačítko.
+ */
+.popover--stats .popover__trigger {
+  height: auto;
+  padding: 6px 10px;
+}
+
+.popover--stats .stats {
+  padding: 0;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+}
+
+/*
+ * Ikony běžících pohrom jsou na telefonu velké jako ostatní tlačítka. Vyžádal
+ * si to autor — o dvaatřicetipixelový terč vedle čtyřiačtyřicetipixelových se
+ * prstem těžko trefuje a v řadě to skáče.
+ */
+.hud--compact .hud__disaster {
+  width: 40px;
+  height: 44px;
+  border-radius: 5px;
+}
+
+.hud--compact .hud__disaster svg,
+.hud--compact .hud__disaster img {
+  width: 30px;
+  height: 30px;
 }
 
 /*

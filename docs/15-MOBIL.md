@@ -42,21 +42,70 @@ Zadání autora, položku po položce:
 | část | zůstává | schová se |
 |---|---|---|
 | statistiky | kasa, měsíční bilance | obyvatel, práce, spokojenost, pod proudem, proud, datum |
-| rychlost | pauza, normální běh | 2×, 4×, 8× |
+| rychlost | jedno tlačítko pauza/běh | 2×, 4×, 8× |
 | nástroje | pacička, silnice, terén, zóny, buldozer | služby, energie, voda, odpad, kultura, doprava |
-| ovládání | povrch/podzemí, průhlednost, stromy, uložení | vrstvy, katastrofy, daně, financování, rozpočet, půjčky, MHD, nápověda, jazyk |
+| ovládání | pohled, průhlednost, stromy, lupa, síť, uložení | vrstvy, katastrofy, daně, financování, rozpočet, půjčky, MHD, nápověda, jazyk |
 
 Schované se nezruší, jen se přesune. Statistiky a rychlost jdou pod roletku
 (otevře se **dolů**, nad horní lištou už je jen okraj displeje), nástroje
 a ovládání do **vysunuté řady** nad tou stálou.
 
-Vysunutá řada je prostý přepínač, ne roletka: uvnitř jsou další roletky
-a nabídka v nabídce by se zavírala navzájem. Jediná výjimka — **výběr nástroje
-řadu zavře**. Kdo si vybral elektrárnu, chce vidět mapu a postavit ji.
-
 Pořadí statistik zůstalo původní, i když kasa a bilance v něm nesousedí. Na
 počítači lišta vypadá dobře tak, jak je, a přeskládat ji kvůli telefonu by
 znamenalo spravit něco, co není rozbité.
+
+### Dvě řady, ne tři
+
+Autor si po prvním kole vyžádal, aby **síť, uložení a trojtečka stály v jedné
+řadě s pacičkou a silnicí**, ne v řadě nad nimi. Spodek lišty je proto:
+
+```
+[lupa −][lupa +] [pohled] [průhlednost] [stromy]
+[pacička silnice terén zóny buldozer] [síť] [uložení] [⋯]
+```
+
+Řadu s paletou skládá HUD (`hud__tools-row`): vlevo si do ní paleta pověsí svou
+lištu, vpravo HUD dopíše to, co k ní patří.
+
+### Jedna trojtečka, ne dvě
+
+Vysunutá řada je **společná**: jsou v ní schované nástroje i schované ovládání
+a otevírá je jedno tlačítko. Dvě trojtečky vedle sebe, každá s jiným obsahem,
+by hráč neměl jak rozeznat.
+
+Vlastní ji HUD; paleta o ní ví jen tolik, kam si své nabídky pověsit a jak ji po
+výběru zavřít (`ToolbarOverflow`). Je to prostý přepínač, ne roletka: uvnitř
+jsou další roletky a nabídka v nabídce by se zavírala navzájem. **Výběr nástroje
+řadu zavře** — kdo si vybral elektrárnu, chce vidět mapu a postavit ji.
+
+### Co se sloučilo do jednoho tlačítka
+
+- **Povrch a podzemí.** Jeden přepínač místo dvojice. Znamená vždycky „pohled
+  pod zem" a rozsvícený je, když se hráč pod zemí zrovna dívá. Na počítači
+  zůstávají dvě — autor řekl, že PC verze je v pohodě.
+- **Pauza a běh.** Běží–neběží je jeden stav a patří mu jeden přepínač. Na
+  tlačítku je **to, co se stane po stisku**, jako u každého přehrávače.
+  Odpauzování se vrací na tu rychlost, na které čas běžel: kdo si pustil osmkrát
+  a dal pauzu, chce po odpauzování zase osmkrát.
+- **Statistiky.** Ikonka grafu zmizela úplně — tlačítkem je rovnou kasa
+  s bilancí. Je to dost velký terč a ušetří to celé jedno tlačítko v liště, kde
+  se počítá každé.
+
+Zrychlení čeká pod **trojtečkou vedle** pauzy. Dokud běží pauza nebo normální
+rychlost, je na tlačítku trojtečka; jakmile si hráč pustí něco rychlejšího,
+vezme si tlačítko jeho ikonu a rozsvítí se — jinak by po zavření nebylo poznat,
+že čas letí.
+
+Ikony běžících pohrom u hodin jsou na telefonu velké jako ostatní tlačítka.
+O menší terč vedle větších se prstem těžko trefuje a v řadě to skáče.
+
+### Proč jsou tlačítka na telefonu užší
+
+Čtyřicet pixelů místo šestačtyřiceti, mezery dva místo šesti. Osm tlačítek
+v řadě s paletou by po šestačtyřiceti zabralo 378 pixelů — víc, než kolik má
+nejužší běžný telefon (360) k dispozici — a řada by se zalomila, tedy přesně to,
+čemu se mělo předejít. Se čtyřiceti to vyjde na 328. Na výšku zůstává 44, takže
+je to pořád terč, na který se dá trefit prstem.
 
 ## Lupa
 
@@ -127,6 +176,6 @@ Pacička je teď druhá výjimka vedle buldozeru.
 
 ## Přibylo později: čtvercová síť
 
-Autor si ji vyžádal **„na mobilu i na pc"**, takže stojí ve stálé řadě vedle
-průhlednosti a stromů — v úsporné liště se neschovává. Popis je
+Autor si ji vyžádal **„na mobilu i na pc"**, takže se neschovává: na počítači
+stojí vedle průhlednosti a stromů, na telefonu v řadě s paletou. Popis je
 v `docs/14-POHLEDY.md`.

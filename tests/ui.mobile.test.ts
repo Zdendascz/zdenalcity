@@ -17,10 +17,11 @@ import type { ReadonlyWorldView } from '@/sim/simHost';
 import { createWorld } from '@/sim/world';
 import { createLayerOptions, createTools, createViewOptions, serviceClassesOf } from '@/render/app';
 import { Hud } from '@/ui/hud';
-import type { HudCallbacks, HudState } from '@/ui/hud';
+import type { HudCallbacks, HudState, ToolbarOverflow } from '@/ui/hud';
 import { I18n } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
 import { uiIconShape } from '@/ui/icons';
+import type { ToolOption } from '@/ui/tools';
 import { COMPACT_GROUPS, groupTools, Toolbar } from '@/ui/toolbar';
 
 async function vanilla(): Promise<ContentRegistry> {
@@ -35,12 +36,16 @@ async function i18nFor(content: ContentRegistry, language = 'cs'): Promise<I18n>
   return new I18n(out as LocaleTables, language);
 }
 
-/** Callbacky, které si jen zapamatují, že je někdo zavolal. */
-function callbacks(): HudCallbacks & { zoomed: number[] } {
+/** Callbacky, které si jen zapamatují, co jim kdo poslal. */
+function callbacks(): HudCallbacks & { zoomed: number[]; speeds: number[]; views: string[] } {
   const zoomed: number[] = [];
+  const speeds: number[] = [];
+  const views: string[] = [];
   return {
     zoomed,
-    onSpeed: () => {},
+    speeds,
+    views,
+    onSpeed: (index) => void speeds.push(index),
     onTaxChange: () => {},
     onQuickSave: () => {},
     onScreenshot: () => {},
@@ -48,7 +53,7 @@ function callbacks(): HudCallbacks & { zoomed: number[] } {
     onDownload: () => {},
     onOpenFile: () => {},
     onToggleLayer: () => {},
-    onSetView: () => {},
+    onSetView: (id) => void views.push(id),
     onToggleBudget: () => {},
     onToggleFinance: () => {},
     onToggleTransit: () => {},
@@ -84,12 +89,19 @@ const STATE: HudState = {
   message: '',
 };
 
-async function hudFor(compact: boolean): Promise<{ root: HTMLElement; hud: Hud }> {
+interface Built {
+  root: HTMLElement;
+  hud: Hud;
+  calls: ReturnType<typeof callbacks>;
+}
+
+async function hudFor(compact: boolean): Promise<Built> {
   const content = await vanilla();
   const i18n = await i18nFor(content);
   const world = createWorld(1, content.getBalance().economy) as unknown as ReadonlyWorldView;
   const root = document.createElement('div');
   root.className = 'hud';
+  const calls = callbacks();
   const hud = new Hud(
     root,
     i18n,
@@ -100,25 +112,39 @@ async function hudFor(compact: boolean): Promise<{ root: HTMLElement; hud: Hud }
     serviceClassesOf(content),
     ['fire'],
     compact,
-    callbacks(),
+    calls,
   );
   hud.update(STATE);
-  return { root, hud };
+  return { root, hud, calls };
 }
 
 /** Kolik tlačítek a roletek stojí v dané části lišty. */
 function widgets(root: HTMLElement, selector: string): number {
-  const row = root.querySelector(selector);
-  return row === null ? 0 : row.childElementCount;
+  return root.querySelector(selector)?.childElementCount ?? 0;
+}
+
+/** Řada ovládání, která je vidět vždycky. */
+const ROW = '.hud__row:not(.hud__row--drawer)';
+/** To, co autor chtěl mít v jedné řadě s paletou — síť, uložení, trojtečka. */
+const EXTRAS = '.hud__extras';
+/** Schované nástroje a schované ovládání, každé ve své skupině. */
+const DRAWER_TOOLS = '.hud__row--drawer > .hud__drawer-group:first-child';
+const DRAWER_CONTROLS = '.hud__row--drawer > .hud__drawer-group:last-child';
+
+function label(root: HTMLElement, text: string): HTMLButtonElement | null {
+  return root.querySelector(`[aria-label="${text}"]`);
 }
 
 describe('úsporná lišta', () => {
-  it('na telefonu zůstane v liště kasa a bilance, zbytek pod ikonou', async () => {
+  it('na telefonu je tlačítkem rovnou kasa s bilancí, ikonka grafu žádná', async () => {
     const { root } = await hudFor(true);
-    const labels = [...root.querySelectorAll('.stats .stat__label')].map((node) => node.textContent);
+    const trigger = root.querySelector('.popover--stats .popover__trigger');
+    const labels = [...(trigger?.querySelectorAll('.stat__label') ?? [])].map((n) => n.textContent);
 
     expect(labels).toEqual(['Kasa', 'Měsíční bilance']);
-    // Ostatní se neztratily — jen se přestěhovaly.
+    // Ikona v tlačítku nezůstala — statistiky ji nahradily celou.
+    expect(trigger?.querySelector('.popover__icon')).toBeNull();
+    // Ostatní se neztratily, jen se přestěhovaly.
     expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(6);
   });
 
@@ -140,74 +166,167 @@ describe('úsporná lišta', () => {
 
     expect(root.querySelectorAll('.stats .stat')).toHaveLength(8);
     expect(root.querySelector('.panel--stats')).toBeNull();
-    // Vysunutá řada existuje, ale je prázdná — v plné verzi není co schovávat.
-    expect(widgets(root, '.hud__row--drawer')).toBe(0);
-    expect(root.querySelector('.hud')).toBeNull();
+    expect(widgets(root, DRAWER_TOOLS)).toBe(0);
+    expect(widgets(root, DRAWER_CONTROLS)).toBe(0);
+    expect(widgets(root, EXTRAS)).toBe(0);
   });
 
-  it('na telefonu zůstanou v liště jen pohledy, průhlednost, stromy, síť, uložení a lupa', async () => {
+  it('na telefonu zůstane nahoře lupa, pohled, průhlednost a stromy', async () => {
+    const { root } = await hudFor(true);
+    expect(widgets(root, ROW)).toBe(4);
+  });
+
+  it('síť, uložení a trojtečka stojí v řadě s paletou, ne nad ní', async () => {
+    // Doslovné zadání autora. Nahoře by z nich byla druhá řada tlačítek.
     const { root } = await hudFor(true);
 
-    // Lupa, pohledy, průhlednost, stromy, síť, uložení a přepínač vysunuté řady.
-    expect(widgets(root, '.hud__row:not(.hud__row--drawer)')).toBe(7);
-    // Vrstvy, katastrofy, daně, financování, rozpočet, půjčky, MHD, nápověda, jazyk.
-    expect(widgets(root, '.hud__row--drawer')).toBe(9);
+    expect(widgets(root, EXTRAS)).toBe(3);
+    expect(root.querySelector(`${EXTRAS} [aria-label="Čtvercová síť"]`)).not.toBeNull();
+    expect(root.querySelector(`${EXTRAS} [aria-label="Uložení"]`)).not.toBeNull();
+    expect(root.querySelector(`${EXTRAS} [aria-label="Další"]`)).not.toBeNull();
   });
 
-  it('čtvercová síť je v liště na obojím — na telefonu i na počítači', async () => {
-    // Autor si vyžádal doslova „na mobilu i na pc". Na telefonu to znamená
-    // stálou řadu, ne vysunutou.
-    const compact = await hudFor(true);
-    const full = await hudFor(false);
-    for (const { root } of [compact, full]) {
-      expect(
-        root.querySelector('.hud__row:not(.hud__row--drawer) [aria-label="Čtvercová síť"]'),
-      ).not.toBeNull();
-    }
+  it('trojtečka je jedna a otevírá nástroje i ovládání naráz', async () => {
+    // Dvě trojtečky vedle sebe, každá s jiným obsahem, by hráč neměl jak
+    // rozeznat — proto je vysunutá řada společná.
+    const { root } = await hudFor(true);
+    const drawer = root.querySelector('.hud__row--drawer');
+    expect(root.querySelectorAll('[aria-label="Další"]')).toHaveLength(1);
+
+    expect(drawer?.classList.contains('is-hidden')).toBe(true);
+    label(root, 'Další')?.click();
+    expect(drawer?.classList.contains('is-hidden')).toBe(false);
+    label(root, 'Další')?.click();
+    expect(drawer?.classList.contains('is-hidden')).toBe(true);
+  });
+
+  it('povrch a podzemí je na telefonu jedno tlačítko', async () => {
+    const { root, hud, calls } = await hudFor(true);
+    expect(label(root, 'Pohled na povrch')).toBeNull();
+
+    const toggle = label(root, 'Pohled pod zem');
+    toggle?.click();
+    expect(calls.views).toEqual(['underground']);
+
+    hud.update({ ...STATE, view: 'underground' });
+    expect(toggle?.classList.contains('is-active')).toBe(true);
+
+    // A zpátky: totéž tlačítko, opačný směr.
+    toggle?.click();
+    expect(calls.views).toEqual(['underground', 'surface']);
+  });
+
+  it('na počítači zůstávají povrch a podzemí dvě tlačítka', async () => {
+    // Autor řekl, že PC verze je v pohodě — tak se jí nesahá.
+    const { root } = await hudFor(false);
+    expect(label(root, 'Pohled na povrch')).not.toBeNull();
+    expect(label(root, 'Pohled pod zem')).not.toBeNull();
   });
 
   it('lupa je jen na telefonu — na počítači je kolečko', async () => {
-    expect((await hudFor(true)).root.querySelector('[aria-label="Přiblížit"]')).not.toBeNull();
-    expect((await hudFor(false)).root.querySelector('[aria-label="Přiblížit"]')).toBeNull();
+    expect(label((await hudFor(true)).root, 'Přiblížit')).not.toBeNull();
+    expect(label((await hudFor(false)).root, 'Přiblížit')).toBeNull();
   });
 
   it('tlačítko lupy mění měřítko oběma směry', async () => {
-    const content = await vanilla();
-    const i18n = await i18nFor(content);
-    const world = createWorld(1, content.getBalance().economy) as unknown as ReadonlyWorldView;
-    const root = document.createElement('div');
-    const calls = callbacks();
-    new Hud(root, i18n, world, SPEEDS, createViewOptions(), createLayerOptions(content), [], [], true, calls);
+    const { root, calls } = await hudFor(true);
+    label(root, 'Oddálit')?.click();
+    label(root, 'Přiblížit')?.click();
 
-    for (const label of ['Oddálit', 'Přiblížit']) {
-      root.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)?.click();
-    }
     expect(calls.zoomed).toHaveLength(2);
     // Oddálení je převrácené přiblížení: dvě klepnutí vrátí měřítko, kde bylo.
     expect((calls.zoomed[0] ?? 0) * (calls.zoomed[1] ?? 0)).toBeCloseTo(1);
   });
 
-  it('rychlost nechá v liště pauzu a normální běh, zrychlení dá do roletky', async () => {
-    const { root } = await hudFor(true);
-    const speed = root.querySelector('.hud__top-left .segmented');
+  it('čtvercová síť je v liště na obojím — na telefonu i na počítači', async () => {
+    // Autor si vyžádal doslova „na mobilu i na pc".
+    for (const compact of [true, false]) {
+      const { root } = await hudFor(compact);
+      const where = compact ? EXTRAS : ROW;
+      expect(
+        root.querySelector(`${where} [aria-label="Čtvercová síť"]`),
+        String(compact),
+      ).not.toBeNull();
+    }
+  });
+});
 
-    expect(speed?.childElementCount).toBe(2);
-    // Zbylé tři stupně (2×, 4×, 8×) čekají v nabídce vedle.
-    expect(root.querySelectorAll('.hud__top-left .menu .menu__item')).toHaveLength(SPEEDS.length - 2);
+describe('rychlost na telefonu', () => {
+  /** Sjednocené tlačítko pauzy a běhu. */
+  function playPause(root: HTMLElement): HTMLButtonElement | null {
+    return root.querySelector('.hud__top-left .segmented__button');
+  }
+
+  it('pauza a běh jsou jedno tlačítko', async () => {
+    const { root, hud, calls } = await hudFor(true);
+    const groups = root.querySelectorAll('.hud__top-left .segmented');
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.childElementCount).toBe(1);
+
+    // Čas běží → tlačítko nabízí pauzu.
+    const node = playPause(root);
+    expect(node?.getAttribute('aria-label')).toBe('Pauza');
+    node?.click();
+    expect(calls.speeds).toEqual([0]);
+
+    // V pauze nabízí návrat k běhu.
+    hud.update({ ...STATE, speedIndex: 0 });
+    expect(node?.getAttribute('aria-label')).toBe('1×');
   });
 
-  it('přepnutí režimu za běhu přestaví lištu, ne jen schová', async () => {
+  it('odpauzování se vrátí na rychlost, na které čas běžel', async () => {
+    const { root, hud, calls } = await hudFor(true);
+
+    hud.update({ ...STATE, speedIndex: 4 }); // 8×
+    hud.update({ ...STATE, speedIndex: 0 });
+    playPause(root)?.click();
+
+    expect(calls.speeds).toEqual([4]);
+  });
+
+  it('zrychlení čeká pod trojtečkou vedle', async () => {
+    const { root, hud } = await hudFor(true);
+
+    expect(root.querySelectorAll('.hud__top-left .menu .menu__item')).toHaveLength(
+      SPEEDS.length - 2,
+    );
+
+    // Dokud běží pauza nebo 1×, je na tlačítku trojtečka a nesvítí. Popoverů
+    // je nahoře víc (statistiky jsou taky jeden), tak se hledá ten s nabídkou.
+    const trigger = [...root.querySelectorAll('.hud__top-left .popover')]
+      .find((node) => node.querySelector('.menu'))
+      ?.querySelector('.popover__trigger');
+    expect(trigger?.classList.contains('is-active')).toBe(false);
+
+    // Jakmile si hráč pustí něco rychlejšího, tlačítko se rozsvítí — jinak by
+    // po zavření nebylo poznat, že čas letí.
+    hud.update({ ...STATE, speedIndex: 4 });
+    expect(trigger?.classList.contains('is-active')).toBe(true);
+  });
+
+  it('na počítači zůstává všech pět stupňů v liště', async () => {
+    const { root } = await hudFor(false);
+    expect(root.querySelectorAll('.hud__top-left .segmented__button')).toHaveLength(SPEEDS.length);
+    expect(root.querySelector('.hud__top-left .menu')).toBeNull();
+  });
+});
+
+describe('přepínání režimu', () => {
+  it('přestaví lištu, ne jen schová', async () => {
     // Otočení telefonu nebo zúžení okna. Kdyby se jen měnilo CSS, zůstala by
     // v liště tlačítka, která tam nepatří — přesouvá se strom, ne vzhled.
     const { root, hud } = await hudFor(false);
-    expect(widgets(root, '.hud__row--drawer')).toBe(0);
+    expect(widgets(root, DRAWER_CONTROLS)).toBe(0);
 
     hud.setCompact(true);
-    expect(widgets(root, '.hud__row--drawer')).toBe(9);
+    // Vrstvy, katastrofy, daně, financování, rozpočet, půjčky, MHD, nápověda, jazyk.
+    expect(widgets(root, DRAWER_CONTROLS)).toBe(9);
     expect(root.classList.contains('hud--compact')).toBe(true);
 
     hud.setCompact(false);
-    expect(widgets(root, '.hud__row--drawer')).toBe(0);
+    expect(widgets(root, DRAWER_CONTROLS)).toBe(0);
+    expect(widgets(root, EXTRAS)).toBe(0);
     expect(root.classList.contains('hud--compact')).toBe(false);
   });
 
@@ -220,6 +339,22 @@ describe('úsporná lišta', () => {
 });
 
 describe('úsporná paleta nástrojů', () => {
+  /** Vysunutá řada tak, jak ji paletě podává HUD. */
+  function overflow(): { slot: ToolbarOverflow; host: HTMLElement; closed: () => number } {
+    const host = document.createElement('div');
+    let closed = 0;
+    return {
+      slot: {
+        host,
+        close: () => {
+          closed += 1;
+        },
+      },
+      host,
+      closed: () => closed,
+    };
+  }
+
   it('v liště zůstane pacička, silnice, terén, zóny a buldozer', async () => {
     const tools = createTools(await vanilla());
     const groups = groupTools(tools).map((group) => group.key);
@@ -230,59 +365,68 @@ describe('úsporná paleta nástrojů', () => {
     expect(COMPACT_GROUPS).toHaveLength(5);
   });
 
-  it('schované nabídky jdou vysunout a nic se cestou neztratí', async () => {
+  it('schované nabídky jdou do řady, kterou drží HUD, a nic se cestou neztratí', async () => {
     const content = await vanilla();
-    const i18n = await i18nFor(content);
     const tools = createTools(content);
     const parent = document.createElement('div');
-    new Toolbar(parent, i18n, tools, 'pan', true, () => {});
+    const over = overflow();
+    new Toolbar(parent, await i18nFor(content), tools, 'pan', true, over.slot, () => {});
 
-    const bar = parent.querySelector('.toolbar:not(.toolbar--drawer)');
-    const drawer = parent.querySelector('.toolbar--drawer');
-    const groups = groupTools(tools).length;
-
-    // Pět nabídek v liště plus přepínač; zbytek ve vysunuté řadě.
-    expect(bar?.childElementCount).toBe(COMPACT_GROUPS.length + 1);
-    expect(drawer?.childElementCount).toBe(groups - COMPACT_GROUPS.length);
-    expect(drawer?.classList.contains('is-hidden')).toBe(true);
+    // Paleta si **žádnou trojtečku nestaví** — je jedna a patří HUDu.
+    expect(parent.querySelector('.toolbar')?.childElementCount).toBe(COMPACT_GROUPS.length);
+    expect(over.host.childElementCount).toBe(groupTools(tools).length - COMPACT_GROUPS.length);
   });
 
   it('výběr nástroje ze schované řady ji zavře', async () => {
     // Kdo si vybral elektrárnu, chce vidět mapu a postavit ji — ne odklikávat
     // seznam, který mu na telefonu zabírá půlku obrazovky.
     const content = await vanilla();
-    const i18n = await i18nFor(content);
     const parent = document.createElement('div');
-    const picked: string[] = [];
-    new Toolbar(parent, i18n, createTools(content), 'pan', true, (tool) => picked.push(tool.id));
+    const picked: ToolOption[] = [];
+    const over = overflow();
+    new Toolbar(
+      parent,
+      await i18nFor(content),
+      createTools(content),
+      'pan',
+      true,
+      over.slot,
+      (tool) => picked.push(tool),
+    );
 
-    const drawer = parent.querySelector('.toolbar--drawer');
-    drawer?.classList.remove('is-hidden');
-    parent.querySelector<HTMLButtonElement>('.toolbar--drawer .menu__item')?.click();
+    over.host.querySelector<HTMLButtonElement>('.menu__item')?.click();
 
     expect(picked).toHaveLength(1);
-    expect(drawer?.classList.contains('is-hidden')).toBe(true);
+    expect(over.closed()).toBe(1);
   });
 
-  it('nástroj ze schované řady je poznat i po jejím zavření', async () => {
+  it('bez místa, kam schované pověsit, zůstane v liště všechno', async () => {
+    // Radši zalomená lišta než nástroje, ke kterým nevede tlačítko.
     const content = await vanilla();
-    const i18n = await i18nFor(content);
     const parent = document.createElement('div');
-    const toolbar = new Toolbar(parent, i18n, createTools(content), 'pan', true, () => {});
-    const more = parent.querySelector('.toolbar > .toolbar__button:last-child');
+    new Toolbar(parent, await i18nFor(content), createTools(content), 'pan', true, null, () => {});
 
-    expect(more?.classList.contains('is-active')).toBe(false);
-    toolbar.setActive('pipe');
-    expect(more?.classList.contains('is-active')).toBe(true);
+    expect(parent.querySelector('.toolbar')?.childElementCount).toBe(
+      groupTools(createTools(content)).length,
+    );
   });
 
-  it('v plné verzi žádná schovaná řada není', async () => {
+  it('v plné verzi je v liště všechno', async () => {
     const content = await vanilla();
     const parent = document.createElement('div');
-    new Toolbar(parent, await i18nFor(content), createTools(content), 'pan', false, () => {});
+    const over = overflow();
+    new Toolbar(
+      parent,
+      await i18nFor(content),
+      createTools(content),
+      'pan',
+      false,
+      over.slot,
+      () => {},
+    );
 
-    expect(parent.querySelector('.toolbar--drawer')?.childElementCount).toBe(0);
-    expect(parent.querySelectorAll('.toolbar__button, .popover')).toHaveLength(
+    expect(over.host.childElementCount).toBe(0);
+    expect(parent.querySelectorAll('.toolbar > *')).toHaveLength(
       groupTools(createTools(content)).length,
     );
   });
@@ -292,7 +436,7 @@ describe('ikony a texty mobilní lišty', () => {
   it('každá nová ikona jde nakreslit', async () => {
     const content = await vanilla();
     const icons = content.getIcons();
-    for (const name of ['zoom-in', 'zoom-out', 'more', 'reload', 'speed-8']) {
+    for (const name of ['zoom-in', 'zoom-out', 'more', 'reload', 'speed-8', 'view-grid']) {
       expect(icons[name] !== undefined || uiIconShape(name) !== undefined, name).toBe(true);
     }
   });
@@ -304,6 +448,7 @@ describe('ikony a texty mobilní lišty', () => {
       'ui.hud.moreStats',
       'ui.zoom.in',
       'ui.zoom.out',
+      'ui.view.grid',
       'ui.save.update',
       'ui.save.updateHint',
       'ui.save.updating',

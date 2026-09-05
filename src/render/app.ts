@@ -1685,7 +1685,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     else if (tool.action.kind !== 'bulldoze' && tool.action.kind !== 'pan') setView('surface');
   }
 
-  const toolbar = new Toolbar(hud.toolsSlot, i18n, tools, activeTool.id, isCompact(), selectTool);
+  // Vysunutou řadu vlastní HUD: je společná pro schované nástroje i schované
+  // ovládání a otevírá je jedna trojtečka.
+  const toolbar = new Toolbar(
+    hud.toolsSlot,
+    i18n,
+    tools,
+    activeTool.id,
+    isCompact(),
+    hud.overflow,
+    selectTool,
+  );
   watchCompact((compact) => {
     hud.setCompact(compact);
     toolbar.setCompact(compact);
