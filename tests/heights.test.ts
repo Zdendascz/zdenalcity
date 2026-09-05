@@ -4,6 +4,7 @@ import {
   cornerIndex,
   countViolations,
   createCornerHeights,
+  groundHeightAt,
   isFlatTile,
   isTwistedTile,
   MAX_HEIGHT,
@@ -248,5 +249,46 @@ describe('podezdívka nikdy neleze nad podlahu', () => {
 
     expect(highest(faces.left)).toBeGreaterThanOrEqual(gridToScreen(0, 2, 3).y - 0.01);
     expect(highest(faces.right)).toBeGreaterThanOrEqual(gridToScreen(2, 0, 3).y - 0.01);
+  });
+});
+
+/**
+ * Kam se sází předmět, který stojí na zemi — strom, hromada suti, scéna
+ * katastrofy.
+ *
+ * Všechny tři to dřív dělaly po svém a všechny tři špatně: suť brala
+ * **zaokrouhlený průměr** rohů dlaždice, scéna katastrofy **nejvyšší** roh.
+ * Na svahu to znamenalo až celou úroveň vedle a autor to hlásil slovy
+ * „zbořeniny v kopcích jsou úplně mimo". Správně je výška terénu přesně v tom
+ * bodě, kde předmět stojí.
+ */
+describe('výška terénu pod předmětem', () => {
+  /** Roh dlaždice (0,0) je nula, ostatní tři čtyři — svah k severozápadu. */
+  function slope(): Uint8Array {
+    const heights = new Uint8Array(CORNER_CELLS);
+    heights.fill(4);
+    heights[0] = 0;
+    return heights;
+  }
+
+  it('uprostřed dlaždice leží mezi nejnižším a nejvyšším rohem', () => {
+    const at = groundHeightAt(slope(), 0.5, 0.5);
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(4);
+    // Bilineárně přesně: (0 + 4 + 4 + 4) / 4.
+    expect(at).toBeCloseTo(3, 5);
+  });
+
+  it('rozliší i posun uvnitř dlaždice', () => {
+    // Předmět se uvnitř dlaždice posouvá až o třetinu, takže pod ním je jiná
+    // výška než uprostřed. Zaokrouhlený průměr rohů tenhle rozdíl neviděl.
+    const heights = slope();
+    expect(groundHeightAt(heights, 0.2, 0.2)).toBeLessThan(groundHeightAt(heights, 0.8, 0.8));
+  });
+
+  it('v rohu vrátí přesně výšku toho rohu', () => {
+    const heights = slope();
+    expect(groundHeightAt(heights, 0, 0)).toBe(0);
+    expect(groundHeightAt(heights, 1, 1)).toBe(4);
   });
 });

@@ -751,6 +751,11 @@ const DISASTER_SCENES: readonly (readonly [string, string])[] = [
   ['riot', 'riot_crowd'],
   ['gangWar', 'riot_crowd'],
   ['pileup', 'pileup_wreck'],
+  // Oheň má jeden obrázek pro dům i les: plameny vypadají stejně, ať hoří
+  // střecha nebo smrk. Do T97 měl požár na mapě jen oranžový nádech dlaždice
+  // a autor to nahlásil — je to nejčastější pohroma ze všech.
+  ['fire', 'fire_blaze'],
+  ['wildfire', 'fire_blaze'],
 ];
 
 async function loadDisasterScenes(

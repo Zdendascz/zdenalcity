@@ -394,6 +394,22 @@ se **podle id katastrofy**, takže se varianta při překreslení nemění.
 | **b** | A BOX LORRY jack-knifed across the picture with two small 1980s cars crashed into its side, scattered debris, filling the picture. |
 | **c** | TWO small 1980s cars after a head-on crash, one tipped onto its side, a third car stopped behind them, debris on the ground, filling the picture. |
 
+### `fire_blaze`
+
+Požár měl do T97 na mapě jen **oranžový nádech dlaždice**. Autor to nahlásil
+slovy „ilustrace požáru není vůbec": u nepokojů a nehody obrázek je, u ohně,
+který je ze všech pohrom nejčastější, nebyl.
+
+Jeden objekt slouží **domovnímu i lesnímu požáru**. Plameny a kouř vypadají
+stejně, ať hoří střecha nebo smrk, a dva sady obrázků by se lišily jen tím, co
+je pod nimi — a to obrázek stejně nesmí přinést, jinak by pod ním zmizela zem.
+
+| | prompt |
+|---|---|
+| **a** | TALL ORANGE FLAMES with dark smoke rising from them, about as tall as a two-storey house, burning fiercely, filling the picture. |
+| **b** | A SPREAD OF FLAMES close to the ground with thick black smoke billowing above, glowing embers, filling the picture. |
+| **c** | A COLUMN OF FIRE AND SMOKE, bright yellow at the base turning orange and then into a dark smoke plume, filling the picture. |
+
 ## Silnice
 
 **Šestnáct hotových dlaždic na typ se zahazuje.** Vygenerovaly se, změřily

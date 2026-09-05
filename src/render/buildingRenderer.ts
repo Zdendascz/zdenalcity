@@ -15,7 +15,7 @@ import {
   WALL_RIGHT_SHADE,
   FOUNDATION_COLOR,
 } from './palette';
-import { areaHeightRange, groundHeightAt, tileCorners } from '@/sim/heights';
+import { areaHeightRange, groundHeightAt } from '@/sim/heights';
 import { depthOrder } from './depth';
 import type { DepthBox } from './depth';
 import { decorDensity, decorHere, decorPick, decorShift, decorTiles } from './decor';
@@ -308,13 +308,21 @@ export class BuildingRenderer {
     sprite.anchor.set(decor.anchor[0] / decor.texture.width, decor.anchor[1] / decor.texture.height);
     sprite.scale.set(1 / decor.scale);
 
-    const corners = tileCorners(this.world.cornerHeight, x, y);
-    // Stojí na **průměrné výšce** rohů: strom roste svisle a na svahu se mění
-    // jen místo, kde se dotýká země. Proto pro něj nejsou zvláštní obrázky
-    // podle svahu — kreslily by osmkrát totéž.
-    const pad = Math.round((corners[0] + corners[1] + corners[2] + corners[3]) / 4);
+    // Strom roste svisle a na svahu se mění jen místo, kde se dotýká země —
+    // proto pro něj nejsou zvláštní obrázky podle svahu, kreslily by osmkrát
+    // totéž. O to důležitější je to místo trefit.
+    //
+    // Výška se bere **přesně pod patou předmětu**, ne jako zaokrouhlený průměr
+    // rohů dlaždice. Průměr chyboval dvakrát: zaokrouhlením na celé úrovně až
+    // o půl úrovně (osm pixelů) a tím, že předmět je uvnitř dlaždice posunutý
+    // až o třetinu, takže pod ním je jiná výška než uprostřed. Na svahu se to
+    // sečetlo a suť visela vedle své dlaždice — hlásil to autor slovy
+    // „zbořeniny v kopcích jsou úplně mimo".
     const [shiftX, shiftY] = decorShift(x, y);
-    const at = gridToScreen(x + 0.5 + shiftX, y + 0.5 + shiftY, pad);
+    const fx = x + 0.5 + shiftX;
+    const fy = y + 0.5 + shiftY;
+    const pad = groundHeightAt(this.world.cornerHeight, fx, fy);
+    const at = gridToScreen(fx, fy, pad);
     sprite.position.set(at.x, at.y);
 
     this.container.addChild(sprite);

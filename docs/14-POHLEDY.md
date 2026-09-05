@@ -370,3 +370,36 @@ Změřeno na mapě 128×128 (`node`, celý výřez, 50 běhů): sestavení geome
 v Pixi změřená není — v prohlížeči se to při plném oddálení kreslí bez zadrhnutí
 a mezní případ je jediný snímek po zapnutí, takže se strop podle měřítka
 nezaváděl.
+
+## Předměty na zemi: suť, stromy, scény katastrof
+
+Všechny tři stojí na terénu a všechny tři si výšku braly po svém — a všechny
+tři špatně. Autor to hlásil jako „zbořeniny v kopcích jsou úplně mimo".
+
+| co | bralo | chyba |
+|---|---|---|
+| suť a stromy | zaokrouhlený průměr rohů dlaždice | až půl úrovně (8 px) ze zaokrouhlení a k tomu posun uvnitř dlaždice, pod kterým je jiná výška |
+| scéna katastrofy | **nejvyšší** roh | až celá úroveň (16 px) nad zemí |
+
+Správně je jedno pravidlo pro obojí: **výška terénu přesně v tom bodě, kde
+předmět stojí**, tedy `groundHeightAt(fx, fy)`. Ta leží mezi nejnižším
+a nejvyšším rohem sama od sebe, takže se nemusí vybírat, ke kterému se
+přiklonit.
+
+Předmět se uvnitř dlaždice posouvá až o třetinu (`decorShift`), takže na to
+místo se musí ptát se stejným posunem, s jakým se pak kreslí.
+
+## Obrázek požáru
+
+Požár měl do T97 na mapě jen **oranžový nádech dlaždice**. Autor to nahlásil
+slovy „ilustrace požáru není vůbec": u nepokojů a hromadné nehody obrázek je,
+u ohně — nejčastější pohromy ze všech — nebyl.
+
+`fire_blaze`, tři varianty, jeden objekt pro **domovní i lesní požár**. Plameny
+a kouř vypadají stejně, ať hoří střecha nebo smrk, a dvě sady by se lišily jen
+tím, co je pod nimi — a to obrázek stejně přinést nesmí, jinak by pod ním
+zmizela zem.
+
+Velikost je jedna dlaždice na 0,9 (`DECOR_SHARE`), ale **dvě patra vysoký**:
+plamen jde vzhůru, ne do šíře, a nízký by nad hořící střechou nebyl vidět.
+Zadání je v `docs/08-DLAZDICE.md`, oddíl „Katastrofy na ulici".

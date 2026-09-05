@@ -1,5 +1,5 @@
 import { Container, Sprite } from 'pixi.js';
-import { tileCorners } from '@/sim/heights';
+import { groundHeightAt } from '@/sim/heights';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { TerrainDecor } from './decor';
 import { gridToScreen } from './projection';
@@ -69,10 +69,17 @@ export class DisasterScenes {
       node.anchor.set(scene.anchor[0] / scene.texture.width, scene.anchor[1] / scene.texture.height);
       node.scale.set(1 / scene.scale);
 
-      // Na nejvyšší roh dlaždice, stejně jako budova: na svahu by scéna
-      // posazená na nejnižší roh zapadla do kopce.
-      const corners = tileCorners(this.world.cornerHeight, disaster.x, disaster.y);
-      const point = gridToScreen(disaster.x + 0.5, disaster.y + 0.5, Math.max(...corners));
+      // Na zem **přesně pod středem dlaždice**, ne na nejvyšší roh.
+      //
+      // Nejvyšší roh tu byl proto, aby scéna na svahu nezapadla do kopce —
+      // jenže tím se přehoupla na druhou stranu a visela až o celou úroveň
+      // (šestnáct pixelů) nad zemí. Správně je výška terénu v tom bodě, kde
+      // scéna stojí; ta leží mezi nejnižším a nejvyšším rohem sama od sebe.
+      const point = gridToScreen(
+        disaster.x + 0.5,
+        disaster.y + 0.5,
+        groundHeightAt(this.world.cornerHeight, disaster.x + 0.5, disaster.y + 0.5),
+      );
       node.position.set(point.x, point.y);
 
       this.container.addChild(node);

@@ -729,6 +729,39 @@
       ]
     },
     {
+      "building": "fire_blaze",
+      "variant": "a",
+      "file": "fire_blaze__a.png",
+      "width": 230,
+      "height": 238,
+      "anchor": [
+        115,
+        238
+      ]
+    },
+    {
+      "building": "fire_blaze",
+      "variant": "b",
+      "file": "fire_blaze__b.png",
+      "width": 230,
+      "height": 234,
+      "anchor": [
+        115,
+        234
+      ]
+    },
+    {
+      "building": "fire_blaze",
+      "variant": "c",
+      "file": "fire_blaze__c.png",
+      "width": 230,
+      "height": 380,
+      "anchor": [
+        115,
+        380
+      ]
+    },
+    {
       "building": "vanilla:fire_station",
       "variant": "a",
       "file": "fire_station__a.png",

@@ -162,6 +162,7 @@ OBJECT_NAMES = (
     'boulders',
     'riot_crowd',
     'pileup_wreck',
+    'fire_blaze',
     'derelict_residential',
     'derelict_commercial',
     'derelict_industrial',

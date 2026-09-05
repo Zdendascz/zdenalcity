@@ -90,6 +90,9 @@ DECOR = {
     # jedna dlazdice, takze scena musi byt zhruba tak siroka.
     'riot_crowd': (1, 1, 1),
     'pileup_wreck': (1, 1, 1),
+    # Ohen: jedna dlazdice, ale dve patra vysoky. Plamen je vzhuru, ne do siry,
+    # a nizky by nad horici strechou nebyl videt.
+    'fire_blaze': (1, 1, 2),
     # Zpustla zastavba. **Jedna velikost na kategorii**, ne jedna na kazdy
     # pudorys: renderer ji posadi doprostred parcely a zmensi, kdyz je parcela
     # mensi. U ruiny nikdo nepozna, jak velky dum tam stal.
@@ -114,6 +117,8 @@ DECOR_SHARE = {
     'pileup_wreck': 0.95,
     # Hromada suti neni pres celou dlazdici: kolem ni ma byt videt rozryta zem.
     'rubble_pile': 0.8,
+    # Ohen ma prekryvat, co hori, ne prescuhovat na sousedni parcelu.
+    'fire_blaze': 0.9,
 }
 
 
