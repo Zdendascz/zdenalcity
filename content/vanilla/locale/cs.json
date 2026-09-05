@@ -603,5 +603,12 @@
   "ui.home.discord": "Discord",
   "ui.home.discordNote": "Ptej se, nadávej, posílej města.",
   "ui.authors.projects": "Další projekty",
-  "ui.version.dev": "Vývojový běh — verze se ukazuje až v hotovém buildu."
+  "ui.version.dev": "Vývojový běh — verze se ukazuje až v hotovém buildu.",
+  "ui.save.update": "Načíst novou verzi",
+  "ui.save.updateHint": "Stáhne novou verzi hry. Rozehrané město zůstane.",
+  "ui.save.updating": "Načítám novou verzi, město zůstává uložené…",
+  "ui.toolbar.more": "Další",
+  "ui.hud.moreStats": "Další čísla",
+  "ui.zoom.in": "Přiblížit",
+  "ui.zoom.out": "Oddálit"
 }

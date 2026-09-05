@@ -283,6 +283,97 @@ const GEAR: Shape = [
   ],
 ];
 
+/** Lupa se stopkou. `sign` kreslí uvnitř plus, minus, nebo nic. */
+function magnifier(sign: 1 | -1): Shape {
+  const shape: Shape[0][] = [
+    // Obruba jako mezikruží: vnější obvod tam, vnitřní zpátky.
+    ring(0.42, 0.42, 0.26, 0.34),
+    // Stopka od pravého dolního okraje ven.
+    [
+      [0.56, 0.66],
+      [0.68, 0.54],
+      [0.94, 0.8],
+      [0.82, 0.92],
+    ],
+    bar(0.26, 0.38, 0.58, 0.46),
+  ];
+  if (sign === 1) shape.push(bar(0.38, 0.26, 0.46, 0.58));
+  return shape;
+}
+
+/** Mezikruží jako jeden polygon: ven po vnějším obvodu, zpátky po vnitřním. */
+function ring(cx: number, cy: number, inner: number, outer: number, points = 16): Shape[0] {
+  const shape: [number, number][] = [];
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * Math.PI * 2;
+    shape.push([cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer]);
+  }
+  for (let i = points; i >= 0; i--) {
+    const angle = (i / points) * Math.PI * 2;
+    shape.push([cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner]);
+  }
+  return shape;
+}
+
+/** Tři tečky — „a další". Přepínač schované části lišty. */
+const MORE: Shape = [circle(0.2, 0.5, 0.1), circle(0.5, 0.5, 0.1), circle(0.8, 0.5, 0.1)];
+
+/**
+ * Kruhová šipka — načíst novou verzi hry.
+ *
+ * Skoro celý kruh a hrot na konci. Mezera nahoře je schválně: uzavřený kruh
+ * by na osmnácti pixelech vypadal jako kolečko, ne jako „znovu".
+ */
+const RELOAD: Shape = [
+  arc(0.5, 0.54, 0.24, 0.34, -0.35, 1.35),
+  [
+    [0.46, 0.06],
+    [0.86, 0.24],
+    [0.5, 0.42],
+  ],
+];
+
+/** Výseč mezikruží. Úhly jsou v otáčkách, ne v radiánech — čte se to líp. */
+function arc(
+  cx: number,
+  cy: number,
+  inner: number,
+  outer: number,
+  from: number,
+  to: number,
+  points = 20,
+): Shape[0] {
+  const shape: [number, number][] = [];
+  for (let i = 0; i <= points; i++) {
+    const angle = (from + ((to - from) * i) / points) * Math.PI * 2;
+    shape.push([cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer]);
+  }
+  for (let i = points; i >= 0; i--) {
+    const angle = (from + ((to - from) * i) / points) * Math.PI * 2;
+    shape.push([cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner]);
+  }
+  return shape;
+}
+
+/**
+ * Rychlost jako řada hrotů. Obsah k stupňům 1–4 dodává obrázky, tohle je
+ * záloha pro ty ostatní — osmičku nikdo nenakreslil a prázdné tlačítko by
+ * hráči neřeklo, co mačká.
+ */
+function chevrons(count: number): Shape {
+  const width = 0.86 / count;
+  const shape: Shape[0][] = [];
+  for (let i = 0; i < count; i++) {
+    const x = 0.07 + width * i;
+    shape.push([
+      [x, 0.16],
+      [x + width * 0.88, 0.5],
+      [x, 0.84],
+    ]);
+  }
+  return shape;
+}
+
 /**
  * Tvary jen pro rozhraní. Střešní symboly se sem nekopírují — `iconShape` sáhne
  * do sady rendereru, když tady jméno nenajde.
@@ -366,6 +457,15 @@ const UI_SHAPES: Readonly<Record<string, Shape>> = {
   chart: CHART,
   globe: GLOBE,
   gear: GEAR,
+  'zoom-in': magnifier(1),
+  'zoom-out': magnifier(-1),
+  more: MORE,
+  reload: RELOAD,
+  'speed-pause': [bar(0.24, 0.12, 0.44, 0.88), bar(0.56, 0.12, 0.76, 0.88)],
+  'speed-1': chevrons(1),
+  'speed-2': chevrons(2),
+  'speed-4': chevrons(3),
+  'speed-8': chevrons(4),
 };
 
 export function uiIconShape(name: string): Shape | undefined {

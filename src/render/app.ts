@@ -60,11 +60,13 @@ import { Hud } from '@/ui/hud';
 import { setIconImages } from '@/ui/icons';
 import type { OverlayOption } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
+import { isCompact, watchCompact } from '@/ui/layout';
 import type { LocaleTables } from '@/ui/i18n';
 import { createBrowserPlatform } from '@/platform';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
 import { showHelp } from '@/ui/help';
 import { showHome } from '@/ui/home';
+import type { HomeChoice } from '@/ui/home';
 import { Legend } from '@/ui/legend';
 import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
@@ -828,10 +830,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   // Rozcestník: značka, snímky ze hry a tři cesty dál — pokračovat, nové
   // město, nebo načíst soubor. Dialog nové hry z něj vychází, nezanikl.
-  const choice = await showHome(mount, i18n, content.getBalance(), {
-    canResume: await platform.storage.has('autosave'),
-    readFile: (file) => platform.files.read(file),
-  });
+  const canResume = await platform.storage.has('autosave');
+  // Po „načíst novou verzi" se rozcestník **přeskočí**. Hráč si vyžádal jen
+  // novou verzi hry, ne návrat do menu — a město mu při té cestě zůstalo
+  // v prohlížeči právě proto, aby se do něj vrátil.
+  const choice: HomeChoice =
+    canResume && platform.resumedAfterUpdate()
+      ? { kind: 'game', game: { cityName: '', seed: 0, size: DEFAULT_MAP_SIZE, disasters: true, resume: true } }
+      : await showHome(mount, i18n, content.getBalance(), {
+          canResume,
+          readFile: (file) => platform.files.read(file),
+        });
   const newGame =
     choice.kind === 'game'
       ? choice.game
@@ -1189,6 +1198,19 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     } catch {
       // Rozehranou hru neshodí ani plné úložiště.
     }
+  }
+
+  /**
+   * Načte novou verzi hry a **město nechá být**.
+   *
+   * Pořadí je to jediné, na čem tu záleží: nejdřív se rozehrané město odloží
+   * do prohlížeče, teprve pak se sáhne na keš. `localStorage` píše synchronně,
+   * takže je uložené dřív, než se stránka začne obnovovat.
+   */
+  async function reloadNewVersion(): Promise<void> {
+    autosaveNow();
+    message = { key: 'ui.save.updating' };
+    await platform.reloadNewVersion();
   }
 
   async function quickSaveNow(): Promise<void> {
@@ -1576,7 +1598,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   let armedDisaster: string | null = null;
 
-  const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, disasterRegistry.kinds(), {
+  const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, disasterRegistry.kinds(), isCompact(), {
     onSpeed: setSpeed,
     onTaxChange: changeTax,
     onQuickSave: () => void quickSaveNow(),
@@ -1590,6 +1612,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       void platform.files.read(file).then(loadFromBytes);
     },
     onScreenshot: () => void saveScreenshot(),
+    // Lupa přibližuje **doprostřed obrazovky**. Kolečko se drží kurzoru,
+    // jenže tlačítko žádný kurzor nemá a držet se jeho vlastní polohy by
+    // znamenalo přibližovat k pravému dolnímu rohu.
+    onZoom: (factor) =>
+      zoomAt(camera, factor, app.screen.width / 2, app.screen.height / 2, app.screen.width, app.screen.height),
+    onReload: () => void reloadNewVersion(),
     onToggleLayer: toggleLayer,
     onSetView: setView,
     onToggleBudget: () => budgetPanel.toggle(),
@@ -1634,13 +1662,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // hráč by kladl trubky poslepu a nikdo by mu neřekl proč. A naopak: kdo
     // sáhne po silnici nebo budově, chce zase vidět povrch.
     //
-    // Buldozer je schválně výjimka: pod zemí bourá trubky, nad zemí domy, a to
-    // je jediný nástroj, u kterého má smysl obojí.
+    // Buldozer a pacička jsou schválně výjimka. Buldozer pod zemí bourá trubky
+    // a nad zemí domy, takže mu vyhovuje obojí. A pacička nedělá **nic** —
+    // posouvá mapu a otevírá parcely. Když s ní pod zemí vyskočil povrch,
+    // přišel hráč o pohled, ve kterém pracoval, jen tím, že si chtěl posunout
+    // mapu. Hlásil to autor.
     if (tool.action.kind === 'pipe') setView('underground');
-    else if (tool.action.kind !== 'bulldoze') setView('surface');
+    else if (tool.action.kind !== 'bulldoze' && tool.action.kind !== 'pan') setView('surface');
   }
 
-  const toolbar = new Toolbar(hud.toolsSlot, i18n, tools, activeTool.id, selectTool);
+  const toolbar = new Toolbar(hud.toolsSlot, i18n, tools, activeTool.id, isCompact(), selectTool);
+  watchCompact((compact) => {
+    hud.setCompact(compact);
+    toolbar.setCompact(compact);
+  });
 
   const canvas = app.canvas;
 

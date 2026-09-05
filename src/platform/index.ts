@@ -69,6 +69,26 @@ export interface Platform {
   readonly storage: SaveStorage;
   readonly files: FileTransfer;
 
+  /**
+   * Zahodí, co si hostitel schoval, a spustí hru znovu z nové verze.
+   *
+   * Vzniklo kvůli mobilu. Na telefonu drží starou verzi prohlížeč, ne hráč:
+   * `index.html` může být z HTTP keše a service worker si nese svoji vlastní.
+   * Hráč neměl jak novou verzi dostat, leda smazáním dat stránky — a tím by
+   * přišel i o rozehrané město.
+   *
+   * **Rozehranou hru to nemaže.** Volající ji nejdřív uloží; tahle metoda
+   * sahá jen na keš hostitele. Na platformě, která žádnou nemá (Electron),
+   * je to prosté spuštění znovu.
+   */
+  reloadNewVersion(): Promise<void>;
+  /**
+   * Vrátí `true` právě jednou: při tom spuštění, které vzniklo z
+   * `reloadNewVersion`. Hra podle toho pozná, že má rovnou pokračovat
+   * a nenutit hráče proklikat rozcestník kvůli něčemu, co si vyžádal.
+   */
+  resumedAfterUpdate(): boolean;
+
   getUserId(): Promise<string | null>;
   hasDlc(id: string): boolean;
   unlockAchievement(id: string): void;

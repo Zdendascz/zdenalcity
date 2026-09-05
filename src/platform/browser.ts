@@ -122,11 +122,71 @@ function createFileTransfer(): FileTransfer {
   };
 }
 
+/**
+ * Klíč, kterým si spuštění po aktualizaci řekne, že má rovnou pokračovat.
+ *
+ * `sessionStorage`, ne `localStorage`: platí pro **tuhle jednu kartu a tohle
+ * jedno obnovení**. V `localStorage` by přežil i to, že hráč hru mezitím
+ * zavřel a za týden ji otevřel znovu — a rozcestník by mu zmizel bez důvodu.
+ */
+const UPDATE_FLAG = `${PREFIX}updating`;
+
+/**
+ * Uklidí, co si prohlížeč schoval, a načte stránku znovu.
+ *
+ * Pořadí je celý vtip:
+ *
+ * 1. Keš service workeru. Drží v sobě `index.html` z minula, takže dokud
+ *    zůstane, dostane hráč po obnovení zase tu starou verzi.
+ * 2. Sám worker. Nový build si zaregistruje vlastní; ten starý by do té doby
+ *    dál obsluhoval každý požadavek.
+ * 3. Teprve pak obnovení stránky. Prohlížeč u něj hlavní dokument ověřuje na
+ *    serveru, takže i `max-age` na `index.html` dostane odpověď „změnilo se".
+ *
+ * Nepovedený úklid se **nehlásí jako chyba**: obnovit stránku má cenu tak jako
+ * tak a hráč nemá co dělat s tím, že prohlížeč nepustil ke `caches`.
+ */
+async function reloadNewVersion(): Promise<void> {
+  try {
+    sessionStorage.setItem(UPDATE_FLAG, '1');
+  } catch {
+    // Bez příznaku se jen ukáže rozcestník. Město je uložené tak jako tak.
+  }
+
+  try {
+    if ('caches' in globalThis) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+    if ('serviceWorker' in navigator) {
+      const workers = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(workers.map((worker) => worker.unregister()));
+    }
+  } catch {
+    // Viz výš: obnovení stránky má smysl i tak.
+  }
+
+  location.reload();
+}
+
+/** Příznak se čte **a hned maže** — platí pro jedno spuštění, ne pro kartu. */
+function resumedAfterUpdate(): boolean {
+  try {
+    const flag = sessionStorage.getItem(UPDATE_FLAG) !== null;
+    sessionStorage.removeItem(UPDATE_FLAG);
+    return flag;
+  } catch {
+    return false;
+  }
+}
+
 export function createBrowserPlatform(): Platform {
   return {
     id: 'browser',
     storage: createLocalStorage(),
     files: createFileTransfer(),
+    reloadNewVersion,
+    resumedAfterUpdate,
 
     // Zaslepené podle §9. Prohlížeč nezná hráče, DLC ani Workshop; až přijde
     // Electron nebo Steam, přibude vedle tohohle souboru další implementace

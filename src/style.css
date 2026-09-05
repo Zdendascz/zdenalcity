@@ -70,11 +70,25 @@ body {
 
 /* Nástroje vlevo, ovládání vpravo — mezi nimi je vidět mapa. */
 .hud__tools,
-.hud__controls {
+.hud__controls,
+.hud__row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: flex-end;
+}
+
+/*
+ * Ovládání je sloupec dvou řad: ta stálá dole, vysunutá nad ní. V plné verzi
+ * je vysunutá prázdná a schovaná, takže se sloupec chová jako jedna řada.
+ */
+.hud__controls {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.hud__row {
+  justify-content: flex-end;
 }
 
 /* Statistiky a rychlost drží pohromadě vlevo nahoře; poptávka zůstává vpravo. */
@@ -102,7 +116,7 @@ body {
 .demand,
 .popover__panel,
 .toolbar,
-.hud__controls > .toolbar__button,
+.hud__row > .toolbar__button,
 .segmented {
   pointer-events: auto;
   padding: 6px 10px;
@@ -555,6 +569,96 @@ body {
 .segmented__button.is-active {
   border-color: var(--accent);
   background: rgb(107 168 232 / 25%);
+}
+
+/* --- úsporná lišta pro telefon ------------------------------------------ */
+
+/*
+ * Třídu `hud--compact` nasazuje `ui/hud.ts` podle `ui/layout.ts`. **Není to
+ * media query** schválně: co se kam přesune, rozhoduje kód, protože se tím
+ * mění strom, ne jen vzhled — a dvě nezávislé podmínky by se dřív nebo
+ * později rozešly.
+ */
+
+/*
+ * Nástroje a ovládání pod sebe, každé na celou šířku. Vedle sebe se na
+ * telefonu nevejdou a mačkají se do sloupečků po jednom tlačítku.
+ *
+ * `column-reverse`: nástroje jsou v DOMu první, ale patří **dolů** k palci.
+ */
+.hud--compact .hud__bottom {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* Vysunutá řada. Odsazená od stálé, ať je poznat, že je to něco navíc. */
+.toolbar--drawer,
+.hud__row--drawer {
+  margin-bottom: 2px;
+}
+
+.toolbar-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+/*
+ * Vysunutá řada ovládání potřebuje vlastní podklad: tlačítka v ní mají každé
+ * to svoje, ale mezi nimi by prosvítala mapa a řada by se rozpadla na hromádku
+ * ikon bez souvislosti.
+ */
+.hud__row--drawer {
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+}
+
+.hud__row--drawer > .toolbar__button {
+  border: 1px solid transparent;
+  background: none;
+}
+
+/*
+ * Roletka v liště dostane stejný podklad jako tlačítko vedle ní.
+ *
+ * Na počítači to tak není a nevadí to — lišta tam stojí na tmavém pruhu.
+ * Na telefonu visí každý prvek sám nad mapou a bez podkladu vypadá roletka
+ * jako ikona vytištěná na trávě.
+ *
+ * Rozsvícená a otevřená se vynechává: ty mají barvu vlastní a je důležitější.
+ */
+.hud--compact .hud__top-left > .popover > .popover__trigger:not(.is-active):not(.is-open),
+.hud--compact .hud__row:not(.hud__row--drawer) > .popover > .popover__trigger:not(.is-active):not(.is-open) {
+  border-color: var(--panel-border);
+  background: var(--panel-bg);
+  backdrop-filter: blur(2px);
+}
+
+/*
+ * Nahoře se roletka rozbaluje **dolů** — nad ní je jen okraj obrazovky.
+ * A doleva od tlačítka, protože to stojí u pravého kraje: doprava by panel
+ * vylezl z displeje a čísla by končila za hranou.
+ */
+.hud__top .popover__panel {
+  top: calc(100% + 6px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+  max-width: calc(100vw - 20px);
+}
+
+/* Schované statistiky: popisek vlevo, hodnota vpravo, jako v ostatních panelech. */
+.panel--stats .stat {
+  flex-direction: row;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
 }
 
 /* --- ikony běžících pohrom ---------------------------------------------- */

@@ -66,6 +66,22 @@ export interface HudCallbacks {
    * dělat. Ruční spuštění z nabídky přepínač neřeší, to je věc ladění.
    */
   onToggleDisasters(): void;
+  /**
+   * Přiblížení a oddálení tlačítky. Násobitel měřítka, jako u kolečka.
+   *
+   * Na telefonu není kolečko a hra nemá gesto — hráč se **neměl jak** dostat
+   * blíž ani dál a díval se na město pořád z jedné výšky.
+   */
+  onZoom(factor: number): void;
+  /**
+   * Načíst novou verzi hry a **nechat rozehrané město**.
+   *
+   * Na mobilu drží starou verzi prohlížeč, ne hráč: index i service worker
+   * mohou být z keše a nový build se do telefonu nedostane, dokud si hráč
+   * neuklidí data stránky — čímž by přišel i o město. Tohle udělá obojí
+   * v pořadí, ve kterém to o město nepřipraví.
+   */
+  onReload(): void;
 }
 
 /** Položka nabídky pohledů nebo vrstev. Popisek je lokalizační klíč. */
@@ -114,6 +130,32 @@ const TAX_ROWS: readonly { zone: ZoneType; labelKey: string; category: 'resident
   { zone: ZONE.industrial, labelKey: 'ui.tool.zone.industrial', category: 'industrial' },
 ];
 
+/**
+ * Statistiky v pořadí, ve kterém stojí v liště.
+ *
+ * `primary` znamená „vidět i na telefonu". Autor vybral kasu a bilanci: obojí
+ * se mění samo a obojí je důvod, proč hra skončí. Zbytek si hráč vyžádá.
+ *
+ * Pořadí je to původní, i když kasa a bilance v něm nesousedí — na počítači
+ * lišta vypadá dobře tak, jak je, a přeskládat ji kvůli telefonu by znamenalo
+ * spravit něco, co není rozbité.
+ */
+const STAT_ROWS: readonly { key: string; labelKey: string; primary?: true }[] = [
+  { key: 'funds', labelKey: 'ui.hud.funds', primary: true },
+  { key: 'population', labelKey: 'ui.hud.population' },
+  { key: 'jobs', labelKey: 'ui.hud.jobs' },
+  { key: 'happiness', labelKey: 'ui.hud.happiness' },
+  { key: 'powered', labelKey: 'ui.hud.powered' },
+  { key: 'power', labelKey: 'ui.hud.power' },
+  { key: 'balance', labelKey: 'ui.hud.balance', primary: true },
+  // Popisek a hodnota mají vlastní klíče: `ui.hud.date` je celá věta s
+  // parametry, jako popisek by se vypsala i se zástupnými symboly.
+  { key: 'date', labelKey: 'ui.hud.dateLabel' },
+];
+
+/** O kolik se změní měřítko jedním klepnutím na lupu. */
+const ZOOM_STEP = 1.25;
+
 const DEMAND_ROWS: readonly { labelKey: string; category: 'residential' | 'commercial' | 'industrial' }[] = [
   { labelKey: 'ui.demand.residential', category: 'residential' },
   { labelKey: 'ui.demand.commercial', category: 'commercial' },
@@ -139,12 +181,22 @@ export class Hud {
   private readonly view: ReadonlyWorldView;
   private readonly speeds: readonly number[];
   private readonly callbacks: HudCallbacks;
+  /** Úsporná lišta pro telefon, viz `ui/layout.ts`. */
+  private compact: boolean;
 
+  /** Kořen HUDu. Nese třídu `hud--compact`, podle které se řídí CSS. */
+  private readonly root: HTMLElement;
   private readonly top: HTMLElement;
   private readonly controls: HTMLElement;
+  /** Řada, která je vidět vždycky. */
+  private readonly controlRow: HTMLElement;
+  /** Řada nad ní, kterou si hráč na telefonu vysouvá. */
+  private readonly controlDrawer: HTMLElement;
 
   private readonly values = new Map<string, HTMLElement>();
   private readonly speedButtons: HTMLButtonElement[] = [];
+  /** Rychlejší stupně na telefonu. `null` v plné verzi — tam jsou v liště. */
+  private speedMenu: Menu | null = null;
   private readonly viewButtons = new Map<string, HTMLButtonElement>();
   private layerMenu: Menu | null = null;
   private budgetButton: HTMLButtonElement | null = null;
@@ -193,8 +245,10 @@ export class Hud {
     layers: readonly OverlayOption[],
     serviceClasses: readonly string[],
     disasters: readonly string[],
+    compact: boolean,
     callbacks: HudCallbacks,
   ) {
+    this.compact = compact;
     this.i18n = i18n;
     this.view = view;
     this.speeds = speeds;
@@ -204,10 +258,15 @@ export class Hud {
     this.disasters = disasters;
     this.callbacks = callbacks;
 
+    this.root = parent;
     this.top = el('div', 'hud__top');
     const bottom = el('div', 'hud__bottom');
     this.toolsSlot = el('div', 'hud__tools');
     this.controls = el('div', 'hud__controls');
+    // Vysunutá řada je nad tou stálou: pod lištou už je jen okraj displeje.
+    this.controlDrawer = el('div', 'hud__row hud__row--drawer is-hidden');
+    this.controlRow = el('div', 'hud__row');
+    this.controls.append(this.controlDrawer, this.controlRow);
 
     bottom.append(this.toolsSlot, this.controls);
     parent.append(this.top, bottom);
@@ -217,6 +276,19 @@ export class Hud {
       this.build();
       this.update(this.lastState);
     });
+  }
+
+  /**
+   * Přepne mezi plnou a úspornou lištou.
+   *
+   * Volá se při otočení telefonu i při změně šířky okna. Přestavuje se celý
+   * HUD, protože se mění, **kam** které tlačítko patří — a to není věc CSS.
+   */
+  setCompact(compact: boolean): void {
+    if (compact === this.compact) return;
+    this.compact = compact;
+    this.build();
+    this.update(this.lastState);
   }
 
   update(state: HudState): void {
@@ -273,6 +345,11 @@ export class Hud {
     this.speedButtons.forEach((node, index) => {
       node.classList.toggle('is-active', index === state.speedIndex);
     });
+    // Zrychlení, které v liště není: roletka se rozsvítí a vezme si jeho ikonu,
+    // aby hráč po zavření poznal, že mu čas pořád letí.
+    this.speedMenu?.setSelected(
+      state.speedIndex >= this.speedButtons.length ? String(state.speedIndex) : null,
+    );
     for (const [serviceClass, input] of this.fundingInputs) {
       const percent = Math.round((state.funding.get(serviceClass) ?? 1) * 100);
       // Posuvník se nepřepisuje, když s ním hráč zrovna hýbe.
@@ -309,11 +386,26 @@ export class Hud {
     if (node) node.textContent = text;
   }
 
+  /**
+   * Kam tlačítko patří.
+   *
+   * V plné verzi je všechno v jedné řadě. Na telefonu zůstávají v liště jen
+   * pohledy, průhlednost, stromy, uložení a lupa — zadání autora. Zbytek čeká
+   * ve vysunuté řadě, protože se k němu hráč vrací jednou za čas.
+   */
+  private slot(primary: boolean): HTMLElement {
+    return !this.compact || primary ? this.controlRow : this.controlDrawer;
+  }
+
   private build(): void {
+    this.root.classList.toggle('hud--compact', this.compact);
     this.top.replaceChildren();
-    this.controls.replaceChildren();
+    this.controlRow.replaceChildren();
+    this.controlDrawer.replaceChildren();
+    this.controlDrawer.classList.add('is-hidden');
     this.values.clear();
     this.speedButtons.length = 0;
+    this.speedMenu = null;
     this.viewButtons.clear();
     this.fundingInputs.clear();
 
@@ -333,6 +425,7 @@ export class Hud {
     this.buildSpeed(left);
     this.buildDemand();
 
+    this.buildZoom();
     this.buildViews();
     this.buildGhost();
     this.buildDecor();
@@ -344,7 +437,47 @@ export class Hud {
     this.buildSave();
     this.buildHelp();
     this.buildLanguage();
+    this.buildMore();
     this.buildMessage();
+  }
+
+  /**
+   * Přepínač vysunuté řady. Staví se **až nakonec**, aby stál v liště úplně
+   * vpravo — tam, kde ho na telefonu chytí palec.
+   */
+  private buildMore(): void {
+    if (!this.compact || this.controlDrawer.childElementCount === 0) return;
+    const label = this.i18n.t('ui.toolbar.more');
+    const node = button('toolbar__button', () => {
+      this.controlDrawer.classList.toggle('is-hidden');
+    });
+    node.appendChild(iconSvg('more'));
+    node.title = label;
+    node.setAttribute('aria-label', label);
+    this.controlRow.appendChild(node);
+  }
+
+  /**
+   * Lupa. Jen na telefonu — na počítači je kolečko a dvě tlačítka navíc by
+   * v liště jen překážela.
+   */
+  private buildZoom(): void {
+    if (!this.compact) return;
+    const group = el('div', 'segmented');
+    for (const [icon, labelKey, factor] of [
+      ['zoom-out', 'ui.zoom.out', 1 / ZOOM_STEP],
+      ['zoom-in', 'ui.zoom.in', ZOOM_STEP],
+    ] as const) {
+      const label = this.i18n.t(labelKey);
+      const node = button('segmented__button segmented__button--icon', () =>
+        this.callbacks.onZoom(factor),
+      );
+      node.appendChild(iconSvg(icon));
+      node.title = label;
+      node.setAttribute('aria-label', label);
+      group.appendChild(node);
+    }
+    this.controlRow.appendChild(group);
   }
 
   /**
@@ -379,28 +512,39 @@ export class Hud {
     }
   }
 
+  /**
+   * Statistiky.
+   *
+   * Na telefonu zůstane v liště kasa a bilance, ostatní se přestěhuje pod
+   * ikonu grafu — s **týmiž** klíči, takže `update()` je plní stejně a
+   * nemusí vědět, kde který údaj zrovna visí.
+   */
   private buildStats(parent: HTMLElement): void {
     const group = el('div', 'stats');
-    for (const [key, labelKey] of [
-      ['funds', 'ui.hud.funds'],
-      ['population', 'ui.hud.population'],
-      ['jobs', 'ui.hud.jobs'],
-      ['happiness', 'ui.hud.happiness'],
-      ['powered', 'ui.hud.powered'],
-      ['power', 'ui.hud.power'],
-      ['balance', 'ui.hud.balance'],
-      // Popisek a hodnota mají vlastní klíče: `ui.hud.date` je celá věta s
-      // parametry, jako popisek by se vypsala i se zástupnými symboly.
-      ['date', 'ui.hud.dateLabel'],
-    ] as const) {
-      const stat = el('div', 'stat');
-      stat.appendChild(el('span', 'stat__label', this.i18n.t(labelKey)));
-      const value = el('span', 'stat__value', '-');
-      stat.appendChild(value);
-      this.values.set(key, value);
-      group.appendChild(stat);
+    for (const row of STAT_ROWS) {
+      if (this.compact && row.primary !== true) continue;
+      group.appendChild(this.stat(row.key, row.labelKey));
     }
     parent.appendChild(group);
+
+    if (!this.compact) return;
+
+    const popover = new Popover({ icon: 'chart', label: this.i18n.t('ui.hud.moreStats') });
+    popover.panel.classList.add('panel--stats');
+    for (const row of STAT_ROWS) {
+      if (row.primary === true) continue;
+      popover.panel.appendChild(this.stat(row.key, row.labelKey));
+    }
+    parent.appendChild(popover.root);
+  }
+
+  private stat(key: string, labelKey: string): HTMLElement {
+    const stat = el('div', 'stat');
+    stat.appendChild(el('span', 'stat__label', this.i18n.t(labelKey)));
+    const value = el('span', 'stat__value', '-');
+    stat.appendChild(value);
+    this.values.set(key, value);
+    return stat;
   }
 
   private buildDemand(): void {
@@ -433,16 +577,21 @@ export class Hud {
    */
   private buildSpeed(parent: HTMLElement): void {
     const group = el('div', 'segmented');
+    // Na telefonu zůstanou v liště jen pauza a normální běh — zadání autora.
+    // Zrychlení je věc, kterou hráč zapne, nechá běžet a zase vypne; pauza je
+    // to, co mačká, když se něco děje.
+    const inBar = this.compact ? 2 : this.speeds.length;
+
     this.speeds.forEach((speed, index) => {
-      const label = speed === 0 ? this.i18n.t('ui.speed.pause') : this.i18n.t('ui.speed.value', { speed });
+      if (index >= inBar) return;
       const node = button('segmented__button segmented__button--icon', () =>
         this.callbacks.onSpeed(index),
       );
+      const label = this.speedLabel(speed);
       // Pauza má vlastní ikonu, ostatní stupně se liší počtem šipek. Když
       // obrázek chybí, spadne to zpátky na text — rychlost musí jít přepnout
       // i bez grafiky.
-      const icon = speed === 0 ? 'speed-pause' : `speed-${speed}`;
-      const drawn = iconSvg(icon);
+      const drawn = iconSvg(speedIcon(speed));
       if (drawn.tagName === 'IMG') node.appendChild(drawn);
       else node.textContent = label;
       node.title = `${this.i18n.t('ui.speed.label')}: ${label}`;
@@ -451,6 +600,29 @@ export class Hud {
       this.speedButtons.push(node);
     });
     parent.appendChild(group);
+
+    if (inBar >= this.speeds.length) return;
+
+    // Roletka **nemá zamčenou ikonu**: hráč po zavření vidí, jak rychle mu
+    // čas běží, i když je tlačítko jen jedno.
+    const menu = new Menu({
+      icon: speedIcon(this.speeds[inBar] ?? 2),
+      label: this.i18n.t('ui.speed.label'),
+    });
+    menu.setItems(
+      this.speeds.slice(inBar).map((speed, offset) => ({
+        id: String(inBar + offset),
+        label: this.speedLabel(speed),
+        icon: speedIcon(speed),
+        onSelect: () => this.callbacks.onSpeed(inBar + offset),
+      })),
+    );
+    this.speedMenu = menu;
+    parent.appendChild(menu.root);
+  }
+
+  private speedLabel(speed: number): string {
+    return speed === 0 ? this.i18n.t('ui.speed.pause') : this.i18n.t('ui.speed.value', { speed });
   }
 
   /**
@@ -471,7 +643,7 @@ export class Hud {
       group.appendChild(node);
       this.viewButtons.set(view.id, node);
     }
-    this.controls.appendChild(group);
+    this.slot(true).appendChild(group);
   }
 
   /**
@@ -485,7 +657,7 @@ export class Hud {
     node.title = label;
     node.setAttribute('aria-label', label);
     this.ghostButton = node;
-    this.controls.appendChild(node);
+    this.slot(true).appendChild(node);
   }
 
   /**
@@ -499,7 +671,7 @@ export class Hud {
     node.title = label;
     node.setAttribute('aria-label', label);
     this.decorButton = node;
-    this.controls.appendChild(node);
+    this.slot(true).appendChild(node);
   }
 
   private buildLayers(): void {
@@ -526,7 +698,7 @@ export class Hud {
       })),
     ]);
     this.layerMenu = menu;
-    this.controls.appendChild(menu.root);
+    this.slot(false).appendChild(menu.root);
   }
 
   /**
@@ -547,7 +719,7 @@ export class Hud {
     });
     this.disasterMenu = menu;
     this.setDisasterItems(this.lastState.disastersEnabled);
-    this.controls.appendChild(menu.root);
+    this.slot(false).appendChild(menu.root);
   }
 
   /**
@@ -597,7 +769,7 @@ export class Hud {
       popover.panel.appendChild(line);
     }
 
-    this.controls.appendChild(popover.root);
+    this.slot(false).appendChild(popover.root);
   }
 
   /**
@@ -632,7 +804,7 @@ export class Hud {
       popover.panel.appendChild(row);
     }
 
-    this.controls.appendChild(popover.root);
+    this.slot(false).appendChild(popover.root);
   }
 
   private buildBudget(): void {
@@ -654,7 +826,7 @@ export class Hud {
     node.appendChild(iconSvg(icon));
     node.title = label;
     node.setAttribute('aria-label', label);
-    this.controls.appendChild(node);
+    this.slot(false).appendChild(node);
     return node;
   }
 
@@ -695,7 +867,20 @@ export class Hud {
     shotRow.appendChild(shot);
 
     popover.panel.append(row, fileRow, shotRow);
-    this.controls.appendChild(popover.root);
+
+    // Načtení nové verze **jen na telefonu**: na počítači si hráč zmáčkne
+    // Ctrl+F5 a hotovo. Sedí to v uložení, protože je to hlavně uložení —
+    // město se před obnovením odloží do prohlížeče a po něm se vrátí.
+    if (this.compact) {
+      const updateRow = el('div', 'panel__row');
+      const update = button('chip', () => this.callbacks.onReload());
+      update.append(iconSvg('reload'), this.i18n.t('ui.save.update'));
+      update.title = this.i18n.t('ui.save.updateHint');
+      updateRow.appendChild(update);
+      popover.panel.appendChild(updateRow);
+    }
+
+    this.slot(true).appendChild(popover.root);
   }
 
   /** Nápověda. Poslední v řadě, hned u jazyka — obojí je o hře, ne o městě. */
@@ -705,7 +890,7 @@ export class Hud {
     node.appendChild(iconSvg('help'));
     node.title = label;
     node.setAttribute('aria-label', label);
-    this.controls.appendChild(node);
+    this.slot(false).appendChild(node);
   }
 
   private buildLanguage(): void {
@@ -719,7 +904,7 @@ export class Hud {
       popover.panel.appendChild(node);
     }
 
-    this.controls.appendChild(popover.root);
+    this.slot(false).appendChild(popover.root);
   }
 
   /**
@@ -727,10 +912,16 @@ export class Hud {
    * zavřený a hráč by se o výsledku nedozvěděl.
    */
   private buildMessage(): void {
+    if (this.messageNode) return;
     const message = el('div', 'hud__message is-empty');
     this.messageNode = message;
     this.controls.appendChild(message);
   }
+}
+
+/** Jméno ikony ke stupni rychlosti. Pauza má vlastní, ostatní počet šipek. */
+function speedIcon(speed: number): string {
+  return speed === 0 ? 'speed-pause' : `speed-${speed}`;
 }
 
 export function dateParts(tick: number): { year: number; month: number; day: number } {
