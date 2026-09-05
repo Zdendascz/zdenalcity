@@ -2154,7 +2154,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     panStartedAt = null;
     if (!start) return;
     const moved = Math.abs(event.clientX - start.x) + Math.abs(event.clientY - start.y);
-    if (moved <= CLICK_SLOP) showBuildingAt(start.tile);
+    if (moved > CLICK_SLOP) return;
+
+    // Klik pacičkou dělá totéž co klik čímkoli jiným — jen se to rozhodne až
+    // tady, protože do posledního okamžiku mohl být začátkem tažení.
+    //
+    // Bez tohohle se **pacičkou nedala vybrat zastávka ani umístit ručně
+    // spuštěná katastrofa**: obojí se vyhodnocuje na stisknutí, jenže pacička
+    // se z toho místa vracela dřív. Hráč klikl na stanici metra a místo
+    // přidání na linku se mu otevřel rozbor parcely. Hlásil to autor.
+    if (triggerArmedDisaster(start.tile)) return;
+    if (pickTransitStop(start.tile)) return;
+    showBuildingAt(start.tile);
   }
 
   canvas.addEventListener('pointerup', endDrag);

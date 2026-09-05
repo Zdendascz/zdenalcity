@@ -403,3 +403,39 @@ zmizela zem.
 Velikost je jedna dlaždice na 0,9 (`DECOR_SHARE`), ale **dvě patra vysoký**:
 plamen jde vzhůru, ne do šíře, a nízký by nad hořící střechou nebyl vidět.
 Zadání je v `docs/08-DLAZDICE.md`, oddíl „Katastrofy na ulici".
+
+## Podlaha budovy s obrázkem leží na nejvyšším rohu
+
+Kvádr si smí zaříznout do svahu — je to holá krabice a průměr rohů u něj dává
+smysl, jak popisuje komentář u `areaHeightRange`. **Obrázek ne.** Nese vlastní
+rovný pozemek (chodník, trávu, plot), a když ho podlaha posadí níž, než kam
+sahá terén, prorostou mu okolní dlaždice skrz ten pozemek. Dům pak vypadá
+odsunutý do silnice a bez podezdívky.
+
+Autor to hlásil dvakrát a pokaždé jinak: „ta budova je posunutý do silnice
+a chybí pod ní podezdívka" a „tento barák je taky ustřelený a bez podezdívky".
+
+Změřeno na jeho městě, 681 budov:
+
+| | před | po |
+|---|---|---|
+| rovná parcela, podezdívka netřeba | 445 | 445 |
+| podezdívka se kreslí | 154 | 236 |
+| **podlaha pod terénem, podezdívka chybí** | **82** | **0** |
+
+Obava, že dům bude stát na soklu, se nepotvrdila: z těch 236 má **228
+podezdívku vysokou jedinou úroveň** (šestnáct pixelů), sedm dvě a jedna tři.
+Tak vypadá dům na svahu doopravdy.
+
+## Klik pacičkou dělá totéž co klik čímkoli jiným
+
+Pacička se v obsluze stisknutí vracela dřív, než se došlo na **ručně spuštěnou
+katastrofu** a na **výběr zastávky MHD**. Kdo měl v ruce pacičku — což je
+výchozí nástroj a ten, po kterém člověk sáhne, když chce na něco kliknout —
+nemohl ani jedno: klikl na stanici metra a místo přidání na linku se mu otevřel
+rozbor parcely. Autor to hlásil jako „u metra nejde vytvořit linku, nejde
+kliknout na zastávku".
+
+Rozhoduje se to až na **puštění** tlačítka, protože do posledního okamžiku mohl
+klik být začátkem tažení mapy. Pořadí je pak stejné jako u ostatních nástrojů:
+katastrofa, zastávka, teprve pak rozbor parcely.

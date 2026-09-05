@@ -538,8 +538,19 @@ export class BuildingRenderer {
     sprite.anchor.set(image.anchor[0] / image.width, image.anchor[1] / image.height);
     sprite.scale.set(fit / image.scale);
 
-    const { min, pad } = areaHeightRange(this.world.cornerHeight, x, y, width, depth);
-    const front = gridToScreen(x + width, y + depth, pad);
+    /*
+     * Podlaha obrázku leží na **nejvyšším rohu parcely**, ne na průměru.
+     *
+     * Kvádr si smí zaříznout do svahu, protože je to holá krabice. Obrázek ne:
+     * nese **vlastní rovný pozemek** — chodník, trávu, plot — a když ho podlaha
+     * posadí níž, než kam sahá terén, prorostou mu okolní dlaždice skrz ten
+     * pozemek. Dům pak vypadá odsunutý do silnice a bez podezdívky. Změřeno na
+     * městě autora: z 681 budov jich takhle sedělo 82.
+     *
+     * Na nejvyšším rohu je pozemek celý nad terénem a zbytek doplní podezdívka.
+     */
+    const { min, max } = areaHeightRange(this.world.cornerHeight, x, y, width, depth);
+    const front = gridToScreen(x + width, y + depth, max);
     sprite.position.set(front.x, front.y);
     this.boxes.set(id, { x, y, width, depth, base: min });
 
@@ -550,7 +561,7 @@ export class BuildingRenderer {
     //
     // Kreslí se **o krok dřív** než sprite, aby ji obrázek překryl. Sprite by
     // ji jinak nepřekryl a byl by vidět pruh kamene přes fasádu.
-    this.drawSkirt(id, x, y, width, depth, min, pad);
+    this.drawSkirt(id, x, y, width, depth, min, max);
 
     const texture = sprite.texture;
     if (texture === Texture.EMPTY || texture.label !== image.url) {

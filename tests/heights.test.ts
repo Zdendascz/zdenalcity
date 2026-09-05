@@ -3,6 +3,7 @@ import {
   applyCornerChanges,
   cornerIndex,
   countViolations,
+  areaHeightRange,
   createCornerHeights,
   groundHeightAt,
   isFlatTile,
@@ -290,5 +291,49 @@ describe('výška terénu pod předmětem', () => {
     const heights = slope();
     expect(groundHeightAt(heights, 0, 0)).toBe(0);
     expect(groundHeightAt(heights, 1, 1)).toBe(4);
+  });
+});
+
+/**
+ * Na jaké výšce leží podlaha budovy, která má obrázek.
+ *
+ * Kvádr si smí zaříznout do svahu — je to holá krabice. Obrázek ne: nese
+ * **vlastní rovný pozemek** (chodník, trávu, plot) a když ho podlaha posadí
+ * níž, než kam sahá terén, prorostou mu okolní dlaždice skrz. Dům pak vypadá
+ * odsunutý do silnice a bez podezdívky; autor to hlásil dvakrát.
+ *
+ * Pravidlo je proto: **podlaha na nejvyšším rohu parcely**, zbytek doplní
+ * podezdívka. Změřeno na městě autora — z 681 budov jich 82 sedělo pod
+ * terénem, po opravě má 228 z 236 podezdívku vysokou jednu jedinou úroveň.
+ */
+describe('podlaha obrázku nesmí být pod terénem', () => {
+  /** Parcela 2×2, jejíž jihovýchodní roh je o dvě úrovně výš. */
+  function bump(): Uint8Array {
+    const heights = createCornerHeights(MAP_SIZE);
+    heights[cornerIndex(2, 2, CORNER_SIZE)] = 2;
+    return heights;
+  }
+
+  it('nejvyšší roh je nad terénem v celé parcele, průměr ne', () => {
+    const heights = bump();
+    const { min, max, pad } = areaHeightRange(heights, 0, 0, 2, 2);
+
+    expect(min).toBe(0);
+    expect(max).toBe(2);
+    // Průměr se zaokrouhlí na nulu, tedy pod hrb — a přesně tudy terén prorostl.
+    expect(pad).toBe(0);
+    expect(groundHeightAt(heights, 2, 2)).toBeGreaterThan(pad);
+
+    // Nejvyšší roh takový bod nemá: pozemek obrázku je nad terénem všude.
+    for (let fx = 0; fx <= 2; fx += 0.25) {
+      for (let fy = 0; fy <= 2; fy += 0.25) {
+        expect(groundHeightAt(heights, fx, fy), `${fx},${fy}`).toBeLessThanOrEqual(max);
+      }
+    }
+  });
+
+  it('na rovné parcele se podlaha nezvedne, takže se podezdívka nekreslí', () => {
+    const { min, max } = areaHeightRange(createCornerHeights(MAP_SIZE), 5, 5, 2, 2);
+    expect(max).toBe(min);
   });
 });
