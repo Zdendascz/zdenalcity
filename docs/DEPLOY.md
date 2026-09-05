@@ -135,16 +135,61 @@ dostane:
    curl -sI "https://games.zdendas.cz/zdenalcity/service-worker.js" | grep -i "cache-control\|cf-cache-status"
    ```
 
-   Čekáme `no-cache`. Když tam pořád je `max-age=14400`, hlavičku nastavuje
-   něco výš — buď vhost (pak patří do jeho konfigurace), nebo **Cloudflare**,
-   který si TTL řídí sám a `.htaccess` ho nezajímá. Tam je potřeba Cache Rule
-   na `games.zdendas.cz/zdenalcity/service-worker.js` s „Bypass cache".
+   Čekáme `no-cache`.
+
+   **Byl to Cloudflare, ne `.htaccess`.** Změřeno 2026-09-05: origin posílal
+   `no-cache` správně (`/zdenalcity/` ho měl), ale `service-worker.js` chodil
+   s `max-age=14400`. Čtrnáct tisíc čtyři sta sekund jsou **čtyři hodiny**, což
+   je výchozí *Browser Cache TTL* Cloudflaru — ten hlavičku z originu u všeho,
+   co považuje za kešovatelné, přepíše. `.htaccess` proti tomu nemá šanci.
 
 ## 6. Cloudflare
+
+### Cache Rule (nastaveno 2026-09-05)
+
+V zóně `zdendas.cz` (id `1b83291b0bf554a72ee121a97fce1d91`) je pravidlo
+**„Zdenalcity - bez kese pro service worker a rozcestnik"**:
+
+```
+(http.host eq "games.zdendas.cz" and http.request.uri.path in
+  {"/zdenalcity/service-worker.js" "/zdenalcity/" "/zdenalcity/index.html"
+   "/zdenalcity/manifest.webmanifest"})
+```
+
+akce `set_cache_settings` s `cache: false` a `browser_ttl: respect_origin`.
+
+**Obojí je nutné.** `cache: false` zařídí, že si to nedrží edge; `respect_origin`
+zařídí, že Cloudflare nepřepíše `Cache-Control` pro prohlížeč svým čtyřhodinovým
+Browser Cache TTL. Bez druhého by hráč dostával starou verzi dál, jen z jiné
+keše.
+
+Pravidlo je **úzké schválně**: sedne jen na ty čtyři cesty na jednom hostu.
+Na doméně běží i jiné věci, které se musí měnit v reálném čase, a ty se ho
+nedotknou. Ověřeno po nasazení — `zdendas.cz`, `www.zdendas.cz` i
+`games.zdendas.cz/` zůstaly `DYNAMIC` jako předtím a hashované assety hry si
+dál drží `max-age=31536000, immutable`.
+
+Nastavit se to dá i z příkazové řádky, když je v prostředí token
+(`CLOUDFLARE_API_TOKEN`, oprávnění *Zone → Cache Rules → Edit* a
+*Zone → Cache Purge → Purge*):
+
+```bash
+curl -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE/rulesets/phases/http_request_cache_settings/entrypoint"   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json"   --data @cache-rule.json
+```
+
+### Protočení keše po nasazení
 
 Po každém dalším nasazení protočit cache pro `games.zdendas.cz/zdenalcity/*`,
 jinak testeři uvidí starou verzi. Jména souborů v `assets/` mají hash, takže
 zastarat může prakticky jen `index.html`.
+
+**Nikdy „Purge Everything"** — na doméně jsou i jiné projekty. V rozhraní
+*Caching → Configuration → Custom Purge → Prefix*, hodnota
+`games.zdendas.cz/zdenalcity/`. Přes API:
+
+```bash
+curl -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/purge_cache"   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json"   --data '{"prefixes":["games.zdendas.cz/zdenalcity/"]}'
+```
 
 ## Rollback
 
