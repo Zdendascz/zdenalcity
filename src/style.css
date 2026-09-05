@@ -596,6 +596,35 @@ body {
   gap: 6px;
 }
 
+/*
+ * Spodek lišty je **jeden tok**, ne dvě oddělené řady.
+ *
+ * `wrap-reverse` obrací směr zalamování: první řádek se vysází dole a teprve
+ * co se do něj nevejde, se přelije nahoru. Dvě nezávislé řady po sobě nechávaly
+ * u pravého okraje díru, protože se každá zalamovala sama za sebe — hlásil to
+ * autor. Pořadí v DOMu je pořadí důležitosti: paleta, síť, uložení, trojtečka,
+ * pak lupa a pohledy.
+ *
+ * `align-items: flex-start` je pod `wrap-reverse` **dolů**: osa je otočená,
+ * takže se prvky srovnají ke spodní hraně svého řádku.
+ */
+.hud--compact .hud__tools-row {
+  flex-wrap: wrap-reverse;
+  align-content: flex-end;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+/*
+ * Obaly zmizí z rozvržení a jejich tlačítka se stanou přímými prvky toku.
+ * Bez toho by se zalamovaly celé skupiny naráz místo jednotlivých tlačítek
+ * a díra by zůstala.
+ */
+.hud--compact .hud__extras,
+.hud--compact .hud__tools-row > .hud__row {
+  display: contents;
+}
+
 /* Vysunutá řada. Odsazená od stálé, ať je poznat, že je to něco navíc. */
 .hud__row--drawer {
   flex-direction: column;
@@ -631,13 +660,13 @@ body {
 /*
  * Roletka v liště dostane stejný podklad jako tlačítko vedle ní.
  *
- * Na počítači to tak není a nevadí to — lišta tam stojí na tmavém pruhu.
- * Na telefonu visí každý prvek sám nad mapou a bez podkladu vypadá roletka
+ * V plné verzi to tak není a nevadí to — lišta tam stojí na tmavém pruhu.
+ * V užším okně visí každý prvek sám nad mapou a bez podkladu vypadá roletka
  * jako ikona vytištěná na trávě.
  *
  * Rozsvícená a otevřená se vynechává: ty mají barvu vlastní a je důležitější.
  */
-.hud--compact .hud__top-left > .popover > .popover__trigger:not(.is-active):not(.is-open),
+.hud--dense .hud__top-left > .popover > .popover__trigger:not(.is-active):not(.is-open),
 .hud--compact .hud__extras > .popover > .popover__trigger:not(.is-active):not(.is-open),
 .hud--compact .hud__row:not(.hud__row--drawer) > .popover > .popover__trigger:not(.is-active):not(.is-open) {
   border-color: var(--panel-border);

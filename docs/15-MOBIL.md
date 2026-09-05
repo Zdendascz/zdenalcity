@@ -8,23 +8,34 @@ zrovna takhle, a co se **záměrně nezměnilo**.
 
 ## Kdy se rozhraní přepne
 
-`src/ui/layout.ts`:
+`src/ui/layout.ts` zná **tři stupně**, ne dva:
 
-```
-(pointer: coarse), (width <= 900px)
-```
+| stupeň | kdy | co se stane |
+|---|---|---|
+| `full` | široké okno | všechno v liště, jak to bylo vždycky |
+| `dense` | okno pod 1500 px | nástroje a ovládání pod trojtečku, z osmi statistik zbude kasa s bilancí |
+| `compact` | prst nebo okno pod 900 px | k tomu sloučená tlačítka, lupa a síť s uložením v řadě s paletou |
 
-Dvě podmínky, každá kvůli něčemu jinému:
+Mezistupeň přibyl na přání autora: mezi telefonem a širokým monitorem je okno
+na půl obrazovky, kde se plná lišta **zalomí do dvou řad nahoře i dole**.
+Nahlásil to se snímkem okna 1044 pixelů širokého.
+
+Hranice 1500 není od oka: plná lišta má dole šestnáct nabídek nástrojů
+a čtrnáct tlačítek ovládání, což i s mezerami dělá kolem 1500 pixelů. Pod tím
+se zalomí, takže přesně tam má smysl začít schovávat.
+
+Podmínka pro `compact` je dvojí:
 
 - `pointer: coarse` je prst. Dotykové zařízení dostane úspornou lištu i na
-  tabletu, kde by se ta plná sice vešla, ale tlačítka by byla na prst malá.
+  tabletu, kde by se ta hustá sice vešla, ale tlačítka by byla na prst malá.
   Notebook s dotykovou obrazovkou sem **nespadá** — hlásí `fine`, protože se
   podmínka ptá na hlavní ukazatel, ne na to, co všechno zařízení umí.
-- Úzké okno dostane totéž bez ohledu na ukazatel. Plná lišta se v něm stejně
-  zalamuje do tří řad.
+- Úzké okno dostane totéž bez ohledu na ukazatel.
 
-Podmínka se **hlídá za běhu** (`watchCompact`), ne jen při startu: otočení
-telefonu na šířku mění šířku okna a lišta se musí přestavět.
+Stupeň se **hlídá za běhu** (`watchLayout`), ne jen při startu: otočení telefonu
+i přetažení okna myší lištu přestaví. Hlásí se jen skutečná změna stupně —
+přetažení okna o pixel spustí událost pokaždé, ale přestavovat HUD kvůli tomu
+není proč.
 
 ### Proč to není media query
 
@@ -66,6 +77,14 @@ Autor si po prvním kole vyžádal, aby **síť, uložení a trojtečka stály v
 
 Řadu s paletou skládá HUD (`hud__tools-row`): vlevo si do ní paleta pověsí svou
 lištu, vpravo HUD dopíše to, co k ní patří.
+
+Spodek lišty je přitom **jeden tok**, ne dvě oddělené řady. Ty po sobě nechávaly
+u pravého okraje díru, protože se každá zalamovala sama za sebe — hlásil to
+autor. Řeší to `flex-wrap: wrap-reverse`, který vysází první řádek dole a teprve
+co se do něj nevejde, přelije nahoru; obaly `hud__extras` a `hud__row` dostanou
+`display: contents`, aby se zalamovala jednotlivá tlačítka, ne celé skupiny.
+Pořadí v DOMu je pořadí důležitosti: paleta, síť, uložení, trojtečka, pak lupa
+a pohledy.
 
 ### Jedna trojtečka, ne dvě
 

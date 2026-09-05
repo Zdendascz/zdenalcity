@@ -17,8 +17,8 @@ import type { ToolOption } from './tools';
  * Nabídka s jedinou položkou se nerozbaluje — z buldozeru by roleta byla jen
  * kliknutí navíc.
  *
- * Na telefonu se ani těch osm roletek nevejde (viz `layout.ts`): v liště pak
- * zůstane jen `COMPACT_GROUPS` a zbytek čeká ve vysouvací řadě nad ní.
+ * Do úzkého okna se ani těch šestnáct roletek nevejde (viz `layout.ts`):
+ * v liště pak zůstane jen `COMPACT_GROUPS` a zbytek čeká ve vysouvací řadě.
  *
  * Tu řadu **vlastní HUD**, ne paleta: je společná pro schované nástroje
  * i schované ovládání a otevírá je jedna trojtečka. Paleta o ní ví jen tolik,
@@ -35,14 +35,15 @@ export class Toolbar {
   private readonly bar: HTMLElement;
   private readonly overflow: ToolbarOverflow | null;
   private activeId: string;
-  private compact: boolean;
+  /** Schovávat nabídky do vysunuté řady? Viz `ui/layout.ts`. */
+  private dense: boolean;
 
   constructor(
     parent: HTMLElement,
     i18n: I18n,
     tools: readonly ToolOption[],
     activeId: string,
-    compact: boolean,
+    dense: boolean,
     overflow: ToolbarOverflow | null,
     onSelect: (tool: ToolOption) => void,
   ) {
@@ -50,7 +51,7 @@ export class Toolbar {
     this.tools = tools;
     this.onSelect = onSelect;
     this.activeId = activeId;
-    this.compact = compact;
+    this.dense = dense;
     this.overflow = overflow;
 
     this.root = el('div', 'toolbar');
@@ -66,9 +67,9 @@ export class Toolbar {
     this.reflect();
   }
 
-  setCompact(compact: boolean): void {
-    if (compact === this.compact) return;
-    this.compact = compact;
+  setDense(dense: boolean): void {
+    if (dense === this.dense) return;
+    this.dense = dense;
     this.build();
   }
 
@@ -96,7 +97,7 @@ export class Toolbar {
       if (!first) continue;
       // Bez místa, kam schované pověsit, zůstane v liště všechno. Radši
       // zalomená lišta než nástroje, ke kterým nevede tlačítko.
-      const hidden = this.compact && !this.inBar(first) && this.overflow !== null;
+      const hidden = this.dense && !this.inBar(first) && this.overflow !== null;
       this.buildGroup(group, hidden ? (this.overflow?.host ?? this.bar) : this.bar);
     }
 

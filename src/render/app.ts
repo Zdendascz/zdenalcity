@@ -60,7 +60,7 @@ import { Hud } from '@/ui/hud';
 import { setIconImages } from '@/ui/icons';
 import type { OverlayOption } from '@/ui/hud';
 import { I18n, pickLanguage } from '@/ui/i18n';
-import { isCompact, watchCompact } from '@/ui/layout';
+import { layoutMode, watchLayout } from '@/ui/layout';
 import type { LocaleTables } from '@/ui/i18n';
 import { createBrowserPlatform } from '@/platform';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
@@ -1608,7 +1608,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   let armedDisaster: string | null = null;
 
-  const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, disasterRegistry.kinds(), isCompact(), {
+  const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, disasterRegistry.kinds(), layoutMode(), {
     onSpeed: setSpeed,
     onTaxChange: changeTax,
     onQuickSave: () => void quickSaveNow(),
@@ -1692,13 +1692,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     i18n,
     tools,
     activeTool.id,
-    isCompact(),
+    layoutMode() !== 'full',
     hud.overflow,
     selectTool,
   );
-  watchCompact((compact) => {
-    hud.setCompact(compact);
-    toolbar.setCompact(compact);
+  watchLayout((mode) => {
+    hud.setLayout(mode);
+    toolbar.setDense(mode !== 'full');
   });
 
   const canvas = app.canvas;

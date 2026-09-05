@@ -7,6 +7,7 @@ import { button, el } from './dom';
 import { formatNumber } from './format';
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
+import type { LayoutMode } from './layout';
 import { Menu, Popover } from './popover';
 
 /** 1 tik = 1 den, 30 dní = měsíc, 12 měsíců = rok (§5). */
@@ -202,8 +203,25 @@ export class Hud {
   private readonly view: ReadonlyWorldView;
   private readonly speeds: readonly number[];
   private readonly callbacks: HudCallbacks;
-  /** Úsporná lišta pro telefon, viz `ui/layout.ts`. */
-  private compact: boolean;
+  /** Jak široké je rozhraní, viz `ui/layout.ts`. */
+  private layout: LayoutMode;
+
+  /**
+   * Plný telefonní režim: sloučená tlačítka, lupa, síť a uložení v řadě
+   * s paletou.
+   */
+  private get compact(): boolean {
+    return this.layout === 'compact';
+  }
+
+  /**
+   * Cokoli užšího než široký monitor. Schovává nástroje a ovládání pod
+   * trojtečku a z osmi statistik nechá kasu s bilancí — jinak se lišta zalomí
+   * do dvou řad nahoře i dole.
+   */
+  private get dense(): boolean {
+    return this.layout !== 'full';
+  }
 
   /**
    * Kam si `app.ts` pověsí grafickou paletu a co k ní na telefonu přibude.
@@ -213,6 +231,11 @@ export class Hud {
    * kterou plní HUD; paleta si plní `toolsSlot` vedle.
    */
   private readonly barExtras: HTMLElement;
+  /**
+   * Spodní řada. Na telefonu do ní spadne **všechno** ovládání, ne jen paleta:
+   * teprve co se do ní nevejde, se přelije nahoru.
+   */
+  private readonly toolsRow: HTMLElement;
 
   /** Kořen HUDu. Nese třídu `hud--compact`, podle které se řídí CSS. */
   private readonly root: HTMLElement;
@@ -233,6 +256,8 @@ export class Hud {
   private speedMenu: Menu | null = null;
   /** Pauza a běh v jednom tlačítku. Jen na telefonu. */
   private playButton: HTMLButtonElement | null = null;
+  /** Co je na tom tlačítku nakreslené. Prázdné = ještě nic. */
+  private playShown = '';
   /**
    * Poslední rychlost, na které čas běžel.
    *
@@ -292,10 +317,10 @@ export class Hud {
     layers: readonly OverlayOption[],
     serviceClasses: readonly string[],
     disasters: readonly string[],
-    compact: boolean,
+    layout: LayoutMode,
     callbacks: HudCallbacks,
   ) {
-    this.compact = compact;
+    this.layout = layout;
     this.i18n = i18n;
     this.view = view;
     this.speeds = speeds;
@@ -311,10 +336,10 @@ export class Hud {
 
     // Spodní řada: paleta nástrojů a hned za ní to, co k ní autor chtěl mít —
     // síť, uložení a trojtečka. Jeden řádek, ne dva nad sebou.
-    const toolsRow = el('div', 'hud__tools-row');
+    this.toolsRow = el('div', 'hud__tools-row');
     this.toolsSlot = el('div', 'hud__tools');
     this.barExtras = el('div', 'hud__extras');
-    toolsRow.append(this.toolsSlot, this.barExtras);
+    this.toolsRow.append(this.toolsSlot, this.barExtras);
 
     this.controls = el('div', 'hud__controls');
     // Vysunutá řada je nad tou stálou: pod lištou už je jen okraj displeje.
@@ -327,7 +352,7 @@ export class Hud {
     this.controlRow = el('div', 'hud__row');
     this.controls.append(this.controlDrawer, this.controlRow);
 
-    bottom.append(toolsRow, this.controls);
+    bottom.append(this.toolsRow, this.controls);
     parent.append(this.top, bottom);
 
     this.build();
@@ -356,9 +381,9 @@ export class Hud {
    * Volá se při otočení telefonu i při změně šířky okna. Přestavuje se celý
    * HUD, protože se mění, **kam** které tlačítko patří — a to není věc CSS.
    */
-  setCompact(compact: boolean): void {
-    if (compact === this.compact) return;
-    this.compact = compact;
+  setLayout(layout: LayoutMode): void {
+    if (layout === this.layout) return;
+    this.layout = layout;
     this.build();
     this.update(this.lastState);
   }
@@ -472,7 +497,7 @@ export class Hud {
    * k paletě (zadání autora) a zbytek čeká ve vysunuté řadě.
    */
   private slot(primary: boolean): HTMLElement {
-    return !this.compact || primary ? this.controlRow : this.controlDrawerGroup;
+    return !this.dense || primary ? this.controlRow : this.controlDrawerGroup;
   }
 
   /** Na telefonu do řady s paletou, jinak mezi ostatní ovládání. */
@@ -482,6 +507,17 @@ export class Hud {
 
   private build(): void {
     this.root.classList.toggle('hud--compact', this.compact);
+    this.root.classList.toggle('hud--dense', this.dense);
+    /*
+     * Na telefonu je spodek lišty **jeden tok**, ne dvě oddělené řady: řada
+     * s paletou se plní první a co se do ní nevejde, se přelije nahoru. Dvě
+     * nezávislé řady po sobě nechávaly u pravého okraje díru, protože se každá
+     * zalamovala sama za sebe. Hlásil to autor.
+     *
+     * Pořadí v DOMu je pořadí důležitosti: paleta, pak síť, uložení
+     * a trojtečka, teprve pak lupa a pohledy.
+     */
+    (this.compact ? this.toolsRow : this.controls).appendChild(this.controlRow);
     this.top.replaceChildren();
     this.controlRow.replaceChildren();
     this.controlDrawerGroup.replaceChildren();
@@ -533,7 +569,7 @@ export class Hud {
    * vpravo — tam, kde ho na telefonu chytí palec.
    */
   private buildMore(): void {
-    if (!this.compact) return;
+    if (!this.dense) return;
     const label = this.i18n.t('ui.toolbar.more');
     const node = button('toolbar__button', () => {
       this.controlDrawer.classList.toggle('is-hidden');
@@ -541,7 +577,7 @@ export class Hud {
     node.appendChild(iconSvg('more'));
     node.title = label;
     node.setAttribute('aria-label', label);
-    this.barExtras.appendChild(node);
+    this.barSlot().appendChild(node);
   }
 
   /**
@@ -609,11 +645,11 @@ export class Hud {
   private buildStats(parent: HTMLElement): void {
     const group = el('div', 'stats');
     for (const row of STAT_ROWS) {
-      if (this.compact && row.primary !== true) continue;
+      if (this.dense && row.primary !== true) continue;
       group.appendChild(this.stat(row.key, row.labelKey));
     }
 
-    if (!this.compact) {
+    if (!this.dense) {
       parent.appendChild(group);
       return;
     }
@@ -713,6 +749,7 @@ export class Hud {
       this.callbacks.onSpeed(this.lastState.speedIndex === 0 ? this.lastRunning : 0);
     });
     this.playButton = node;
+    this.playShown = '';
     group.appendChild(node);
     parent.appendChild(group);
 
@@ -734,16 +771,28 @@ export class Hud {
     this.reflectPlayPause();
   }
 
-  /** Ikona i popisek přepínače podle toho, jestli čas zrovna běží. */
+  /**
+   * Ikona i popisek přepínače podle toho, jestli čas zrovna běží.
+   *
+   * Sahá na obsah tlačítka, **jen když se něco změnilo**. Volá se každý snímek
+   * a kdyby obrázek pokaždé vyhodilo a nahradilo novým, prst by mezi stiskem
+   * a puštěním přišel o cíl a prohlížeč by `click` vůbec neposlal — na telefonu
+   * pak tlačítko spuštění nereagovalo. Hlásil to autor.
+   */
   private reflectPlayPause(): void {
     const node = this.playButton;
     if (!node) return;
+
     const paused = this.lastState.speedIndex === 0;
     // Na tlačítku je **to, co se stane po stisku**, ne to, co zrovna platí:
     // tak to má každý přehrávač a hráč to nemusí luštit.
     const label = paused
       ? this.speedLabel(this.speeds[this.lastRunning] ?? 1)
       : this.i18n.t('ui.speed.pause');
+    const shown = `${paused ? 'play' : 'pause'}:${label}`;
+    if (shown === this.playShown) return;
+    this.playShown = shown;
+
     node.replaceChildren(iconSvg(paused ? 'speed-1' : 'speed-pause'));
     node.title = `${this.i18n.t('ui.speed.label')}: ${label}`;
     node.setAttribute('aria-label', label);

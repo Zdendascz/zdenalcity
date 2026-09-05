@@ -1,45 +1,69 @@
 /**
- * Kdy se rozhraní přepne do úsporného režimu.
+ * Jak široké je rozhraní a co se do něj vejde.
  *
- * Hru začali lidé hrát na mobilu a HUD, který na monitoru sedí, tam zabírá
- * půlku obrazovky: dvacet nástrojů ve třech řadách, osm statistik vedle sebe
- * a pět stupňů rychlosti. Na telefonu z toho zbyde škvíra na město.
+ * Tři stupně, ne dva. Hru začali lidé hrát na mobilu a HUD, který na monitoru
+ * sedí, tam zabíral půlku obrazovky — jenže mezi telefonem a širokým monitorem
+ * je ještě okno na půl obrazovky, kde se plná lišta **zalomí do dvou řad nahoře
+ * i dole**. Autor to nahlásil se snímkem okna 1044 pixelů širokého: „vypadá to
+ * kravsky na dva řádky nahoře i dole."
  *
- * Úsporný režim proto nechá v liště **jen to, co hráč mačká pořád**, a zbytek
- * schová za jedno tlačítko. Co kam patří, rozhoduje `hud.ts` a `toolbar.ts`;
- * tenhle soubor jen říká, **kdy** se to má stát.
+ * | stupeň | kdy | co se stane |
+ * |---|---|---|
+ * | `full` | široké okno | všechno v liště, jak to bylo vždycky |
+ * | `dense` | okno pod 1500 px | nástroje a ovládání se schovají pod trojtečku, z osmi statistik zbude kasa s bilancí |
+ * | `compact` | prst nebo okno pod 900 px | k tomu ještě lupa a sloučená tlačítka, viz `docs/15-MOBIL.md` |
  *
- * Podmínka je dvojí schválně:
+ * Hranice 1500 není od oka: plná lišta má dole šestnáct nabídek nástrojů
+ * a čtrnáct tlačítek ovládání, což i s mezerami dělá kolem 1500 pixelů. Pod tím
+ * se zalomí, takže přesně tam má smysl začít schovávat.
+ */
+export type LayoutMode = 'full' | 'dense' | 'compact';
+
+/**
+ * Kdy se sáhne po úplně úsporné liště.
  *
- * - `pointer: coarse` je prst. Dotykové zařízení dostane úsporný HUD i na
- *   tabletu, kde by se lišta sice vešla, ale tlačítka by byla na prst malá.
- *   Notebook s dotykovou obrazovkou sem nespadá — ten hlásí `fine`, protože
- *   se rozhoduje podle **hlavního** ukazatele.
- * - Úzké okno dostane totéž bez ohledu na ukazatele. Lišta se v něm stejně
- *   zalamuje do tří řad, takže je to zlepšení i na počítači.
+ * Dvě podmínky, každá kvůli něčemu jinému:
+ *
+ * - `pointer: coarse` je prst. Dotykové zařízení dostane úspornou lištu i na
+ *   tabletu, kde by se ta hustá sice vešla, ale tlačítka by byla na prst malá.
+ *   Notebook s dotykovou obrazovkou sem **nespadá** — hlásí `fine`, protože se
+ *   podmínka ptá na hlavní ukazatel, ne na to, co všechno zařízení umí.
+ * - Úzké okno dostane totéž bez ohledu na ukazatel.
  */
 export const COMPACT_QUERY = '(pointer: coarse), (width <= 900px)';
 
+/** Kdy se začne schovávat pod trojtečku. Viz tabulka výš. */
+export const DENSE_QUERY = '(width <= 1500px)';
+
 /** Bez `matchMedia` (jsdom v testech) se hraje v plné verzi. */
-function query(): MediaQueryList | null {
+function query(text: string): MediaQueryList | null {
   return typeof window === 'undefined' || typeof window.matchMedia !== 'function'
     ? null
-    : window.matchMedia(COMPACT_QUERY);
+    : window.matchMedia(text);
 }
 
-export function isCompact(): boolean {
-  return query()?.matches ?? false;
+export function layoutMode(): LayoutMode {
+  if (query(COMPACT_QUERY)?.matches === true) return 'compact';
+  if (query(DENSE_QUERY)?.matches === true) return 'dense';
+  return 'full';
 }
 
 /**
- * Hlásí změnu režimu.
+ * Hlásí změnu stupně.
  *
- * Otočení telefonu na šířku je právě takový případ: podmínka se nezmění (prst
- * je pořád prst), ale kdyby se měnila, HUD se musí přestavět, ne zůstat
- * v tom, co platilo při startu.
+ * Otočení telefonu i přetažení okna myší je právě takový případ: lišta se musí
+ * přestavět, ne zůstat v tom, co platilo při startu. Hlásí se **jen skutečná
+ * změna stupně** — přetažení okna o pixel spustí událost pokaždé, ale přestavět
+ * HUD kvůli tomu není proč.
  */
-export function watchCompact(onChange: (compact: boolean) => void): void {
-  const media = query();
-  if (!media) return;
-  media.addEventListener('change', (event) => onChange(event.matches));
+export function watchLayout(onChange: (mode: LayoutMode) => void): void {
+  let last = layoutMode();
+  for (const text of [COMPACT_QUERY, DENSE_QUERY]) {
+    query(text)?.addEventListener('change', () => {
+      const mode = layoutMode();
+      if (mode === last) return;
+      last = mode;
+      onChange(mode);
+    });
+  }
 }

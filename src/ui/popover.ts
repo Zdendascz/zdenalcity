@@ -77,6 +77,8 @@ export class Popover {
    */
   readonly trigger: HTMLButtonElement;
   private readonly iconSlot: HTMLElement;
+  /** Které jméno je v ikoně nakreslené. Kvůli `setIcon`, viz tam. */
+  private iconName: string;
   private isOpen = false;
 
   constructor(options: PopoverOptions) {
@@ -88,6 +90,7 @@ export class Popover {
     this.trigger.setAttribute('aria-label', options.label);
 
     this.iconSlot = el('span', 'popover__icon');
+    this.iconName = options.icon;
     this.iconSlot.appendChild(iconSvg(options.icon));
     this.trigger.appendChild(this.iconSlot);
     if (options.showLabel) {
@@ -98,8 +101,18 @@ export class Popover {
     this.root.append(this.trigger, this.panel);
   }
 
-  /** Ikona na tlačítku — mění se podle toho, co má hráč zrovna v ruce. */
+  /**
+   * Ikona na tlačítku — mění se podle toho, co má hráč zrovna v ruce.
+   *
+   * **Stejné jméno se překreslovat nesmí.** `setSelected` volá HUD každý
+   * snímek; kdyby se obrázek pokaždé vyhodil a nahradil novým, prst by mezi
+   * stiskem a puštěním přišel o cíl a prohlížeč by `click` vůbec neposlal.
+   * Na telefonu se tak nedalo zmáčknout zrychlení. Totéž už jednou řešily
+   * ikony běžících pohrom u hodin.
+   */
   setIcon(name: string): void {
+    if (name === this.iconName) return;
+    this.iconName = name;
     this.iconSlot.replaceChildren(iconSvg(name));
   }
 
