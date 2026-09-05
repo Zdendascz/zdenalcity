@@ -63,6 +63,7 @@ import { I18n, pickLanguage } from '@/ui/i18n';
 import type { LocaleTables } from '@/ui/i18n';
 import { createBrowserPlatform } from '@/platform';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
+import { showHelp } from '@/ui/help';
 import { showHome } from '@/ui/home';
 import { Legend } from '@/ui/legend';
 import { Toolbar } from '@/ui/toolbar';
@@ -1611,6 +1612,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onFundingChange: (serviceClass, funding) =>
       dispatch({ type: 'set_service_funding', serviceClass, funding }),
     onLanguageChange: (language) => i18n.setLanguage(language),
+    // Nápověda se otevírá **nad hrou**, ne místo ní: hráč se vrací jedním
+    // tlačítkem a nepřijde o místo, kde se zrovna díval.
+    onHelp: () => showHelp(mount, (key) => i18n.t(key)),
     onArmDisaster: (kind) => {
       armedDisaster = kind;
       message = { key: 'ui.disaster.armed', params: { name: i18n.t(`ui.disaster.${kind}`) } };

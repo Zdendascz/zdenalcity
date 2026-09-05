@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { button, el } from './dom';
+import { showHelp } from './help';
 import type { I18n } from './i18n';
 import { showNewGameDialog } from './newGameDialog';
 import { BUILD_COMMIT, buildAge, buildDate } from './version';
@@ -36,6 +37,21 @@ export interface HomeOptions {
 
 /** Kam se hlásí chyby. Adresa autora, ne obecná schránka. */
 const AUTHOR_EMAIL = 'jsem@zdendas.cz';
+
+/** Discord hráčů. Odkaz vede na pozvánku, ne na kanál — ta platí i pro nečleny. */
+const DISCORD_URL = 'https://discord.gg/TrDVH5kFe2';
+
+/**
+ * Další projekty autora. Logo je obrázek v `public/brand/`, ne text.
+ *
+ * `dark` říká, že logo má **vlastní tmavé pozadí** a nepotřebuje světlou
+ * podložku. Kresba na průhledném pozadí by na tmavém panelu zmizela, takže
+ * dostane bílou dlaždici; obrázek s vlastním papírem se položí, jak je.
+ */
+const PROJECTS = [
+  { url: 'https://zeminarod.cz', logo: 'brand/zeminarod.jpg', label: 'zeminarod.cz', dark: true },
+  { url: 'https://rpgmagazin.cz', logo: 'brand/rpgmagazin.png', label: 'rpgmagazin.cz', dark: false },
+] as const;
 
 /**
  * Obrázky do hlavičky i do galerie.
@@ -337,16 +353,33 @@ function showLightbox(parent: HTMLElement, t: (key: string) => string, from: num
   parent.appendChild(overlay);
 }
 
-/** Řada s odkazy: zatím autoři, časem přibude nápověda a novinky. */
+/** Řada s odkazy: nápověda, autor a Discord. */
 function aboutRow(t: (key: string) => string, root: HTMLElement): HTMLElement {
   const section = el('section', 'home__row');
   section.appendChild(el('h2', 'home__row-title', t('ui.home.about')));
 
   const strip = el('div', 'home__strip');
+
+  // Nápověda první: hra nemá tutoriál, takže je to jediné místo, kde se hráč
+  // doví, proč mu zóna nezarostla.
+  const help = button('home__card home__card--text', () => showHelp(root, t));
+  help.appendChild(el('span', 'home__card-title', t('ui.help.title')));
+  help.appendChild(el('span', 'home__card-note', t('ui.help.note')));
+  strip.appendChild(help);
+
   const card = button('home__card home__card--text', () => showAuthors(root, t));
   card.appendChild(el('span', 'home__card-title', t('ui.home.authors')));
   card.appendChild(el('span', 'home__card-note', t('ui.home.authorsNote')));
   strip.appendChild(card);
+
+  // Discord je **odkaz ven**, ne překryv: je to jiné místo, ne další stránka hry.
+  const discord = el('a', 'home__card home__card--text home__card--link');
+  discord.href = DISCORD_URL;
+  discord.target = '_blank';
+  discord.rel = 'noreferrer noopener';
+  discord.appendChild(el('span', 'home__card-title', t('ui.home.discord')));
+  discord.appendChild(el('span', 'home__card-note', t('ui.home.discordNote')));
+  strip.appendChild(discord);
 
   section.appendChild(strip);
   return section;
@@ -386,6 +419,25 @@ function showAuthors(parent: HTMLElement, t: (key: string) => string): void {
 
   // Věnování stojí samo a jinak než zbytek: není to údaj, je to důvod.
   panel.appendChild(el('p', 'home__dedication', t('ui.authors.dedication')));
+
+  // Další projekty autora. Loga jsou odkazy — kdo sem došel, může chtít vidět,
+  // co ještě dělá.
+  panel.appendChild(el('h3', 'home__panel-subtitle', t('ui.authors.projects')));
+  const projects = el('div', 'home__projects');
+  for (const project of PROJECTS) {
+    const link = el('a', `home__project${project.dark ? '' : ' home__project--light'}`);
+    link.href = project.url;
+    link.target = '_blank';
+    link.rel = 'noreferrer noopener';
+    const image = el('img', 'home__project-logo');
+    image.src = project.logo;
+    image.alt = project.label;
+    // Chybějící logo nesmí odkaz zabít — zůstane jméno domény.
+    image.addEventListener('error', () => image.remove());
+    link.append(image, el('span', 'home__project-label', project.label));
+    projects.appendChild(link);
+  }
+  panel.appendChild(projects);
 
   const close = button('home__button home__button--primary', () => overlay.remove());
   close.textContent = t('ui.home.back');

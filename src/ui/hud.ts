@@ -42,6 +42,13 @@ export interface HudCallbacks {
    */
   onDisasterClick(kind: string, x: number, y: number): void;
   onToggleDecor(): void;
+  /**
+   * Otevře nápovědu.
+   *
+   * Musí být **i ve hře**, ne jen na domovské stránce: otázka „proč mi to
+   * neroste" přijde uprostřed hraní a nikdo se kvůli ní nevrátí do menu.
+   */
+  onHelp(): void;
   onFundingChange(serviceClass: string, funding: number): void;
   onLanguageChange(language: string): void;
   /**
@@ -335,6 +342,7 @@ export class Hud {
     this.buildFunding();
     this.buildBudget();
     this.buildSave();
+    this.buildHelp();
     this.buildLanguage();
     this.buildMessage();
   }
@@ -688,6 +696,16 @@ export class Hud {
 
     popover.panel.append(row, fileRow, shotRow);
     this.controls.appendChild(popover.root);
+  }
+
+  /** Nápověda. Poslední v řadě, hned u jazyka — obojí je o hře, ne o městě. */
+  private buildHelp(): void {
+    const label = this.i18n.t('ui.help.title');
+    const node = button('toolbar__button', () => this.callbacks.onHelp());
+    node.appendChild(iconSvg('help'));
+    node.title = label;
+    node.setAttribute('aria-label', label);
+    this.controls.appendChild(node);
   }
 
   private buildLanguage(): void {

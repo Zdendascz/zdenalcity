@@ -1393,6 +1393,160 @@ body {
   margin-top: 14px;
 }
 
+/* --- nápověda ----------------------------------------------------------- */
+
+/*
+ * Wiki ve hře: seznam témat vlevo, text vpravo. Širší než ostatní panely —
+ * je to jediné místo, kde se čte souvislý text, a úzký sloupec by z něj udělal
+ * telefonní seznam.
+ */
+.help {
+  width: min(880px, 100%);
+}
+
+.help__lead {
+  margin: 0 0 16px;
+  color: #9fb3bb;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.help__body {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.help__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.help__item {
+  padding: 7px 10px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0 4px 4px 0;
+  background: transparent;
+  color: #cdd9de;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.help__item:hover {
+  background: rgb(238 243 245 / 8%);
+}
+
+.help__item.is-active {
+  border-left-color: #f0a020;
+  background: rgb(240 160 32 / 12%);
+  color: #fff;
+}
+
+/* Delší téma se roluje uvnitř, ne celým panelem: seznam témat musí zůstat. */
+.help__article {
+  max-height: min(52vh, 420px);
+  padding-right: 6px;
+  overflow-y: auto;
+}
+
+.help__topic-title {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.help__paragraph {
+  margin: 0 0 10px;
+  color: #cdd9de;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Odrážka: text odsazený, značka na svém místě. */
+.help__bullet {
+  margin: 0 0 7px;
+  padding-left: 18px;
+  color: #cdd9de;
+  font-size: 14px;
+  line-height: 1.6;
+  text-indent: -18px;
+}
+
+.help__bullet::before {
+  margin-right: 8px;
+  color: #f0a020;
+  content: "\2022";
+}
+
+@media (width <= 720px) {
+  /* Na úzké obrazovce se seznam témat položí nad text. */
+  .help__body {
+    grid-template-columns: 1fr;
+  }
+
+  .help__menu {
+    flex-flow: row wrap;
+  }
+}
+
+/* --- další projekty autora ---------------------------------------------- */
+
+.home__panel-subtitle {
+  margin: 18px 0 8px;
+  font-size: 15px;
+}
+
+.home__projects {
+  display: flex;
+  gap: 12px;
+}
+
+/*
+ * Dlaždice s logem. `--light` znamená, že kresba je na průhledném pozadí
+ * a potřebuje světlou podložku — na tmavém panelu by jinak zmizela.
+ */
+.home__project {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgb(238 243 245 / 15%);
+  border-radius: 8px;
+  color: #cdd9de;
+  text-decoration: none;
+}
+
+.home__project:hover {
+  border-color: #f0a020;
+  color: #fff;
+}
+
+.home__project-logo {
+  width: 100%;
+  max-width: 130px;
+  height: auto;
+  border-radius: 4px;
+}
+
+.home__project--light .home__project-logo {
+  padding: 6px;
+  background: #f4efe4;
+}
+
+.home__project-label {
+  font-size: 13px;
+}
+
+/* Karta, která vede ven ze hry. Vypadá jako ostatní, ale je to `<a>`. */
+.home__card--link {
+  text-decoration: none;
+}
+
 /* Adresa v autorech. Jantarová jako tlačítka, ať je poznat, že je to odkaz. */
 .home__mail {
   color: #f0a020;
