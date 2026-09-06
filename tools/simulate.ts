@@ -84,8 +84,8 @@ const TICKS_PER_YEAR = 360;
 /** Jak často hráč sáhne na město. Člověk nekliká každý den. */
 const DECIDE_EVERY = 10;
 
-/** Jak často se zapíše řádek průběhu. */
-const SAMPLE_YEARS = 5;
+/** Jak často se zapíše řádek průběhu. Přepíše `--sample`. */
+let SAMPLE_YEARS = 5;
 
 // --- strategie -------------------------------------------------------------
 
@@ -172,8 +172,10 @@ interface Plan {
   blocks: number;
   /** Id linek MHD, které založil. */
   lines: number[];
-  /** Kolikátý řádek daní naposledy nastavil. */
+  /** Kdy naposledy žádal o půjčku. */
   lastTax: number;
+  /** Kdy naposledy zkoušel postavit kterou budovu. Brzda proti zacyklení. */
+  tried: Map<string, number>;
 }
 
 const CENTRE = 0.5;
@@ -229,6 +231,8 @@ export interface GameResult {
   disasters: Record<string, number>;
   /** Vteřiny, které partie stála. */
   seconds: number;
+  /** Svět na konci. Slouží sondám, do souboru se nezapisuje. */
+  world?: WorldState;
 }
 
 export interface Sample {
@@ -244,6 +248,8 @@ export interface Sample {
   powered: number;
   powerProduced: number;
   powerNeeded: number;
+  waterProduced: number;
+  zonedTiles: number;
   roadTiles: number;
   debt: number;
   bonds: number;
@@ -268,13 +274,18 @@ function sample(world: WorldState, content: ContentRegistry, year: number): Samp
   let powered = 0;
   let powerProduced = 0;
   let powerNeeded = 0;
+  let waterProduced = 0;
   for (const building of world.buildings.values()) {
     if (building.abandoned) abandoned++;
     if (building.powered) powered++;
     const definition = content.get(building.definitionId);
     powerProduced += definition?.power?.production ?? 0;
     powerNeeded += definition?.power?.consumption ?? 0;
+    waterProduced += definition?.water?.production ?? 0;
   }
+
+  let zonedTiles = 0;
+  for (const value of world.layers.zone) if (value !== ZONE.none) zonedTiles++;
 
   const coverage: Record<string, number> = {};
   for (const [serviceClass, field] of world.coverage) {
@@ -294,6 +305,8 @@ function sample(world: WorldState, content: ContentRegistry, year: number): Samp
     powered,
     powerProduced,
     powerNeeded,
+    waterProduced,
+    zonedTiles,
     roadTiles: world.roadTiles.size,
     debt: Math.round(world.loans.reduce((sum, loan) => sum + loan.remaining, 0)),
     bonds: Math.round(world.bonds.reduce((sum, bond) => sum + bond.principal, 0)),
@@ -346,7 +359,7 @@ export function playGame(
   const host: SimHost = createSimHost(world, systems, content, balance);
 
   const rng = new Rng(seed ^ 0x9e3779b9);
-  const plan: Plan = { reach: 4, blocks: 0, lines: [], lastTax: -1 };
+  const plan: Plan = { reach: 0, blocks: 0, lines: [], lastTax: -1, tried: new Map() };
   const commands: Record<string, number> = {};
   const rejected: Record<string, number> = {};
   const seen = new Set<number>();
@@ -392,6 +405,7 @@ export function playGame(
     rejected,
     disasters,
     seconds: Math.round((Date.now() - started) / 100) / 10,
+    world,
   };
 }
 
@@ -466,6 +480,9 @@ class Player {
     this.keepWater();
     // Zóna bez proudu a vody je vyhozená koruna, takže růst čeká na obojí.
     this.grow();
+    // Potrubí po každém zónování: čerstvě vyznačená parcela bez vody nezaroste
+    // a hráč by na ni koukal donekonečna. Už položené trubky se jen odmítnou.
+    if (this.hasUtilities()) this.layPipes();
     this.keepServices();
     this.keepTransit();
   }
@@ -497,6 +514,10 @@ class Player {
 
   private borrow(): void {
     if (this.strategy.finance === 'bez dluhu') return;
+    // Nejvýš jednou za rok. Předtím se o půjčku žádalo při každém rozhodnutí
+    // a dvě stě šedesát pět žádostí za dvacet let je klikání, ne strategie.
+    if (this.world.tick - this.plan.lastTax < TICKS_PER_YEAR) return;
+    this.plan.lastTax = this.world.tick;
     const income = Math.max(1, this.world.economy.lastIncome);
 
     if (this.strategy.finance === 'půjčky') {
@@ -561,13 +582,20 @@ class Player {
   private layPipes(): void {
     const half = Math.round(this.world.size * CENTRE);
     const reach = this.plan.reach;
-    // Mříž po dvou dlaždicích: dům potřebuje vodu **pod sebou**, takže dvě osy
-    // přes střed nestačí a zóna kolem nich by chátrala.
-    for (let dy = -reach; dy <= reach; dy += 2) {
-      for (let dx = -reach; dx <= reach; dx++) {
-        if (this.isLand(half + dx, half + dy)) {
-          this.send({ type: 'build_pipe', x: half + dx, y: half + dy });
-        }
+    // Potrubí **jen pod vyznačené parcely**, ne pod každou volnou dlaždici
+    // u silnice. Předtím jich za dvacet let koupil skoro pět tisíc a město
+    // na to zbankrotovalo dřív, než se stačilo nastěhovat.
+    const size = this.world.size;
+    let budget = 60;
+    for (let dy = -reach; dy <= reach && budget > 0; dy++) {
+      for (let dx = -reach; dx <= reach && budget > 0; dx++) {
+        const x = half + dx;
+        const y = half + dy;
+        if (x < 0 || y < 0 || x >= size || y >= size) continue;
+        const tile = index(x, y, size);
+        if ((this.world.layers.zone[tile] ?? ZONE.none) === ZONE.none) continue;
+        if ((this.world.layers.pipe[tile] ?? 0) !== 0) continue;
+        if (this.send({ type: 'build_pipe', x, y })) budget--;
       }
     }
   }
@@ -585,28 +613,62 @@ class Player {
     // ní se hráč jen prostaví do mínusu. Přesně to se v prvním běhu stalo.
     this.fillBlocks();
 
+    const half = Math.round(this.world.size * CENTRE);
+
+    // Začátek je **kříž o čtrnácti dlaždicích**, nic víc.
+    //
+    // Předtím tu stálo sto dlaždic silnice hned v prvním roce a jejich údržba
+    // srazila kasu do mínusu dřív, než vyrostl první dům. A v mínusu se
+    // ve hře zastaví všechen růst, takže město navždy zamrzlo na čtyřech
+    // lidech — ne kvůli hře, ale kvůli tomu, jak hloupě jsem hrál.
+    if (this.plan.reach === 0) {
+      for (let d = -3; d <= 3; d++) {
+        if (this.isLand(half + d, half)) {
+          this.send({ type: 'build_road', x: half + d, y: half, roadType: ROAD.street });
+        }
+        if (this.isLand(half, half + d)) {
+          this.send({ type: 'build_road', x: half, y: half + d, roadType: ROAD.street });
+        }
+      }
+      this.plan.reach = 3;
+      return;
+    }
+
     const wanted = ambitionReach(this.strategy);
     if (this.plan.reach >= wanted) return;
-    // Prstenec navíc se přidá, až když je z čeho: silnice stojí a nová čtvrť
-    // se sama nezaplatí dřív, než zaroste.
-    if (this.world.economy.funds < 25000) return;
+    // Prstenec navíc, až když je **z čeho a pro koho**: kasa v plusu, měsíční
+    // bilance kladná a stávající čtvrť zarostlá.
+    if (this.world.economy.funds < 20000) return;
+    if (this.world.economy.lastIncome <= this.world.economy.lastExpenses) return;
+    // Osm lidí na dlaždici okruhu: dost na to, aby čtvrť žila, a málo na to,
+    // aby se město zaseklo na prvním kříži. Se čtyřiceti se nikdy nerozrostlo.
+    if (totalPopulation(this.world.buildings) < this.plan.reach * 8) return;
 
-    const half = Math.round(this.world.size * CENTRE);
-    const reach = this.plan.reach + 4;
-
-    // Jen jeden prstenec a jen po souši. Silnice do vody chce most a ten je
-    // drahý; hráč, který se dívá na mapu, tam prostě nestaví.
+    const reach = this.plan.reach + 3;
     for (let d = -reach; d <= reach; d++) {
       for (const [x, y] of [
         [half + d, half + reach],
         [half + d, half - reach],
         [half + reach, half + d],
         [half - reach, half + d],
-        [half + d, half],
-        [half, half + d],
       ] as const) {
         if (!this.isLand(x, y)) continue;
         this.send({ type: 'build_road', x, y, roadType: ROAD.street });
+      }
+    }
+    // A spojky ke kříži, jinak by prstenec visel bez napojení.
+    for (let d = this.plan.reach; d <= reach; d++) {
+      if (this.isLand(half + d, half)) {
+        this.send({ type: 'build_road', x: half + d, y: half, roadType: ROAD.street });
+      }
+      if (this.isLand(half - d, half)) {
+        this.send({ type: 'build_road', x: half - d, y: half, roadType: ROAD.street });
+      }
+      if (this.isLand(half, half + d)) {
+        this.send({ type: 'build_road', x: half, y: half + d, roadType: ROAD.street });
+      }
+      if (this.isLand(half, half - d)) {
+        this.send({ type: 'build_road', x: half, y: half - d, roadType: ROAD.street });
       }
     }
 
@@ -630,13 +692,20 @@ class Player {
     const reach = this.plan.reach;
     const [r, c] = zoneWeights(this.strategy);
 
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const x = half - reach + this.rng.int(reach * 2);
-      const y = half - reach + this.rng.int(reach * 2);
-      if (!this.isLand(x, y)) continue;
+    // Bloky se lepí **na silnici**. Zóna uprostřed pole nezaroste — dům chce
+    // sousedit s vozovkou — a jen by se za ni zaplatilo.
+    const spots = this.besideRoad(reach);
+    if (spots.length === 0) return;
+
+    // Po **jedné dlaždici**. Blok 2×2 se skoro vždy otřel o vozovku a pravidlo
+    // ho odmítlo (`error.roadInTheWay`, tři sta odmítnutí za třicet let), takže
+    // město nemělo kde růst. Parcela u silnice je stejně to, co dům potřebuje.
+    for (const spot of spots.slice(0, 40)) {
       const roll = this.rng.next();
       const zone = roll < r ? ZONE.residential : roll < r + c ? ZONE.commercial : ZONE.industrial;
-      if (this.send({ type: 'zone', x, y, w: 3, h: 3, zone })) this.plan.blocks++;
+      if (this.send({ type: 'zone', x: spot[0], y: spot[1], w: 1, h: 1, zone })) {
+        this.plan.blocks++;
+      }
     }
   }
 
@@ -661,6 +730,140 @@ class Player {
    * Je to jediná osa, kterou lidé v diskusích řeší nejvíc — proto má tři stupně.
    */
   private keepServices(): void {
+    // V mínusu se ve hře zastaví růst, takže je horší postavit něco navíc než
+    // chvíli počkat. Služby jdou stranou, dokud město nevydělává.
+    if (this.world.economy.funds < 8000) return;
+    const threshold = { 'skoupý': 25, 'vyvážený': 70, 'štědrý': 120 }[this.strategy.services];
+    if (this.world.buildings.size < 6) return;
+
+    let worst: { serviceClass: string; value: number } | null = null;
+    for (const serviceClass of this.byClass.keys()) {
+      const value = meanOf(this.world.coverage.get(serviceClass));
+      if (worst === null || value < worst.value) worst = { serviceClass, value };
+    }
+    if (!worst || worst.value >= threshold) return;
+
+    const options = this.byClass.get(worst.serviceClass) ?? [];
+    for (const definition of options) {
+      if (this.world.economy.funds < definition.construction.cost * 2) continue;
+      if (this.place(definition)) return;
+    }
+  }
+
+  // --- MHD -----------------------------------------------------------------
+
+  private keepTransit(): void {
+    if (this.strategy.transit === 'žádná') return;
+    if (totalPopulation(this.world.buildings) < 400) return;
+
+    const mode = this.strategy.transit === 'autobusy' ? 'bus' : 'tram';
+    const stopId = mode === 'bus' ? 'vanilla:transit_stop' : 'vanilla:tram_stop';
+
+    if (this.plan.lines.length === 0) {
+      if (!this.send({ type: 'create_line', mode })) return;
+      const line = this.world.lines[this.world.lines.length - 1];
+      if (!line) return;
+      this.plan.lines.push(line.id);
+      this.send({ type: 'set_vehicles', lineId: line.id, vehicles: 4 });
+      this.send({ type: 'set_fare', lineId: line.id, fare: 6 });
+    }
+
+    const lineId = this.plan.lines[0];
+    if (lineId === undefined) return;
+    const line = this.world.lines.find((candidate) => candidate.id === lineId);
+    if (!line || line.stops.length >= 10) return;
+
+    // Zastávka se nejdřív postaví, pak přidá na linku — přesně jako v rozhraní.
+    const definition = this.content.get(stopId);
+    if (!definition) return;
+    const before = new Set(this.world.buildings.keys());
+    if (!this.place(definition)) return;
+    const created = [...this.world.buildings.keys()].find((id) => !before.has(id));
+    if (created === undefined) return;
+    this.send({ type: 'add_stop', lineId, buildingId: created });
+  }
+
+  // --- kam co postavit -----------------------------------------------------
+
+  /** Souš u vody v dosahu města. Sem patří vodárna a čerpací stanice. */
+  private shoreSpots(reach: number, w: number, d: number): [number, number][] {
+    const half = Math.round(this.world.size * CENTRE);
+    const out: [number, number][] = [];
+    for (let dy = -reach; dy <= reach; dy++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        const x = half + dx;
+        const y = half + dy;
+        // **Celý půdorys musí být na souši** a aspoň jednou hranou u vody.
+        // Vodárna je 3×3; když se hledala jedna dlaždice u břehu, spadly jí
+        // do vody dvě třetiny parcely a nepostavila se nikdy.
+        let land = true;
+        for (let oy = 0; oy < d && land; oy++) {
+          for (let ox = 0; ox < w && land; ox++) land = this.isLand(x + ox, y + oy);
+        }
+        if (!land) continue;
+
+        let touches = false;
+        for (let oy = -1; oy <= d && !touches; oy++) {
+          for (let ox = -1; ox <= w && !touches; ox++) {
+            const nx = x + ox;
+            const ny = y + oy;
+            if (nx < 0 || ny < 0 || nx >= this.world.size || ny >= this.world.size) continue;
+            if (this.world.layers.terrain[index(nx, ny, this.world.size)] === TERRAIN.water) {
+              touches = true;
+            }
+          }
+        }
+        if (touches) out.push([x, y]);
+      }
+    }
+    // Nejbližší břeh první: silnice k němu se platí po dlaždicích.
+    out.sort(
+      (a, b) =>
+        Math.abs(a[0] - half) +
+        Math.abs(a[1] - half) -
+        (Math.abs(b[0] - half) + Math.abs(b[1] - half)),
+    );
+    return out.slice(0, 12);
+  }
+
+  private besideRoad(reach: number): [number, number][] {
+    const half = Math.round(this.world.size * CENTRE);
+    const size = this.world.size;
+    const out: [number, number][] = [];
+    for (let dy = -reach; dy <= reach; dy++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        const x = half + dx;
+        const y = half + dy;
+        if (!this.isLand(x, y)) continue;
+        const tile = index(x, y, size);
+        if ((this.world.layers.road[tile] ?? ROAD.none) !== ROAD.none) continue;
+        if ((this.world.layers.buildingId[tile] ?? 0) !== 0) continue;
+        // Už vyznačenou parcelu nechat být. Hráč ji předtím při každém
+        // rozhodnutí přebarvil na jinou zónu, takže na ní nikdy nic nestihlo
+        // vyrůst — dva a půl tisíce zbytečných zásahů za dvacet let.
+        if ((this.world.layers.zone[tile] ?? ZONE.none) !== ZONE.none) continue;
+        const touches = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(
+          ([ox, oy]) =>
+            (this.world.layers.road[index(x + ox, y + oy, size)] ?? ROAD.none) !== ROAD.none,
+        );
+        if (touches) out.push([x, y]);
+      }
+    }
+    return out;
+  }
+
+  // --- služby --------------------------------------------------------------
+
+  /**
+   * Doplní službu, které je ve městě nejmíň.
+   *
+   * Skoupý hráč staví, až když pokrytí spadne hodně nízko, štědrý drží rezervu.
+   * Je to jediná osa, kterou lidé v diskusích řeší nejvíc — proto má tři stupně.
+   */
+  private keepServices(): void {
+    // V mínusu se ve hře zastaví růst, takže je horší postavit něco navíc než
+    // chvíli počkat. Služby jdou stranou, dokud město nevydělává.
+    if (this.world.economy.funds < 8000) return;
     const threshold = { 'skoupý': 25, 'vyvážený': 70, 'štědrý': 120 }[this.strategy.services];
     if (this.world.buildings.size < 6) return;
 
@@ -721,27 +924,47 @@ class Player {
    * to je taky jen tlačítko, které má člověk k dispozici.
    */
   private place(definition: Definition): boolean {
+    // **Nejvýš jeden pokus za rok na budovu.**
+    //
+    // Předtím se o totéž zkoušelo při každém rozhodnutí, takže se k břehu
+    // pořád dokola natahovala tatáž silnice: dva a tři čtvrtě milionu
+    // odmítnutých příkazů `error.roadExists` za partii. Hráč mezitím neudělal
+    // nic jiného a město nevzniklo.
+    const last = this.plan.tried.get(definition.id) ?? -TICKS_PER_YEAR;
+    if (this.world.tick - last < TICKS_PER_YEAR) return false;
+    this.plan.tried.set(definition.id, this.world.tick);
+
     const [w, d] = definition.footprint;
     const half = Math.round(this.world.size * CENTRE);
     const reach = Math.max(6, this.plan.reach);
 
     // Vodárna musí stát u vody. Hráč se podívá na mapu a jde k břehu; náhodné
     // klikání doprostřed města ji nepostaví nikdy — a bez vody město neroste.
-    const shore = definition.construction.nearWater === true ? this.shoreSpots(reach) : null;
+    const shore = definition.construction.nearWater === true ? this.shoreSpots(40, w, d) : null;
 
-    for (let attempt = 0; attempt < 24; attempt++) {
-      const spot = shore ? this.rng.pick(shore) : null;
+    // U pobřežní stavby se zkouší jen pár nejbližších míst: ke každému se
+    // táhne silnice a ta se platí po dlaždicích.
+    const tries = shore ? Math.min(shore.length, 6) : 24;
+    for (let attempt = 0; attempt < tries; attempt++) {
+      const spot = shore ? shore[attempt] : null;
       if (shore && !spot) return false;
-      const x = spot ? spot[0] : half - reach + this.rng.int(reach * 2);
-      const y = spot ? spot[1] : half - reach + this.rng.int(reach * 2);
+      const free = spot ?? this.rng.pick(this.besideRoad(reach));
+      if (!free) return false;
+      const [x, y] = free;
+      // K vodárně se musí dostat silnice, jinak ji pravidlo odmítne.
+      if (spot) this.roadTo(x, y);
       if (x < 1 || y < 1 || x + w >= this.world.size || y + d >= this.world.size) continue;
       if (!this.freeAndNearRoad(x, y, w, d)) continue;
 
       if (this.send({ type: 'place_building', definitionId: definition.id, x, y })) return true;
 
       // Les, balvany, trosky: hráč je odveze buldozerem a zkusí to znovu.
-      for (let dy = 0; dy < d; dy++) {
-        for (let dx = 0; dx < w; dx++) this.send({ type: 'bulldoze', x: x + dx, y: y + dy });
+      // Jen u prvních tří míst — jinak se za partii naklikalo přes milion
+      // odmítnutých „tady není co bourat".
+      if (attempt < 3) {
+        for (let dy = 0; dy < d; dy++) {
+          for (let dx = 0; dx < w; dx++) this.send({ type: 'bulldoze', x: x + dx, y: y + dy });
+        }
       }
       if (this.send({ type: 'place_building', definitionId: definition.id, x, y })) return true;
 
@@ -754,23 +977,24 @@ class Player {
     return false;
   }
 
-  /** Souš u vody v dosahu města. Sem patří vodárna a čerpací stanice. */
-  private shoreSpots(reach: number): [number, number][] {
+  /**
+   * Přivede silnici k cíli.
+   *
+   * Lomená cesta ze středu: nejdřív po ose x, pak po ose y. Voda se přeskakuje,
+   * takže se cesta u zálivu přeruší — a to je v pořádku, hráč by ji tam taky
+   * nevedl. Bez tohohle se **vodárna nedá postavit vůbec**: musí stát u vody
+   * a zároveň u silnice, a k břehu žádná nevedla.
+   */
+  private roadTo(tx: number, ty: number): void {
     const half = Math.round(this.world.size * CENTRE);
-    const out: [number, number][] = [];
-    for (let dy = -reach; dy <= reach; dy++) {
-      for (let dx = -reach; dx <= reach; dx++) {
-        const x = half + dx;
-        const y = half + dy;
-        if (!this.isLand(x, y)) continue;
-        const touches = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(
-          ([ox, oy]) =>
-            this.world.layers.terrain[index(x + ox, y + oy, this.world.size)] === TERRAIN.water,
-        );
-        if (touches) out.push([x, y]);
-      }
+    const stepX = tx >= half ? 1 : -1;
+    for (let x = half; x !== tx; x += stepX) {
+      if (this.isLand(x, half)) this.send({ type: 'build_road', x, y: half, roadType: ROAD.street });
     }
-    return out;
+    const stepY = ty >= half ? 1 : -1;
+    for (let y = half; y !== ty; y += stepY) {
+      if (this.isLand(tx, y)) this.send({ type: 'build_road', x: tx, y, roadType: ROAD.street });
+    }
   }
 
   private freeAndNearRoad(x: number, y: number, w: number, d: number): boolean {
@@ -814,6 +1038,7 @@ function parseArgs(argv: string[]): Options {
     const at = argv.indexOf(`--${name}`);
     return at >= 0 ? (argv[at + 1] ?? fallback) : fallback;
   };
+  SAMPLE_YEARS = value('sample', SAMPLE_YEARS);
   return {
     games: value('games', 0),
     years: value('years', 100),
@@ -852,13 +1077,15 @@ async function main(): Promise<void> {
     const result = playGame(content, job.strategy, job.seed, options.years);
     appendFileSync(games, `${JSON.stringify(result)}\n`);
 
-    const done = i - options.offset + 1;
+    const done = Math.floor((i - options.offset) / options.stride) + 1;
     const elapsed = (Date.now() - started) / 1000;
     if (done % 5 === 0 || done === 1) {
+      const mine = Math.ceil((total - options.offset) / options.stride);
       const rate = elapsed / done;
       process.stdout.write(
-        `  ${done}/${total - options.offset}  ${elapsed.toFixed(0)} s  ` +
-          `(${rate.toFixed(1)} s/partii, zbývá ${(((total - options.offset - done) * rate) / 60).toFixed(0)} min)\n`,
+        `  ${done}/${mine}  ${elapsed.toFixed(0)} s  ` +
+          `(${rate.toFixed(1)} s/partii, zbývá ${(((mine - done) * rate) / 60).toFixed(0)} min)
+`,
       );
     }
   }
