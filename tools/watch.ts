@@ -48,12 +48,13 @@ const STRATEGY: Strategy = {
   funding: 'plné',
 };
 
+const YEARS = Number(process.argv[3] ?? 40);
 const seeds = process.argv.includes('--seeds')
   ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   : [Number(process.argv[2] ?? 12345)];
 
 for (const seed of seeds) {
-  const result = playGame(content, STRATEGY, seed, seeds.length > 1 ? 100 : 40, (world, year) => {
+  const result = playGame(content, STRATEGY, seed, seeds.length > 1 ? 100 : YEARS, (world, year) => {
     if (seeds.length > 1) return;
     if (year % 5 !== 0) return;
     const f = {
@@ -61,7 +62,16 @@ for (const seed of seeds) {
       budov: world.buildings.size,
       kasa: Math.round(world.economy.funds),
     };
-    for (const b of world.buildings.values()) f.obyv += b.population;
+    let voda = 0;
+    let vodaren = 0;
+    for (const b of world.buildings.values()) {
+      f.obyv += b.population;
+      const d = content.get(b.definitionId);
+      if ((d?.water?.production ?? 0) > 0) {
+        vodaren++;
+        if (!b.abandoned) voda += d?.water?.production ?? 0;
+      }
+    }
     process.stdout.write(
       `  rok ${String(year).padStart(3)}  obyv ${String(f.obyv).padStart(5)}` +
         `  budov ${String(f.budov).padStart(4)}  kasa ${String(f.kasa).padStart(9)}` +
@@ -69,9 +79,23 @@ for (const seed of seeds) {
         `  vydaje ${String(Math.round(world.economy.lastExpenses)).padStart(6)}` +
         `  napajeno ${String([...world.buildings.values()].filter((b) => b.powered).length).padStart(4)}` +
         `  dane ${world.economy.taxRates.residential}%` +
+        `  voda ${voda}/${vodaren}` +
         `  ${blockers(world)}\n`,
     );
   });
+
+  const top = (rec: Record<string, number>): string =>
+    Object.entries(rec)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([k, v]) => `${k.replace(/^error\./, '')}×${v}`)
+      .join(' ');
+  process.stdout.write(`  prikazy: ${top(result.commands)}
+`);
+  process.stdout.write(`  odmitnuto: ${top(result.rejected)}
+`);
+  process.stdout.write(`  pohromy: ${top(result.disasters)}
+`);
 
   const f = result.final;
   process.stdout.write(

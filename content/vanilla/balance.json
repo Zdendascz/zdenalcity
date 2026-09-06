@@ -416,6 +416,7 @@
     },
     "blackout": {
       "cascadeEvery": 2,
+      "maxTicks": 90,
       "overloadRatio": 1.15,
       "recoveryRatio": 0.95,
       "calmCycles": 3,

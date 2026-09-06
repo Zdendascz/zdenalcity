@@ -319,6 +319,22 @@ export interface GangWarBalance {
  */
 export interface BlackoutBalance {
   cascadeEvery: number;
+  /**
+   * Nejdéle takhle dlouho, ať se stane cokoli.
+   *
+   * Bez stropu je blackout **past bez východu** a změřilo ho to na simulované
+   * partii: dvě elektrárny šly dolů ve čtvrtém roce a čtyřicet let se
+   * nevrátily. Zatížení se totiž počítá proti spotřebě **celého** města, i toho
+   * potmě — vrácená elektrárna ho sama neunese, hned padne zpátky a klid se
+   * počítá znovu od nuly. Město mezitím nemá proud, nenapájený dům neplatí daň,
+   * příjem je nula a půjčka se odvozuje od příjmu (T57), takže se nedá ani
+   * půjčit. Přesně o tomhle stavu píše komentář v `blackout.ts`: katastrofa,
+   * ze které není cesty ven, není katastrofa, ale konec hry.
+   *
+   * Strop to nedělá neškodným — město s tenkou rezervou dostane další výpadek
+   * hned, jak doběhne doba hájení. Jen mu nechá šanci ho přežít.
+   */
+  maxTicks: number;
   /** Nad tímhle zatížením padne další elektrárna. */
   overloadRatio: number;
   /** Pod tímhle se začne počítat klid. */
@@ -2116,6 +2132,7 @@ function validateBlackout(
   const raw = disasterSection(issues, disasters, 'blackout');
   const value: BlackoutBalance = {
     cascadeEvery: num(issues, raw, 'cascadeEvery', 'disasters.blackout.cascadeEvery', 1, 100),
+    maxTicks: num(issues, raw, 'maxTicks', 'disasters.blackout.maxTicks', 1, 10000),
     overloadRatio: num(issues, raw, 'overloadRatio', 'disasters.blackout.overloadRatio', 1, 10),
     recoveryRatio: num(issues, raw, 'recoveryRatio', 'disasters.blackout.recoveryRatio', 0, 10),
     calmCycles: num(issues, raw, 'calmCycles', 'disasters.blackout.calmCycles', 1, 100),

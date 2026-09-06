@@ -341,6 +341,8 @@ export interface PlacementEstimate {
   total: number;
   /** Rohy, které srovnání pohne. Prázdné, když se nic srovnávat nemusí. */
   changes: Map<number, number>;
+  /** Rohy parcely samotné. Dorovnání pod silnicí je nesmí přepsat (T101). */
+  core: Set<number>;
 }
 
 /**
@@ -359,7 +361,9 @@ export function estimatePlacement(
   balance?: Balance,
 ): PlacementEstimate {
   const definition = catalogue.get(definitionId);
-  if (!definition) return { building: 0, levelling: 0, total: 0, changes: new Map() };
+  if (!definition) {
+    return { building: 0, levelling: 0, total: 0, changes: new Map(), core: new Set() };
+  }
 
   const [width, depth] = definition.footprint;
   // Co snese svah, to se nesrovnává a nic za srovnání neplatí — park se do
@@ -370,11 +374,12 @@ export function estimatePlacement(
   // Dorovnání terénu pod okolními silnicemi je **součást ceny**, ne překvapení
   // na účtu (§12 kritérium 14). Bez toho by hráč zaplatil za rohy, které v
   // odhadu neviděl — a do T101 se místo nich rovnou bořila vozovka.
-  const changes = gradeForRoads(world, wanted).changes;
+  const core = coreCorners(world, x, y, width, depth);
+  const changes = gradeForRoads(world, wanted, [], core).changes;
   const levelling = changes.size * (balance?.map.terraformCost ?? 0);
   const building = definition.construction.cost;
 
-  return { building, levelling, total: building + levelling, changes };
+  return { building, levelling, total: building + levelling, changes, core };
 }
 
 /**
@@ -388,6 +393,24 @@ export function estimatePlacement(
  * Vyplavalo to při hraní: elektrárna u pobřeží se odmítala postavit s hláškou
  * „zvedat dno moře neumíme", i když stála celá na souši.
  */
+/**
+ * Rohy obdélníku dlaždic — to, co si hráč vyžádal.
+ *
+ * Kaskáda kolem toho je důsledek, ne přání, takže se s ní při dorovnávání
+ * terénu pod silnicí smí hýbat (T101).
+ */
+function coreCorners(world: WorldState, x: number, y: number, w: number, h: number): Set<number> {
+  const side = world.size + 1;
+  const out = new Set<number>();
+  for (let cy = y; cy <= y + h; cy++) {
+    for (let cx = x; cx <= x + w; cx++) {
+      if (cx < 0 || cy < 0 || cx >= side || cy >= side) continue;
+      out.add(cy * side + cx);
+    }
+  }
+  return out;
+}
+
 function planLevelling(
   world: WorldState,
   x: number,
@@ -438,7 +461,7 @@ export function placeDefinition(
   if (!met.ok) return met;
 
   if (plan.changes.size > 0) {
-    const allowed = checkTerraform(world, plan.changes);
+    const allowed = checkTerraform(world, plan.changes, plan.core);
     if (!allowed.ok) return allowed;
   }
 
@@ -449,7 +472,7 @@ export function placeDefinition(
   }
 
   world.economy.funds -= plan.total;
-  reshapeTerrain(world, plan.changes);
+  reshapeTerrain(world, plan.changes, plan.core);
   placeBuilding(world, definition, x, y);
   return OK;
 }
@@ -821,6 +844,12 @@ export interface TerraformEstimate {
   corners: number;
   cost: number;
   changes: Map<number, number>;
+  /**
+   * Rohy, o které hráč **opravdu stojí** — parcela pod stavbou, roh, na který
+   * klikl. Dorovnání terénu pod silnicí je nesmí přepsat; zbytek plánu je
+   * kaskáda a tou hýbat smí (T101).
+   */
+  core: Set<number>;
 }
 
 /**
@@ -847,13 +876,17 @@ export interface TerraformEstimate {
  * Hlásí se to **troskami na dlaždici**, ne hláškou. Hláška by přišla uprostřed
  * tažení štětcem a hráč by ji překlikl; hromada suti zůstane, dokud ji neuklidí.
  */
-function reshapeTerrain(world: WorldState, changes: ReadonlyMap<number, number>): void {
+function reshapeTerrain(
+  world: WorldState,
+  changes: ReadonlyMap<number, number>,
+  core?: Set<number>,
+): void {
   if (changes.size === 0) return;
 
   // Terén se dorovná tak, aby pod ním silnice obstály (T101). Plány z odhadů
   // už dorovnané jsou, tohle je pojistka pro cesty, které jdou mimo ně —
   // opakované dorovnání nic nemění, je to funkce téhož stavu.
-  const graded = gradeForRoads(world, changes);
+  const graded = gradeForRoads(world, changes, [], core);
   applyHeightChanges(world, graded.changes);
 
   // Co dorovnat nešlo, se rozpadne jako dřív. Stává se to tam, kde by roh
@@ -865,13 +898,17 @@ function reshapeTerrain(world: WorldState, changes: ReadonlyMap<number, number>)
   }
 }
 
-function checkTerraform(world: WorldState, changes: ReadonlyMap<number, number>): CommandResult {
+function checkTerraform(
+  world: WorldState,
+  changes: ReadonlyMap<number, number>,
+  core?: Set<number>,
+): CommandResult {
   if (reshapeBlocker(world, changes) === 'water') return reject('error.terraformWater');
   // Silnice se kvůli srovnání terénu **nebourá** (rozhodnutí autora, T101).
   // Plán, který sem přišel z odhadu, je už dorovnaný, takže tohle chytá jen
   // zbytek: dlaždice, u kterých dorovnání narazilo na strop výšek nebo na
   // samé zamčené rohy. Radši odmítnout než tiše rozbít síť, po které jde proud.
-  if (gradeForRoads(world, changes).unfixable.length > 0) {
+  if (gradeForRoads(world, changes, [], core).unfixable.length > 0) {
     return reject('error.terraformBreaksRoad');
   }
   return OK;
@@ -888,10 +925,12 @@ function estimate(
   world: WorldState,
   changes: Map<number, number>,
   balance?: Balance,
+  core?: Set<number>,
 ): TerraformEstimate {
-  const graded = gradeForRoads(world, changes).changes;
+  const keep = core ?? new Set(changes.keys());
+  const graded = gradeForRoads(world, changes, [], keep).changes;
   const perCorner = balance?.map.terraformCost ?? 0;
-  return { corners: graded.size, cost: graded.size * perCorner, changes: graded };
+  return { corners: graded.size, cost: graded.size * perCorner, changes: graded, core: keep };
 }
 
 /** Kolik by stálo zvednutí nebo snížení rohu. Nic nemění — jen počítá. */
@@ -904,7 +943,14 @@ export function estimateCornerHeight(
 ): TerraformEstimate {
   const corner = cornerIndex(x, y, cornerSideOf(world.cornerHeight));
   const current = world.cornerHeight[corner] ?? 0;
-  return estimate(world, planCornerHeight(world.cornerHeight, x, y, current + delta), balance);
+  // Jádro je **ten jeden roh**, na který hráč klikl. Kaskáda kolem něj se smí
+  // při dorovnávání pod silnicí posunout (T101).
+  return estimate(
+    world,
+    planCornerHeight(world.cornerHeight, x, y, current + delta),
+    balance,
+    new Set([corner]),
+  );
 }
 
 /** Jak se plocha srovnává: na průměr, nebo dozděním na nejvyšší roh. */
@@ -944,13 +990,13 @@ export function estimateLevelArea(
       : mode === 'fill'
         ? planFilling(world, x, y, w, h)
         : planLevelling(world, x, y, w, h);
-  return estimate(world, changes, balance);
+  return estimate(world, changes, balance, coreCorners(world, x, y, w, h));
 }
 
 function commit(world: WorldState, plan: TerraformEstimate): CommandResult {
   if (plan.corners === 0) return reject('error.terraformNoChange');
 
-  const allowed = checkTerraform(world, plan.changes);
+  const allowed = checkTerraform(world, plan.changes, plan.core);
   if (!allowed.ok) return allowed;
 
   if (world.economy.funds < plan.cost) {
@@ -958,7 +1004,7 @@ function commit(world: WorldState, plan: TerraformEstimate): CommandResult {
   }
   world.economy.funds -= plan.cost;
 
-  reshapeTerrain(world, plan.changes);
+  reshapeTerrain(world, plan.changes, plan.core);
   return OK;
 }
 

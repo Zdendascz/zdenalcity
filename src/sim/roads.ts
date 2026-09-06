@@ -152,10 +152,22 @@ export function gradeForRoads(
   world: RoadGradeView,
   changes: ReadonlyMap<number, number>,
   pending: Iterable<number> = [],
+  core?: Iterable<number>,
 ): { changes: Map<number, number>; unfixable: number[] } {
   const side = world.size + 1;
   const plan = new Map(changes);
-  const locked = new Set(changes.keys());
+  /*
+   * Nedotknutelné jsou jen rohy, o které hráč **opravdu stojí** — parcela pod
+   * stavbou, roh, na který klikl. Zbytek plánu je kaskáda, tedy důsledek, a
+   * tou se hýbat smí.
+   *
+   * Bez tohohle rozdělení se dorovnání zbytečně často vzdávalo: kaskáda kolem
+   * srovnané parcely 3×3 zamkla i rohy dvě dlaždice daleko a silnice mezi nimi
+   * pak neměla čím povolit. Změřeno na simulovaných partiích — stavba u
+   * silnice se odmítala tak často, že si hráč za jednu partii vysloužil
+   * 20 718 hlášek „terén tu nejde srovnat".
+   */
+  const locked = new Set(core ?? changes.keys());
   const unfixable = new Set<number>();
   // Dlaždice, na kterých vozovka teprve bude. Bez nich by dorovnání souseda
   // naklonilo právě stavěnou silnici a ta by po položení spadla — změřeno na

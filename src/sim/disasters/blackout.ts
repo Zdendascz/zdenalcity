@@ -27,8 +27,25 @@ export function createBlackoutDisaster(): Disaster {
     pickOrigin: (world, catalogue) => pickPlant(world, catalogue),
     start: (context, active) => begin(context, active),
     tick: (context, active) => advance(context, active),
-    isFinished: (_world, active) =>
-      ((active.state['offline'] as number[] | undefined) ?? []).length === 0,
+    /*
+     * Konec je dvojí: buď se všechny elektrárny vrátily, **nebo došel čas**.
+     *
+     * Ten strop tu není pro pořádek. Bez něj je blackout past bez východu:
+     * zatížení se počítá proti spotřebě celého města, i toho potmě, takže
+     * jedna vrácená elektrárna ho neunese, hned padne zpátky a klid se počítá
+     * od nuly. Změřeno na simulované partii — dvě elektrárny šly dolů ve
+     * čtvrtém roce a za dalších šestatřicet let se nevrátila ani jedna.
+     * Město bez proudu nevybírá daň, takže si ani nepůjčí a nemá z čeho
+     * přistavět. To není katastrofa, to je konec hry.
+     *
+     * Délka je v datech (`disasters.blackout.maxTicks`, P5) a bere se ze
+     * začátku, protože `isFinished` balanc nedostane.
+     */
+    isFinished: (_world, active) => {
+      if (((active.state['offline'] as number[] | undefined) ?? []).length === 0) return true;
+      const max = (active.state['maxTicks'] as number | undefined) ?? 0;
+      return max > 0 && ((active.state['age'] as number | undefined) ?? 0) >= max;
+    },
     cooldownFromEnd: true,
   };
 }
@@ -43,6 +60,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
   active.state['offline'] = [];
   active.state['calm'] = 0;
   active.state['age'] = 0;
+  active.state['maxTicks'] = context.balance.disasters.blackout.maxTicks;
   if (id === null) return;
 
   takeOffline(world, active, id);
