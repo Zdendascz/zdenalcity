@@ -35,3 +35,7 @@ art/tiles/rejected/*.png
 __pycache__/
 *.pyc
 tools/.build/
+
+# Výstup simulace: statisíce řádků měření, do repa nepatří.
+data/
+tools/.build/
