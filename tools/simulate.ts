@@ -325,6 +325,8 @@ export function playGame(
   strategy: Strategy,
   seed: number,
   years: number,
+  /** Volitelný pozorovatel: dostane svět po každém roce. Slouží ladění. */
+  watch?: (world: WorldState, year: number) => void,
 ): GameResult {
   const started = Date.now();
   const balance = content.getBalance();
@@ -390,6 +392,7 @@ export function playGame(
     }
 
     const year = tick / TICKS_PER_YEAR;
+    if (tick % TICKS_PER_YEAR === 0 && watch) watch(world, Math.round(year));
     if (tick % (SAMPLE_YEARS * TICKS_PER_YEAR) === 0) {
       timeline.push(sample(world, content, Math.round(year)));
     }
@@ -480,8 +483,9 @@ class Player {
     this.keepWater();
     // Zóna bez proudu a vody je vyhozená koruna, takže růst čeká na obojí.
     this.grow();
-    // Potrubí po každém zónování: čerstvě vyznačená parcela bez vody nezaroste
-    // a hráč by na ni koukal donekonečna. Už položené trubky se jen odmítnou.
+    // Potrubí **až po zónování**: čerstvě vyznačená parcela bez vody nezaroste
+    // a hráč by na ni koukal donekonečna. Jedenáct z pětačtyřiceti parcel
+    // takhle leželo s hláškou „chybí voda".
     if (this.hasUtilities()) this.layPipes();
     this.keepServices();
     this.keepTransit();
@@ -492,6 +496,24 @@ class Player {
   private keepTaxes(): void {
     const monthly = this.world.economy.lastIncome - this.world.economy.lastExpenses;
     const wanted = taxTargets(this.strategy, monthly);
+
+    /*
+     * Nouzové zvýšení. Když město prodělává a kasa se blíží nule, hráč **vždy**
+     * sáhne po daních — i ten, který jinak drží nízké. Bez toho se strategie
+     * „nízké daně" nerozhodovala mezi levným a drahým městem, ale mezi
+     * bankrotem a bankrotem: v mínusu se ve hře zastaví růst a město už se
+     * nezvedne.
+     *
+     * Základ si každá strategie drží svůj, tohle je jen strop nad ním.
+     */
+    // Reaguje se **na bilanci, ne až na prázdnou kasu**. Kdo čeká, až mu dojdou
+    // peníze, čeká pozdě: mezitím spadne do mínusu, v mínusu se zastaví růst
+    // a z toho už se město nevyhrabe.
+    if (monthly < 0) {
+      for (let i = 0; i < wanted.length; i++) {
+        wanted[i] = Math.min(20, (wanted[i] ?? 10) + 5);
+      }
+    }
     const zones: ZoneType[] = [ZONE.residential, ZONE.commercial, ZONE.industrial];
     const keys = ['residential', 'commercial', 'industrial'] as const;
 
@@ -536,11 +558,27 @@ class Player {
 
   /** Zbořeniny a opuštěné domy pryč — jinak čtvrť shnije. */
   private clearRubble(): void {
-    let budget = 3;
+    let budget = 6;
     for (const building of this.world.buildings.values()) {
       if (budget <= 0) return;
       if (!building.abandoned) continue;
       if (this.send({ type: 'bulldoze', x: building.x, y: building.y })) budget--;
+    }
+
+    // A **suť po katastrofě**. Blokuje parcelu napořád: hra na ní hlásí
+    // „hromada suti" a nic tam nevyroste. Po tornádu takhle leželo čtyřiadvacet
+    // dlaždic a město se z toho už nezvedlo.
+    const size = this.world.size;
+    const half = Math.round(size * CENTRE);
+    const reach = this.plan.reach;
+    for (let dy = -reach; dy <= reach && budget > 0; dy++) {
+      for (let dx = -reach; dx <= reach && budget > 0; dx++) {
+        const x = half + dx;
+        const y = half + dy;
+        if (x < 0 || y < 0 || x >= size || y >= size) continue;
+        if ((this.world.rubble[index(x, y, size)] ?? 0) === 0) continue;
+        if (this.send({ type: 'bulldoze', x, y })) budget--;
+      }
     }
   }
 
@@ -553,9 +591,17 @@ class Player {
       needed += definition?.power?.consumption ?? 0;
     }
     // Rezerva 100, aby první zóna měla z čeho růst dřív, než ji někdo připojí.
-    if (produced >= needed * 1.15 + 100) return;
+    if (produced >= needed * 1.25 + 200) return;
 
-    for (const plant of this.powerPlants) {
+    // Chybí-li hodně, sáhne se po velké elektrárně: deset větrníků po sedmi
+    // stech je dražší na údržbu než jedna uhelná.
+    const missing = needed * 1.25 + 200 - produced;
+    const options = [...this.powerPlants].sort((a, b) => {
+      const aFits = (a.power?.production ?? 0) >= missing ? 0 : 1;
+      const bFits = (b.power?.production ?? 0) >= missing ? 0 : 1;
+      return aFits - bFits || a.construction.cost - b.construction.cost;
+    });
+    for (const plant of options) {
       if (this.world.economy.funds < plant.construction.cost * 1.5) continue;
       if (this.place(plant)) return;
     }
@@ -580,13 +626,29 @@ class Player {
 
   /** Potrubí pod hlavní osy. Bez vody dům chátrá. */
   private layPipes(): void {
-    const half = Math.round(this.world.size * CENTRE);
-    const reach = this.plan.reach;
-    // Potrubí **jen pod vyznačené parcely**, ne pod každou volnou dlaždici
-    // u silnice. Předtím jich za dvacet let koupil skoro pět tisíc a město
-    // na to zbankrotovalo dřív, než se stačilo nastěhovat.
     const size = this.world.size;
-    let budget = 60;
+    const reach = this.plan.reach + 2;
+    const half = Math.round(size * CENTRE);
+
+    /*
+     * Potrubí musí být **souvislé od vodárny**, ne rozeseté pod jednotlivými
+     * parcelami. Voda teče sítí; osamocená trubka pod domem je díra v zemi.
+     *
+     * Předtím se kladlo jen pod vyznačené parcely a hra hlásila „chybí voda"
+     * na třiadvaceti z devětatřiceti. Páteří je proto **silnice**: ta vede od
+     * středu ke všemu, co hráč postavil, včetně vodárny u břehu. Parcely na ni
+     * navazují, protože jsou z definice u silnice.
+     */
+    let budget = 120;
+    for (const tile of this.world.roadTiles) {
+      if (budget <= 0) break;
+      const x = tile % size;
+      const y = (tile - x) / size;
+      if (Math.abs(x - half) > reach || Math.abs(y - half) > reach) continue;
+      if ((this.world.layers.pipe[tile] ?? 0) !== 0) continue;
+      if (this.send({ type: 'build_pipe', x, y })) budget--;
+    }
+
     for (let dy = -reach; dy <= reach && budget > 0; dy++) {
       for (let dx = -reach; dx <= reach && budget > 0; dx++) {
         const x = half + dx;
@@ -698,11 +760,32 @@ class Player {
     if (spots.length === 0) return;
 
     // Po **jedné dlaždici**. Blok 2×2 se skoro vždy otřel o vozovku a pravidlo
-    // ho odmítlo (`error.roadInTheWay`, tři sta odmítnutí za třicet let), takže
-    // město nemělo kde růst. Parcela u silnice je stejně to, co dům potřebuje.
+    // ho odmítlo, takže město nemělo kde růst.
+    //
+    // A vyznačuje se **jen to, po čem je poptávka**. Hráč se dívá na sloupečky
+    // O/K/P a nedělá obchodní čtvrť do města o dvaceti lidech; hra to i tak
+    // odmítne (`noDemand`) a parcela jen leží a stojí peníze. Ze čtyřiceti
+    // šesti vyznačených dlaždic jich takhle dvacet čtyři leželo ladem.
+    const demand = this.world.demand;
+    const wanted: [ZoneType, number][] = [
+      [ZONE.residential, demand.residential * r],
+      [ZONE.commercial, demand.commercial * c],
+      [ZONE.industrial, demand.industrial * (1 - r - c)],
+    ];
+    const live = wanted.filter(([, weight]) => weight > 0);
+    if (live.length === 0) return;
+    const sum = live.reduce((total, [, weight]) => total + weight, 0);
+
     for (const spot of spots.slice(0, 40)) {
-      const roll = this.rng.next();
-      const zone = roll < r ? ZONE.residential : roll < r + c ? ZONE.commercial : ZONE.industrial;
+      let roll = this.rng.next() * sum;
+      let zone = live[0]?.[0] ?? ZONE.residential;
+      for (const [candidate, weight] of live) {
+        roll -= weight;
+        if (roll <= 0) {
+          zone = candidate;
+          break;
+        }
+      }
       if (this.send({ type: 'zone', x: spot[0], y: spot[1], w: 1, h: 1, zone })) {
         this.plan.blocks++;
       }
@@ -842,6 +925,10 @@ class Player {
         // rozhodnutí přebarvil na jinou zónu, takže na ní nikdy nic nestihlo
         // vyrůst — dva a půl tisíce zbytečných zásahů za dvacet let.
         if ((this.world.layers.zone[tile] ?? ZONE.none) !== ZONE.none) continue;
+        // Do lesa ani na skálu se nezónuje: pravidlo to odmítne a parcela
+        // by ležela ladem s hláškou „tady tenhle povrch nedovolí".
+        const terrain = this.world.layers.terrain[tile] ?? TERRAIN.grass;
+        if (terrain !== TERRAIN.grass && terrain !== TERRAIN.sand) continue;
         const touches = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(
           ([ox, oy]) =>
             (this.world.layers.road[index(x + ox, y + oy, size)] ?? ROAD.none) !== ROAD.none,
@@ -930,8 +1017,12 @@ class Player {
     // pořád dokola natahovala tatáž silnice: dva a tři čtvrtě milionu
     // odmítnutých příkazů `error.roadExists` za partii. Hráč mezitím neudělal
     // nic jiného a město nevzniklo.
+    // Měsíc, ne rok: elektrárny musí jít stavět rychleji, než roste město.
+    // S roční brzdou se do sítě dostávalo 700 kW ročně, kdežto čtyřicet pět
+    // domů chtělo přes tři tisíce — nenapájený dům neplatí daň a městu byl
+    // příjem nula při dvou stech sedmdesáti obyvatelích.
     const last = this.plan.tried.get(definition.id) ?? -TICKS_PER_YEAR;
-    if (this.world.tick - last < TICKS_PER_YEAR) return false;
+    if (this.world.tick - last < 30) return false;
     this.plan.tried.set(definition.id, this.world.tick);
 
     const [w, d] = definition.footprint;
