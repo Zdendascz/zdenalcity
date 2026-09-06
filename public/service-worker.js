@@ -64,10 +64,24 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() =>
-        caches.match(request).then((cached) => cached ?? caches.match('./index.html')).then(
-          (fallback) => fallback ?? Response.error(),
-        ),
-      ),
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+
+        // Rozcestník je náhrada **jen za navigaci**, ne za cokoli.
+        //
+        // Dřív se vracel na každý neúspěšný požadavek, takže při výpadku sítě
+        // dostal prohlížeč na žádost o PNG stránku s HTML — a nakreslil místo
+        // ikony rozbitý obrázek. Autor to hlásil jako „na produkci nejsou
+        // obrázky u linek": panel MHD si říká o pět ikon naráz a jedno
+        // zaškobrtnutí sítě rozbilo všechny. Ve vývoji se to projevit nemohlo,
+        // worker se tam neregistruje.
+        if (request.mode === 'navigate') {
+          const shell = await caches.match('./index.html');
+          if (shell) return shell;
+        }
+
+        return Response.error();
+      }),
   );
 });

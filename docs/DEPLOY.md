@@ -143,6 +143,20 @@ dostane:
    je výchozí *Browser Cache TTL* Cloudflaru — ten hlavičku z originu u všeho,
    co považuje za kešovatelné, přepíše. `.htaccess` proti tomu nemá šanci.
 
+### Rozcestník je náhrada jen za navigaci
+
+Service worker vracel při neúspěšném požadavku `index.html` **na cokoli**.
+Při výpadku sítě tak prohlížeč na žádost o PNG dostal stránku s HTML a nakreslil
+místo ikony rozbitý obrázek. Autor to hlásil jako „na produkci nejsou obrázky
+u linek": panel MHD si říká o pět ikon naráz a jedno zaškobrtnutí sítě rozbilo
+všechny.
+
+Ve vývoji se to projevit nemohlo — worker se tam neregistruje. Ověřeno, že
+soubory samy v pořádku byly: všech pět ikon panelu vrací na produkci 200.
+
+Od T99 se skořápka podstrčí jen tehdy, když `request.mode === 'navigate'`.
+Ostatní požadavky dostanou buď svou verzi z keše, nebo poctivou chybu.
+
 ## 6. Cloudflare
 
 ### Cache Rule (nastaveno 2026-09-05)
