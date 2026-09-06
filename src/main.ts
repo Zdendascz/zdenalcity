@@ -9,8 +9,15 @@ if (!mount) {
 /**
  * Service worker, aby šla hra spustit i bez sítě.
  *
- * Registruje se **až po startu hry**, ne před ním: instalace stahuje skořápku
- * a při prvním spuštění by soupeřila o linku s obsahem, na který hráč čeká.
+ * Registruje se **před `startApp`**, ne za ním. Dřív stálo volání za
+ * `await startApp(mount)`, jenže ten dobíhá až se spuštěním města — na
+ * rozcestníku se tak worker neregistroval vůbec. Změřeno na produkci: po
+ * dvaceti vteřinách na úvodní obrazovce nula registrací, po založení města
+ * jedna. Kdo si hru otevřel a město nezaložil, neměl offline kopii.
+ *
+ * Platí za to tím, že instalace stahuje skořápku souběžně s obsahem, na který
+ * hráč čeká. Registrace sama je nelokující (`void` nad příslibem), takže start
+ * hry nezdrží; soupeří jen o linku.
  *
  * Ve vývoji se **neregistruje vůbec**. Worker si drží keš a při každé úpravě
  * by se muselo hádat, jestli je v prohlížeči nová verze, nebo ta jeho.
@@ -23,5 +30,5 @@ function registerServiceWorker(): void {
   void navigator.serviceWorker.register('./service-worker.js').catch(() => undefined);
 }
 
-await startApp(mount);
 registerServiceWorker();
+await startApp(mount);
