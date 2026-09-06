@@ -1071,11 +1071,19 @@ async function main(): Promise<void> {
   const total = options.games > 0 ? Math.min(options.games, planned.length) : planned.length;
   const started = Date.now();
 
-  for (let i = options.offset; i < total; i += 1) {
+  // Souběžné běhy si dělí partie po `stride`: každý bere každou N-tou,
+  // takže se strategie rozprostřou rovnoměrně.
+  for (let i = options.offset; i < total; i += options.stride) {
     const job = planned[i];
     if (!job) break;
     const result = playGame(content, job.strategy, job.seed, options.years);
-    appendFileSync(games, `${JSON.stringify(result)}\n`);
+    // Svět se **nezapisuje**: je to celý stav mapy a v JSONu má přes dva
+    // megabajty na partii. Deset tisíc partií by dělalo přes dvacet gigabajtů,
+    // ve kterých není nic ke čtení. Slouží jen sondám.
+    const row: Record<string, unknown> = { ...result };
+    delete row.world;
+    appendFileSync(games, `${JSON.stringify(row)}
+`);
 
     const done = Math.floor((i - options.offset) / options.stride) + 1;
     const elapsed = (Date.now() - started) / 1000;
