@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "health",
-    "radius": 10,
-    "strength": 70
+    "radius": 20,
+    "strength": 140
   },
   "graphics": {
     "color": "#dfe4ea",

@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "police",
-    "radius": 22,
-    "strength": 140
+    "radius": 44,
+    "strength": 255
   },
   "nuisance": {
     "class": "prison",

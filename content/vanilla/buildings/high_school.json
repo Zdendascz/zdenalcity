@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "education",
-    "radius": 14,
-    "strength": 100
+    "radius": 28,
+    "strength": 200
   },
   "power": {
     "consumption": 520

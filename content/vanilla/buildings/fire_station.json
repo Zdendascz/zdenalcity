@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "fire",
-    "radius": 10,
-    "strength": 60
+    "radius": 20,
+    "strength": 120
   },
   "graphics": {
     "color": "#c05a4a",

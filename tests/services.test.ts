@@ -252,7 +252,10 @@ describe('vanilla policejní stanice', () => {
 
     const station = content.get('vanilla:police_small');
     expect(station?.category).toBe('service');
-    expect(station?.service).toEqual({ class: 'police', radius: 12, strength: 60 });
+    // Čísla se posunula v T99: byla napsaná pro buňky hrubé mřížky a T91 je
+    // začal číst jako dlaždice, takže dosah spadl na čtvrtinu a služby přestaly
+    // dosáhnout. Změřeno na městě autora — hasiči u domu 5 %, po přepočtu 73 %.
+    expect(station?.service).toEqual({ class: 'police', radius: 24, strength: 120 });
   });
 
   it('je v katalogu služeb, takže se objeví v paletě', async () => {

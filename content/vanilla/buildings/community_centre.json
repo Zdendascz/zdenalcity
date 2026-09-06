@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "social",
-    "radius": 7,
-    "strength": 75
+    "radius": 14,
+    "strength": 150
   },
   "graphics": {
     "color": "#8fb48f",

@@ -32,8 +32,8 @@
   },
   "service": {
     "class": "transit",
-    "radius": 3,
-    "strength": 110
+    "radius": 12,
+    "strength": 220
   },
   "graphics": {
     "color": "#5aa9c7",

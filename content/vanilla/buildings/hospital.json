@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "health",
-    "radius": 16,
-    "strength": 130
+    "radius": 32,
+    "strength": 255
   },
   "power": {
     "consumption": 800

@@ -591,9 +591,14 @@ function validateService(
   if (!section) return undefined;
 
   const serviceClass = requireString(issues, section, 'class', `${field}.class`, NAMESPACE);
-  // Dosah je v **dlaždicích**. Strop je čtvrtina výchozí mapy: služba, která
+  // Dosah je v **dlaždicích**. Strop je polovina výchozí mapy: služba, která
   // dosáhne dál, přestává být místní a hráč nemá co rozmisťovat.
-  const radius = requireInt(issues, section, 'radius', `${field}.radius`, 1, 32);
+  //
+  // Do T99 tu bylo 32, tedy čtvrtina mapy — jenže to je hodnota z doby, kdy se
+  // dosah počítal v buňkách hrubé mřížky a strop tak znamenal celou mapu. T91
+  // jednotku opravil a strop se s ní neposunul, takže by věznice ani univerzita
+  // neprošly.
+  const radius = requireInt(issues, section, 'radius', `${field}.radius`, 1, 64);
   const strength = requireInt(issues, section, 'strength', `${field}.strength`, 1, 255);
 
   return serviceClass !== null && radius !== null && strength !== null

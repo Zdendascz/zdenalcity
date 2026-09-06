@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "culture",
-    "radius": 7,
-    "strength": 70
+    "radius": 14,
+    "strength": 140
   },
   "graphics": {
     "color": "#b4708f",

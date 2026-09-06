@@ -1,6 +1,6 @@
 import type { Balance, TransitModeBalance } from '@/content/balance';
 import type { BuildingCatalogue } from './catalogue';
-import { coarseIndex, coarseSizeOf } from './coarse';
+import { COARSE_FACTOR, coarseIndex, coarseSizeOf } from './coarse';
 import { index, ROAD } from './layers';
 import type { WorldState } from './world';
 
@@ -343,7 +343,14 @@ export function servedCells(
   for (const stop of line.stops) {
     const building = world.buildings.get(stop);
     if (!building) continue;
-    const radius = catalogue.get(building.definitionId)?.service?.radius ?? 0;
+    // Dosah je v **dlaždicích**, buňka hrubé mřížky jich má `COARSE_FACTOR`.
+    //
+    // Tudy oprava jednotky z T91 nešla a zůstalo tu čtení po buňkách, takže
+    // linka sbírala poptávku ze čtyřikrát většího okolí, než kam zastávka
+    // doopravdy dosáhne. Vyplavalo to, až když se dosahy služeb přepočítaly:
+    // testovací městečko se celé vešlo do dosahu jedné zastávky.
+    const radiusTiles = catalogue.get(building.definitionId)?.service?.radius ?? 0;
+    const radius = radiusTiles / COARSE_FACTOR;
     if (radius <= 0) continue;
 
     const origin = coarseIndex(building.x, building.y, world.size);

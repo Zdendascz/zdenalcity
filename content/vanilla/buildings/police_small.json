@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "police",
-    "radius": 12,
-    "strength": 60
+    "radius": 24,
+    "strength": 120
   },
   "graphics": {
     "color": "#6f7fa8",

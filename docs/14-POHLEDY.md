@@ -456,3 +456,49 @@ totéž pravidlo jako u budov, které taky nesou vlastní pozemek.
 **Strom, balvan ani hromada suti sem nespadají.** Ty se země dotýkají v jednom
 bodě a patří do středu dlaždice; kdyby se posunuly na roh, stály by na hranici
 mezi dvěma parcelami.
+
+## Dosah služeb: čísla byla psaná pro buňky
+
+Autor: „jakto? že hasiči jsou 6 parcel daleko… co už mám dělat?" Karta parcely
+u něj hlásila **hasiče na 5 %**, ačkoli tři stanice stály do čtrnácti dlaždic.
+
+Je to dozvuk T91. Tehdy se opravila **jednotka** dosahu — četla se jako buňky
+hrubé mřížky, takže hasičárna s hodnotou 10 dosáhla čtyřicet dlaždic a autor
+nahlásil „dosah přes 3/4 mapy". Jednotka se změnila na dlaždice, ale **čísla
+v obsahu zůstala ta, která byla napsaná pro buňky**, takže dosah spadl na
+čtvrtinu. Kyvadlo se přehouplo na druhou stranu.
+
+Změřeno na `mesto (26).city` (4922 obyvatel, osm hasičských stanic):
+
+| služba na parcele 64,11 | před | po |
+|---|---|---|
+| hasiči | 5 % | **73 %** |
+| zdravotnictví | 16 % | 100 % |
+| policie | 38 % | 100 % |
+| parky | 49 % | 100 % |
+| vzdělání | 9 % | 63 % |
+| sounáležitost | 13 % | 69 % |
+
+Hasiči přes celé město, jen tam, kde něco stojí: medián 74 %, dolní kvartil
+47 %, devátý decil 100 %. Čtvrtina zastavěné plochy tedy pořád není pokrytá ani
+z poloviny — je co zlepšovat, ale úsilí se projeví.
+
+### Proč zrovna dvojnásobek
+
+Poctivý převod z buněk na dlaždice by byl **čtyřnásobek** — jenže to je přesně
+stav před T91, který autor odmítl. Dvojnásobek je mezi tím a měření výš říká,
+že sedí. Poměry mezi budovami, které autor zvolil, zůstaly nedotčené.
+
+**U MHD je to jinak a schválně: tam se násobilo čtyřmi.** Dosah zastávky
+neznamená „kam sahá kvalita služby", ale „jak daleko člověk dojde na zastávku",
+a tam je původní číslo (3 buňky = 12 dlaždic) věcně správné.
+
+Strop dosahu ve schématu se posunul z 32 na 64 dlaždic. Třicet dva byla
+hodnota z doby, kdy dosah znamenal buňky a strop tedy celou mapu.
+
+### A ještě jedna nedodělaná polovina T91
+
+`servedCells` v `sim/transit.ts` četl dosah **pořád jako buňky** — tudy oprava
+jednotky nešla. Linka tak sbírala poptávku ze čtyřikrát většího okolí, než kam
+zastávka dosáhne. Vyplavalo to, až když se dosahy přepočítaly: testovací
+městečko se celé vešlo do dosahu jedné zastávky a testu nezbylo, co porovnávat.

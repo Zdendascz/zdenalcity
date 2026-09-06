@@ -27,8 +27,8 @@
   },
   "service": {
     "class": "parks",
-    "radius": 12,
-    "strength": 120
+    "radius": 24,
+    "strength": 240
   },
   "power": {
     "consumption": 80

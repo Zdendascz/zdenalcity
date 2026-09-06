@@ -11,7 +11,7 @@ import {
   setLineFare,
   setLineVehicles,
 } from '@/sim/commands';
-import { coarseIndex, coarseSizeOf } from '@/sim/coarse';
+import { COARSE_FACTOR, coarseIndex, coarseSizeOf } from '@/sim/coarse';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { index, ROAD } from '@/sim/layers';
 import {
@@ -270,7 +270,9 @@ describe('kdo do poptávky patří', () => {
 
     const stop = world.buildings.get(line.stops[0] ?? 0);
     if (!stop) throw new Error('bez zastávky');
-    const radius = content.get(stop.definitionId)?.service?.radius ?? 0;
+    // Dosah je v definici v **dlaždicích**, obsluha se počítá na hrubé mřížce.
+    const radiusTiles = content.get(stop.definitionId)?.service?.radius ?? 0;
+    const radius = radiusTiles / COARSE_FACTOR;
     expect(radius).toBeGreaterThan(1);
 
     const cells = new Set(servedCells(world, content, line));

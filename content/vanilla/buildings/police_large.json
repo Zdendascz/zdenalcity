@@ -26,8 +26,8 @@
   },
   "service": {
     "class": "police",
-    "radius": 18,
-    "strength": 110
+    "radius": 36,
+    "strength": 220
   },
   "power": {
     "consumption": 480
