@@ -1752,6 +1752,20 @@ body {
   font-size: 13px;
 }
 
+/*
+ * Karta „pošli hru kamarádovi". Jantarová jako tlačítka na rozcestníku —
+ * je to jediná karta v řadě, která něco **udělá**, ne otevře.
+ */
+.home__card--share {
+  border-color: rgb(240 160 32 / 45%);
+  background: rgb(240 160 32 / 10%);
+}
+
+.home__card--share:hover {
+  border-color: #f0a020;
+  background: rgb(240 160 32 / 18%);
+}
+
 /* Karta, která vede ven ze hry. Vypadá jako ostatní, ale je to `<a>`. */
 .home__card--link {
   text-decoration: none;

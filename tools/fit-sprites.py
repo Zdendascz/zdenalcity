@@ -29,6 +29,7 @@ from __future__ import annotations
 import io
 import json
 import sys
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -312,6 +313,28 @@ def spriteKey(name: str) -> str:
 # Naměřené kotvy, aby je šlo zapsat do manifestu. Sbírá je `process`.
 ANCHORS: dict[str, dict] = {}
 
+# Co už v manifestu je. Slouží jako záchrana pro obrázek, který se v tomhle
+# běhu nepovedl zpracovat: jeho záznam se přenese, ať z manifestu nevypadne.
+def _previous() -> dict[str, dict]:
+    path = OUT / 'index.json'
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+    return {
+        f"{row['file'].rsplit('.', 1)[0]}": {
+            'width': row['width'],
+            'height': row['height'],
+            'anchor': row['anchor'],
+        }
+        for row in data.get('sprites', [])
+    }
+
+
+PREVIOUS: dict[str, dict] = _previous()
+
 
 def fit_decor(
     building: str, variant: str, cropped: Image.Image, spec: dict, write: bool
@@ -350,7 +373,8 @@ def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str,
     if variant not in ('a', 'b', 'c'):
         return f'{path.name}: varianta „{variant}" není a/b/c', False
 
-    keyed = key_out(Image.open(path))
+    with Image.open(path) as opened:
+        keyed = key_out(opened)
     cropped = trim(keyed)
     if cropped is None:
         return f'{path.name}: po odklíčování nezbylo nic — jiné pozadí?', False
@@ -475,10 +499,24 @@ def main() -> int:
         return 0
 
     ok = 0
-    for path in files:
-        message, success = process(path, definitions, write)
+    failed: list[str] = []
+    for order, path in enumerate(files, 1):
+        # Jeden vadný obrázek nesmí shodit celý běh. Dvě stě padesát obrázků
+        # trvá minuty a spadnout na tom posledním znamená udělat všechno znovu —
+        # a hlavně bez zápisu `index.json`, protože ten se píše až nakonec.
+        try:
+            message, success = process(path, definitions, write)
+        except (MemoryError, OSError, ValueError) as chyba:
+            message, success = f'{path.name}: {type(chyba).__name__}: {chyba}', False
         print(('  ' if success else '! ') + message)
         ok += success
+        if not success:
+            failed.append(path.stem)
+        # Pillow drží dekódovaná data, dokud je sběrač neuklidí. Při dvou stech
+        # padesáti obrázcích po několika megabajtech to stačilo na `MemoryError`
+        # uprostřed běhu.
+        if order % 25 == 0:
+            gc.collect()
 
     print(f'\n{ok} z {len(files)} zpracováno{"" if write else " (jen kontrola)"}.')
 
@@ -492,6 +530,16 @@ def main() -> int:
         print(f'\nZbývá {len(missing)} z {len(definitions) * 3}:')
         for i in range(0, len(missing), 4):
             print('  ' + '  '.join(missing[i:i + 4]))
+
+    # Co se nepovedlo, si ponechá svůj dosavadní záznam — jinak by sprite
+    # z manifestu vypadl a hra by místo domu nakreslila kvádr.
+    if write and failed:
+        for stem in failed:
+            keep = PREVIOUS.get(stem)
+            if keep is not None:
+                ANCHORS[stem] = keep
+        print()
+        print(f'Nepovedlo se {len(failed)}; jejich záznamy zůstávají z minula.')
 
     if write and ok:
         index = {

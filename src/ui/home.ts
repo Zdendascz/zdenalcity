@@ -42,6 +42,15 @@ const AUTHOR_EMAIL = 'jsem@zdendas.cz';
 const DISCORD_URL = 'https://discord.gg/TrDVH5kFe2';
 
 /**
+ * Adresa, která se posílá kamarádovi.
+ *
+ * Napevno, ne `location.href`: hra běží i z `file://`, z localhostu a
+ * z vývojového serveru, a nikomu není co poslat odtamtud. Tohle je jediné
+ * místo, kde se dá hrát.
+ */
+const SHARE_URL = 'https://games.zdendas.cz/zdenalcity/';
+
+/**
  * Další projekty autora. Logo je obrázek v `public/brand/`, ne text.
  *
  * `dark` říká, že logo má **vlastní tmavé pozadí** a nepotřebuje světlou
@@ -360,14 +369,74 @@ function showLightbox(parent: HTMLElement, t: (key: string) => string, from: num
   parent.appendChild(overlay);
 }
 
-/** Řada s odkazy: nápověda, autor a Discord. */
+/**
+ * Pošle odkaz na hru dál.
+ *
+ * Nejdřív se zkusí **systémové sdílení** — na telefonu je to ta nabídka
+ * s WhatsAppem a Messengerem, tedy přesně to, čím se odkaz doopravdy posílá.
+ * Prohlížeč na počítači ho většinou nemá, tam se odkaz zkopíruje do schránky.
+ * A když ani schránka není (starý prohlížeč, stránka bez HTTPS), otevře se
+ * mailto, které umí každý.
+ *
+ * Vrací klíč hlášky, kterou má rozhraní ukázat — samo tu nic nevypisuje.
+ */
+async function shareGame(t: (key: string) => string): Promise<string> {
+  const data = { title: 'Zdenalcity', text: t('ui.home.shareText'), url: SHARE_URL };
+
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share(data);
+      return 'ui.home.shareSent';
+    } catch {
+      // Zavřená nabídka není chyba: hráč si to rozmyslel a nemá co číst.
+      return '';
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(SHARE_URL);
+    return 'ui.home.shareCopied';
+  } catch {
+    // Poslední záchrana. `mailto:` funguje i tam, kde schránka není povolená.
+    const subject = encodeURIComponent('Zdenalcity');
+    const body = encodeURIComponent(`${t('ui.home.shareText')}
+
+${SHARE_URL}`);
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank', 'noreferrer');
+    return '';
+  }
+}
+
+/** Jak dlouho zůstane v kartě odpověď, než se vrátí původní popisek. */
+const SHARE_NOTE_MS = 2500;
+
+/** Řada s odkazy: sdílení, nápověda, autor a Discord. */
 function aboutRow(t: (key: string) => string, root: HTMLElement): HTMLElement {
   const section = el('section', 'home__row');
   section.appendChild(el('h2', 'home__row-title', t('ui.home.about')));
 
   const strip = el('div', 'home__strip');
 
-  // Nápověda první: hra nemá tutoriál, takže je to jediné místo, kde se hráč
+  // Sdílení první: je to jediná karta, která hru **šíří**, a hráč po ní sáhne
+  // hned po tom, co ho pobavila. Ostatní tři jsou o hře samotné.
+  const share = button('home__card home__card--text home__card--share', () => {
+    void shareGame(t).then((key) => {
+      if (key === '') return;
+      // Odpověď se píše rovnou do karty: bublina by na domovské stránce
+      // neměla kam, a hráč se dívá na tlačítko, které zmáčkl.
+      const note = share.querySelector('.home__card-note');
+      if (!note) return;
+      note.textContent = t(key);
+      window.setTimeout(() => {
+        note.textContent = t('ui.home.shareNote');
+      }, SHARE_NOTE_MS);
+    });
+  });
+  share.appendChild(el('span', 'home__card-title', t('ui.home.share')));
+  share.appendChild(el('span', 'home__card-note', t('ui.home.shareNote')));
+  strip.appendChild(share);
+
+  // Nápověda: hra nemá tutoriál, takže je to jediné místo, kde se hráč
   // doví, proč mu zóna nezarostla.
   const help = button('home__card home__card--text', () => showHelp(root, t));
   help.appendChild(el('span', 'home__card-title', t('ui.help.title')));

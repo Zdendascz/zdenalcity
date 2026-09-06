@@ -611,5 +611,10 @@
   "ui.hud.moreStats": "Další čísla",
   "ui.zoom.in": "Přiblížit",
   "ui.zoom.out": "Oddálit",
-  "ui.view.grid": "Čtvercová síť"
+  "ui.view.grid": "Čtvercová síť",
+  "ui.home.share": "Pošli hru kamarádovi",
+  "ui.home.shareNote": "Odkaz na hru jedním klepnutím.",
+  "ui.home.shareText": "Zkus Zdenalcity — izometrický budovatel měst v prohlížeči.",
+  "ui.home.shareCopied": "Odkaz zkopírován do schránky.",
+  "ui.home.shareSent": "Odesláno, díky!"
 }

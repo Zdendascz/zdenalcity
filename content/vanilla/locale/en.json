@@ -611,5 +611,10 @@
   "ui.hud.moreStats": "More numbers",
   "ui.zoom.in": "Zoom in",
   "ui.zoom.out": "Zoom out",
-  "ui.view.grid": "Tile grid"
+  "ui.view.grid": "Tile grid",
+  "ui.home.share": "Send the game to a friend",
+  "ui.home.shareNote": "The link to the game in one tap.",
+  "ui.home.shareText": "Try Zdenalcity — an isometric city builder in your browser.",
+  "ui.home.shareCopied": "Link copied to the clipboard.",
+  "ui.home.shareSent": "Sent, thank you!"
 }
