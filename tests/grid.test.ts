@@ -1,4 +1,6 @@
 /**
+ * @vitest-environment jsdom
+ *
  * Čtvercová síť po hranicích dlaždic.
  *
  * Testuje se to, co jde rozbít potichu:
