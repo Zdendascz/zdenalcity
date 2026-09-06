@@ -216,6 +216,16 @@ function findSite(world: WorldState): { x: number; y: number } {
  * Že se nehnulo nic jiného, je dobrá zpráva: ceny se v tomhle městě nikde
  * nedotkly stropu, takže hashe měří dál růst a ne rozpočet.
  */
+/*
+ * Posun po dorovnání terénu pod silnicí (T101): kasa 31 686 → 30 787, hashe
+ * vrstev i hrubé mřížky jiné. **Budov 32, obyvatel 58, práce 50 — beze změny.**
+ *
+ * Srovnání parcely pod stavbou dřív sousední silnici zkroutilo a zbořilo;
+ * nově se místo bourání dorovnají i rohy pod vozovkou. Rohů se tedy hýbe víc,
+ * scénář za ně zaplatil o 899 navíc, a protože se hýbe terén, změní se i hash
+ * vrstev. Že město vyšlo přesně stejně velké, znamená, že dorovnání jen
+ * uklidilo terén — nezasáhlo do růstu.
+ */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
     const content = await vanilla();

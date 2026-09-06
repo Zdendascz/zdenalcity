@@ -349,10 +349,16 @@ it('silnici, které sesuv podhrabal roh, zboří', async () => {
     }
   });
 
-  it('silnici, kterou podhrabalo hráčovo srovnávání, taky zboří', async () => {
-    // Roh drží čtyři dlaždice, takže srovnání parcely **vedle** silnice nakloní
-    // i vozovku. Sesuv za to nemůže a výsledek je stejný: vozovka přes zlom.
-    // Pravidlo proto nesmí být v katastrofě, ale u každé změny terénu.
+  it('silnici, kterou podhrabalo hráčovo srovnávání, dorovná — nezboří', async () => {
+    /*
+     * Roh drží čtyři dlaždice, takže srovnání parcely **vedle** silnice nakloní
+     * i vozovku. Do T101 se taková silnice zbořila, přestože za to sesuv
+     * nemohl — a bylo to horší, než to vypadá: silnice je vodič elektřiny,
+     * takže díra v ní odřízla čtvrť od proudu a městu spadl příjem na nulu.
+     *
+     * Autor rozhodl: **zbourání nesmí proběhnout, terén se má dorovnat.**
+     * Sesuvu se to netýká, tam se bořit má (T89) — a hlídá to test nad tímhle.
+     */
     const w = world();
     slope(w, 20, 6);
 
@@ -370,7 +376,8 @@ it('silnici, které sesuv podhrabal roh, zboří', async () => {
       terraformCorner(w, 29, 30, current + 1 <= 6 ? 1 : -1, VANILLA_BALANCE).ok,
     ).toBe(true);
 
-    expect(countRoads(w)).toBeLessThan(before);
+    // Silnice stojí celá a žádná dlaždice nezůstala v sedle.
+    expect(countRoads(w)).toBe(before);
     for (let y = 28; y <= 32; y++) {
       expect(roadFitsTerrain(w, 29, y), `dlaždice 29, ${y} neunese vozovku`).toBe(true);
     }

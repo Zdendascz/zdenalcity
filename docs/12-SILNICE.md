@@ -223,8 +223,8 @@ zbylo 35. Proto se hlídá jen zkroucení.
 | kdo hne terénem | co se stane |
 |---|---|
 | srovnání pod zónou | **couvne** — `reshapeBlocker` vrátí `road` a plocha se dělí na menší, stejně jako kolem budov |
-| stavba silnice | srovná si spád; co po tom zbude zkroucené, se rozbije |
-| stavba budovy, ruční terraform | adresný příkaz, couvat není kam — silnice se rozbije |
+| stavba silnice | srovná si spád a **dorovná** rohy pod sousedními silnicemi; co dorovnat nejde, se odmítne (T101) |
+| stavba budovy, ruční terraform | **dorovná** taky; co dorovnat nejde, se odmítne (T101) |
 | sesuv půdy | rozbije |
 | načtení savu | `repairUnsupportedRoads` projde mapu a rozbije, co je v sedle |
 
@@ -240,3 +240,57 @@ město ve zlatém testu přišlo o **jednu z pětadvaceti** — od `placeDefinit
 Zbytek posunu v jeho číslech je tím, že se srovnávání pod zónami silnicím
 vyhýbá, takže se pod městem přestal přesypávat terén; podrobně v komentáři
 u `tests/golden/city.test.ts`.
+
+## T101: pod silnicí se terén dorovná, nebourá se
+
+Řádek „stavba budovy, ruční terraform → silnice se rozbije" platil rok a byl
+špatně. Autor to viděl v hraní a rozhodl jednoznačně: **zbourání silnice nesmí
+proběhnout, musí se upravit terén pod silnicí tak, aby bylo vše v pořádku.**
+
+### Proč to bylo horší, než to vypadalo
+
+Silnice je **vodič elektřiny**. Díra v ní odřízne čtvrť od elektrárny,
+nenapájené domy neplatí daň a městu spadne příjem na nulu. Příkaz přitom vrátil
+`ok` a odhad ceny mlčel — hráč se to nedozvěděl a hledal chybu v rozpočtu.
+
+Změřeno (`tools/probe.ts`): větrník o jedné dlaždici postavený vedle rovné
+ulice rozbil **dvě** dlaždice vozovky a proud se za ně už nedostal. A není to
+okrajový jev — `tools/probe2.ts` na pěti generovaných mapách napočítal, že
+**598 z 14 668** postavených dlaždic silnice zbořilo jinou. Čtyři procenta.
+
+### Jak se dorovnává
+
+`gradeForRoads` v `sim/roads.ts` vezme plán změn výšek a **rozšíří ho** o rohy,
+které je potřeba dorovnat pod vozovkou. Hráčův záměr je nedotknutelný — rohy,
+které si vyžádal, se nepřepisují; hýbe se jen volnými.
+
+Ze čtyř rohů sedla se vybírá **nejtišší** volba, ne první, která projde. Roh
+sdílejí čtyři dlaždice, takže špatná volba sedlo jen posune na souseda a to na
+dalšího — vlna pak běží po celé ulici. Změřeno: s „ber první" přepsal jeden klik
+až 68 rohů a sedlo skončilo sedmnáct dlaždic daleko. Skóre je proto počet
+silnic, které by volba nechala v sedle; nula znamená hotovo.
+
+Dlaždice, které byly v sedle **už před zásahem** (staré savy, sesuvy), se
+nechávají být. Jinak by hráč platil za úklid cizí škody a jedno kliknutí u kraje
+města by roztáhlo kaskádu přes půl mapy.
+
+### Dorovnání je v ceně, ne překvapení na účtu
+
+`estimatePlacement`, `estimateLevelArea` i odhad silnice se ptají na **týž**
+plán jako samotný příkaz, takže v odhadu i v účtu stojí totéž číslo (§12
+kritérium 14). Zlatý test to zaplatil: kasa 31 686 → 30 787, hashe vrstev jiné,
+ale **budov 32, obyvatel 58, práce 50 beze změny** — dorovnání uklidilo terén
+a do růstu nesáhlo.
+
+### Co když to nejde
+
+Roh na stropu výšek, nebo dlaždice, jejíž všechny čtyři rohy patří hráčovu
+plánu. Pak se příkaz **odmítne** hláškou `error.terraformBreaksRoad`. Odmítnout
+je jediná zbývající možnost: nakloněnou vozovku nechat nelze (kreslí se přes
+zlom) a zbourat ji nesmíme.
+
+Změřeno na týchž pěti mapách: po opravě je ztracených dlaždic **nula** a
+odmítnutých staveb 287 ze 14 668, tedy dvě procenta — a to na hustém rastru
+přes hory, který je horší než cokoli, co hráč postaví.
+
+Sesuv půdy tudy nechodí. Tam se silnice bořit **má** a je to rozhodnutí z T89.

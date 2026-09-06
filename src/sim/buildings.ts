@@ -140,7 +140,10 @@ export function checkFootprint(
   if (definition.construction.requiresWater === true && !hasWater(world, definition, x, y)) {
     return reject('error.needsWater');
   }
-  // Vodárna musí stát u vody, ze které bere (§8 fáze 3).
+  // Vodárna musí stát u vody, ze které bere (§8 fáze 3). Není v tom sama:
+  // `nearWater` má i čistička a jaderná elektrárna, ta kvůli chlazení. Hláška
+  // proto **nesmí jmenovat vodárnu** — autor ji dostal u jaderky a ptal se,
+  // co s tím má vodárna společného.
   if (definition.construction.nearWater === true && !touchesWater(world, definition, x, y)) {
     return reject('error.needsShore');
   }

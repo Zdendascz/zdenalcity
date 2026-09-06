@@ -13,7 +13,7 @@ import { buildRoad, bulldoze, terraformCorner, zoneArea } from '@/sim/commands';
 import { index, ROAD, TERRAIN, ZONE } from '@/sim/layers';
 import { tileQuad } from '@/render/projection';
 import { roadMask, roadPolygons } from '@/render/roads';
-import { roadFitsTerrain } from '@/sim/roads';
+import { gradeForRoads, roadFitsTerrain } from '@/sim/roads';
 import { ROAD_FAMILIES } from '@/render/roadRenderer';
 import { ROAD_COLORS, ROAD_WIDTHS } from '@/render/palette';
 import { computeBudget } from '@/sim/systems/economy';
@@ -387,9 +387,85 @@ describe('terén pod vozovkou', () => {
     }
   });
 
-  it('srovnávání rohu pod silnicí ji rozbije a nechá trosky', () => {
-    // Kdo couvnout neumí — ruční terraform je adresný příkaz — tomu se silnice
-    // rozbije. Autor to chtěl jednoznačně: nakloněná vozovka ne, rozbitá ano.
+  it('stavba silnice ve svahu nezboří tu vedle', () => {
+    /*
+     * Vlastnost, ne jeden případ: postaví se pruh vozovky napříč terasovitým
+     * svahem a po **každé** dlaždici se kontroluje, že síť jen vyrostla.
+     *
+     * Změřeno na pěti generovaných mapách (`tools/probe2.ts`): před T101 zbořilo
+     * 598 z 14 668 postavených dlaždic jinou silnici — čtyři procenta staveb.
+     * Silnice vede proud, takže každá taková díra odřízla kus města od
+     * elektrárny. Po opravě je to nula; co dorovnat nejde, se odmítne.
+     */
+    // Kopečky nejsou vymyšlené: vyhledal je `tools/find-case.ts` jako nejmenší
+    // terén, na kterém stará verze o dlaždici přišla. Zvedají se **bez kaskády**,
+    // jde o tvar terénu, ne o to, jak vznikl.
+    const w = createWorld(1);
+    const BUMPS: readonly [number, number][] = [
+      [11, 17],
+      [14, 9],
+      [12, 17],
+      [9, 12],
+      [12, 17],
+      [13, 13],
+      [16, 8],
+      [18, 16],
+      [16, 18],
+      [8, 10],
+      [13, 13],
+      [14, 8],
+      [15, 13],
+      [12, 14],
+    ];
+    for (const [cx, cy] of BUMPS) raise(w, cx, cy, 1);
+
+    let built = 0;
+    for (let x = 10; x <= 16; x++) {
+      for (const y of [10, 12]) {
+        const before = w.roadTiles.size;
+        if (!buildRoad(w, x, y, ROAD.street, VANILLA_BALANCE).ok) continue;
+        built++;
+        expect(w.roadTiles.size, `stavba ${x}, ${y} zbořila jinou silnici`).toBe(before + 1);
+      }
+    }
+    expect(built, 'test nic nepostavil, tak nic neměří').toBeGreaterThan(8);
+
+    for (const tile of w.roadTiles) {
+      const x = tile % MAP_SIZE;
+      const y = (tile - x) / MAP_SIZE;
+      expect(roadFitsTerrain(w, x, y), `dlaždice ${x}, ${y} zůstala v sedle`).toBe(true);
+    }
+  });
+
+  it('co dorovnat nejde, se pozná dopředu — a nezboří se', () => {
+    // Když hráčův plán zamkne všechny čtyři rohy dlaždice a nechá je v sedle,
+    // dorovnání nemá čím pohnout. Vrátí dlaždici jako nespravitelnou a příkaz
+    // se odmítne; do T101 se místo toho bourala vozovka i s trámy pod proudem.
+    const w = withRoad([[10, 10]]);
+    const side = MAP_SIZE + 1;
+    const twisted = new Map<number, number>([
+      [10 * side + 10, 0],
+      [10 * side + 11, 1],
+      [11 * side + 10, 0],
+      [11 * side + 11, 0],
+    ]);
+
+    const graded = gradeForRoads(w, twisted);
+    expect(graded.changes.size, 'hráčův plán se nesmí přepsat').toBe(4);
+    expect(graded.unfixable).toEqual([index(10, 10, MAP_SIZE)]);
+  });
+
+  it('srovnávání rohu pod silnicí ji dorovná — nerozbije', () => {
+    /*
+     * Do T101 se silnice pod ručním srovnáním bořila: terraform je adresný
+     * příkaz, tak ať si hráč nese následky. Jenže silnice vede proud, takže
+     * díra v ní odřízla čtvrť od elektřiny a městu spadl příjem na nulu —
+     * změřeno v `tools/probe.ts`, kde stavba větrníku vedle ulice tiše
+     * rozbila dvě vozovky a proud dál nešel.
+     *
+     * Autor rozhodl jednoznačně: **zbourání nesmí proběhnout, terén se dorovná.**
+     * Rohy pod vozovkou tedy dojedou za tím, který hráč posunul.
+     */
     const w = withRoad([
       [10, 10],
       [10, 11],
@@ -397,14 +473,17 @@ describe('terén pod vozovkou', () => {
     ]);
     expect(terraformCorner(w, 10, 11, 1, VANILLA_BALANCE).ok).toBe(true);
 
+    // Roh, na který hráč klikl, se opravdu posunul — dorovnání ho nevrací zpět.
+    expect(w.cornerHeight[11 * (MAP_SIZE + 1) + 10], 'roh se vůbec nezvedl').toBe(1);
+
     for (let y = 10; y <= 12; y++) {
       expect(roadFitsTerrain(w, 10, y), `dlaždice 10, ${y}`).toBe(true);
     }
-    expect(w.roadTiles.size, 'nic se nerozbilo, test nic neměří').toBeLessThan(3);
+    expect(w.roadTiles.size, 'srovnání zbořilo silnici').toBe(3);
     for (let y = 10; y <= 12; y++) {
       const tile = index(10, y, MAP_SIZE);
-      if ((w.layers.road[tile] ?? ROAD.none) !== ROAD.none) continue;
-      expect(w.rubble[tile], `po silnici 10, ${y} nezůstaly trosky`).toBe(1);
+      expect(w.layers.road[tile], `dlaždice 10, ${y} zmizela`).toBe(ROAD.street);
+      expect(w.rubble[tile], `po silnici 10, ${y} zbyly trosky`).toBe(0);
     }
   });
 });

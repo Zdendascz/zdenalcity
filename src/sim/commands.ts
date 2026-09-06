@@ -13,7 +13,7 @@ import {
 import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
-import { planRoadGradeAround } from './roads';
+import { gradeForRoads, planRoadGradeAround } from './roads';
 import { checkRequirements, presentDefinitions } from './requirements';
 import {
   bondCap,
@@ -27,7 +27,7 @@ import {
 import { needsClearing } from './terrain';
 import { createLine, findLine, modeOf, removeLine, stopMode } from './transit';
 import { extinguishTile } from './disasters/fire';
-import { collapseUnsupportedRoads, noLosses } from './disasters/damage';
+import { collapseUnsupportedRoads, destroyInfrastructure, noLosses } from './disasters/damage';
 import { clearRubble } from './disasters/rubble';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
@@ -188,7 +188,18 @@ export function buildRoad(
   // proto jen **příčný spád** — viz `planRoadGrade`.
   let grade: ReadonlyMap<number, number> | null = null;
   if (!overWater) {
-    grade = planRoadGradeAround(world, x, y);
+    // Spád pod novou dlaždicí, a k němu **dorovnání rohů pod sousedními
+    // silnicemi** (T101). Rohy jsou sdílené, takže srovnání pod novou vozovkou
+    // nakloní i tu vedle; do T101 se taková soused silnice bourala. Změřeno na
+    // pěti generovaných mapách: ze 14 668 postavených dlaždic jich 598 zbořilo
+    // jinou. Silnice přitom vede proud, takže každá díra odřízne kus města.
+    const graded = gradeForRoads(world, planRoadGradeAround(world, x, y), [tile]);
+    // Když se dorovnat nedá, stavba **neprojde**. Zbourat kvůli ní stojící
+    // ulici nesmíme (rozhodnutí autora, T101) a nechat ji nakloněnou taky ne —
+    // zbývá říct hráči, že sem vozovka nepatří. Změřeno na pěti generovaných
+    // mapách: ze 14 631 pokusů takhle skončilo 92, tedy šest z tisíce.
+    if (graded.unfixable.length > 0) return reject('error.terraformBreaksRoad');
+    grade = graded.changes;
     // **Budova v cestě silnici nezastaví** (rozhodnutí autora): domy nad
     // silnicí se mají podezdít, ne bránit stavbě. Podezdívku jim renderer
     // dokreslí sám, protože kopíruje terén.
@@ -226,10 +237,11 @@ export function buildRoad(
   setRoadTile(world, tile, type);
   markRoadNeighbourhoodDirty(world, x, y);
 
-  // Rozbití okolních silnic se řeší **až po položení**, ne přes `reshapeTerrain`.
-  // `planRoadGradeAround` totiž počítá spád podle masky, ve které nová dlaždice
-  // už je; kdyby se kontrolovalo dřív, ptali bychom se na tvar, který ještě
-  // neplatí, a odbočka by při stavbě zbořila ulici, do které se napojuje.
+  // Pojistka na to, co dorovnat nešlo — roh na stropu výšek nebo dlaždice, jejíž
+  // všechny čtyři rohy plán zamkl. Řeší se **až po položení**, ne přes
+  // `reshapeTerrain`: `planRoadGradeAround` počítá spád podle masky, ve které
+  // nová dlaždice už je, takže dřív by se ptalo na tvar, který ještě neplatí,
+  // a odbočka by při stavbě zbořila ulici, do které se napojuje.
   if (grade && grade.size > 0) collapseUnsupportedRoads(world, grade, noLosses());
   markPowerNetworkDirty(world); // silnice je vodič
   return OK;
@@ -306,9 +318,12 @@ export function estimateRoad(
 
   const clearing = !overWater && needsClearing(terrain) ? clearingCost(balance, terrain) : 0;
 
+  // Dorovnání pod sousedními silnicemi je v ceně, ne překvapení na účtu —
+  // odhad se proto ptá na týž plán jako `buildRoad` (T101).
   const levelling = overWater
     ? 0
-    : planRoadGradeAround(world, x, y).size * (balance?.map.terraformCost ?? 0);
+    : gradeForRoads(world, planRoadGradeAround(world, x, y), [tile]).changes.size *
+      (balance?.map.terraformCost ?? 0);
 
   return { road, clearing, levelling, total: road + clearing + levelling };
 }
@@ -349,9 +364,13 @@ export function estimatePlacement(
   const [width, depth] = definition.footprint;
   // Co snese svah, to se nesrovnává a nic za srovnání neplatí — park se do
   // kopce posadí, jak je (`allowsSlope`, P5).
-  const changes = definition.construction.allowsSlope
+  const wanted = definition.construction.allowsSlope
     ? new Map<number, number>()
     : planLevelling(world, x, y, width, depth);
+  // Dorovnání terénu pod okolními silnicemi je **součást ceny**, ne překvapení
+  // na účtu (§12 kritérium 14). Bez toho by hráč zaplatil za rohy, které v
+  // odhadu neviděl — a do T101 se místo nich rovnou bořila vozovka.
+  const changes = gradeForRoads(world, wanted).changes;
   const levelling = changes.size * (balance?.map.terraformCost ?? 0);
   const building = definition.construction.cost;
 
@@ -830,18 +849,49 @@ export interface TerraformEstimate {
  */
 function reshapeTerrain(world: WorldState, changes: ReadonlyMap<number, number>): void {
   if (changes.size === 0) return;
-  applyHeightChanges(world, changes);
-  collapseUnsupportedRoads(world, changes, noLosses());
+
+  // Terén se dorovná tak, aby pod ním silnice obstály (T101). Plány z odhadů
+  // už dorovnané jsou, tohle je pojistka pro cesty, které jdou mimo ně —
+  // opakované dorovnání nic nemění, je to funkce téhož stavu.
+  const graded = gradeForRoads(world, changes);
+  applyHeightChanges(world, graded.changes);
+
+  // Co dorovnat nešlo, se rozpadne jako dřív. Stává se to tam, kde by roh
+  // vyjel z rozsahu výšek nebo kde jsou všechny čtyři rohy hráčovy — nechat
+  // stát nakloněnou vozovku je horší než hromada suti, kterou je vidět.
+  if (graded.unfixable.length > 0) {
+    const losses = noLosses();
+    for (const tile of graded.unfixable) destroyInfrastructure(world, tile, losses);
+  }
 }
 
 function checkTerraform(world: WorldState, changes: ReadonlyMap<number, number>): CommandResult {
   if (reshapeBlocker(world, changes) === 'water') return reject('error.terraformWater');
+  // Silnice se kvůli srovnání terénu **nebourá** (rozhodnutí autora, T101).
+  // Plán, který sem přišel z odhadu, je už dorovnaný, takže tohle chytá jen
+  // zbytek: dlaždice, u kterých dorovnání narazilo na strop výšek nebo na
+  // samé zamčené rohy. Radši odmítnout než tiše rozbít síť, po které jde proud.
+  if (gradeForRoads(world, changes).unfixable.length > 0) {
+    return reject('error.terraformBreaksRoad');
+  }
   return OK;
 }
 
-function estimate(changes: Map<number, number>, balance?: Balance): TerraformEstimate {
+/**
+ * Zaokrouhlí plán terénu tak, aby pod ním silnice obstály, a spočítá cenu.
+ *
+ * Dorovnání je **součást plánu, ne úklid po něm**: kdyby se dělalo až při
+ * provedení, hráč by za rohy navíc zaplatil, aniž by je viděl v ceně předem
+ * (§12 kritérium 14). Takhle je v odhadu i v účtu totéž číslo.
+ */
+function estimate(
+  world: WorldState,
+  changes: Map<number, number>,
+  balance?: Balance,
+): TerraformEstimate {
+  const graded = gradeForRoads(world, changes).changes;
   const perCorner = balance?.map.terraformCost ?? 0;
-  return { corners: changes.size, cost: changes.size * perCorner, changes };
+  return { corners: graded.size, cost: graded.size * perCorner, changes: graded };
 }
 
 /** Kolik by stálo zvednutí nebo snížení rohu. Nic nemění — jen počítá. */
@@ -854,7 +904,7 @@ export function estimateCornerHeight(
 ): TerraformEstimate {
   const corner = cornerIndex(x, y, cornerSideOf(world.cornerHeight));
   const current = world.cornerHeight[corner] ?? 0;
-  return estimate(planCornerHeight(world.cornerHeight, x, y, current + delta), balance);
+  return estimate(world, planCornerHeight(world.cornerHeight, x, y, current + delta), balance);
 }
 
 /** Jak se plocha srovnává: na průměr, nebo dozděním na nejvyšší roh. */
@@ -894,7 +944,7 @@ export function estimateLevelArea(
       : mode === 'fill'
         ? planFilling(world, x, y, w, h)
         : planLevelling(world, x, y, w, h);
-  return estimate(changes, balance);
+  return estimate(world, changes, balance);
 }
 
 function commit(world: WorldState, plan: TerraformEstimate): CommandResult {
