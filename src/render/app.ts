@@ -425,6 +425,24 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupIcon: 'terrain-raise',
       action: { kind: 'fill' },
     },
+    /*
+     * Vysazení lesa (rozhodnutí autora).
+     *
+     * Patří k terénním nástrojům, protože mění povrch, ne zástavbu — a je to
+     * protějšek buldozeru, který les kácí. Ve hře je to jediná obrana proti
+     * znečištění bez údržby: les pohltí půlku kouře v buňce, kterou zarůstá,
+     * a zvedne cenu půdy kolem.
+     */
+    {
+      id: 'terrain:trees',
+      labelKey: 'ui.tool.terrain.trees',
+      icon: 'plant-trees',
+      hotkey: 't',
+      groupKey: 'ui.menu.terrain',
+      groupIcon: 'terrain-raise',
+      cost: content.getBalance().map.plantTreesCost,
+      action: { kind: 'plantTrees' },
+    },
     {
       id: 'zone:residential',
       labelKey: 'ui.tool.zone.residential',
@@ -846,6 +864,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       : await showHome(mount, i18n, content.getBalance(), {
           canResume,
           readFile: (file) => platform.files.read(file),
+          catalogue: content,
         });
   const newGame =
     choice.kind === 'game'
@@ -1661,7 +1680,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onLanguageChange: (language) => i18n.setLanguage(language),
     // Nápověda se otevírá **nad hrou**, ne místo ní: hráč se vrací jedním
     // tlačítkem a nepřijde o místo, kde se zrovna díval.
-    onHelp: () => showHelp(mount, (key) => i18n.t(key)),
+    onHelp: () => showHelp(mount, (key) => i18n.t(key), undefined, content),
     onArmDisaster: (kind) => {
       armedDisaster = kind;
       message = { key: 'ui.disaster.armed', params: { name: i18n.t(`ui.disaster.${kind}`) } };
@@ -1941,6 +1960,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         break;
       case 'fill':
         dispatch({ type: 'level_area', x: tile.x, y: tile.y, w: 1, h: 1, mode: 'fill' });
+        break;
+      case 'plantTrees':
+        dispatch({ type: 'plant_trees', x: tile.x, y: tile.y });
         break;
       case 'bulldoze':
         // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.

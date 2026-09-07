@@ -35,7 +35,12 @@ export type ToolAction =
    * Dozdění: plocha se zaveze na úroveň **nejvyššího** rohu, místo aby se
    * odkopala na průměr. U kopce tak vznikne terasa nahoře, ne jáma dole.
    */
-  | { kind: 'fill' };
+  | { kind: 'fill' }
+  /**
+   * Vysazení lesa. Opak buldozeru na lese: z trávy udělá les, který pohlcuje
+   * znečištění a zvedá cenu půdy.
+   */
+  | { kind: 'plantTrees' };
 
 export interface ToolOption {
   id: string;

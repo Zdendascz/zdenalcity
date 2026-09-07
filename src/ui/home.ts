@@ -1,5 +1,7 @@
 import type { Balance } from '@/content/balance';
+import type { Definition } from '@/content/schema';
 import { button, el } from './dom';
+import { iconSvg } from './icons';
 import { showHelp } from './help';
 import type { I18n } from './i18n';
 import { showNewGameDialog } from './newGameDialog';
@@ -31,6 +33,13 @@ export type HomeChoice =
 export interface HomeOptions {
   /** Je co obnovit? Bez toho se „Pokračovat" neukáže. */
   canResume: boolean;
+  /**
+   * Katalog staveb pro nápovědu.
+   *
+   * Domovská stránka sama žádnou budovu nezná a nepotřebuje — bere si ho jen
+   * proto, aby přehled staveb v nápovědě fungoval i před rozehráním města.
+   */
+  catalogue?: { getAll(type: string): Definition[] };
   /** Přečte vybraný soubor. Jde přes platform vrstvu (§9), ne přes `File` API. */
   readFile: (file: File) => Promise<Uint8Array>;
 }
@@ -211,7 +220,7 @@ export function showHome(
   // --- řady karet ---------------------------------------------------------
 
   root.appendChild(galleryRow(t, root));
-  root.appendChild(aboutRow(t, root));
+  root.appendChild(aboutRow(t, root, options));
 
   parent.appendChild(root);
 
@@ -410,21 +419,41 @@ ${SHARE_URL}`);
 /** Jak dlouho zůstane v kartě odpověď, než se vrátí původní popisek. */
 const SHARE_NOTE_MS = 2500;
 
-/** Řada s odkazy: sdílení, nápověda, autor a Discord. */
-function aboutRow(t: (key: string) => string, root: HTMLElement): HTMLElement {
-  const section = el('section', 'home__row');
-  section.appendChild(el('h2', 'home__row-title', t('ui.home.about')));
+/**
+ * Odkazy o hře: sdílení, nápověda, autor a Discord.
+ *
+ * **Sloupec vpravo, ne řada přes celou stránku.** Čtyři široké karty pod
+ * galerií vypadaly jako druhá nabídka a přetahovaly pozornost obrázkům, kvůli
+ * kterým na stránce jsou. Autor to popsal takhle: „doprava pod sebe, trochu
+ * menší, méně nápadně." Jsou to odkazy, ne rozcestník — hráč po nich sáhne až
+ * potom, co si hru prohlédl.
+ *
+ * Ikona je z téže sady jako ve hře, takže sloupec drží styl a řádek se dá
+ * poznat dřív, než se přečte.
+ */
+function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOptions): HTMLElement {
+  const section = el('section', 'home__row home__row--about');
+  const strip = el('div', 'home__links');
+  strip.appendChild(el('h2', 'home__links-title', t('ui.home.about')));
 
-  const strip = el('div', 'home__strip');
+  /** Jeden řádek sloupce: ikona, název, popisek pod ním. */
+  function fill(node: HTMLElement, icon: string, title: string, note: string): HTMLElement {
+    node.appendChild(iconSvg(icon));
+    const text = el('span', 'home__link-text');
+    text.appendChild(el('span', 'home__link-title', title));
+    text.appendChild(el('span', 'home__link-note', note));
+    node.appendChild(text);
+    return node;
+  }
 
-  // Sdílení první: je to jediná karta, která hru **šíří**, a hráč po ní sáhne
+  // Sdílení první: je to jediný odkaz, který hru **šíří**, a hráč po něm sáhne
   // hned po tom, co ho pobavila. Ostatní tři jsou o hře samotné.
-  const share = button('home__card home__card--text home__card--share', () => {
+  const share = button('home__link', () => {
     void shareGame(t).then((key) => {
       if (key === '') return;
-      // Odpověď se píše rovnou do karty: bublina by na domovské stránce
+      // Odpověď se píše rovnou do řádku: bublina by na domovské stránce
       // neměla kam, a hráč se dívá na tlačítko, které zmáčkl.
-      const note = share.querySelector('.home__card-note');
+      const note = share.querySelector('.home__link-note');
       if (!note) return;
       note.textContent = t(key);
       window.setTimeout(() => {
@@ -432,30 +461,24 @@ function aboutRow(t: (key: string) => string, root: HTMLElement): HTMLElement {
       }, SHARE_NOTE_MS);
     });
   });
-  share.appendChild(el('span', 'home__card-title', t('ui.home.share')));
-  share.appendChild(el('span', 'home__card-note', t('ui.home.shareNote')));
-  strip.appendChild(share);
+  strip.appendChild(fill(share, 'share', t('ui.home.share'), t('ui.home.shareNote')));
 
   // Nápověda: hra nemá tutoriál, takže je to jediné místo, kde se hráč
   // doví, proč mu zóna nezarostla.
-  const help = button('home__card home__card--text', () => showHelp(root, t));
-  help.appendChild(el('span', 'home__card-title', t('ui.help.title')));
-  help.appendChild(el('span', 'home__card-note', t('ui.help.note')));
-  strip.appendChild(help);
+  const help = button('home__link', () => showHelp(root, t, undefined, options.catalogue));
+  strip.appendChild(fill(help, 'help', t('ui.help.title'), t('ui.help.note')));
 
-  const card = button('home__card home__card--text', () => showAuthors(root, t));
-  card.appendChild(el('span', 'home__card-title', t('ui.home.authors')));
-  card.appendChild(el('span', 'home__card-note', t('ui.home.authorsNote')));
-  strip.appendChild(card);
+  const authors = button('home__link', () => showAuthors(root, t));
+  strip.appendChild(
+    fill(authors, 'author', t('ui.home.authors'), t('ui.home.authorsNote')),
+  );
 
   // Discord je **odkaz ven**, ne překryv: je to jiné místo, ne další stránka hry.
-  const discord = el('a', 'home__card home__card--text home__card--link');
+  const discord = el('a', 'home__link home__link--out');
   discord.href = DISCORD_URL;
   discord.target = '_blank';
   discord.rel = 'noreferrer noopener';
-  discord.appendChild(el('span', 'home__card-title', t('ui.home.discord')));
-  discord.appendChild(el('span', 'home__card-note', t('ui.home.discordNote')));
-  strip.appendChild(discord);
+  strip.appendChild(fill(discord, 'chat', t('ui.home.discord'), t('ui.home.discordNote')));
 
   section.appendChild(strip);
   return section;

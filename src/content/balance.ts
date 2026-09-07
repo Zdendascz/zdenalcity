@@ -567,6 +567,14 @@ export interface Balance {
     /** Cena za vykaceni jedne dlazdice lesa. */
     clearForestCost: number;
     /**
+     * Cena za vysazení lesa na jedné dlaždici.
+     *
+     * Levnější než vykácení schválně: les je jediná obrana proti znečištění,
+     * která nemá údržbu, a má se vyplatit zasadit ho dřív, než továrna zakouří
+     * čtvrť.
+     */
+    plantTreesCost: number;
+    /**
      * Nad kolik dlaždic se vyznačená zóna už automaticky nesrovnává. Kdo táhne
      * zónu přes celé údolí, nechce náhorní plošinu.
      */
@@ -1105,6 +1113,7 @@ export function validateBalance(raw: unknown): {
       scrapIslandTiles: num(issues, map, 'scrapIslandTiles', 'map.scrapIslandTiles', 0, 4096),
       forestAbsorption: num(issues, map, 'forestAbsorption', 'map.forestAbsorption', 0, 1),
       clearForestCost: num(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
+      plantTreesCost: num(issues, map, 'plantTreesCost', 'map.plantTreesCost', 0, 100000),
       maxLevelledZoneTiles: num(
         issues,
         map,

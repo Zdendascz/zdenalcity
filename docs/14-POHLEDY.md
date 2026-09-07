@@ -502,3 +502,52 @@ hodnota z doby, kdy dosah znamenal buňky a strop tedy celou mapu.
 jednotky nešla. Linka tak sbírala poptávku ze čtyřikrát většího okolí, než kam
 zastávka dosáhne. Vyplavalo to, až když se dosahy přepočítaly: testovací
 městečko se celé vešlo do dosahu jedné zastávky a testu nezbylo, co porovnávat.
+
+## T102: sázení lesa, odkazy na domovské stránce, nápověda z dat
+
+Tři věci na zadání autora: „přidej novou funkci — tlačítko ve hře: vysazení
+stromů", „ty linky dole bych dal spíš doprava pod sebe, trochu menší, méně
+nápadně" a „doplň nápovědu: každá služba každý problém: co jej způsobuje, co
+jej řeší; každá budova: co dělá, co žere, co přináší".
+
+### Sázení lesa
+
+Protějšek buldozeru: ten les kácí, tenhle nástroj ho sází. Není to ozdoba —
+les **pohltí polovinu znečištění** v buňce, kterou zarůstá (`map.forestAbsorption`
+= 0,5), a zvedá cenu půdy. Je to jediná obrana proti kouři **bez údržby**:
+zaplatí se jednou a dál jen roste.
+
+Cena je 60 za dlaždici proti 120 za vykácení. Levněji schválně: pás zeleně
+kolem továrny má vyjít líp než jeho pozdější likvidace.
+
+Sází se jen na volnou trávu nebo písek. Zóna je překážka schválně — na
+vyznačené parcele by les jen tiše zabránil růstu a hráč by koukal, proč mu
+čtvrť nezarůstá, když si ji sám zalesnil.
+
+### Odkazy o hře
+
+Byla to řada čtyř širokých karet přes celou stránku a vypadala jako druhá
+nabídka; přetahovala pozornost obrázkům, kvůli kterým na stránce je. Teď je to
+sloupec u pravého okraje s ikonou, menším písmem a tichým pozadím.
+
+Tři ikony k tomu vznikly (`share`, `author`, `chat`) v téže sadě jako zbytek
+hry. U dvou z nich model nechal na štítku šmouhy, tak se **plocha štítku
+srovnala programově** na jeden odstín — jinak by v řadě ostatních ikon
+vyčnívaly. Kdo je bude generovat znovu, musí to zopakovat.
+
+### Nápověda
+
+Dvě nové kapitoly a obě se **skládají z dat**, ne z ručně psaného textu:
+
+- **Stavby** — každá budova z obsahu se rozebere na „potřebuje / dává / bere".
+  Čísla jsou tatáž, podle kterých počítá simulace, takže nápověda nemůže lhát.
+  Ručně psaný seznam by zastaral první změnou balance a nikdo by si toho
+  nevšiml.
+- **Problémy** — dvacet věcí, které se ve městě kazí, každá s odstavcem „čím to
+  je" a „co s tím".
+
+Text zůstává v locale (§10), v kódu jsou jen klíče a pořadí. Hlídá to
+`tests/help.test.ts`: každá překážka růstu, kterou hra umí nahlásit
+(`ui.parcel.blocked.*`), musí mít v nápovědě odstavec, každý údaj o stavbě musí
+mít překlad v obou jazycích a žádná budova nesmí zůstat bez ceny, údržby a
+půdorysu. Nová překážka v kódu si tak vynutí i odstavec v nápovědě.

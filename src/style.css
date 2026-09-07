@@ -1546,6 +1546,84 @@ body {
   font-size: 13px;
 }
 
+/*
+ * Odkazy o hře: úzký sloupec vpravo.
+ *
+ * Byla to řada čtyř širokých karet přes celou stránku a vypadala jako druhá
+ * nabídka — přetahovala pozornost obrázkům, kvůli kterým na stránce je.
+ * Teď je to sloupec u pravého okraje, menší písmo a tiché pozadí; odkazy jsou
+ * po ruce, ale nekřičí.
+ */
+.home__row--about {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.home__links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(320px, 100%);
+}
+
+.home__links-title {
+  margin: 0 0 2px;
+  color: #8fa3ab;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home__link {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid rgb(238 243 245 / 8%);
+  border-radius: 8px;
+  background: rgb(14 32 40 / 45%);
+  color: #dbe6ea;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.home__link:hover {
+  border-color: rgb(240 160 32 / 55%);
+  background: rgb(20 44 54 / 75%);
+}
+
+.home__link .icon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+}
+
+.home__link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.home__link-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.home__link-note {
+  overflow: hidden;
+  color: #93a7af;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .home__card--text {
   display: flex;
   flex-direction: column;
@@ -1673,6 +1751,101 @@ body {
   color: #cdd9de;
   font-size: 14px;
   line-height: 1.6;
+}
+
+/*
+ * Skládané kapitoly: přehled staveb a seznam problémů.
+ *
+ * Nejsou to odstavce k přečtení, ale seznam k prolistování — proto rámečky,
+ * mezery mezi položkami a čísla vpravo. Hráč v nich hledá jednu věc, ne
+ * souvislý text.
+ */
+.help__group {
+  margin: 18px 0 8px;
+  color: #f0a020;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.help__entry {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid rgb(238 243 245 / 10%);
+  border-radius: 8px;
+  background: rgb(9 24 30 / 45%);
+}
+
+.help__entry-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.help__entry-head .icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.help__entry-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.help__entry-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.help__entry-note {
+  color: #9db0b8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.help__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  margin-top: 4px;
+}
+
+.help__facts-title {
+  min-width: 76px;
+  color: #7e939b;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.help__fact {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgb(238 243 245 / 7%);
+  font-size: 12px;
+}
+
+.help__fact-key {
+  color: #b6c6cc;
+}
+
+.help__fact-value {
+  color: #eef3f5;
+  font-weight: 700;
+}
+
+.help__label {
+  color: #eef3f5;
 }
 
 /* Odrážka: text odsazený, značka na svém místě. */

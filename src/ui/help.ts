@@ -1,4 +1,8 @@
+import type { Definition } from '@/content/schema';
 import { button, el } from './dom';
+import { buildingFacts, HELP_PROBLEMS } from './helpData';
+import type { HelpFact } from './helpData';
+import { iconSvg } from './icons';
 
 /**
  * Nápověda ke hře.
@@ -43,7 +47,15 @@ export const HELP_TOPICS: readonly string[] = [
   'disasters',
   'controls',
   'saving',
+  // Poslední dvě se **nečtou, ale hledá se v nich**: jsou to seznamy, do
+  // kterých hráč skočí s konkrétní otázkou („co žere spalovna", „proč mi to
+  // nezarůstá"), ne text, který si přečte odshora dolů.
+  'problems',
+  'buildings',
 ];
+
+/** Témata, která se nekreslí z locale textu, ale skládají z dat. */
+const GENERATED = new Set(['buildings', 'problems']);
 
 /**
  * Otevře nápovědu jako překryv nad tím, co je pod ní.
@@ -55,6 +67,12 @@ export function showHelp(
   parent: HTMLElement,
   t: (key: string) => string,
   startAt = HELP_TOPICS[0] ?? 'start',
+  /**
+   * Katalog staveb. Bez něj se přehled staveb nevykreslí — ostatní témata
+   * fungují dál, protože jsou v locale. Volitelný proto, že nápovědu otevírá
+   * i domovská stránka a ta obsah dostala až kvůli tomuhle.
+   */
+  catalogue?: { getAll(type: string): Definition[] },
 ): void {
   const overlay = el('div', 'home__overlay');
   const panel = el('div', 'home__panel help');
@@ -74,6 +92,15 @@ export function showHelp(
     for (const [id, node] of buttons) node.classList.toggle('is-active', id === topic);
     article.replaceChildren();
     article.appendChild(el('h3', 'help__topic-title', t(`ui.help.${topic}.title`)));
+
+    if (GENERATED.has(topic)) {
+      article.appendChild(el('p', 'help__paragraph', t(`ui.help.${topic}.lead`)));
+      if (topic === 'problems') problems(article, t);
+      else buildings(article, t, catalogue);
+      article.scrollTop = 0;
+      return;
+    }
+
     for (const paragraph of t(`ui.help.${topic}.body`).split(PARAGRAPH_BREAK)) {
       const bullet = BULLET.test(paragraph);
       article.appendChild(
@@ -102,4 +129,104 @@ export function showHelp(
   parent.appendChild(overlay);
 
   open(HELP_TOPICS.includes(startAt) ? startAt : (HELP_TOPICS[0] ?? 'start'));
+}
+
+/**
+ * Seznam problémů: co to je, čím to je a co s tím.
+ *
+ * Pořadí je pevné a jde od nejčastějšího (`HELP_PROBLEMS`). Každý problém má
+ * tři odstavce, protože přesně tohle si autor vyžádal: „co jej způsobuje, co
+ * jej řeší".
+ */
+function problems(article: HTMLElement, t: (key: string) => string): void {
+  for (const id of HELP_PROBLEMS) {
+    const block = el('section', 'help__entry');
+    block.appendChild(el('h4', 'help__entry-title', t(`ui.help.problem.${id}.title`)));
+    block.appendChild(line(t('ui.help.problem.cause'), t(`ui.help.problem.${id}.cause`)));
+    block.appendChild(line(t('ui.help.problem.fix'), t(`ui.help.problem.${id}.fix`)));
+    article.appendChild(block);
+  }
+}
+
+/** Odstavec „štítek: text". Štítek je tučný, aby šel seznam přeletět očima. */
+function line(label: string, text: string): HTMLElement {
+  const node = el('p', 'help__paragraph');
+  node.appendChild(el('strong', 'help__label', `${label}: `));
+  node.appendChild(document.createTextNode(text));
+  return node;
+}
+
+/**
+ * Přehled staveb **z dat, ne z textu**.
+ *
+ * Řadí se podle nabídky, ve které je hráč hledá ve hře, a v ní podle ceny —
+ * to je pořadí, ve kterém k nim ve hře dojde. Čísla jsou tatáž, podle kterých
+ * počítá simulace, takže nápověda nemůže lhát.
+ */
+function buildings(
+  article: HTMLElement,
+  t: (key: string) => string,
+  catalogue?: { getAll(type: string): Definition[] },
+): void {
+  if (!catalogue) return;
+
+  const all = [...catalogue.getAll('building')].sort(
+    (a, b) =>
+      (a.menu ?? a.category).localeCompare(b.menu ?? b.category) ||
+      a.construction.cost - b.construction.cost,
+  );
+
+  let group = '';
+  for (const definition of all) {
+    const menu = definition.menu ?? definition.category;
+    if (menu !== group) {
+      group = menu;
+      article.appendChild(el('h4', 'help__group', groupName(menu, t)));
+    }
+
+    const entry = el('section', 'help__entry');
+    const head = el('div', 'help__entry-head');
+    // Ikona je v definici volitelná (mod ji nemusí dodat); bez ní se kreslí
+    // prázdný tvar, ne výjimka.
+    head.appendChild(iconSvg(definition.graphics.icon ?? ''));
+    const title = el('div', 'help__entry-text');
+    title.appendChild(el('span', 'help__entry-title', t(definition.name)));
+    title.appendChild(el('span', 'help__entry-note', t(definition.description)));
+    head.appendChild(title);
+    entry.appendChild(head);
+
+    const facts = buildingFacts(definition, t);
+    entry.appendChild(column(t('ui.help.section.needs'), facts.needs, t));
+    entry.appendChild(column(t('ui.help.section.gives'), facts.gives, t));
+    entry.appendChild(column(t('ui.help.section.takes'), facts.takes, t));
+    article.appendChild(entry);
+  }
+}
+
+/** Jeden sloupec údajů. Prázdný se nekreslí — mlčet je lepší než psát „nic". */
+function column(title: string, facts: readonly HelpFact[], t: (key: string) => string): HTMLElement {
+  const node = el('div', 'help__facts');
+  if (facts.length === 0) return node;
+  node.appendChild(el('span', 'help__facts-title', title));
+  for (const item of facts) {
+    const row = el('span', 'help__fact');
+    row.appendChild(el('span', 'help__fact-key', t(item.key)));
+    if (item.value !== '') row.appendChild(el('span', 'help__fact-value', item.value));
+    node.appendChild(row);
+  }
+  return node;
+}
+
+/**
+ * Jméno skupiny v přehledu staveb.
+ *
+ * Nabídkové skupiny mají klíč `ui.menu.*`, jenže domy, obchody a továrny
+ * žádnou nabídku nemají — vyrostou ze zóny — a jmenují se podle ní. Chybějící
+ * překlad se pozná po tom, že `t` vrátí sám klíč (§10), a sáhne se pro jméno
+ * zóny.
+ */
+function groupName(menu: string, t: (key: string) => string): string {
+  const key = `ui.menu.${menu}`;
+  const named = t(key);
+  return named === key ? t(`ui.zone.${menu}`) : named;
 }

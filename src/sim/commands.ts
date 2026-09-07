@@ -10,7 +10,7 @@ import {
   planFillArea,
   planLevelArea,
 } from './heights';
-import { inBounds, index, ROAD, TERRAIN, ZONE } from './layers';
+import { inBounds, index, ROAD, TERRAIN, terrainNameKey, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { categoryForZone } from './rci';
 import { gradeForRoads, planRoadGradeAround } from './roads';
@@ -63,6 +63,15 @@ export type Command =
   | { type: 'build_pipe'; x: number; y: number }
   | { type: 'remove_pipe'; x: number; y: number }
   | { type: 'terraform_corner'; x: number; y: number; delta: number }
+  /**
+   * Vysazení lesa (rozhodnutí autora).
+   *
+   * Protějšek k vykácení: buldozer les mění na trávu, tenhle příkaz trávu na
+   * les. Není to ozdoba — les **pohlcuje znečištění** (`systems/pollution.ts`,
+   * `map.forestAbsorption`) a zvedá cenu půdy, takže je to jediná obrana proti
+   * kouři, která nestojí údržbu. Zaplatí se jednou a dál jen roste.
+   */
+  | { type: 'plant_trees'; x: number; y: number }
   /**
    * `mode: 'fill'` dozdí plochu na **nejvyšší** roh místo srovnání na průměr.
    * Svah tak nezmizí odkopáním, ale zavezením — hráč si tím rovná terasu
@@ -745,6 +754,56 @@ export function bulldoze(
   }
 
   return reject('error.nothingToBulldoze');
+}
+
+/**
+ * Vysadí les na jedné dlaždici.
+ *
+ * **Opak vykácení**, se stejnými pravidly z druhé strany: sází se jen tam, kde
+ * je volná tráva nebo písek. Co je zastavěné, zpevněné nebo pod sutí, se
+ * nejdřív musí uklidit — les neroste přes silnici ani přes barák.
+ *
+ * Zóna je překážka schválně. Vyznačená parcela znamená „sem chci dům" a les by
+ * na ní jen tiše zabránil růstu: hra by hlásila, že terén nedovolí stavbu, a
+ * hráč by koukal, proč mu čtvrť nezarostla, když si ji sám zalesnil.
+ *
+ * Cena je v datech (`map.plantTreesCost`, P5). Kácení stojí 120, sázení 60 —
+ * les se sází snáz, než se odklízí, a pás zeleně kolem továrny tak vyjde
+ * levněji než jeho pozdější likvidace.
+ */
+export function plantTrees(
+  world: WorldState,
+  x: number,
+  y: number,
+  balance?: Balance,
+): CommandResult {
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+
+  const tile = index(x, y, world.size);
+  const terrain = world.layers.terrain[tile] ?? TERRAIN.grass;
+  if (terrain === TERRAIN.forest) return reject('error.forestExists');
+  if (terrain !== TERRAIN.grass && terrain !== TERRAIN.sand) {
+    return reject('error.terrainNotAllowed', {
+      terrain: terrainNameKey(terrain),
+      allowed: [TERRAIN.grass, TERRAIN.sand].map(terrainNameKey).join(','),
+    });
+  }
+
+  if ((world.layers.buildingId[tile] ?? 0) !== 0) return reject('error.occupied');
+  if ((world.layers.road[tile] ?? ROAD.none) !== ROAD.none) return reject('error.roadInTheWay');
+  if ((world.rubble[tile] ?? 0) !== 0) return reject('error.rubbleInTheWay');
+  if ((world.layers.zone[tile] ?? ZONE.none) !== ZONE.none) return reject('error.zoneInTheWay');
+
+  const cost = balance?.map.plantTreesCost ?? 0;
+  if (world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  }
+
+  world.economy.funds -= cost;
+  world.layers.terrain[tile] = TERRAIN.forest;
+  markTerrainChanged(world);
+  markTileDirty(world, x, y);
+  return OK;
 }
 
 /**

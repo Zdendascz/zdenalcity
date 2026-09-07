@@ -11,6 +11,7 @@ import {
   deleteTransitLine,
   levelArea,
   placeDefinition,
+  plantTrees,
   removePipe,
   issueBondCommand,
   requestLoan,
@@ -172,6 +173,8 @@ class MainThreadSimHost implements SimHost {
           cmd.mode,
           cmd.height,
         );
+      case 'plant_trees':
+        return plantTrees(this.world, cmd.x, cmd.y, this.balance);
       case 'set_service_funding':
         return setServiceFunding(this.world, cmd.serviceClass, cmd.funding);
       case 'create_line':

@@ -23,6 +23,7 @@
     "scrapIslandTiles": 24,
     "forestAbsorption": 0.5,
     "clearForestCost": 120,
+    "plantTreesCost": 60,
     "maxLevelledZoneTiles": 64,
     "minLandShare": 0.97,
     "maxHeight": 10,
