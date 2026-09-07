@@ -582,3 +582,37 @@ Text zůstává v locale (§10), v kódu jsou jen klíče a pořadí. Hlídá to
 (`ui.parcel.blocked.*`), musí mít v nápovědě odstavec, každý údaj o stavbě musí
 mít překlad v obou jazycích a žádná budova nesmí zůstat bez ceny, údržby a
 půdorysu. Nová překážka v kódu si tak vynutí i odstavec v nápovědě.
+
+## T105: co si vyžádali hráči
+
+Šest bodů ze zpětné vazby z testovacího hraní. Tři byly chyby v pravidlech,
+tři v tom, že hra mlčí.
+
+**Zbořená zastávka zabíjela linku.** Zůstala na ní viset, `lineProblems` ji
+hlásil jako „tohle není zastávka" a linka přestala jezdit natrvalo, dokud ji
+hráč ručně nevyhodil — a protože zastávky nemají jméno, ani nepoznal, která to
+byla. V kódu k tomu byla funkce `liveStops`, která se **nikde nepoužívala**:
+někdo to tak zamýšlel a nedotáhl. Nově mizí z linky sama v `removeBuilding`,
+tedy na jediném místě, kudy budova z města mizí.
+
+**Linka se dá odstavit** (save v9). Odstavená stojí v depu: nikoho nevozí,
+nevydělá a neplatí se za ni údržba vozidel — jinak by odstavení nebylo k ničemu
+a hráči by zbývalo linku smazat i se zastávkami. Má vlastní stav, aby šla
+odlišit od rozbité.
+
+**Kamera po katastrofě míří tam, kde to bolí.** Zemětřesení má epicentrum
+kdekoli, i v pustině, protože otřes se stejně roznese po celé mapě — hráč pak
+koukal do prázdné krajiny. `alertTarget` proto vrátí vznik jen tehdy, když u něj
+něco je; jinak nejbližší škodu a jako poslední možnost těžiště města.
+
+**Rozpad poptávky.** Sloupečky O/K/P vypadaly náhodně, přestože model je tři
+řádky. Po najetí myší vypíšou sčítance a počítají se **týmiž vzorci jako sama
+poptávka**, takže se s ní nemůžou rozejít.
+
+**Terénní nástroj ukáže kaskádu i cenu.** Roh pod kurzorem svítil, ale sousedi,
+které terén stáhne s sebou, ne. Bere se to z téhož odhadu, ze kterého se pak
+strhne z kasy.
+
+**Ikona zavření** byla lososový křížek na světlém štítku — ve 20 px z toho byl
+prázdný čtvereček a hráč tvrdil, že tlačítko chybí. Nová je bílý křížek na šedém
+štítku jako zbytek sady.

@@ -41,6 +41,9 @@ export const HELP_TOPICS: readonly string[] = [
   'roads',
   'utilities',
   'services',
+  // MHD má vlastní téma: hráči se ptali na koleje, tunely a na to, jak vůbec
+  // linka vzniká — a nic z toho se do „služeb" nevešlo.
+  'transit',
   'quality',
   'terrain',
   'money',
