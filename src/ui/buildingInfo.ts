@@ -128,16 +128,34 @@ export class BuildingInfo {
    * projít všechny budovy a znát katalog. Kapacita spalovny sama o sobě nic
    * neříká — teprve vedle městské potřeby je z ní odpověď „stačí to?".
    */
-  private readonly utilities: () => { wasteNeeded: number; sewageNeeded: number };
+  private readonly utilities: () => {
+    wasteNeeded: number;
+    wasteCapacity: number;
+    sewageNeeded: number;
+    sewageCapacity: number;
+    waterNeeded: number;
+    waterCapacity: number;
+  };
 
   constructor(
     parent: HTMLElement,
     i18n: I18n,
     balance: Balance,
     tileImage: (terrain: number) => string | undefined = () => undefined,
-    utilities: () => { wasteNeeded: number; sewageNeeded: number } = () => ({
+    utilities: () => {
+      wasteNeeded: number;
+      wasteCapacity: number;
+      sewageNeeded: number;
+      sewageCapacity: number;
+      waterNeeded: number;
+      waterCapacity: number;
+    } = () => ({
       wasteNeeded: 0,
+      wasteCapacity: 0,
       sewageNeeded: 0,
+      sewageCapacity: 0,
+      waterNeeded: 0,
+      waterCapacity: 0,
     }),
   ) {
     this.i18n = i18n;
@@ -277,7 +295,12 @@ export class BuildingInfo {
         `${formatNumber(sewageCapacity)} / ${formatNumber(city.sewageNeeded)}`,
       ]);
     }
-    if (waterProduction > 0) rows.push(['ui.info.waterProduction', formatNumber(waterProduction)]);
+    if (waterProduction > 0) {
+      rows.push([
+        'ui.info.waterProduction',
+        `${formatNumber(waterProduction)} / ${formatNumber(city.waterNeeded)}`,
+      ]);
+    }
     if (waterRange > 0) rows.push(['ui.info.waterRange', formatNumber(waterRange)]);
 
     const tax = buildingMonthlyTax(world, definition, building, this.balance);
@@ -309,6 +332,44 @@ export class BuildingInfo {
       list.appendChild(el('dd', undefined, value));
     }
     left.appendChild(list);
+
+    /*
+     * Varování rovnou na kartě té budovy, které se to týká.
+     *
+     * Číslo „300 / 1240" je pravda, ale hráč nemá povinnost si ho přepočítat.
+     * Autor se právem ptal: „a kde se dozvím, že není kapacita čištění?"
+     * Tady, červeně, s tím, co s tím dělat.
+     */
+    const over: string[] = [];
+    if (wasteCapacity > 0 && city.wasteNeeded > city.wasteCapacity) over.push('ui.info.wasteOver');
+    if (sewageCapacity > 0 && city.sewageNeeded > city.sewageCapacity) {
+      over.push('ui.info.sewageOver');
+    }
+    if (waterProduction > 0 && city.waterNeeded > city.waterCapacity) over.push('ui.info.waterOver');
+    for (const key of over) {
+      left.appendChild(
+        el(
+          'p',
+          'sheet__warning',
+          t(key, {
+            capacity: formatNumber(
+              key === 'ui.info.wasteOver'
+                ? city.wasteCapacity
+                : key === 'ui.info.sewageOver'
+                  ? city.sewageCapacity
+                  : city.waterCapacity,
+            ),
+            needed: formatNumber(
+              key === 'ui.info.wasteOver'
+                ? city.wasteNeeded
+                : key === 'ui.info.sewageOver'
+                  ? city.sewageNeeded
+                  : city.waterNeeded,
+            ),
+          }),
+        ),
+      );
+    }
 
     if (building.abandoned) {
       left.appendChild(el('p', 'sheet__warning', t('ui.info.abandonedWarning')));

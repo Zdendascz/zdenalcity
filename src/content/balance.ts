@@ -489,6 +489,16 @@ export interface DisasterBalance {
   season?: { from: number; to: number; inFactor: number; outFactor: number };
   /** Bez čeho katastrofa nevznikne — pobřeží u povodně, les u lesního požáru. */
   require: readonly { metric: DisasterMetric; min: number }[];
+  /**
+   * Kdy katastrofa **nevznikne vůbec**, i kdyby ostatní podmínky seděly.
+   *
+   * Doplněk k `risk`, který umí riziko jen zvyšovat. Blackout to potřebuje:
+   * jeho základní šance je čtyři procenta měsíčně a rezerva sítě ji nesnižuje,
+   * takže i město s dvojnásobkem výroby dostávalo výpadek každé dva roky.
+   * Autor se ptal přesně tak: „pokud mám dvojnásobnou rezervu, jak je možný
+   * ten blackout?" Síť s rezervou prostě nepadá.
+   */
+  unless?: readonly { indicator: string; above: number }[];
   risk: readonly RiskTermBalance[];
   burn?: BurnBalance;
 }
@@ -697,6 +707,16 @@ export interface Balance {
      */
     decayStep: number;
     abandonAfter: number;
+    /**
+     * Kolik vody spotřebuje jeden obyvatel a jedno pracovní místo.
+     *
+     * Do T107 se `water.production` používalo **jen jako vypínač**: stačila
+     * jedna vodárna a pár čerpacích stanic a voda byla všude, takže větší
+     * vodárna neměla důvod existovat. Autor to nahlásil přesně tak. Teď je
+     * výroba strop: co se za něj nevejde, zůstane na konci sítě suché.
+     */
+    perCitizen: number;
+    perWorker: number;
   };
 
   health: {
@@ -1170,6 +1190,8 @@ export function validateBalance(raw: unknown): {
       pipeCost: num(issues, water, 'pipeCost', 'water.pipeCost', 0, 100000),
       decayStep: num(issues, water, 'decayStep', 'water.decayStep', 0, 1000),
       abandonAfter: num(issues, water, 'abandonAfter', 'water.abandonAfter', 1, 1000),
+      perCitizen: num(issues, water, 'perCitizen', 'water.perCitizen', 0, 100),
+      perWorker: num(issues, water, 'perWorker', 'water.perWorker', 0, 100),
     },
     happiness: {
       base: num(issues, happiness, 'base', 'happiness.base', 0, 255),
@@ -1286,6 +1308,9 @@ function validateDisasters(
         ? {}
         : { season: validateSeason(issues, asRecord(record['season']), `${where}.season`) }),
       require: validateRequire(issues, record['require'], `${where}.require`),
+      ...(record['unless'] === undefined
+        ? {}
+        : { unless: validateUnless(issues, record['unless'], `${where}.unless`) }),
       risk: validateRisk(issues, record['risk'], `${where}.risk`, natural === true),
       ...(record['burn'] === undefined
         ? {}
@@ -1391,6 +1416,37 @@ function validateRequire(
     return {
       metric: metric(issues, record, 'metric', `${where}[${i}].metric`),
       min: num(issues, record, 'min', `${where}[${i}].min`, 0, 1000000),
+    };
+  });
+}
+
+/** Jméno ukazatele. Seznam je otevřený (mod si smí přidat vlastní), tvar ne. */
+function indicatorName(issues: ValidationIssue[], raw: unknown, field: string): string {
+  if (typeof raw !== 'string' || raw.length === 0) {
+    issues.push({ field, message: 'musí být neprázdný řetězec' });
+    return 'none';
+  }
+  return raw;
+}
+
+function validateUnless(
+  issues: ValidationIssue[],
+  raw: unknown,
+  where: string,
+): { indicator: string; above: number }[] {
+  if (!Array.isArray(raw)) {
+    issues.push({ field: where, message: 'musí být pole' });
+    return [];
+  }
+  return raw.map((entry, i) => {
+    const record = asRecord(entry);
+    if (!record) {
+      issues.push({ field: `${where}[${i}]`, message: 'musí být objekt' });
+      return { indicator: 'none', above: 0 };
+    }
+    return {
+      indicator: indicatorName(issues, record['indicator'], `${where}[${i}].indicator`),
+      above: num(issues, record, 'above', `${where}[${i}].above`, -1000000, 1000000),
     };
   });
 }

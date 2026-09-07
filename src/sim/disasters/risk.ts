@@ -217,9 +217,20 @@ export function concurrentLimit(disaster: DisasterBalance, metrics: Metrics): nu
 }
 
 /** Splňuje město podmínky pro vznik? Neplatí pro ruční spuštění z menu. */
-export function meetsConditions(disaster: DisasterBalance, metrics: Metrics): boolean {
+export function meetsConditions(
+  disaster: DisasterBalance,
+  metrics: Metrics,
+  indicators?: Indicators,
+): boolean {
   for (const condition of disaster.require) {
     if (metrics[condition.metric] < condition.min) return false;
+  }
+  // `unless` je opačná podmínka: dobře vedená síť blackout prostě nedostane.
+  // Bez ukazatelů se nevyhodnocuje — testy podmínek si je nemusí stavět.
+  if (indicators) {
+    for (const condition of disaster.unless ?? []) {
+      if (indicators.get(condition.indicator) > condition.above) return false;
+    }
   }
   return true;
 }

@@ -666,6 +666,8 @@ export interface CityUtilities {
   wasteCapacity: number;
   sewageNeeded: number;
   sewageCapacity: number;
+  waterNeeded: number;
+  waterCapacity: number;
 }
 
 /**
@@ -687,6 +689,8 @@ export function cityUtilities(
   let citizens = 0;
   let wasteCapacity = 0;
   let sewageCapacity = 0;
+  let waterCapacity = 0;
+  let waterNeeded = 0;
 
   for (const building of world.buildings.values()) {
     if (building.abandoned) continue;
@@ -695,12 +699,20 @@ export function cityUtilities(
     if (!definition) continue;
     wasteCapacity += definition.waste?.capacity ?? 0;
     sewageCapacity += definition.sewage?.capacity ?? 0;
+    // Vodárna sama vodu nespotřebuje, jen ji vyrábí — přesně jako v rozvodu.
+    const produced = definition.water?.production ?? 0;
+    waterCapacity += produced;
+    if (produced === 0) {
+      waterNeeded +=
+        building.population * balance.water.perCitizen + building.jobs * balance.water.perWorker;
+    }
   }
-
   return {
     wasteNeeded: Math.round(citizens * balance.waste.perCitizen),
     wasteCapacity,
     sewageNeeded: Math.round(citizens * balance.sewage.perCitizen),
     sewageCapacity,
+    waterNeeded: Math.round(waterNeeded),
+    waterCapacity,
   };
 }

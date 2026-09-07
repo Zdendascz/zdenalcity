@@ -37,7 +37,11 @@ describe('vanilla balance.json', () => {
     expect(balance.diffusion).toEqual({ spread: 0.4, decay: 0.94, passes: 2 });
     expect(balance.landValue.base).toBe(40);
     expect(balance.landValue.weights['pollution']).toBe(0.8);
-    expect(balance.crime.police).toBe(0.9);
+    // Váha policie klesla z 0,9 na 0,3 (T107). Při 0,9 srazila jedna stanice
+    // kriminalitu na **nulu v celém městě**: změřeno na savu autora — průměrné
+    // pokrytí 80 z 255 znamenalo odečet 72, kdežto zdroj (hustota × 0,6) dělal
+    // v průměru 55. Kriminalita byla nula ve všech 1024 buňkách.
+    expect(balance.crime.police).toBe(0.3);
     expect(balance.levels.thresholds).toEqual([0, 0, 90, 130, 170, 210]);
     expect(balance.growth.maxAttempts).toBe(12);
   });

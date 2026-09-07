@@ -149,7 +149,7 @@ function rollForNew(
     const running = world.disasters.active.filter((entry) => entry.kind === kind).length;
     if (running >= concurrentLimit(settings, metrics)) continue;
 
-    if (!meetsConditions(settings, metrics)) continue;
+    if (!meetsConditions(settings, metrics, indicators)) continue;
 
     // Faktor typu je jediné, co roste ze špatné správy města — a jen na něj
     // se strop z R16 vztahuje. Když je rozpočet v černých číslech, strop se

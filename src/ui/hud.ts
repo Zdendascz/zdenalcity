@@ -145,6 +145,9 @@ export interface HudState {
   wasteNeeded: number;
   sewageCapacity: number;
   sewageNeeded: number;
+  /** Vodovod: kolik se načerpá a kolik město vypije. */
+  waterCapacity: number;
+  waterNeeded: number;
   /** Financování podle třídy služby, 0–1. */
   funding: ReadonlyMap<string, number>;
   /**
@@ -191,6 +194,7 @@ const STAT_ROWS: readonly { key: string; labelKey: string; primary?: true }[] = 
   { key: 'power', labelKey: 'ui.hud.power' },
   { key: 'waste', labelKey: 'ui.hud.waste' },
   { key: 'sewage', labelKey: 'ui.hud.sewage' },
+  { key: 'water', labelKey: 'ui.hud.water' },
   { key: 'balance', labelKey: 'ui.hud.balance', primary: true },
   // Popisek a hodnota mají vlastní klíče: `ui.hud.date` je celá věta s
   // parametry, jako popisek by se vypsala i se zástupnými symboly.
@@ -331,6 +335,8 @@ export class Hud {
     wasteNeeded: 0,
     sewageCapacity: 0,
     sewageNeeded: 0,
+    waterCapacity: 0,
+    waterNeeded: 0,
     funding: new Map(),
     message: '',
   };
@@ -455,6 +461,7 @@ export class Hud {
     for (const [key, capacity, needed] of [
       ['waste', state.wasteCapacity, state.wasteNeeded],
       ['sewage', state.sewageCapacity, state.sewageNeeded],
+      ['water', state.waterCapacity, state.waterNeeded],
     ] as const) {
       this.setValue(key, `${formatNumber(capacity)} / ${formatNumber(needed)}`);
       this.values.get(key)?.classList.toggle('is-alarm', needed > capacity);

@@ -92,13 +92,15 @@
     "population": 0.6,
     "unemployment": 40,
     "abandoned": 30,
-    "police": 0.9
+    "police": 0.3
   },
   "water": {
     "defaultRange": 24,
     "pipeCost": 30,
     "decayStep": 2,
-    "abandonAfter": 12
+    "abandonAfter": 12,
+    "perCitizen": 0.1,
+    "perWorker": 0.05
   },
   "waste": {
     "perCitizen": 0.1,
@@ -972,6 +974,12 @@
           {
             "metric": "powerPlants",
             "min": 1
+          }
+        ],
+        "unless": [
+          {
+            "indicator": "powerReserve",
+            "above": 0.5
           }
         ],
         "risk": [

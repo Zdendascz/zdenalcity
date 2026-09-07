@@ -1276,6 +1276,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   /** Aby se hláška o plném úložišti neopakovala každou uzávěrku. */
   let autosaveWarned = false;
 
+  /** Hlásí se jen přechod do nedostatku, ne každý snímek. */
+  const utilityShortage: Record<'waste' | 'sewage' | 'water', boolean> = {
+    waste: false,
+    sewage: false,
+    water: false,
+  };
+
   function autosaveNow(): void {
     try {
       // Bez `await`: na `pagehide` už není kam čekat. Zápis v prohlížeči běží
@@ -2622,6 +2629,31 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
     const utilities = cityUtilities(simWorld, content, content.getBalance());
 
+    /*
+     * Hlášky o překročené kapacitě.
+     *
+     * Hlásí se **při přechodu**, ne každý snímek, přesně jako nedostatek
+     * proudu. Bez nich se hráč o tom, že mu čistička nestačí, nedozvěděl
+     * vůbec — a přitom je to největší zdroj znečištění ve hře: co se
+     * nezpracuje, rozlije se rovnoměrně po celé mapě.
+     */
+    for (const [key, capacity, needed] of [
+      ['waste', utilities.wasteCapacity, utilities.wasteNeeded],
+      ['sewage', utilities.sewageCapacity, utilities.sewageNeeded],
+      ['water', utilities.waterCapacity, utilities.waterNeeded],
+    ] as const) {
+      const short = needed > capacity;
+      if (short === utilityShortage[key]) continue;
+      utilityShortage[key] = short;
+      if (!short) continue;
+      notifications.show(
+        i18n.t(`ui.notice.${key}Shortage`, {
+          capacity: formatNumber(capacity),
+          needed: formatNumber(needed),
+        }),
+      );
+    }
+
     // Hlásí se při přechodu do nedostatku, ne každý snímek. Když hráč postaví
     // elektrárnu a město zase přeroste, ozve se to znovu.
     const shortage = powerNeeded > powerProduced;
@@ -2644,6 +2676,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       wasteNeeded: utilities.wasteNeeded,
       sewageCapacity: utilities.sewageCapacity,
       sewageNeeded: utilities.sewageNeeded,
+      waterCapacity: utilities.waterCapacity,
+      waterNeeded: utilities.waterNeeded,
       // Rozpad poptávky se počítá tady, ne v HUD: potřebuje katalog i balanc.
       demandTerms: explainDemand(simWorld, content, content.getBalance()),
       speedIndex,

@@ -97,10 +97,10 @@ function recompute(world: WorldState, catalogue: BuildingCatalogue, balance: Bal
   }
 
   // Bez jediné vodárny nemá co téct ani nejdelší potrubí.
-  if (production > 0) floodFill(world, sources, supply);
+  const pressure = production > 0 ? floodFill(world, sources, supply) : null;
 
   markChangedTiles(world, before, supply);
-  markWateredBuildings(world, catalogue, ids);
+  markWateredBuildings(world, catalogue, ids, balance, production, pressure);
 }
 
 /** Je vodárna v zamořené buňce? */
@@ -144,7 +144,11 @@ function footprintTiles(
  * jinak by pořadí zdrojů rozhodovalo o tom, kam síť dosáhne, a výsledek by
  * závisel na tom, co hráč postavil dřív.
  */
-function floodFill(world: WorldState, sources: readonly Source[], supply: Uint8Array): void {
+function floodFill(
+  world: WorldState,
+  sources: readonly Source[],
+  supply: Uint8Array,
+): Int32Array {
   const { pipe } = world.layers;
   const size = world.size;
   const remaining = new Int32Array(pipe.length).fill(-1);
@@ -218,6 +222,11 @@ function floodFill(world: WorldState, sources: readonly Source[], supply: Uint8A
     // Zdrojová dlaždice bez potrubí vodu nikam nedá, ale sama ji má.
     if ((remaining[tile] ?? -1) >= 0) supply[tile] = 1;
   }
+
+  // Zbývající dosah je zároveň **tlak**: čím vyšší číslo, tím blíž ke zdroji.
+  // Používá ho rozdělení kapacity — když voda nestačí na všechny, uschne
+  // nejdřív konec sítě, ne náhodná budova uprostřed města.
+  return remaining;
 }
 
 /**
@@ -277,24 +286,67 @@ function markWateredBuildings(
   world: WorldState,
   catalogue: BuildingCatalogue,
   ids: readonly number[],
+  balance: Balance,
+  production: number,
+  pressure: Int32Array | null,
 ): void {
+  // Nejdřív kdo je na síti a s jakým tlakem, teprve pak kdo se vejde do
+  // kapacity. Bez druhého kroku byla `water.production` jen vypínač.
+  const connected: { id: number; demand: number; pressure: number }[] = [];
+
   for (const id of ids) {
     const building = world.buildings.get(id);
     if (!building) continue;
 
-    const footprint = catalogue.get(building.definitionId)?.footprint ?? [1, 1];
-    const watered = footprintTiles(
-      world.size,
-      building.x,
-      building.y,
-      footprint,
-    ).some((tile) => world.waterSupply[tile] === 1);
+    const definition = catalogue.get(building.definitionId);
+    const footprint = definition?.footprint ?? [1, 1];
+    const tiles = footprintTiles(world.size, building.x, building.y, footprint);
+    if (!tiles.some((tile) => world.waterSupply[tile] === 1)) {
+      if (world.watered.delete(id)) markBuildingDirty(world, id);
+      continue;
+    }
 
-    const had = world.watered.has(id);
-    if (watered === had) continue;
+    // Tlak budovy je ten nejlepší pod jejím půdorysem — stačí, aby k ní
+    // trubka vedla jedním rohem, takže se počítá stejně jako připojení.
+    let best = -1;
+    for (const tile of tiles) {
+      const value = pressure?.[tile] ?? 0;
+      if (value > best) best = value;
+    }
 
-    if (watered) world.watered.add(id);
-    else world.watered.delete(id);
-    markBuildingDirty(world, id);
+    connected.push({
+      id,
+      demand:
+        building.population * balance.water.perCitizen +
+        building.jobs * balance.water.perWorker,
+      pressure: best,
+    });
+  }
+
+  /*
+   * Rozdělení kapacity.
+   *
+   * Voda teče **od zdroje k okraji**, takže když jí není dost, uschne konec
+   * sítě. Řadí se proto podle tlaku sestupně a při shodě podle `id`, aby
+   * výsledek nezávisel na pořadí v mapě (P2). Vodárna sama vodu nespotřebuje
+   * a nikdy nevyschne — jinak by se odpojila a s ní i celé město.
+   */
+  connected.sort((a, b) => (b.pressure - a.pressure) || (a.id - b.id));
+
+  let used = 0;
+  for (const entry of connected) {
+    const definition = catalogue.get(world.buildings.get(entry.id)?.definitionId ?? '');
+    const source = (definition?.water?.production ?? 0) > 0;
+    if (!source) {
+      used += entry.demand;
+      if (used > production) {
+        if (world.watered.delete(entry.id)) markBuildingDirty(world, entry.id);
+        continue;
+      }
+    }
+    if (!world.watered.has(entry.id)) {
+      world.watered.add(entry.id);
+      markBuildingDirty(world, entry.id);
+    }
   }
 }
