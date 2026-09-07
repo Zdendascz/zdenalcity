@@ -28,6 +28,11 @@ interface Row {
     happiness: number;
     zonedTiles: number;
     debt: number;
+    lines: number;
+    stops: number;
+    riders: number;
+    fares: number;
+    grants: number;
   };
   disasters: Record<string, number>;
   rejected: Record<string, number>;
@@ -108,6 +113,23 @@ for (const axis of axes) {
   }
   process.stdout.write('\n');
 }
+
+// --- mechaniky, které se v ose neprojeví -----------------------------------
+
+const usedTransit = rows.filter((row) => row.final.stops > 0);
+process.stdout.write(
+  `MHD: linku mělo ${usedTransit.length} partií z ${rows.length}` +
+    `, medián zastávek ${median(usedTransit.map((r) => r.final.stops))}` +
+    `, odvezených ${median(usedTransit.map((r) => r.final.riders))} za měsíc` +
+    `, jízdné ${median(usedTransit.map((r) => r.final.fares))}
+`,
+);
+process.stdout.write(
+  `Granty: medián ${median(rows.map((r) => r.final.grants))}` +
+    `, dluh na konci: medián ${median(rows.map((r) => r.final.debt))}
+
+`,
+);
 
 // --- pohromy a odmítnuté příkazy -------------------------------------------
 

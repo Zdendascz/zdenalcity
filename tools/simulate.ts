@@ -381,6 +381,19 @@ export interface Sample {
   crime: number;
   landValue: number;
   coverage: Record<string, number>;
+  /**
+   * MHD: linky, zastávky, odvezení lidé a výnos z jízdného za měsíc.
+   *
+   * Bez toho by se o dopravní ose nedalo říct nic — data by ukazovala jen to,
+   * že se s ní město nechová jinak, a nešlo by poznat, jestli je to tím, že
+   * mechanika nefunguje, nebo tím, že ji hráč nepoužil.
+   */
+  lines: number;
+  stops: number;
+  riders: number;
+  fares: number;
+  /** Kolik grantů už město dostalo. */
+  grants: number;
 }
 
 function meanOf(values: Uint8Array | undefined): number {
@@ -438,6 +451,15 @@ function sample(world: WorldState, content: ContentRegistry, year: number): Samp
     crime: meanOf(world.coarse.crime),
     landValue: meanOf(world.coarse.landValue),
     coverage,
+    lines: world.lines.length,
+    stops: world.lines.reduce((sum, line) => sum + line.stops.length, 0),
+    riders: Math.round(
+      [...world.lineStats.values()].reduce((sum, stats) => sum + stats.transported, 0),
+    ),
+    fares: Math.round(
+      [...world.lineStats.values()].reduce((sum, stats) => sum + stats.income, 0),
+    ),
+    grants: world.grantsAwarded.size,
   };
 }
 
@@ -872,7 +894,9 @@ class Player {
     const size = this.world.size;
     const half = this.homeX;
     const halfY = this.homeY;
-    const reach = this.plan.reach;
+    // Dosah o deset dál než zástavba: vodárna a čerpací stanice stojí u břehu,
+    // tedy často za hranou města, a bez úklidu se tam nedá znovu postavit.
+    const reach = this.plan.reach + 10;
     budget += 30;
     for (let dy = -reach; dy <= reach && budget > 0; dy++) {
       for (let dx = -reach; dx <= reach && budget > 0; dx++) {
@@ -1401,11 +1425,15 @@ class Player {
             const tile = index(x + ox, y + oy, this.world.size);
             free =
               (this.world.layers.buildingId[tile] ?? 0) === 0 &&
-              (this.world.layers.road[tile] ?? ROAD.none) === ROAD.none &&
-              (this.world.rubble[tile] ?? 0) === 0;
+              (this.world.layers.road[tile] ?? ROAD.none) === ROAD.none;
           }
         }
         if (!free) continue;
+        // Suť se **nevyřazuje** — hráč ji odveze. Po velké pohromě je celý
+        // blízký břeh v troskách a vyřazování znamenalo, že nová vodárna
+        // nevznikne nikdy: na seedu 12 zmizelo v šedesátém roce všech sedm
+        // vodáren naráz a město pak čtyřicet let stálo se čtyřmi miliony
+        // v kase a hláškou „chybí voda" na devíti stech parcelách.
 
         let touches = false;
         for (let oy = -1; oy <= d && !touches; oy++) {
@@ -1720,8 +1748,9 @@ class Player {
 
       // Les, balvany, trosky: hráč je odveze buldozerem a zkusí to znovu.
       // Jen u prvních tří míst — jinak se za partii naklikalo přes milion
-      // odmítnutých „tady není co bourat".
-      if (attempt < 3) {
+      // odmítnutých „tady není co bourat". U břehu se uklízí vždycky: míst je
+      // málo a bez úklidu by po pohromě nevznikla nová vodárna vůbec.
+      if (attempt < 3 || spot) {
         for (let dy = 0; dy < d; dy++) {
           for (let dx = 0; dx < w; dx++) this.send({ type: 'bulldoze', x: x + dx, y: y + dy });
         }
