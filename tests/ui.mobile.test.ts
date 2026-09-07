@@ -87,6 +87,10 @@ const STATE: HudState = {
   poweredBuildings: 0,
   powerProduced: 0,
   powerNeeded: 0,
+  wasteCapacity: 0,
+  wasteNeeded: 0,
+  sewageCapacity: 0,
+  sewageNeeded: 0,
   funding: new Map(),
   message: '',
 };
@@ -147,7 +151,7 @@ describe('úsporná lišta', () => {
     // Ikona v tlačítku nezůstala — statistiky ji nahradily celou.
     expect(trigger?.querySelector('.popover__icon')).toBeNull();
     // Ostatní se neztratily, jen se přestěhovaly.
-    expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(6);
+    expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(8);
   });
 
   it('schované statistiky se pořád plní', async () => {
@@ -166,7 +170,7 @@ describe('úsporná lišta', () => {
   it('v plné verzi je všechno v jedné řadě a nic se neschovává', async () => {
     const { root } = await hudFor('full');
 
-    expect(root.querySelectorAll('.stats .stat')).toHaveLength(8);
+    expect(root.querySelectorAll('.stats .stat')).toHaveLength(10);
     expect(root.querySelector('.panel--stats')).toBeNull();
     expect(widgets(root, DRAWER_TOOLS)).toBe(0);
     expect(widgets(root, DRAWER_CONTROLS)).toBe(0);
@@ -323,7 +327,7 @@ describe('střední velikost', () => {
     expect(label(root, 'Další')).not.toBeNull();
   });
 
-  it('z osmi statistik nechá kasu s bilancí', async () => {
+  it('z deseti statistik nechá kasu s bilancí', async () => {
     // Osm statistik s velkými čísly je přes sedm set pixelů a odsune rychlost
     // na druhý řádek. Zbytek je klik daleko.
     const { root } = await hudFor('dense');
@@ -331,7 +335,7 @@ describe('střední velikost', () => {
     expect([...(trigger?.querySelectorAll('.stat__label') ?? [])].map((n) => n.textContent)).toEqual(
       ['Kasa', 'Měsíční bilance'],
     );
-    expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(6);
+    expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(8);
   });
 
   it('ale nechá si všechny rychlosti, oba pohledy a nedává lupu', async () => {

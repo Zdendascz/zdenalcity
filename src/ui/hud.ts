@@ -133,6 +133,18 @@ export interface HudState {
   /** Kolik proudu město vyrábí a kolik ho potřebuje. */
   powerProduced: number;
   powerNeeded: number;
+  /**
+   * Odpad a kanalizace: kapacita zpracování proti tomu, co město vyrobí.
+   *
+   * Čte se stejně jako proud, protože to **stejně funguje**: co kapacita
+   * nepobere, jde do znečištění — jenom ne kolem skládky, ale rovnoměrně po
+   * celé mapě. Do teď to nebylo vidět nikde a autor právem hlásil, že
+   * spalovna ani čistička „nemají žádný efekt".
+   */
+  wasteCapacity: number;
+  wasteNeeded: number;
+  sewageCapacity: number;
+  sewageNeeded: number;
   /** Financování podle třídy služby, 0–1. */
   funding: ReadonlyMap<string, number>;
   /**
@@ -177,6 +189,8 @@ const STAT_ROWS: readonly { key: string; labelKey: string; primary?: true }[] = 
   { key: 'happiness', labelKey: 'ui.hud.happiness' },
   { key: 'powered', labelKey: 'ui.hud.powered' },
   { key: 'power', labelKey: 'ui.hud.power' },
+  { key: 'waste', labelKey: 'ui.hud.waste' },
+  { key: 'sewage', labelKey: 'ui.hud.sewage' },
   { key: 'balance', labelKey: 'ui.hud.balance', primary: true },
   // Popisek a hodnota mají vlastní klíče: `ui.hud.date` je celá věta s
   // parametry, jako popisek by se vypsala i se zástupnými symboly.
@@ -313,6 +327,10 @@ export class Hud {
     poweredBuildings: 0,
     powerProduced: 0,
     powerNeeded: 0,
+    wasteCapacity: 0,
+    wasteNeeded: 0,
+    sewageCapacity: 0,
+    sewageNeeded: 0,
     funding: new Map(),
     message: '',
   };
@@ -431,6 +449,16 @@ export class Hud {
     this.values
       .get('power')
       ?.classList.toggle('is-alarm', state.powerNeeded > state.powerProduced);
+
+    // Odpad a stoky. Pořadí je stejné jako u proudu — nejdřív co zvládneme,
+    // pak co je potřeba — a červená znamená totéž: zbytek jde do vzduchu.
+    for (const [key, capacity, needed] of [
+      ['waste', state.wasteCapacity, state.wasteNeeded],
+      ['sewage', state.sewageCapacity, state.sewageNeeded],
+    ] as const) {
+      this.setValue(key, `${formatNumber(capacity)} / ${formatNumber(needed)}`);
+      this.values.get(key)?.classList.toggle('is-alarm', needed > capacity);
+    }
 
     for (const row of DEMAND_ROWS) {
       const value = demand[row.category];

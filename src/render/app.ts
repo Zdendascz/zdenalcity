@@ -18,7 +18,14 @@ import {
   estimateRoad,
   estimateZoning,
 } from '@/sim/commands';
-import { alertTarget, explainDemand, explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
+import {
+  alertTarget,
+  cityUtilities,
+  explainDemand,
+  explainParcel,
+  growthBlocker,
+  worstBlocker,
+} from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
@@ -1169,7 +1176,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (name === undefined) return undefined;
     const [variant] = content.getTileVariants(name);
     return variant === undefined ? undefined : content.getTile(name, variant);
-  });
+  }, () => cityUtilities(simWorld, content, content.getBalance()));
   const financePanel = new FinancePanel(mount, i18n, dispatch);
   const transitPanel = new TransitPanel(mount, i18n, dispatch, {
     onPickStop: (lineId) => {
@@ -1663,6 +1670,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
     if (layerMode.startsWith('coverage:')) {
       legend.showCoverage(labelKey);
+      return;
+    }
+    // Elektřina není stupnice, ale tři stavy — a bez legendy byla nečitelná.
+    if (layerMode === 'power') {
+      legend.showSwatches(labelKey, [
+        ['power-on', 'ui.legend.power.on'],
+        ['power-off', 'ui.legend.power.off'],
+        ['power-none', 'ui.legend.power.none'],
+      ]);
       return;
     }
 
@@ -2593,6 +2609,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     let poweredBuildings = 0;
     let powerProduced = 0;
     let powerNeeded = 0;
+    // Odpad a kanalizace se do teď **nikde nezobrazovaly**, přestože rozhodují
+    // o znečištění celé mapy: nepokrytý zbytek se rozlije do každé buňky.
+    // Autor to popsal takhle: „odpady vůbec nikde nevidím, nevnímám, že by
+    // měly nějaký efekt." Čte se to stejně jako proud — kapacita / potřeba.
     for (const building of world.buildings.values()) {
       if (building.powered) poweredBuildings++;
       if (building.abandoned) continue;
@@ -2600,6 +2620,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       powerProduced += definition?.power?.production ?? 0;
       powerNeeded += definition?.power?.consumption ?? 0;
     }
+    const utilities = cityUtilities(simWorld, content, content.getBalance());
 
     // Hlásí se při přechodu do nedostatku, ne každý snímek. Když hráč postaví
     // elektrárnu a město zase přeroste, ozve se to znovu.
@@ -2619,6 +2640,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     hud.update({
       powerProduced,
       powerNeeded,
+      wasteCapacity: utilities.wasteCapacity,
+      wasteNeeded: utilities.wasteNeeded,
+      sewageCapacity: utilities.sewageCapacity,
+      sewageNeeded: utilities.sewageNeeded,
       // Rozpad poptávky se počítá tady, ne v HUD: potřebuje katalog i balanc.
       demandTerms: explainDemand(simWorld, content, content.getBalance()),
       speedIndex,

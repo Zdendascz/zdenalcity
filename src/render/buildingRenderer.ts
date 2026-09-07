@@ -444,10 +444,18 @@ export class BuildingRenderer {
     const [width, depth] = appearance.footprint;
 
     if (appearance.sprite) {
-      // Zpustlá budova má obrázek pro dvě dlaždice na dvě. Na menší parcele
-      // se **zmenší celý**, ne zúží: roztažením by se rozešla izometrie.
+      // Zpustlá budova má **jeden obrázek na dvě dlaždice na dvě** a nosí ho
+      // každý půdorys. Na jinou parcelu se proto celý zmenší, ne zúží:
+      // roztažením by se rozešla izometrie.
+      //
+      // Měřítko se řídí **kratší stranou**, ne obvodem. Podle obvodu vycházelo
+      // u podlouhlé parcely (2 × 1) měřítko 0,75, jenže obrázek je čtvercový —
+      // po delší straně se vešel a po kratší přetekl do ulice. Autor to hlásil
+      // dvakrát: „tyhle zborceniny jdou dost mimo pozice, vytékají z parcel."
+      // Podle kratší strany se ruina vejde vždycky; na podlouhlé parcele je
+      // menší, což je pořád lepší než hromada suti přes chodník.
       const fit = building.abandoned
-        ? Math.min(1, (width + depth) / (DERELICT_TILES * 2))
+        ? Math.min(1, Math.min(width, depth) / DERELICT_TILES)
         : 1;
       this.drawSprite(id, building.x, building.y, width, depth, appearance.sprite, fit);
       return;

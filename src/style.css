@@ -892,6 +892,25 @@ body {
   background: transparent;
 }
 
+/*
+ * Elektřina. Barvy musí sedět s `POWER_ON_COLOR` a `POWER_OFF_COLOR`
+ * v paletě — kdyby se rozešly, legenda by lhala o tom, na co se hráč dívá.
+ * Průhlednost je stejná jako u překryvu na mapě.
+ */
+.legend__swatch--power-on {
+  background: rgb(242 216 87 / 70%);
+}
+
+.legend__swatch--power-off {
+  background: rgb(217 72 58 / 70%);
+}
+
+/* Co není silnice ani budova, proud nevede — a nebarví se. */
+.legend__swatch--power-none {
+  border: 1px solid rgb(255 255 255 / 35%);
+  background: transparent;
+}
+
 .legend__label {
   color: var(--text-dim);
 }

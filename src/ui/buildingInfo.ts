@@ -121,16 +121,29 @@ export class BuildingInfo {
    * a ukáže se jen jméno povrchu.
    */
   private readonly tileImage: (terrain: number) => string | undefined;
+  /**
+   * Kolik odpadu a odpadní vody město dělá **teď**.
+   *
+   * Panel si to nepočítá sám ze stejného důvodu jako obrázek povrchu: musel by
+   * projít všechny budovy a znát katalog. Kapacita spalovny sama o sobě nic
+   * neříká — teprve vedle městské potřeby je z ní odpověď „stačí to?".
+   */
+  private readonly utilities: () => { wasteNeeded: number; sewageNeeded: number };
 
   constructor(
     parent: HTMLElement,
     i18n: I18n,
     balance: Balance,
     tileImage: (terrain: number) => string | undefined = () => undefined,
+    utilities: () => { wasteNeeded: number; sewageNeeded: number } = () => ({
+      wasteNeeded: 0,
+      sewageNeeded: 0,
+    }),
   ) {
     this.i18n = i18n;
     this.balance = balance;
     this.tileImage = tileImage;
+    this.utilities = utilities;
     this.root = el('div', 'sheet sheet--info is-hidden');
     parent.appendChild(this.root);
   }
@@ -242,6 +255,30 @@ export class BuildingInfo {
       'ui.info.powered',
       building.powered ? t('ui.info.poweredYes') : t('ui.info.poweredNo'),
     ]);
+
+    // Co budova zpracuje. Bez tohohle řádku byla spalovna k nerozeznání od
+    // kůlny: karta o ní neřekla vůbec nic a hráč neměl jak zjistit, jestli mu
+    // kapacita stačí. Vedle čísla stojí, kolik toho město dělá — samotná
+    // kapacita je bez měřítka k ničemu.
+    const wasteCapacity = definition.waste?.capacity ?? 0;
+    const sewageCapacity = definition.sewage?.capacity ?? 0;
+    const waterProduction = definition.water?.production ?? 0;
+    const waterRange = definition.water?.range ?? 0;
+    const city = this.utilities();
+    if (wasteCapacity > 0) {
+      rows.push([
+        'ui.info.wasteCapacity',
+        `${formatNumber(wasteCapacity)} / ${formatNumber(city.wasteNeeded)}`,
+      ]);
+    }
+    if (sewageCapacity > 0) {
+      rows.push([
+        'ui.info.sewageCapacity',
+        `${formatNumber(sewageCapacity)} / ${formatNumber(city.sewageNeeded)}`,
+      ]);
+    }
+    if (waterProduction > 0) rows.push(['ui.info.waterProduction', formatNumber(waterProduction)]);
+    if (waterRange > 0) rows.push(['ui.info.waterRange', formatNumber(waterRange)]);
 
     const tax = buildingMonthlyTax(world, definition, building, this.balance);
     const upkeep = buildingMonthlyUpkeep(world, definition, building);

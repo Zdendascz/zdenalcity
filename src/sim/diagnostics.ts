@@ -658,3 +658,49 @@ export function explainDemand(
     },
   ];
 }
+
+
+/** Odpad a kanalizace města: kolik se toho vyrobí a kolik se toho zpracuje. */
+export interface CityUtilities {
+  wasteNeeded: number;
+  wasteCapacity: number;
+  sewageNeeded: number;
+  sewageCapacity: number;
+}
+
+/**
+ * Odpadové hospodářství v jednom čísle na každou stranu.
+ *
+ * Počítá **totéž, co `systems/pollution.ts`** — proto tu jsou obě strany
+ * pohromadě: co kapacita nepobere, se rozlije do znečištění po celé mapě, a to
+ * je zdaleka největší zdroj špíny ve městě. Do teď to nebylo vidět nikde, takže
+ * spalovna i čistička vypadaly jako budovy bez účinku.
+ *
+ * Opuštěné budovy se přeskakují stejně jako tam: ruina neprodukuje odpad, ale
+ * ani nic nezpracuje.
+ */
+export function cityUtilities(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  balance: Balance,
+): CityUtilities {
+  let citizens = 0;
+  let wasteCapacity = 0;
+  let sewageCapacity = 0;
+
+  for (const building of world.buildings.values()) {
+    if (building.abandoned) continue;
+    citizens += building.population;
+    const definition = catalogue.get(building.definitionId);
+    if (!definition) continue;
+    wasteCapacity += definition.waste?.capacity ?? 0;
+    sewageCapacity += definition.sewage?.capacity ?? 0;
+  }
+
+  return {
+    wasteNeeded: Math.round(citizens * balance.waste.perCitizen),
+    wasteCapacity,
+    sewageNeeded: Math.round(citizens * balance.sewage.perCitizen),
+    sewageCapacity,
+  };
+}

@@ -57,6 +57,28 @@ export class Legend {
     this.root.appendChild(ends);
   }
 
+  /**
+   * Pohled na elektřinu: dvě barvy a nic, co by je vysvětlilo.
+   *
+   * Do teď neměl legendu vůbec — tepelné mapy ji dostaly, protože mají
+   * stupnici, jenže elektřina není stupnice, a tak vypadla. Autor to shrnul
+   * takhle: „z toho přehledu elektřiny absolutně nic nepochopím a nevím, co to
+   * ukazuje, co je dobře, co špatně." Podstatná je i ta třetí položka: co
+   * není silnice ani budova, proud nevede a zůstává nebarevné.
+   */
+  showSwatches(titleKey: string, rows: readonly (readonly [string, string])[]): void {
+    this.root.replaceChildren();
+    this.root.classList.remove('is-hidden');
+    this.root.appendChild(el('div', 'legend__title', this.i18n.t(titleKey)));
+
+    for (const [modifier, key] of rows) {
+      const row = el('div', 'legend__row');
+      row.appendChild(el('span', `legend__swatch legend__swatch--${modifier}`, ''));
+      row.appendChild(el('span', 'legend__label', this.i18n.t(key)));
+      this.root.appendChild(row);
+    }
+  }
+
   /** Mapa dosahu: co znamená plocha a co obě bílé čáry. */
   showCoverage(titleKey: string): void {
     this.root.replaceChildren();
