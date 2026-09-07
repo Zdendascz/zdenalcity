@@ -284,7 +284,7 @@ export class BuildingRenderer {
       // přeskládala.
       const pile = this.rubblePiles[decorPick(x, y) % this.rubblePiles.length];
       if (pile === undefined) continue;
-      this.placeDecor(-(tile + 1 + offset), x, y, pile);
+      this.placeDecor(-(tile + 1 + offset), x, y, pile, true);
     }
   }
 
@@ -303,7 +303,21 @@ export class BuildingRenderer {
     return false;
   }
 
-  private placeDecor(id: number, x: number, y: number, decor: TerrainDecor): void {
+  private placeDecor(
+    id: number,
+    x: number,
+    y: number,
+    decor: TerrainDecor,
+    /**
+     * Leží předmět na zemi celou plochou, nebo se jí dotýká jen v jednom bodě?
+     *
+     * Strom se země dotýká kmenem, takže mu stačí výška přesně pod patou.
+     * Hromada suti zabírá celou dlaždici a má **plochou spodní hranu**: na
+     * svahu pak polovina hromady visí ve vzduchu. Autor to popsal takhle —
+     * „suť je pořád nad kopcem, ne na stráni".
+     */
+    onGround = false,
+  ): void {
     const sprite = new Sprite(decor.texture);
     sprite.anchor.set(decor.anchor[0] / decor.texture.width, decor.anchor[1] / decor.texture.height);
     sprite.scale.set(1 / decor.scale);
@@ -321,7 +335,20 @@ export class BuildingRenderer {
     const [shiftX, shiftY] = decorShift(x, y);
     const fx = x + 0.5 + shiftX;
     const fy = y + 0.5 + shiftY;
-    const pad = groundHeightAt(this.world.cornerHeight, fx, fy);
+    /*
+     * Plošný předmět sedá na **nejnižší roh dlaždice**, bodový na výšku přesně
+     * pod patou.
+     *
+     * Rozdíl je v tom, co je pod obrázkem. Strom má pod sebou jeden bod, takže
+     * interpolovaná výška je přesně ta správná. Hromada suti má plochou spodní
+     * hranu přes celou dlaždici, a ta na svahu nemůže sedět nikde jinde než na
+     * nejnižším rohu — jinak jí zbytek visí. Radši ať se do svahu zaboří, než
+     * aby nad ním plavala: zabořená suť vypadá jako suť na stráni, plovoucí
+     * jako chyba.
+     */
+    const pad = onGround
+      ? areaHeightRange(this.world.cornerHeight, x, y, 1, 1).min
+      : groundHeightAt(this.world.cornerHeight, fx, fy);
     const at = gridToScreen(fx, fy, pad);
     sprite.position.set(at.x, at.y);
 

@@ -295,6 +295,52 @@ describe('výška terénu pod předmětem', () => {
 });
 
 /**
+ * Na jaké výšce leží hromada suti.
+ *
+ * Suť má **plochou spodní hranu přes celou dlaždici**, na rozdíl od stromu,
+ * který se země dotýká jedním bodem. Interpolovaná výška pod patou je proto
+ * pro strom správně, ale pro suť ne: na svahu jí polovina visí ve vzduchu a
+ * autor to nahlásil slovy „suť je pořád nad kopcem, ne na stráni".
+ *
+ * Pravidlo je proto **nejnižší roh dlaždice**. Radši ať se hromada do svahu
+ * zaboří, než aby nad ním plavala — zabořená suť vypadá jako suť na stráni,
+ * plovoucí vypadá jako chyba.
+ */
+describe('suť na svahu nesmí viset', () => {
+  /** Dlaždice (3,3), jejíž severozápadní roh je o dvě úrovně výš. */
+  function slopedTile(): Uint8Array {
+    const heights = createCornerHeights(MAP_SIZE);
+    heights[cornerIndex(3, 3, CORNER_SIZE)] = 2;
+    return heights;
+  }
+
+  it('nejnižší roh je pod terénem v celé dlaždici, výška pod patou ne', () => {
+    const heights = slopedTile();
+    const { min, max } = areaHeightRange(heights, 3, 3, 1, 1);
+    expect(min).toBe(0);
+    expect(max).toBe(2);
+
+    // Výška přesně pod patou hromady je někde uprostřed, takže část dlaždice
+    // je pod ní — a přes tu část hromada visí.
+    const foot = groundHeightAt(heights, 3.5, 3.5);
+    expect(foot).toBeGreaterThan(min);
+    expect(groundHeightAt(heights, 3, 3)).toBeGreaterThan(foot);
+
+    // Nejnižší roh takový bod nemá: hromada nikde nevisí.
+    for (let fx = 3; fx <= 4; fx += 0.25) {
+      for (let fy = 3; fy <= 4; fy += 0.25) {
+        expect(groundHeightAt(heights, fx, fy), `${fx},${fy}`).toBeGreaterThanOrEqual(min);
+      }
+    }
+  });
+
+  it('na rovné dlaždici je nejnižší roh i výška pod patou totéž', () => {
+    const heights = createCornerHeights(MAP_SIZE);
+    expect(areaHeightRange(heights, 5, 5, 1, 1).min).toBe(groundHeightAt(heights, 5.5, 5.5));
+  });
+});
+
+/**
  * Na jaké výšce leží podlaha budovy, která má obrázek.
  *
  * Kvádr si smí zaříznout do svahu — je to holá krabice. Obrázek ne: nese

@@ -389,6 +389,24 @@ přiklonit.
 Předmět se uvnitř dlaždice posouvá až o třetinu (`decorShift`), takže na to
 místo se musí ptát se stejným posunem, s jakým se pak kreslí.
 
+### T103: suť je plocha, ne bod
+
+Jedno pravidlo pro obojí nestačilo. Strom se země dotýká **kmenem**, tedy
+jedním bodem, a výška přesně pod patou je pro něj správně. Hromada suti má ale
+**plochou spodní hranu přes celou dlaždici** — je to kulatá halda, která
+dlaždici vyplní — a plochá hrana na nakloněné rovině sedět nemůže: na výšce
+pod patou jí polovina visí ve vzduchu. Autor to nahlásil slovy „suť je pořád
+nad kopcem, ne na stráni".
+
+Suť proto sedá na **nejnižší roh dlaždice**. Radši ať se do svahu zaboří, než
+aby nad ním plavala: zabořená halda vypadá jako suť na stráni, plovoucí vypadá
+jako chyba. Na rovné dlaždici vyjde nejnižší roh a výška pod patou stejně,
+takže se v rovině nezměnilo nic.
+
+Kreslit suť zvlášť pro každý sklon (osm tvarů × tři varianty) by šlo, ale
+neplatí se to: rozdíl mezi zabořenou haldou a haldou tvarovanou do svahu je
+mnohem menší než rozdíl mezi zabořenou a plovoucí.
+
 ## Obrázek požáru
 
 Požár měl do T97 na mapě jen **oranžový nádech dlaždice**. Autor to nahlásil
