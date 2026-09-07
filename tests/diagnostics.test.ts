@@ -6,6 +6,7 @@ import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, zoneArea } from '@/sim/commands';
 import { coarseIndex } from '@/sim/coarse';
 import {
+  alertTarget,
   explainLandValue,
   explainParcel,
   growthBlocker,
@@ -13,7 +14,7 @@ import {
   worstBlocker,
 } from '@/sim/diagnostics';
 import { applyCornerChanges, planCornerHeight } from '@/sim/heights';
-import { ZONE } from '@/sim/layers';
+import { index, ZONE } from '@/sim/layers';
 import { createDefaultSystems, createLandValueSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
@@ -297,3 +298,46 @@ function bigSeeds(content: ContentRegistry): BuildingCatalogue {
     byCategory: (category) => (category === 'industrial' ? wide : content.byCategory(category)),
   };
 }
+
+/**
+ * Kam kamera skočí, když se ohlásí katastrofa.
+ *
+ * Zemětřesení má epicentrum kdekoli, i v pustině — otřes se roznese po celé
+ * mapě, takže na epicentru není co vidět. Hráč to nahlásil: „notifikace přijde,
+ * ale vždy mi to ukáže místo zásahu mimo město."
+ */
+describe('kam ukázat po katastrofě', () => {
+  it('když je u vzniku zástavba, ukáže se vznik', async () => {
+    const content = await vanilla();
+    const world = createWorld(1, content.getBalance().economy);
+    const definition = content.get('vanilla:wind_turbine');
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    placeBuilding(world, definition, 40, 40);
+
+    expect(alertTarget(world, 41, 41)).toEqual({ x: 41, y: 41 });
+  });
+
+  it('epicentrum v pustině přesměruje na hořící dlaždici', async () => {
+    const content = await vanilla();
+    const world = createWorld(1, content.getBalance().economy);
+    const definition = content.get('vanilla:wind_turbine');
+    if (!definition) return;
+    placeBuilding(world, definition, 40, 40);
+    world.fire[index(42, 40, world.size)] = 200;
+
+    // Sto dlaždic daleko není ani dům, ani silnice, ani oheň.
+    expect(alertTarget(world, 5, 120)).toEqual({ x: 42, y: 40 });
+  });
+
+  it('bez škody a bez zástavby u vzniku ukáže těžiště města', async () => {
+    const content = await vanilla();
+    const world = createWorld(1, content.getBalance().economy);
+    const definition = content.get('vanilla:wind_turbine');
+    if (!definition) return;
+    placeBuilding(world, definition, 40, 40);
+    placeBuilding(world, definition, 44, 44);
+
+    expect(alertTarget(world, 5, 120)).toEqual({ x: 42, y: 42 });
+  });
+});

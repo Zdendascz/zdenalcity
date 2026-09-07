@@ -13,7 +13,7 @@ import {
 } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
 import { estimatePlacement, estimateRoad, estimateZoning } from '@/sim/commands';
-import { explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
+import { alertTarget, explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
@@ -1148,6 +1148,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onCancelPick: () => {
       message = null;
     },
+    // Zastávky nemají jméno, tak ať se na ně dá aspoň podívat.
+    onShowStop: (x, y) => centreOn(x, y),
   });
   const alert = new DisasterAlert(mount, i18n, {
     onIgnore: () => setSpeed(DEFAULT_SPEED_INDEX),
@@ -1401,7 +1403,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // `announced` se doplní **až když se okno opravdu otevřelo**. Kdyby se
     // zapsalo dřív, pohroma, která přišla přes už otevřené okno, by se
     // označila za ohlášenou a hráč by se o ní nedozvěděl nikdy.
-    if (!alert.open(disaster.kind, disaster.x, disaster.y)) return;
+    // Kamera míří tam, **kde to bolí**, ne kam spadlo epicentrum: zemětřesení
+    // ho má kdekoli, i v pustině, a hráč pak koukal do prázdné krajiny.
+    const where = alertTarget(simWorld, disaster.x, disaster.y);
+    if (!alert.open(disaster.kind, where.x, where.y)) return;
     announced.add(disaster.id);
     setSpeed(0);
   }
@@ -1703,7 +1708,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Klik na ikonu u hodin vrátí **tutéž kartu, která přišla při vzniku**.
     // Hra se u ní znovu zastaví: kdo si ji otevřel, chce číst, ne dohánět.
     onDisasterClick: (kind, x, y) => {
-      if (alert.open(kind, x, y)) setSpeed(0);
+      const where = alertTarget(simWorld, x, y);
+      if (alert.open(kind, where.x, where.y)) setSpeed(0);
     },
   });
 

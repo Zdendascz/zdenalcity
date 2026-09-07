@@ -806,6 +806,24 @@ export function removeBuilding(world: WorldState, buildingId: number): boolean {
     markTileDirty(world, x, (tile - x) / world.size);
   }
 
+  /*
+   * **Zbořená zastávka zmizí i z linek.**
+   *
+   * Dřív na nich zůstávala viset a linka kvůli ní **přestala jezdit natrvalo**:
+   * pravidlo `lineProblems` ji nahlásilo jako „tohle není zastávka" a
+   * `lineRuns` linku zastavil, dokud ji hráč ručně nevyhodil. Zastávky přitom
+   * nemají jména, takže hráč ani nepoznal, která to byla — nahlásil to slovy
+   * „není šance zjistit, která to byla".
+   *
+   * Uklízí se tady, ne v dopravě: jediné místo, kudy budova z města mizí.
+   */
+  for (const line of world.lines) {
+    const at = line.stops.indexOf(buildingId);
+    if (at < 0) continue;
+    line.stops.splice(at, 1);
+    world.transitDirty = true;
+  }
+
   markBuildingDirty(world, buildingId);
   markPowerNetworkDirty(world); // budova byla vodič i možný zdroj
   markWaterNetworkDirty(world);

@@ -30,6 +30,18 @@ export interface TransitLine {
   vehicles: number;
   /** Jízdné za cestu. Účinek přidává T56. */
   fare: number;
+  /**
+   * Odstavená linka: **vozidla stojí v depu**.
+   *
+   * Nikoho nevozí, nevydělá na jízdném a **neplatí se za ni údržba vozidel** —
+   * jinak by odstavení nebylo k ničemu a hráči by zbývalo jen linku smazat
+   * i se zastávkami. Přesně tohle si vyžádal hráč: „jede spustí linku, nejede
+   * jen pozastaví, mimo provoz úplně se po zvolení nejede odstraní."
+   *
+   * Zastávky, vozidla ani jízdné se odstavením neztrácejí, takže se linka
+   * jedním kliknutím rozjede zpátky.
+   */
+  paused: boolean;
 }
 
 export type LineProblem =
@@ -112,6 +124,7 @@ export function lineRuns(
   balance: Balance,
   line: TransitLine,
 ): boolean {
+  if (line.paused) return false;
   if (line.vehicles <= 0) return false;
   if (lineProblems(world, catalogue, balance, line).length > 0) return false;
 
@@ -263,6 +276,7 @@ export function createLine(world: WorldState, mode: string): TransitLine {
     stops: [],
     vehicles: 0,
     fare: 0,
+    paused: false,
   };
   world.lines.push(line);
   world.transitDirty = true;
@@ -415,7 +429,10 @@ export function computeLineStats(
     const mode = modeOf(balance, line.mode);
     if (!mode) continue;
 
-    stats.upkeep = line.vehicles * mode.vehicleUpkeep;
+    // Odstavená linka **neplatí údržbu**: vozidla stojí v depu. U rozbité
+    // linky se platí dál — ta jezdit má a jen jí něco chybí, takže je to na
+    // hráči, ne úspora zadarmo.
+    stats.upkeep = line.paused ? 0 : line.vehicles * mode.vehicleUpkeep;
     if (!lineRuns(world, catalogue, balance, line)) continue;
 
     stats.capacity = line.vehicles * mode.capacity;

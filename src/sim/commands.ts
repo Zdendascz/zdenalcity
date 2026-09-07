@@ -111,6 +111,14 @@ export type Command =
   | { type: 'set_vehicles'; lineId: number; vehicles: number }
   | { type: 'set_fare'; lineId: number; fare: number }
   /**
+   * Odstavení linky, nebo její rozjezd.
+   *
+   * Vyžádal si to hráč: „jede spustí linku, nejede jen pozastaví, mimo provoz
+   * úplně se po zvolení nejede odstraní." Do té doby se dala linka jedině
+   * smazat — i se zastávkami, které se pak musely naklikat znovu.
+   */
+  | { type: 'set_line_paused'; lineId: number; paused: boolean }
+  /**
    * Půjčka (§8 fáze 4).
    *
    * Splácet se nedá dřív: předčasné splacení by z půjčky udělalo bezúročný
@@ -1201,6 +1209,26 @@ export function setLineVehicles(
 
   world.economy.funds -= cost;
   line.vehicles = vehicles;
+  return OK;
+}
+
+/**
+ * Odstaví linku, nebo ji zase rozjede.
+ *
+ * Odstavená stojí v depu: nikoho nevozí, nevydělá a **neplatí se za ni údržba
+ * vozidel**. Zastávky, vozidla ani jízdné se neztratí, takže se rozjede jedním
+ * kliknutím.
+ */
+export function setLinePaused(
+  world: WorldState,
+  lineId: number,
+  paused: boolean,
+): CommandResult {
+  const line = findLine(world, lineId);
+  if (!line) return reject('error.unknownLine', { id: lineId });
+  if (line.paused === paused) return OK;
+  line.paused = paused;
+  world.transitDirty = true;
   return OK;
 }
 

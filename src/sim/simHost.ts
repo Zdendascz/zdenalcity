@@ -18,6 +18,7 @@ import {
   removeTransitStop,
   setLineFare,
   setLineVehicles,
+  setLinePaused,
   setServiceFunding,
   setTaxRate,
   terraformCorner,
@@ -187,6 +188,8 @@ class MainThreadSimHost implements SimHost {
         return removeTransitStop(this.world, cmd.lineId, cmd.buildingId);
       case 'set_vehicles':
         return setLineVehicles(this.world, this.balance, cmd.lineId, cmd.vehicles);
+      case 'set_line_paused':
+        return setLinePaused(this.world, cmd.lineId, cmd.paused);
       case 'set_fare':
         return setLineFare(this.world, cmd.lineId, cmd.fare);
       case 'take_loan':

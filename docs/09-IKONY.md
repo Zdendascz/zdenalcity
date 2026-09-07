@@ -174,6 +174,7 @@ hvězdu, velká dvě. Zmenšit tentýž tvar by nešlo poznat.
 | `screenshot` | A white photo camera seen from the front with a round lens, centred on a grey rounded-square badge. |
 | `layer-risk` | A white warning triangle with an exclamation mark inside it, centred on a grey rounded-square badge. |
 | `help` | A white question mark, centred on a grey rounded-square badge. |
+| `close` | A thick white X, two straight bars crossing at the centre, on a flat grey rounded-square badge. The badge is one even shade of grey with no texture, shading or smudges. |
 | `plant-trees` | A white broadleaf tree with a small white garden spade stuck in the ground beside it, centred on a green rounded-square badge. |
 | `share` | A white paper plane, centred on a flat grey rounded-square badge. The badge is one even shade of grey with no texture, shading or smudges. |
 | `author` | A white quill pen, centred on a flat grey rounded-square badge. The badge is one even shade of grey with no texture, shading or smudges. |

@@ -278,6 +278,24 @@ function emptyTerraformBytes(size: number): number {
   return size * size * BYTES_PER_TILE_V8;
 }
 
+/**
+ * v8 → v9: linky dostaly příznak **odstavení**.
+ *
+ * Starý save ho nemá a doplní se `false`, tedy „jede". Je to jediná možná
+ * volba: linka, která do uložení vozila lidi, po načtení vozit nepřestane.
+ */
+const migrateV8ToV9: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 9 },
+  state: {
+    ...save.state,
+    transit: {
+      ...save.state.transit,
+      lines: save.state.transit.lines.map((line) => ({ ...line, paused: false })),
+    },
+  },
+});
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
@@ -287,6 +305,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   5: migrateV5ToV6,
   6: migrateV6ToV7,
   7: migrateV7ToV8,
+  8: migrateV8ToV9,
 };
 
 /**

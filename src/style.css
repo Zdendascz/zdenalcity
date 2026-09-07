@@ -1749,6 +1749,45 @@ body {
  * mezery mezi položkami a čísla vpravo. Hráč v nich hledá jednu věc, ne
  * souvislý text.
  */
+/*
+ * Čip zastávky nese **dvě tlačítka**: jméno ukáže zastávku na mapě, křížek ji
+ * vyhodí z linky. Dřív mazalo obojí a hráč se bál na čip kliknout.
+ */
+.chip--stop {
+  display: inline-flex;
+  gap: 0;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.chip__label,
+.chip__drop {
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chip__label:hover,
+.chip__drop:hover {
+  background: rgb(238 243 245 / 12%);
+}
+
+.chip__drop {
+  display: grid;
+  place-items: center;
+  padding: 4px 6px;
+  border-left: 1px solid rgb(238 243 245 / 15%);
+}
+
+.chip__drop .icon {
+  width: 14px;
+  height: 14px;
+}
+
 .help__group {
   margin: 18px 0 8px;
   color: #f0a020;

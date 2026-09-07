@@ -29,6 +29,13 @@ export interface TransitCallbacks {
   onPickStop(lineId: number): void;
   /** Panel se zavírá nebo se přidávání ruší. */
   onCancelPick(): void;
+  /**
+   * Hráč klikl na zastávku v seznamu — ukaž mu ji na mapě.
+   *
+   * Zastávky nemají jméno a hráč se ptal, „co ta čísla znamenají". Jsou to
+   * souřadnice; tímhle se z nich stane místo, na které se dá podívat.
+   */
+  onShowStop(x: number, y: number): void;
 }
 
 export class TransitPanel {
@@ -186,10 +193,26 @@ export class TransitPanel {
       ),
     );
     const runs = lineRuns(world, catalogue, balance, line);
+    // Odstavená linka není rozbitá — to jsou dva různé stavy a hráč musí
+    // poznat, jestli si ji vypnul sám, nebo jí něco chybí.
+    const state = line.paused ? 'ui.transit.paused' : runs ? 'ui.transit.running' : 'ui.transit.stopped';
     head.appendChild(
-      el('span', runs ? 'transit__state' : 'transit__state is-negative',
-        t(runs ? 'ui.transit.running' : 'ui.transit.stopped')),
+      el('span', runs ? 'transit__state' : 'transit__state is-negative', t(state)),
     );
+    /*
+     * **Jede / nejede** je přepínač, ne mazání.
+     *
+     * Hráč to popsal takhle: „jede spustí linku, nejede jen pozastaví, mimo
+     * provoz úplně se po zvolení nejede odstraní." Do té doby se dala linka
+     * jedině smazat i se zastávkami, které se pak musely naklikat znovu.
+     */
+    const pause = button('chip chip--tight', () =>
+      this.dispatch({ type: 'set_line_paused', lineId: line.id, paused: !line.paused }),
+    );
+    pause.appendChild(iconSvg(line.paused ? 'speed-1' : 'speed-pause'));
+    pause.title = t(line.paused ? 'ui.transit.resume' : 'ui.transit.pause');
+    head.appendChild(pause);
+
     const remove = button('chip chip--tight', () =>
       this.dispatch({ type: 'delete_line', lineId: line.id }),
     );
@@ -207,22 +230,39 @@ export class TransitPanel {
       })),
     );
 
+    /*
+     * Čip zastávky dělá **dvě různé věci a každou jiným tlačítkem**.
+     *
+     * Klik na jméno ukáže zastávku na mapě, křížek ji vyhodí z linky. Dřív
+     * mazalo obojí a popisek byl holé „3. 64, 71" — hráč se ptal, co ta čísla
+     * znamenají, a bál se na ně kliknout.
+     *
+     * Zbořená zastávka se v seznamu neobjeví: mizí z linky sama, hned jak
+     * budova zmizí z města (`removeBuilding`).
+     */
     for (const [order, stopId] of line.stops.entries()) {
       const building = world.buildings.get(stopId);
-      const chip = button('chip chip--stop', () =>
+      if (!building) continue;
+      const chip = el('span', 'chip chip--stop');
+
+      const show = button('chip__label', () =>
+        this.callbacks.onShowStop(building.x, building.y),
+      );
+      show.textContent = t('ui.transit.stopAt', {
+        order: order + 1,
+        x: building.x,
+        y: building.y,
+      });
+      show.title = t('ui.transit.showStop');
+      chip.appendChild(show);
+
+      const drop = button('chip__drop', () =>
         this.dispatch({ type: 'remove_stop', lineId: line.id, buildingId: stopId }),
       );
-      chip.appendChild(iconSvg('stop-remove'));
-      chip.appendChild(
-        el('span', undefined,
-          building
-            ? t('ui.transit.stopAt', { order: order + 1, x: building.x, y: building.y })
-            // Zbořená zastávka zůstane v lince, dokud ji hráč nevyhodí —
-            // simulace ji přeskakuje (`liveStops`), ale mlčet o ní by znamenalo
-            // linku, která nejezdí bez viditelného důvodu.
-            : t('ui.transit.stopGone', { order: order + 1 })),
-      );
-      chip.title = t('ui.transit.removeStop');
+      drop.appendChild(iconSvg('stop-remove'));
+      drop.title = t('ui.transit.removeStop');
+      chip.appendChild(drop);
+
       stops.appendChild(chip);
     }
 

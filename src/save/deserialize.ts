@@ -150,6 +150,9 @@ function parseTransit(raw: Record<string, unknown>): SaveTransitState {
         stops: numberArray(line['stops'], `${what}.lines[${i}].stops`),
         vehicles: int(line, 'vehicles', `${what}.lines[${i}]`),
         fare: num(line, 'fare', `${what}.lines[${i}]`),
+        // **Shovívavě**: `paused` přibylo ve v9 a starší save ho nemá.
+        // Parsuje se dřív než migrace, takže by na něm jinak spadl v1 až v8.
+        paused: line['paused'] === undefined ? false : bool(line, 'paused', `${what}.lines[${i}]`),
       };
     }),
     nextLineId: int(raw, 'nextLineId', what),
@@ -826,6 +829,7 @@ function applyTransitToWorld(world: WorldState, save: SaveData): void {
     mode: line.mode,
     stops: [...line.stops],
     vehicles: line.vehicles,
+    paused: line.paused,
     fare: line.fare,
   }));
   world.nextLineId = save.state.transit.nextLineId;

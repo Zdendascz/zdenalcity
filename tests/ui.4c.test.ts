@@ -266,17 +266,31 @@ async function transitFixture() {
 
   const mount = document.createElement('div');
   const picks: number[] = [];
+  const shown: { x: number; y: number }[] = [];
   let cancels = 0;
   const { sent, dispatch } = recorder();
   const panel = new TransitPanel(mount, await i18nFor(content), dispatch, {
     onPickStop: (lineId) => void picks.push(lineId),
     onCancelPick: () => void cancels++,
+    onShowStop: (x, y) => void shown.push({ x, y }),
   });
   panel.toggle();
 
   const refresh = () => panel.update(world, content, balance);
   refresh();
-  return { panel, mount, sent, world, content, balance, stops, picks, refresh, cancels: () => cancels };
+  return {
+    panel,
+    mount,
+    sent,
+    world,
+    content,
+    balance,
+    stops,
+    picks,
+    shown,
+    refresh,
+    cancels: () => cancels,
+  };
 }
 
 /** Postaví `count` zastávek podél ulice a vrátí jejich id. */
@@ -358,26 +372,48 @@ describe('panel MHD', () => {
     expect(panel.pickingLine()).toBeNull();
   });
 
-  it('zastávka na lince se dá vyhodit', async () => {
-    const { mount, sent, world, content, stops, refresh } = await transitFixture();
+  it('klik na jméno zastávky ji ukáže na mapě, křížek ji vyhodí', async () => {
+    /*
+     * Dvě různé věci, dvě různá tlačítka. Dřív mazalo obojí a popisek byl holé
+     * „1. 12, 21" — hráč se ptal, co ta čísla znamenají, a bál se na ně
+     * kliknout. Souřadnice zůstaly, protože zastávky nemají jméno; nově se
+     * s nimi ale dá skočit kamerou.
+     */
+    const { mount, sent, world, content, stops, refresh, shown } = await transitFixture();
     const lineId = addLine(world, content, stops);
     refresh();
 
-    // Zastávky se popisují souřadnicemi: id budovy hráči nic neříká.
-    buttonWith(mount, '1. 12, 21').click();
+    buttonWith(mount, '1. zastávka · 12, 21').click();
+    expect(sent, 'klik na jméno nesmí nic měnit').toEqual([]);
+    expect(shown).toEqual([{ x: 12, y: 21 }]);
 
+    const drop = mount.querySelector('.chip__drop');
+    expect(drop).toBeTruthy();
+    (drop as HTMLButtonElement).click();
     expect(sent).toEqual([{ type: 'remove_stop', lineId, buildingId: stops[0] }]);
   });
 
-  it('zbořená zastávka na lince zůstane vidět', async () => {
-    // Simulace ji přeskočí, ale mlčet o ní by znamenalo linku, která nejezdí
-    // bez viditelného důvodu.
+  it('zbořená zastávka v seznamu není — z linky mizí sama', async () => {
+    // Od T105 ji `removeBuilding` z linky vyhodí, takže v panelu nemá co
+    // dělat. Dřív tam visela a linka kvůli ní nejezdila natrvalo.
     const { mount, world, content, stops, refresh } = await transitFixture();
     addLine(world, content, stops);
     world.buildings.delete(stops[0] ?? 0);
     refresh();
 
-    expect(mount.textContent).toContain('zbořeno');
+    expect(mount.textContent).not.toContain('12, 21');
+  });
+
+  it('linka se dá odstavit a zase rozjet', async () => {
+    const { mount, sent, world, content, stops, refresh } = await transitFixture();
+    const lineId = addLine(world, content, stops);
+    refresh();
+
+    // Tlačítko nese jen ikonu, takže se hledá podle popisku pro odečítačku.
+    const pause = mount.querySelector('[title="Odstavit linku (vozidla do depa)"]');
+    expect(pause, 'přepínač jede/nejede v panelu chybí').toBeTruthy();
+    (pause as HTMLButtonElement).click();
+    expect(sent).toEqual([{ type: 'set_line_paused', lineId, paused: true }]);
   });
 
   it('vozidla se přidávají po jednom a s cenou', async () => {

@@ -161,6 +161,7 @@ function packTransit(world: WorldState): SaveTransitState {
         stops: [...line.stops],
         vehicles: line.vehicles,
         fare: line.fare,
+        paused: line.paused,
       })),
     nextLineId: world.nextLineId,
   };

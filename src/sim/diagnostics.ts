@@ -489,3 +489,90 @@ export function explainParcel(
     },
   };
 }
+
+/**
+ * Kam srovnat kameru, když se ohlásí katastrofa.
+ *
+ * Není to vždycky místo, kde vznikla. **Zemětřesení má epicentrum kdekoli, i
+ * v pustině** — otřes se roznese po celé mapě, takže na epicentru není co
+ * vidět. Hráč to nahlásil: „notifikace přijde, ale vždy mi to ukáže místo
+ * zásahu mimo město."
+ *
+ * Pravidlo je proto **„ukaž, kde to bolí"**, a je jedno pro všechny druhy:
+ *
+ * 1. Když je u vzniku něco živého — dům, silnice, oheň nebo voda — je to místo
+ *    správně. Hromadná nehoda na křižovatce i lesní požár v lese sem spadnou.
+ * 2. Jinak se hledá **nejbližší škoda**: hořící nebo zaplavená dlaždice.
+ * 3. A když ani ta není, ukáže se **těžiště města**. Tam se hráč stejně dívá.
+ *
+ * Prochází se celá mapa, ale jen jednou za ohlášení, ne každý tik.
+ */
+export function alertTarget(
+  world: WorldState,
+  x: number,
+  y: number,
+): { x: number; y: number } {
+  if (somethingAt(world, x, y, ALERT_NEAR)) return { x, y };
+
+  const damage = nearestDamage(world, x, y);
+  if (damage) return damage;
+
+  return cityCentre(world) ?? { x, y };
+}
+
+/** Jak daleko od vzniku se ještě hledá, jestli tam vůbec něco je. */
+const ALERT_NEAR = 6;
+
+/** Stojí, jezdí, hoří nebo teče v okolí té dlaždice něco? */
+function somethingAt(world: WorldState, x: number, y: number, reach: number): boolean {
+  const size = world.size;
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const tx = x + dx;
+      const ty = y + dy;
+      if (tx < 0 || ty < 0 || tx >= size || ty >= size) continue;
+      const tile = index(tx, ty, size);
+      if ((world.layers.buildingId[tile] ?? 0) !== 0) return true;
+      if ((world.layers.road[tile] ?? ROAD.none) !== ROAD.none) return true;
+      if ((world.fire[tile] ?? 0) !== 0) return true;
+      if ((world.flood[tile] ?? 0) !== 0) return true;
+    }
+  }
+  return false;
+}
+
+/** Nejbližší hořící nebo zaplavená dlaždice. Měří se po čtvercích, ne úhlopříčně. */
+function nearestDamage(
+  world: WorldState,
+  x: number,
+  y: number,
+): { x: number; y: number } | null {
+  const size = world.size;
+  let best: { x: number; y: number } | null = null;
+  let closest = Number.POSITIVE_INFINITY;
+
+  for (let tile = 0; tile < world.fire.length; tile++) {
+    if ((world.fire[tile] ?? 0) === 0 && (world.flood[tile] ?? 0) === 0) continue;
+    const tx = tile % size;
+    const ty = (tile - tx) / size;
+    const distance = Math.max(Math.abs(tx - x), Math.abs(ty - y));
+    if (distance >= closest) continue;
+    closest = distance;
+    best = { x: tx, y: ty };
+  }
+  return best;
+}
+
+/** Těžiště zástavby. Prázdné město ho nemá. */
+function cityCentre(world: WorldState): { x: number; y: number } | null {
+  let sumX = 0;
+  let sumY = 0;
+  let count = 0;
+  for (const building of world.buildings.values()) {
+    sumX += building.x;
+    sumY += building.y;
+    count++;
+  }
+  if (count === 0) return null;
+  return { x: Math.round(sumX / count), y: Math.round(sumY / count) };
+}

@@ -11,6 +11,7 @@ import {
   removeTransitStop,
   setLineFare,
   setLineVehicles,
+  setLinePaused,
 } from '@/sim/commands';
 import { coarseIndex } from '@/sim/coarse';
 import { coarseCongestion } from '@/sim/diagnostics';
@@ -705,20 +706,56 @@ describe('jede, nebo nejede', () => {
     expect(lineRuns(world, content, balance, line)).toBe(true);
   });
 
-  it('zbouraná zastávka z linky nezmizí sama, ale linka to přežije', async () => {
-    // Tiché mizení zastávek by hráči rozpadlo linku a on by nevěděl proč.
+  it('zbouraná zastávka z linky zmizí sama a linka jede dál', async () => {
+    /*
+     * Do T105 zastávka na lince zůstávala viset a `lineProblems` ji hlásil jako
+     * „tohle není zastávka" — což **zastavilo celou linku natrvalo**, dokud ji
+     * hráč ručně nevyhodil. Zastávky přitom nemají jméno, takže ani nepoznal,
+     * která to byla; nahlásil to slovy „není šance zjistit, která to byla".
+     *
+     * Mizí proto sama. Linka o zastávku přijde, ale jezdí dál po zbylých —
+     * a když jich zbude míň než dvě, hlásí `tooFewStops`, což je pravda a
+     * hráč s ní umí něco udělat.
+     */
     const content = await vanilla();
     const balance = content.getBalance();
     const world = street(content);
     const line = tramLineOf(world, content);
     const first = line.stops[0] ?? 0;
+    addTransitStop(world, content, balance, line.id, addStop(world, content, 'vanilla:tram_stop', 30));
+    expect(line.stops.length).toBe(3);
 
     expect(removeBuilding(world, first)).toBe(true);
-    expect(line.stops, 'zastávka z linky zmizela sama').toContain(first);
-    expect(lineProblems(world, content, balance, line)).toContain('notAStop');
+    expect(line.stops, 'zastávka na lince zůstala viset').not.toContain(first);
+    expect(lineProblems(world, content, balance, line)).not.toContain('notAStop');
     // A přepočet koridoru na tom nespadne.
     rebuildTramTiles(world, content, balance);
-    expect(world.tramTiles.size).toBe(0);
+  });
+
+  it('odstavená linka nejezdí, ale nic neztratí', async () => {
+    // Hráč si to vyžádal: „jede spustí linku, nejede jen pozastaví, mimo
+    // provoz úplně se po zvolení nejede odstraní."
+    const content = await vanilla();
+    const balance = content.getBalance();
+    // Autobus, ne tramvaj: tramvaj potřebuje proud u zastávek a test je
+    // o odstavení, ne o elektřině.
+    const world = street(content);
+    const a = addStop(world, content, 'vanilla:transit_stop', 12);
+    const b = addStop(world, content, 'vanilla:transit_stop', 48);
+    createTransitLine(world, balance, 'bus');
+    const line = lastLine(world);
+    addTransitStop(world, content, balance, line.id, a);
+    addTransitStop(world, content, balance, line.id, b);
+    setLineVehicles(world, balance, line.id, 2);
+    expect(lineRuns(world, content, balance, line)).toBe(true);
+
+    expect(setLinePaused(world, line.id, true).ok).toBe(true);
+    expect(lineRuns(world, content, balance, line)).toBe(false);
+    expect(line.stops.length, 'odstavení nesmí sebrat zastávky').toBe(2);
+    expect(line.vehicles, 'ani vozidla').toBe(2);
+
+    expect(setLinePaused(world, line.id, false).ok).toBe(true);
+    expect(lineRuns(world, content, balance, line)).toBe(true);
   });
 
   function tramLineOf(world: WorldState, content: ContentRegistry): TransitLine {
