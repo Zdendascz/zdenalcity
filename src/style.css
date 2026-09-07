@@ -1566,61 +1566,51 @@ body {
   z-index: 1;
 }
 
+/*
+ * Jen ikony, žádný text. Sloupec je proto úzký a řídký: čtyři obrázky pod
+ * sebou, mezi nimi vzduch, ať se nespojí do jednoho pruhu.
+ */
 .home__links {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  width: min(280px, 60vw);
+  gap: 10px;
+  align-items: flex-end;
 }
 
 .home__link {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 10px;
-  border: 1px solid rgb(238 243 245 / 10%);
-  border-radius: 8px;
-  /* Nad fotkou musí být podklad hutnější než dole nad tmavou stránkou. */
-  background: rgb(9 24 30 / 62%);
-  backdrop-filter: blur(4px);
-  color: #dbe6ea;
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  background: none;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  /* Objekt nad světlou fotkou potřebuje odsazení od pozadí; dělá ho stín
+     samotné ikony, ne rámeček — rámeček by z hlavičky udělal lištu. */
+  filter: drop-shadow(0 3px 6px rgb(6 14 18 / 65%));
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 
-.home__link:hover {
-  border-color: rgb(240 160 32 / 55%);
-  background: rgb(20 44 54 / 75%);
+.home__link:hover,
+.home__link:focus-visible {
+  transform: translateY(-2px) scale(1.06);
+  filter: drop-shadow(0 5px 10px rgb(6 14 18 / 75%));
 }
 
 .home__link .icon {
-  flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
-.home__link-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.home__link-title {
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.home__link-note {
-  overflow: hidden;
-  color: #93a7af;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Odpověď na sdílení: pod sloupcem, ne v tlačítku — v ikoně není kam psát. */
+.home__links-note {
+  margin: 8px 0 0;
+  color: #eef3f5;
+  font-size: 12px;
+  text-align: right;
+  text-shadow: 0 1px 3px rgb(6 14 18 / 90%);
 }
 
 .home__card--text {

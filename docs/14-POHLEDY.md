@@ -527,13 +527,18 @@ vyznačené parcele by les jen tiše zabránil růstu a hráč by koukal, proč 
 ### Odkazy o hře
 
 Byla to řada čtyř širokých karet přes celou stránku a vypadala jako druhá
-nabídka; přetahovala pozornost obrázkům, kvůli kterým na stránce je. Teď je to
-sloupec u pravého okraje s ikonou, menším písmem a tichým pozadím.
+nabídka; přetahovala pozornost obrázkům, kvůli kterým na stránce je. Pak sloupec
+s názvem a popiskem dole, kde zase splýval s koncem stránky. Teď jsou to
+**čtyři ikony v pravém horním rohu hlavičky**, bez textu.
 
-Tři ikony k tomu vznikly (`share`, `author`, `chat`) v téže sadě jako zbytek
-hry. U dvou z nich model nechal na štítku šmouhy, tak se **plocha štítku
-srovnala programově** na jeden odstín — jinak by v řadě ostatních ikon
-vyčnívaly. Kdo je bude generovat znovu, musí to zopakovat.
+Ikony jsou **izometrické rendery**, ne ploché štítky z HUD: leží na fotce a mají
+vypadat jako kus hry. Zadání i prompty jsou v `09-IKONY.md`, oddíl „Ikony
+domovské stránky"; kreslí je `tools/generate-home-icons.py` a ořezává
+`tools/fit-scene-icons.py` (bez štítku, průhlednost zůstává).
+
+Význam nese tvar, ne text: vlaštovka „pošli", otazník „nápověda", přilba
+s výkresem „kdo to postavil", bubliny „povídej si". Slovo zůstalo v `title`
+a `aria-label`, takže odečítačka i najetí myší ho pořád najdou.
 
 ### Nápověda
 

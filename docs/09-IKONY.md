@@ -208,3 +208,54 @@ triviálně a je z ní i podklad ikony.
 | id | prompt |
 |---|---|
 | `logo` | Three simple isometric city blocks of different heights standing together, seen from the front-above at the isometric angle, in warm amber and deep teal. |
+
+## Ikony domovské stránky
+
+Čtyři odkazy v rohu hlavičky (poslat hru, nápověda, autor, Discord) měly u sebe
+popisek a autor si vyžádal opak: „místo tlačítek s popisem vymysli špičkové
+ikonky, které naprosto jasně každý pochopí, ale budou dělány grafikou hry."
+
+Proto **nejsou ploché**. Zbytek sady jsou štítky do HUD, kde se čte barva dřív
+než tvar; tyhle čtyři leží na fotce v hlavičce a mají vypadat jako kus hry —
+tedy měkce stínovaný izometrický render, stejná řeč jako u budov na mapě
+(`06-SPRITY-SLUZEB.md`).
+
+Význam nese **tvar, ne text**: papírová vlaštovka je „pošli", otazník „nápověda",
+přilba s výkresem „kdo to postavil" a bubliny „povídej si". Popisek zůstává
+v `title` a v `aria-label`, takže odečítačka i najetí myší ho pořád najdou.
+
+### Styl
+
+Doslova takhle, přidává se ke každému promptu:
+
+```
+A single object rendered as a small isometric 3D icon, seen from the
+south-east, in the visual language of an isometric city-builder game.
+
+Rendering style: a soft-shaded 3D render, not a drawing. Believable materials
+with smooth gradients across the surfaces and gentle ambient occlusion where
+forms meet. Bright, warm, even daylight from the left: left-facing surfaces are
+clearly brighter than right-facing ones.
+
+NOT cartoon, NOT cel-shaded, NOT toon-shaded. No dark outline or contour line
+around the object, no flat single-colour fills, no posterisation. Equally no
+photorealism, no film grain, no vignette, no lens effects, no bloom.
+
+The object floats alone, centred, and fills most of the frame with a small
+even margin on every side. Fully transparent background: no plinth, no ground,
+no scenery, no people, no cast shadow outside the object itself.
+
+One bold silhouette that still reads when the icon is 48 pixels wide: no thin
+parts, no small pieces, no fine detail.
+
+NO WORDS, NO LETTERING, NO NUMBERS, NO SIGNATURE, NO WATERMARK, NO LOGO.
+```
+
+### Ikony
+
+| id | prompt |
+|---|---|
+| `home-share` | A folded paper plane made of thick matte white paper, tilted as if it has just been thrown up and to the right, with crisp folds and a warm highlight along the top edge. |
+| `home-help` | A bold question mark modelled as a solid extruded object with softly rounded edges, in warm amber-orange plastic, standing upright with its own separate round dot below it. |
+| `home-author` | A white builder helmet resting on a tightly rolled paper drawing that lies flat under it, the roll in pale blue-grey paper. |
+| `home-chat` | Two overlapping rounded speech bubbles standing upright, the front one white and the one behind it soft teal blue, both thick and solid like moulded plastic. |

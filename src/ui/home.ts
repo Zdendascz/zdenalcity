@@ -426,28 +426,30 @@ const SHARE_NOTE_MS = 2500;
 /**
  * Odkazy o hře: sdílení, nápověda, autor a Discord.
  *
- * **Sloupec vpravo nahoře, přes hlavičku.** Čtyři široké karty přes celou
- * stránku vypadaly jako druhá nabídka a přetahovaly pozornost obrázkům, kvůli
- * kterým na stránce jsou; pod galerií zase splývaly s koncem stránky a hráč je
- * hledal. Autor to popsal takhle: „vpravo nahoře přes hero, pod sebe, trochu
- * menší, méně nápadně." Jsou to odkazy, ne rozcestník.
+ * **Sloupec vpravo nahoře, přes hlavičku, a jen ikony.** Nejdřív to byly čtyři
+ * široké karty přes celou stránku, pak sloupec s názvem a popiskem — a autor
+ * si vyžádal opak: „místo tlačítek s popisem vymysli špičkové ikonky, které
+ * naprosto jasně každý pochopí, ale budou dělány grafikou hry."
  *
- * Ikona je z téže sady jako ve hře, takže sloupec drží styl a řádek se dá
- * poznat dřív, než se přečte.
+ * Ikony jsou proto **izometrické rendery** jako budovy na mapě, ne ploché
+ * štítky z HUD (zadání v `docs/09-IKONY.md`, oddíl o domovské stránce).
+ * Význam nese tvar: vlaštovka „pošli", otazník „nápověda", přilba s výkresem
+ * „kdo to postavil", bubliny „povídej si".
+ *
+ * Slovo nezmizelo, jen se schovalo do `title` a `aria-label` — odečítačka i
+ * najetí myší ho pořád najdou. Odpověď na sdílení se ukáže pod sloupcem, ne
+ * v tlačítku: v ikoně by nebylo kam ji napsat.
  */
 function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOptions): HTMLElement {
   const section = el('section', 'home__about');
-  // Nadpis „O hře" tu **není schválně**: nad fotkou by se špatně četl a čtyři
-  // pojmenované řádky s ikonou se představovat nemusí.
   const strip = el('div', 'home__links');
+  const note = el('p', 'home__links-note');
 
-  /** Jeden řádek sloupce: ikona, název, popisek pod ním. */
-  function fill(node: HTMLElement, icon: string, title: string, note: string): HTMLElement {
+  /** Ikona s popiskem jen pro odečítačku a pro najetí myší. */
+  function fill(node: HTMLElement, icon: string, label: string): HTMLElement {
     node.appendChild(iconSvg(icon));
-    const text = el('span', 'home__link-text');
-    text.appendChild(el('span', 'home__link-title', title));
-    text.appendChild(el('span', 'home__link-note', note));
-    node.appendChild(text);
+    node.title = label;
+    node.setAttribute('aria-label', label);
     return node;
   }
 
@@ -456,36 +458,30 @@ function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOp
   const share = button('home__link', () => {
     void shareGame(t).then((key) => {
       if (key === '') return;
-      // Odpověď se píše rovnou do řádku: bublina by na domovské stránce
-      // neměla kam, a hráč se dívá na tlačítko, které zmáčkl.
-      const note = share.querySelector('.home__link-note');
-      if (!note) return;
       note.textContent = t(key);
       window.setTimeout(() => {
-        note.textContent = t('ui.home.shareNote');
+        note.textContent = '';
       }, SHARE_NOTE_MS);
     });
   });
-  strip.appendChild(fill(share, 'share', t('ui.home.share'), t('ui.home.shareNote')));
+  strip.appendChild(fill(share, 'home-share', t('ui.home.share')));
 
   // Nápověda: hra nemá tutoriál, takže je to jediné místo, kde se hráč
   // doví, proč mu zóna nezarostla.
   const help = button('home__link', () => showHelp(root, t, undefined, options.catalogue));
-  strip.appendChild(fill(help, 'help', t('ui.help.title'), t('ui.help.note')));
+  strip.appendChild(fill(help, 'home-help', t('ui.help.title')));
 
   const authors = button('home__link', () => showAuthors(root, t));
-  strip.appendChild(
-    fill(authors, 'author', t('ui.home.authors'), t('ui.home.authorsNote')),
-  );
+  strip.appendChild(fill(authors, 'home-author', t('ui.home.authors')));
 
   // Discord je **odkaz ven**, ne překryv: je to jiné místo, ne další stránka hry.
   const discord = el('a', 'home__link home__link--out');
   discord.href = DISCORD_URL;
   discord.target = '_blank';
   discord.rel = 'noreferrer noopener';
-  strip.appendChild(fill(discord, 'chat', t('ui.home.discord'), t('ui.home.discordNote')));
+  strip.appendChild(fill(discord, 'home-chat', t('ui.home.discord')));
 
-  section.appendChild(strip);
+  section.append(strip, note);
   return section;
 }
 
