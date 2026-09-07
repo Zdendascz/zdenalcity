@@ -13,6 +13,7 @@
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { growthBlocker } from '@/sim/diagnostics';
+import { lineProblems } from '@/sim/transit';
 import { index, ZONE } from '@/sim/layers';
 import { playGame, type Strategy } from './simulate';
 import type { WorldState } from '@/sim/world';
@@ -90,6 +91,21 @@ for (const seed of seeds) {
         `  napajeno ${String([...world.buildings.values()].filter((b) => b.powered).length).padStart(4)}` +
         `  dane ${world.economy.taxRates.residential}%` +
         `  voda ${voda}/${vodaren}` +
+        `  linky ${world.lines.length}/${world.lines.reduce((n, l) => n + l.stops.length, 0)}` +
+        `  MHD ${world.lines
+          .map(
+            (l) =>
+              `${l.stops.length}z/${l.vehicles}v/${lineProblems(world, content, balance, l).join('+') || 'ok'}` +
+              (lineProblems(world, content, balance, l).includes('notAStop')
+                ? `[${l.stops
+                    .map((id) => {
+                      const b = world.buildings.get(id);
+                      return b ? (b.definitionId.replace('vanilla:', '') + (b.abandoned ? '!' : '')) : 'chybí';
+                    })
+                    .join(',')}]`
+                : ''),
+          )
+          .join(' ') || '-'}` +
         `  opust ${opustenych}` +
         `  spokoj ${Math.round(mean(world.happiness))}` +
         `  sluzby ${[...world.coverage.entries()]

@@ -754,6 +754,7 @@ class Player {
 
     this.clearRubble();
     this.repairRoads();
+    this.fixLines();
     // Proud má **přednost před vším ostatním**. Dokud ho není dost, nemá smysl
     // stavět služby ani linky: nenapájený dům neplatí daň, takže město platí
     // údržbu ze mzdy, kterou nedostává.
@@ -1528,21 +1529,46 @@ class Player {
         // Voda o dlaždici vedle znamená odmítnutí „zvedat dno moře neumíme",
         // protože srovnání parcely hne rohem, který sdílí s hladinou.
         let nearWater = false;
-        let road = false;
         for (let oy = -1; oy <= d && !nearWater; oy++) {
           for (let ox = -1; ox <= w; ox++) {
             const tx = x + ox;
             const ty = y + oy;
             if (tx < 0 || ty < 0 || tx >= size || ty >= size) continue;
-            const tile = index(tx, ty, size);
-            if (this.world.layers.terrain[tile] === TERRAIN.water) {
+            if (this.world.layers.terrain[index(tx, ty, size)] === TERRAIN.water) {
               nearWater = true;
               break;
             }
-            if ((this.world.layers.road[tile] ?? ROAD.none) !== ROAD.none) road = true;
           }
         }
-        if (nearWater || !road) continue;
+        if (nearWater) continue;
+
+        /*
+         * Silnice musí sousedit **hranou**, ne rohem.
+         *
+         * Pravidlo hry (`touchesRoad`) se ptá na čtyři sousedy každé dlaždice
+         * půdorysu; roh se nepočítá. Hráč měl v okruhu volnější podmínku, takže
+         * si vybíral místa, kde vozovka leží šikmo za rohem, a hra ho odmítala
+         * „musí sousedit se silnicí". Vozovna MHD se takhle nepostavila ani
+         * jednou a s ní padla celá doprava.
+         */
+        let road = false;
+        for (let oy = 0; oy < d && !road; oy++) {
+          for (let ox = 0; ox < w && !road; ox++) {
+            for (const [nx, ny] of [
+              [x + ox, y + oy - 1],
+              [x + ox + 1, y + oy],
+              [x + ox, y + oy + 1],
+              [x + ox - 1, y + oy],
+            ] as const) {
+              if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+              if ((this.world.layers.road[index(nx, ny, size)] ?? ROAD.none) !== ROAD.none) {
+                road = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!road) continue;
 
         (level ? flat : rough).push([x, y]);
       }
@@ -1634,6 +1660,24 @@ class Player {
 
   // --- MHD -----------------------------------------------------------------
 
+  /**
+   * Zbořená zastávka se z linky **odebere**.
+   *
+   * Pohroma zastávku srovná se zemí, ale na lince zůstane viset; hra pak hlásí
+   * „tohle není zastávka" a linka **přestane jezdit** — natrvalo. Dělá se to
+   * mimo `keepTransit`, protože to nestojí ani korunu: `keepTransit` se
+   * přeskakuje, když městu chybí proud, a zrovna po katastrofě chybí vždycky.
+   * Linky pak zůstaly rozbité na desítky let.
+   */
+  private fixLines(): void {
+    for (const line of this.world.lines) {
+      for (const stop of [...line.stops]) {
+        if (this.world.buildings.has(stop)) continue;
+        this.send({ type: 'remove_stop', lineId: line.id, buildingId: stop });
+      }
+    }
+  }
+
   private keepTransit(): void {
     if (this.strategy.transit === 'žádná') return;
     if (totalPopulation(this.world.buildings) < 400) return;
@@ -1641,19 +1685,75 @@ class Player {
     const mode = this.strategy.transit === 'autobusy' ? 'bus' : 'tram';
     const stopId = mode === 'bus' ? 'vanilla:transit_stop' : 'vanilla:tram_stop';
 
-    if (this.plan.lines.length === 0) {
-      if (!this.send({ type: 'create_line', mode })) return;
-      const line = this.world.lines[this.world.lines.length - 1];
-      if (!line) return;
-      this.plan.lines.push(line.id);
-      this.send({ type: 'set_vehicles', lineId: line.id, vehicles: 4 });
-      this.send({ type: 'set_fare', lineId: line.id, fare: 6 });
+    /*
+     * **Nejdřív vozovna.**
+     *
+     * Zastávka bez ní nejde postavit — `requirements.buildings` u ní žádá
+     * `vanilla:transit_depot`. Hráč to nevěděl a zkoušel rovnou zastávku, hra
+     * ji odmítla „nejdřív potřebuješ jinou budovu" a od té chvíle měl na ni
+     * čtyřletý klid. Výsledek: ve **všech 239 partiích** stála linka bez
+     * jediné zastávky, takže o MHD data neříkala vůbec nic. Přitom osa dopravy
+     * v nich vyšla jako rozdíl 55 proti 40 procentům přeživších měst — jenže
+     * ten rozdíl dělaly samotné budovy zastávek, ne doprava.
+     */
+    const depot = this.content.get('vanilla:transit_depot');
+    const hasDepot = [...this.world.buildings.values()].some(
+      (building) => building.definitionId === 'vanilla:transit_depot',
+    );
+    if (!hasDepot) {
+      if (!depot) return;
+      if (!this.canSpend(depot.construction.cost)) return;
+      this.place(depot);
+      return;
     }
 
-    const lineId = this.plan.lines[0];
-    if (lineId === undefined) return;
-    const line = this.world.lines.find((candidate) => candidate.id === lineId);
+    /*
+     * **Linka na každé dva tisíce lidí**, nejvýš čtyři.
+     *
+     * Jedna linka o deseti zastávkách obslouží kus města a dál je to jedno;
+     * hráč, který si za MHD platí, ji ve stotisícovém městě nenechá jednu.
+     * Deset zastávek je strop jedné linky, takže se další zakládá, až je ta
+     * dosavadní plná.
+     */
+    const wanted = Math.min(4, Math.floor(totalPopulation(this.world.buildings) / 2000) + 1);
+    const live = this.world.lines.filter((line) => this.plan.lines.includes(line.id));
+    const full = live.every((line) => line.stops.length >= 10);
+    if (live.length < wanted && (live.length === 0 || full)) {
+      if (!this.canSpend(2000)) return;
+      if (!this.send({ type: 'create_line', mode })) return;
+      const created = this.world.lines[this.world.lines.length - 1];
+      if (!created) return;
+      this.plan.lines.push(created.id);
+      this.send({ type: 'set_fare', lineId: created.id, fare: 6 });
+    }
+
+    /*
+     * **Vozidla se dokupují průběžně**, ne jednou při založení linky.
+     *
+     * Čtyři autobusy stojí 3 600 a hráč zakládal linku ve chvíli, kdy měl
+     * sotva na ni; nákup se odmítl pro nedostatek peněz a už se nikdy
+     * neopakoval. Linka pak stála s **nulou vozidel**, což znamená nulovou
+     * kapacitu, nikoho odvezeného a nulové jízdné — a přesně tak to vypadalo
+     * ve všech 74 partiích, kde linka vznikla. Osa dopravy tím neměřila
+     * dopravu, ale jen budovy zastávek.
+     *
+     * Vozidel je půldruhého na zastávku: dost, aby linka vezla, a málo na to,
+     * aby se jimi město prodražilo.
+     */
+    for (const line of this.world.lines) {
+      if (!this.plan.lines.includes(line.id)) continue;
+      if (line.stops.length < 2) continue;
+      const want = Math.max(2, Math.ceil(line.stops.length * 1.5));
+      if (line.vehicles >= want) continue;
+      const mode = this.balance.transit.modes[line.mode];
+      const price = (want - line.vehicles) * (mode?.vehicleCost ?? 0);
+      if (!this.canSpend(price)) continue;
+      this.send({ type: 'set_vehicles', lineId: line.id, vehicles: want });
+    }
+
+    const line = live.find((candidate) => candidate.stops.length < 10) ?? live[0];
     if (!line || line.stops.length >= 10) return;
+    const lineId = line.id;
 
     // Zastávka se nejdřív postaví, pak přidá na linku — přesně jako v rozhraní.
     const definition = this.content.get(stopId);
