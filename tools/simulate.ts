@@ -770,6 +770,7 @@ class Player {
     const powerShort = this.keepPower();
     if (!powerShort) this.trimUpkeep();
     this.keepWater();
+    if (process.env['SIM_NO_WASTE'] !== '1') this.keepWaste();
     // Zóna bez proudu a vody je vyhozená koruna, takže růst čeká na obojí.
     this.grow();
     // Potrubí **až po zónování**: čerstvě vyznačená parcela bez vody nezaroste
@@ -1070,6 +1071,95 @@ class Player {
     }
     if (!smallest) return;
     this.send({ type: 'bulldoze', x: smallest.x, y: smallest.y });
+  }
+
+  /**
+   * Odpad a kanalizace.
+   *
+   * **Nepokrytý odpad a odpadní voda se rozpustí do znečištění po celé mapě**
+   * (`systems/pollution.ts`), ne jen kolem města. Hráč, který skládku ani
+   * čističku nepostavil, měl ve dvacátém roce znečištění 153 z 255 **průměrně
+   * přes celou mapu** a 167 ve městě — a znečištění sráží cenu půdy, zdraví
+   * i spokojenost. Změřeno `tools/field-probe.ts`.
+   *
+   * Skládka ani čistička nemají `service.class`, takže je stavba služeb
+   * nenašla a v simulaci nikdy nevznikly. Byla to díra v hráči, ne ve hře.
+   *
+   * Skládka je levná a malá (120), spalovna drahá a velká (400): bere se ta,
+   * která zbytek pokryje. Čistička musí stát u vody jako vodárna.
+   */
+  private keepWaste(): void {
+    let population = 0;
+    let waste = 0;
+    let sewage = 0;
+    for (const building of this.world.buildings.values()) {
+      if (building.abandoned) continue;
+      population += building.population;
+      const definition = this.content.get(building.definitionId);
+      waste += definition?.waste?.capacity ?? 0;
+      sewage += definition?.sewage?.capacity ?? 0;
+    }
+    if (population === 0) return;
+
+    // Staví se **dokud kapacita nestačí**, nejvýš tři za rozhodnutí — město
+    // roste rychleji, než by stihla jedna skládka za měsíc. Ve dvacátém roce
+    // mělo 686 budov a znečištění bylo zpátky na 110, protože se dosypávalo
+    // po jedné.
+    /*
+     * **Řeší se, až když je co řešit.**
+     *
+     * Nepokrytý odpad se převádí na znečištění koeficientem 0,02, kanalizace
+     * 0,03 — u města o stovce lidí je to dvě desetiny bodu na buňku, tedy nic.
+     * Skládka za 900 a hlavně čistička za 6 000 i s cestou k břehu jsou přitom
+     * v druhém roce polovina rozpočtu. Hráč, který je stavěl hned, dovedl do
+     * konce 5 měst z 20 a některá umřela už v pátém roce; ten, který je
+     * nestavěl vůbec, 17 z 20. Práh je tedy „až to bude aspoň bod a půl
+     * znečištění", což u odpadu vyjde kolem sedmi set obyvatel.
+     */
+    const MATTERS = 1.5;
+
+    const wasteOptions = this.utilitiesBy((d) => d.waste?.capacity ?? 0);
+    for (let built = 0; built < 3; built++) {
+      const missing = population * this.balance.waste.perCitizen - waste;
+      if (missing * this.balance.waste.toPollution < MATTERS) break;
+      // Nejlevnější na jednotku kapacity: skládka vyjde na 7,5 za jednotku,
+      // spalovna na 11,25. Spalovna se vyplatí, až když dojde místo — a to
+      // hráč pozná tak, že se skládka nemá kam vejít.
+      const pick =
+        [...wasteOptions].sort(
+          (a, b) =>
+            a.construction.cost / Math.max(1, a.waste?.capacity ?? 1) -
+            b.construction.cost / Math.max(1, b.waste?.capacity ?? 1),
+        )[0] ?? wasteOptions[wasteOptions.length - 1];
+      void missing;
+      /*
+       * Skládka a spalovna se **neplatí z rezervy**, stejně jako elektrárna
+       * a vodárna. Nepokrytý odpad zamoří celou mapu, a znečištění sráží cenu
+       * půdy, zdraví i spokojenost — je to tedy výdaj, který drží město při
+       * životě, ne vylepšení. S rezervou se v růstové fázi nepostavily vůbec:
+       * ve dvacátém roce mělo město kapacitu **nula** proti potřebě 454.
+       */
+      if (!pick || this.world.economy.funds < pick.construction.cost * 3) break;
+      if (!this.placeAway(pick)) break;
+      waste += pick.waste?.capacity ?? 0;
+    }
+
+    const sewageOptions = this.utilitiesBy((d) => d.sewage?.capacity ?? 0);
+    for (let built = 0; built < 2; built++) {
+      const missing = population * this.balance.sewage.perCitizen - sewage;
+      if (missing * this.balance.sewage.toPollution < MATTERS) break;
+      const pick = sewageOptions[sewageOptions.length - 1];
+      if (!pick || this.world.economy.funds < pick.construction.cost * 3) break;
+      if (!this.place(pick)) break;
+      sewage += pick.sewage?.capacity ?? 0;
+    }
+  }
+
+  /** Stavby s danou kapacitou, vzestupně podle ní. */
+  private utilitiesBy(capacity: (definition: Definition) => number): Definition[] {
+    return [...this.content.byCategory('service'), ...this.content.byCategory('utility')]
+      .filter((definition) => capacity(definition) > 0)
+      .sort((a, b) => capacity(a) - capacity(b));
   }
 
   private keepWater(): void {
@@ -1801,6 +1891,36 @@ class Player {
    * všechno do jednoho rohu. Když se to nepovede, zkusí se srovnat terén —
    * to je taky jen tlačítko, které má člověk k dispozici.
    */
+  /**
+   * Postaví **co nejdál od středu města**.
+   *
+   * Skládka kouří za jedenadvacet, tedy dvakrát víc než uhelná elektrárna a
+   * třikrát víc než malá továrna. Postavená mezi domy srazí cenu půdy a s ní
+   * daňový výnos celé čtvrti: měřeno na dvaceti partiích, hráč, který skládky
+   * stavěl kamkoli, dovedl do konce 5 měst z 20, kdežto ten, který je nestavěl
+   * vůbec, 17 z 20 — přestože zamořil celou mapu. Člověk to řeší tím, že je
+   * odveze na kraj, a hráč to dělá taky.
+   */
+  private placeAway(definition: Definition): boolean {
+    const last = this.plan.tried.get(definition.id) ?? -TICKS_PER_YEAR;
+    if (this.world.tick - last < 180) return false;
+    this.plan.tried.set(definition.id, this.world.tick);
+
+    const spots = this.spotsFor(definition, this.plan.reach + 10).sort(
+      (a, b) =>
+        Math.max(Math.abs(b[0] - this.homeX), Math.abs(b[1] - this.homeY)) -
+        Math.max(Math.abs(a[0] - this.homeX), Math.abs(a[1] - this.homeY)),
+    );
+    for (const [x, y] of spots.slice(0, 8)) {
+      if (this.send({ type: 'place_building', definitionId: definition.id, x, y })) {
+        this.plan.tried.delete(definition.id);
+        return true;
+      }
+      if (this.plan.lastReason === 'error.notEnoughFunds') return false;
+    }
+    return false;
+  }
+
   private place(definition: Definition): boolean {
     // **Nejvýš jeden pokus za rok na budovu.**
     //
@@ -1872,6 +1992,14 @@ class Player {
         this.plan.tried.set(definition.id, this.world.tick + 4 * TICKS_PER_YEAR);
         return false;
       }
+      /*
+       * **Na co nejsou peníze, to se nezačne ani připravovat.**
+       *
+       * Bourání i rovnání se platí. Hráč po odmítnutí „nemáš na to" pokračoval
+       * a odvezl les i srovnal parcelu, na které stejně nepostavil — a příště
+       * zas. Utrácel tak za přípravu míst, která zůstala prázdná.
+       */
+      if (this.plan.lastReason === 'error.notEnoughFunds') return false;
 
       // Les, balvany, trosky: hráč je odveze buldozerem a zkusí to znovu.
       // Jen u prvních tří míst — jinak se za partii naklikalo přes milion
