@@ -21,6 +21,14 @@ const content = new ContentRegistry();
 await content.load(createVanillaSource());
 const balance = content.getBalance();
 
+/** Průměr pole. */
+function mean(values: Uint8Array | undefined): number {
+  if (!values || values.length === 0) return 0;
+  let sum = 0;
+  for (const value of values) sum += value;
+  return sum / values.length;
+}
+
 /** Co brání růstu na vyznačených parcelách, seřazené podle četnosti. */
 function blockers(world: WorldState): string {
   const counts: Record<string, number> = {};
@@ -64,8 +72,10 @@ for (const seed of seeds) {
     };
     let voda = 0;
     let vodaren = 0;
+    let opustenych = 0;
     for (const b of world.buildings.values()) {
       f.obyv += b.population;
+      if (b.abandoned) opustenych++;
       const d = content.get(b.definitionId);
       if ((d?.water?.production ?? 0) > 0) {
         vodaren++;
@@ -80,6 +90,11 @@ for (const seed of seeds) {
         `  napajeno ${String([...world.buildings.values()].filter((b) => b.powered).length).padStart(4)}` +
         `  dane ${world.economy.taxRates.residential}%` +
         `  voda ${voda}/${vodaren}` +
+        `  opust ${opustenych}` +
+        `  spokoj ${Math.round(mean(world.happiness))}` +
+        `  sluzby ${[...world.coverage.entries()]
+          .map(([k, v]) => `${k.slice(0, 3)}:${Math.round(mean(v))}`)
+          .join(' ')}` +
         `  ${blockers(world)}\n`,
     );
   });
