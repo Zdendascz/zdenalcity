@@ -1,4 +1,5 @@
 import type { Texture } from 'pixi.js';
+import { tileCorners } from '@/sim/heights';
 
 /**
  * Předmět, který stojí na terénu — strom nebo balvan.
@@ -73,4 +74,47 @@ export function decorShift(x: number, y: number): [number, number] {
   let h = Math.imul((x * 0x85ebca6b) ^ (y * 0xc2b2ae35), 0x27d4eb2f) >>> 0;
   h = (h ^ (h >>> 13)) >>> 0;
   return [((h & 15) / 15 - 0.5) / 1.5, (((h >>> 8) & 15) / 15 - 0.5) / 1.5];
+}
+
+/**
+ * Kterým směrem na obrazovce klesá země pod dlaždicí.
+ *
+ * `flat` je rovina, zbytek jsou čtyři hrany kosočtverce: `ur` vpravo nahoru,
+ * `lr` vpravo dolů, `ll` vlevo dolů, `ul` vlevo nahoru. Přesně tak se jmenují
+ * i obrázky suti kreslené do svahu (`docs/08-DLAZDICE.md`).
+ *
+ * Rohy dlaždice leží na obrazovce takhle: **nw nahoře, ne vpravo, sw vlevo,
+ * se dole**. Směr klesání se proto určí tak, že se najde **nejnižší hrana** —
+ * dvojice sousedních rohů s nejmenším součtem.
+ *
+ * Čtyři směry stačí. Dlaždice může klesat i k jednomu rohu, ale rozdíl mezi
+ * „klesá k rohu" a „klesá k nejbližší hraně" je půl dlaždice; rozdíl mezi
+ * plochou a nakloněnou hromadou je celá úroveň. Při shodě rozhoduje pevné
+ * pořadí, aby výběr nezávisel na ničem, co se mezi snímky mění (P2).
+ */
+export type RubbleSlope = 'flat' | 'ur' | 'lr' | 'll' | 'ul';
+
+export function rubbleSlope(
+  heights: Readonly<Uint8Array>,
+  x: number,
+  y: number,
+): RubbleSlope {
+  const [nw, ne, sw, se] = tileCorners(heights, x, y);
+  if (nw === ne && ne === sw && sw === se) return 'flat';
+
+  const edges: readonly [RubbleSlope, number][] = [
+    ['ur', nw + ne],
+    ['lr', ne + se],
+    ['ll', sw + se],
+    ['ul', nw + sw],
+  ];
+
+  let best: RubbleSlope = 'flat';
+  let lowest = Number.POSITIVE_INFINITY;
+  for (const [slope, sum] of edges) {
+    if (sum >= lowest) continue;
+    lowest = sum;
+    best = slope;
+  }
+  return best;
 }

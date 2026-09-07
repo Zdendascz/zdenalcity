@@ -102,6 +102,11 @@ DECOR = {
     'derelict_industrial': (2, 2, 3),
     # Sut: jedna hromada na dlazdici.
     'rubble_pile': (1, 1, 1),
+    # Tataz hromada nakreslena do svahu, ctyri smery klesani.
+    'rubble_slope_ur': (1, 1, 1),
+    'rubble_slope_lr': (1, 1, 1),
+    'rubble_slope_ll': (1, 1, 1),
+    'rubble_slope_ul': (1, 1, 1),
 }
 
 # Kolik z té dlaždice předmět skutečně zabere.
@@ -118,6 +123,11 @@ DECOR_SHARE = {
     'pileup_wreck': 0.95,
     # Hromada suti neni pres celou dlazdici: kolem ni ma byt videt rozryta zem.
     'rubble_pile': 0.8,
+    # Ve svahu se hromada rozlije po spadnici, takze je o kus sirsi.
+    'rubble_slope_ur': 0.9,
+    'rubble_slope_lr': 0.9,
+    'rubble_slope_ll': 0.9,
+    'rubble_slope_ul': 0.9,
     # Ohen ma prekryvat, co hori, ne prescuhovat na sousedni parcelu.
     'fire_blaze': 0.9,
 }

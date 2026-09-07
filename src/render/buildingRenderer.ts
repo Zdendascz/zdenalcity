@@ -18,8 +18,8 @@ import {
 import { areaHeightRange, groundHeightAt } from '@/sim/heights';
 import { depthOrder } from './depth';
 import type { DepthBox } from './depth';
-import { decorDensity, decorHere, decorPick, decorShift, decorTiles } from './decor';
-import type { TerrainDecor } from './decor';
+import { decorDensity, decorHere, decorPick, decorShift, decorTiles, rubbleSlope } from './decor';
+import type { RubbleSlope, TerrainDecor } from './decor';
 import { index, TERRAIN } from '@/sim/layers';
 import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
 
@@ -132,7 +132,7 @@ export class BuildingRenderer {
    */
   private decorByTerrain = new Map<number, TerrainDecor[]>();
   /** Hromady suti. Kreslí se na dlaždice s troskami, jedna na dlaždici. */
-  private rubblePiles: readonly TerrainDecor[] = [];
+  private rubblePiles: ReadonlyMap<RubbleSlope, readonly TerrainDecor[]> = new Map();
   /**
    * Kreslí se stromy a balvany?
    *
@@ -214,7 +214,7 @@ export class BuildingRenderer {
    * rozbitých věcí místo té textury udělej obrázky". Textura zůstala jako
    * rozrytá zem, hromada je to, co z toho dělá demolici a ne pole.
    */
-  setRubblePiles(piles: readonly TerrainDecor[]): void {
+  setRubblePiles(piles: ReadonlyMap<RubbleSlope, readonly TerrainDecor[]>): void {
     this.rubblePiles = piles;
     this.rebuildRubble();
     this.reorder();
@@ -272,17 +272,29 @@ export class BuildingRenderer {
     for (const id of [...this.views.keys()]) {
       if (id <= -offset) this.remove(id);
     }
-    if (this.rubblePiles.length === 0) return;
+    if (this.rubblePiles.size === 0) return;
 
     const rubble = this.world.rubble;
     for (let tile = 0; tile < rubble.length; tile++) {
       if ((rubble[tile] ?? 0) === 0) continue;
       const x = tile % size;
       const y = (tile - x) / size;
+
+      /*
+       * Podle sklonu dlaždice se vybere sada, teprve v ní varianta.
+       *
+       * Hromada kreslená do svahu má spodní hranu nakloněnou, takže sedne na
+       * výšku přesně pod svou patou jako strom. Rovná hromada takovou hranu
+       * nemá a musí na nejnižší roh, jinak jí polovina visí — o tom je celý
+       * `onGround`.
+       */
+      const slope = rubbleSlope(this.world.cornerHeight, x, y);
+      const set = this.rubblePiles.get(slope) ?? this.rubblePiles.get('flat') ?? [];
+      if (set.length === 0) continue;
       // Varianta ze souřadnic, ne z `world.rng`: musí vyjít stejně při každém
       // překreslení i po načtení savu, jinak by se suť při každém pohledu
       // přeskládala.
-      const pile = this.rubblePiles[decorPick(x, y) % this.rubblePiles.length];
+      const pile = set[decorPick(x, y) % set.length];
       if (pile === undefined) continue;
       this.placeDecor(-(tile + 1 + offset), x, y, pile, true);
     }
@@ -309,14 +321,17 @@ export class BuildingRenderer {
     y: number,
     decor: TerrainDecor,
     /**
-     * Leží předmět na zemi celou plochou, nebo se jí dotýká jen v jednom bodě?
+     * Vyplňuje předmět celou dlaždici, nebo se jí dotýká jen v jednom bodě?
      *
-     * Strom se země dotýká kmenem, takže mu stačí výška přesně pod patou.
-     * Hromada suti zabírá celou dlaždici a má **plochou spodní hranu**: na
-     * svahu pak polovina hromady visí ve vzduchu. Autor to popsal takhle —
-     * „suť je pořád nad kopcem, ne na stráni".
+     * Strom se země dotýká **kmenem**, tedy bodem uprostřed dlaždice — a tam
+     * taky patří jeho kotva. Hromada suti stojí na **celém kosočtverci** a její
+     * nejnižší bod je jižní roh dlaždice, přesně jako u budov. Kotvit ji
+     * doprostřed znamenalo posadit ji o půl dlaždice moc vysoko: hromada pak
+     * seděla nad severní půlkou dlaždice a přečuhovala nahoru. Autor to hlásil
+     * dvakrát — „zbořeniny v kopcích jsou úplně mimo" a „suť je pořád nad
+     * kopcem, ne na stráni" — a obojí bylo tímhle, ne sklonem terénu.
      */
-    onGround = false,
+    fillsTile = false,
   ): void {
     const sprite = new Sprite(decor.texture);
     sprite.anchor.set(decor.anchor[0] / decor.texture.width, decor.anchor[1] / decor.texture.height);
@@ -333,21 +348,18 @@ export class BuildingRenderer {
     // sečetlo a suť visela vedle své dlaždice — hlásil to autor slovy
     // „zbořeniny v kopcích jsou úplně mimo".
     const [shiftX, shiftY] = decorShift(x, y);
-    const fx = x + 0.5 + shiftX;
-    const fy = y + 0.5 + shiftY;
+    // Bodový předmět stojí uprostřed dlaždice, plošný na jejím jižním rohu.
+    // Posun se přidává oběma — dvě sousední hromady nemají stát v zákrytu.
+    const fx = (fillsTile ? x + 1 : x + 0.5) + shiftX;
+    const fy = (fillsTile ? y + 1 : y + 0.5) + shiftY;
     /*
-     * Plošný předmět sedá na **nejnižší roh dlaždice**, bodový na výšku přesně
-     * pod patou.
-     *
-     * Rozdíl je v tom, co je pod obrázkem. Strom má pod sebou jeden bod, takže
-     * interpolovaná výška je přesně ta správná. Hromada suti má plochou spodní
-     * hranu přes celou dlaždici, a ta na svahu nemůže sedět nikde jinde než na
-     * nejnižším rohu — jinak jí zbytek visí. Radši ať se do svahu zaboří, než
-     * aby nad ním plavala: zabořená suť vypadá jako suť na stráni, plovoucí
-     * jako chyba.
+     * Výška se bere tam, kde předmět **stojí**: u stromu přesně pod patou,
+     * u haldy v jižním rohu dlaždice, tedy v jejím nejnižším viditelném bodě.
+     * Ptát se na výšku i s posunem by u haldy znamenalo brát ji z cizí
+     * dlaždice, přes kterou halda jen přečuhuje.
      */
-    const pad = onGround
-      ? areaHeightRange(this.world.cornerHeight, x, y, 1, 1).min
+    const pad = fillsTile
+      ? groundHeightAt(this.world.cornerHeight, x + 1, y + 1)
       : groundHeightAt(this.world.cornerHeight, fx, fy);
     const at = gridToScreen(fx, fy, pad);
     sprite.position.set(at.x, at.y);

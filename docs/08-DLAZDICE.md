@@ -363,6 +363,66 @@ jako rozrytá zem; hromada je to, co z toho dělá demolici a ne pole.
 | **b** | A LOW SPREAD OF DEMOLITION DEBRIS: cracked concrete, splintered roof timbers, a bent radiator and a twisted window frame lying among broken bricks, filling the picture. |
 | **c** | A HEAP OF RUBBLE AND SCRAP: broken masonry, a crumpled sheet of corrugated iron, coils of wire and shattered tiles, about as tall as a man, filling the picture. |
 
+### Suť ve svahu
+
+Plochá hromada na nakloněné rovině sedět nemůže. Suť se proto do T104 sázela na
+**nejnižší roh dlaždice**, aby aspoň nevisela — jenže tím se zas trochu boří.
+Autor to popsal takhle: „je to lepší, ale ne dokonalé… nakresli ty slope
+varianty suti."
+
+Kreslí se tedy hromady, které **mají spodní hranu už nakloněnou**. Sklon je
+popsaný tím, kam na obrázku klesá země, protože přesně tak ho vidí i model:
+čtyři směry po hranách kosočtverce, tedy vpravo nahoru, vpravo dolů, vlevo dolů
+a vlevo nahoru.
+
+Čtyři směry stačí. Dlaždice může klesat i k jednomu rohu, ale rozdíl mezi
+„klesá k rohu" a „klesá k nejbližší hraně" je půl dlaždice na osmi pixelech —
+kdežto rozdíl mezi plochou a nakloněnou hromadou je celá úroveň. Renderer proto
+vybere nejbližší ze čtyř; rovná dlaždice dostane dál `rubble_pile`.
+
+Ostatní pravidla jsou stejná jako u `rubble_pile`: hnědá textura pod hromadou
+zůstává, hromada je nízká a odbarvená a kolem ní má být vidět rozrytá zem.
+
+### `rubble_slope_ur`
+
+Země klesá **vpravo nahoru**.
+
+| | prompt |
+|---|---|
+| **a** | A HEAP OF DEMOLITION RUBBLE LYING ON A SLOPE: the ground beneath it falls away towards the upper right of the picture, so the heap is thick and tall on its lower left side and thins out to a low tongue of spilled debris towards the upper right; broken concrete slabs with bent reinforcing bars sticking out, shattered bricks and grey dust, filling the picture. |
+| **b** | A LOW SPREAD OF DEMOLITION DEBRIS ON A SLOPE: the ground beneath it falls away towards the upper right of the picture, so the debris is banked up on the lower left and spills thin towards the upper right; cracked concrete, splintered roof timbers, a bent radiator and a twisted window frame lying among broken bricks, filling the picture. |
+| **c** | A HEAP OF RUBBLE AND SCRAP ON A SLOPE: the ground beneath it falls away towards the upper right of the picture, so the pile leans into the slope on its lower left and trails off towards the upper right; broken masonry, a crumpled sheet of corrugated iron, coils of wire and shattered tiles, filling the picture. |
+
+### `rubble_slope_lr`
+
+Země klesá **vpravo dolů**.
+
+| | prompt |
+|---|---|
+| **a** | A HEAP OF DEMOLITION RUBBLE LYING ON A SLOPE: the ground beneath it falls away towards the lower right of the picture, so the heap is thick and tall on its upper left side and thins out to a low tongue of spilled debris towards the lower right; broken concrete slabs with bent reinforcing bars sticking out, shattered bricks and grey dust, filling the picture. |
+| **b** | A LOW SPREAD OF DEMOLITION DEBRIS ON A SLOPE: the ground beneath it falls away towards the lower right of the picture, so the debris is banked up on the upper left and spills thin towards the lower right; cracked concrete, splintered roof timbers, a bent radiator and a twisted window frame lying among broken bricks, filling the picture. |
+| **c** | A HEAP OF RUBBLE AND SCRAP ON A SLOPE: the ground beneath it falls away towards the lower right of the picture, so the pile leans into the slope on its upper left and trails off towards the lower right; broken masonry, a crumpled sheet of corrugated iron, coils of wire and shattered tiles, filling the picture. |
+
+### `rubble_slope_ll`
+
+Země klesá **vlevo dolů**.
+
+| | prompt |
+|---|---|
+| **a** | A HEAP OF DEMOLITION RUBBLE LYING ON A SLOPE: the ground beneath it falls away towards the lower left of the picture, so the heap is thick and tall on its upper right side and thins out to a low tongue of spilled debris towards the lower left; broken concrete slabs with bent reinforcing bars sticking out, shattered bricks and grey dust, filling the picture. |
+| **b** | A LOW SPREAD OF DEMOLITION DEBRIS ON A SLOPE: the ground beneath it falls away towards the lower left of the picture, so the debris is banked up on the upper right and spills thin towards the lower left; cracked concrete, splintered roof timbers, a bent radiator and a twisted window frame lying among broken bricks, filling the picture. |
+| **c** | A HEAP OF RUBBLE AND SCRAP ON A SLOPE: the ground beneath it falls away towards the lower left of the picture, so the pile leans into the slope on its upper right and trails off towards the lower left; broken masonry, a crumpled sheet of corrugated iron, coils of wire and shattered tiles, filling the picture. |
+
+### `rubble_slope_ul`
+
+Země klesá **vlevo nahoru**.
+
+| | prompt |
+|---|---|
+| **a** | A HEAP OF DEMOLITION RUBBLE LYING ON A SLOPE: the ground beneath it falls away towards the upper left of the picture, so the heap is thick and tall on its lower right side and thins out to a low tongue of spilled debris towards the upper left; broken concrete slabs with bent reinforcing bars sticking out, shattered bricks and grey dust, filling the picture. |
+| **b** | A LOW SPREAD OF DEMOLITION DEBRIS ON A SLOPE: the ground beneath it falls away towards the upper left of the picture, so the debris is banked up on the lower right and spills thin towards the upper left; cracked concrete, splintered roof timbers, a bent radiator and a twisted window frame lying among broken bricks, filling the picture. |
+| **c** | A HEAP OF RUBBLE AND SCRAP ON A SLOPE: the ground beneath it falls away towards the upper left of the picture, so the pile leans into the slope on its lower right and trails off towards the upper left; broken masonry, a crumpled sheet of corrugated iron, coils of wire and shattered tiles, filling the picture. |
+
 ## Katastrofy na ulici
 
 Nepřírodní katastrofy se odehrávají **na silnici**: hromadná nehoda na

@@ -14,7 +14,7 @@ import {
   tileBaseHeight,
   tileCorners,
 } from '@/sim/heights';
-import { gridToScreen, skirtFaces } from '@/render/projection';
+import { gridToScreen, skirtFaces, TILE_H } from '@/render/projection';
 import { index } from '@/sim/layers';
 import { applyHeightChanges, createWorld } from '@/sim/world';
 import { MAP_SIZE, CORNER_SIZE, CORNER_CELLS } from './support/grid';
@@ -295,48 +295,34 @@ describe('výška terénu pod předmětem', () => {
 });
 
 /**
- * Na jaké výšce leží hromada suti.
+ * Kam patří kotva hromady suti.
  *
- * Suť má **plochou spodní hranu přes celou dlaždici**, na rozdíl od stromu,
- * který se země dotýká jedním bodem. Interpolovaná výška pod patou je proto
- * pro strom správně, ale pro suť ne: na svahu jí polovina visí ve vzduchu a
- * autor to nahlásil slovy „suť je pořád nad kopcem, ne na stráni".
+ * Strom se země dotýká **kmenem**, tedy bodem uprostřed dlaždice. Hromada suti
+ * stojí na **celém kosočtverci** a její nejnižší bod je jižní roh dlaždice —
+ * přesně jako u budovy s obrázkem. Kotvená doprostřed seděla o půl dlaždice
+ * moc vysoko a přečuhovala nad severní půlku; autor to hlásil dvakrát,
+ * „zbořeniny v kopcích jsou úplně mimo" a „suť je pořád nad kopcem, ne na
+ * stráni", a obojí bylo tímhle, ne sklonem terénu.
  *
- * Pravidlo je proto **nejnižší roh dlaždice**. Radši ať se hromada do svahu
- * zaboří, než aby nad ním plavala — zabořená suť vypadá jako suť na stráni,
- * plovoucí vypadá jako chyba.
+ * Půl dlaždice je v téhle projekci **šestnáct pixelů**, tedy přesně tolik, co
+ * jedna úroveň výšky — proto to vypadalo jako chyba ve výšce a hledalo se to
+ * ve sklonu.
  */
-describe('suť na svahu nesmí viset', () => {
-  /** Dlaždice (3,3), jejíž severozápadní roh je o dvě úrovně výš. */
-  function slopedTile(): Uint8Array {
-    const heights = createCornerHeights(MAP_SIZE);
-    heights[cornerIndex(3, 3, CORNER_SIZE)] = 2;
-    return heights;
-  }
-
-  it('nejnižší roh je pod terénem v celé dlaždici, výška pod patou ne', () => {
-    const heights = slopedTile();
-    const { min, max } = areaHeightRange(heights, 3, 3, 1, 1);
-    expect(min).toBe(0);
-    expect(max).toBe(2);
-
-    // Výška přesně pod patou hromady je někde uprostřed, takže část dlaždice
-    // je pod ní — a přes tu část hromada visí.
-    const foot = groundHeightAt(heights, 3.5, 3.5);
-    expect(foot).toBeGreaterThan(min);
-    expect(groundHeightAt(heights, 3, 3)).toBeGreaterThan(foot);
-
-    // Nejnižší roh takový bod nemá: hromada nikde nevisí.
-    for (let fx = 3; fx <= 4; fx += 0.25) {
-      for (let fy = 3; fy <= 4; fy += 0.25) {
-        expect(groundHeightAt(heights, fx, fy), `${fx},${fy}`).toBeGreaterThanOrEqual(min);
-      }
-    }
+describe('kotva hromady suti', () => {
+  it('střed dlaždice leží o půl dlaždice výš než její jižní roh', () => {
+    const centre = gridToScreen(5.5, 5.5, 0);
+    const south = gridToScreen(6, 6, 0);
+    expect(south.x).toBe(centre.x);
+    expect(south.y - centre.y).toBe(TILE_H / 2);
   });
 
-  it('na rovné dlaždici je nejnižší roh i výška pod patou totéž', () => {
+  it('jižní roh je bod, ve kterém se hromada dotýká země', () => {
+    // Výška se bere v rohu, ne s posunem: hromada přes sousední dlaždici jen
+    // přečuhuje a její výšku brát nemá.
     const heights = createCornerHeights(MAP_SIZE);
-    expect(areaHeightRange(heights, 5, 5, 1, 1).min).toBe(groundHeightAt(heights, 5.5, 5.5));
+    heights[cornerIndex(6, 6, CORNER_SIZE)] = 2;
+    expect(groundHeightAt(heights, 6, 6)).toBe(2);
+    expect(groundHeightAt(heights, 5.5, 5.5)).toBeLessThan(2);
   });
 });
 

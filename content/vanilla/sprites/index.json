@@ -2379,6 +2379,138 @@
       ]
     },
     {
+      "building": "rubble_slope_ll",
+      "variant": "a",
+      "file": "rubble_slope_ll__a.png",
+      "width": 230,
+      "height": 213,
+      "anchor": [
+        115,
+        213
+      ]
+    },
+    {
+      "building": "rubble_slope_ll",
+      "variant": "b",
+      "file": "rubble_slope_ll__b.png",
+      "width": 230,
+      "height": 227,
+      "anchor": [
+        115,
+        227
+      ]
+    },
+    {
+      "building": "rubble_slope_ll",
+      "variant": "c",
+      "file": "rubble_slope_ll__c.png",
+      "width": 230,
+      "height": 225,
+      "anchor": [
+        115,
+        225
+      ]
+    },
+    {
+      "building": "rubble_slope_lr",
+      "variant": "a",
+      "file": "rubble_slope_lr__a.png",
+      "width": 230,
+      "height": 222,
+      "anchor": [
+        115,
+        222
+      ]
+    },
+    {
+      "building": "rubble_slope_lr",
+      "variant": "b",
+      "file": "rubble_slope_lr__b.png",
+      "width": 230,
+      "height": 227,
+      "anchor": [
+        115,
+        227
+      ]
+    },
+    {
+      "building": "rubble_slope_lr",
+      "variant": "c",
+      "file": "rubble_slope_lr__c.png",
+      "width": 230,
+      "height": 215,
+      "anchor": [
+        115,
+        215
+      ]
+    },
+    {
+      "building": "rubble_slope_ul",
+      "variant": "a",
+      "file": "rubble_slope_ul__a.png",
+      "width": 230,
+      "height": 216,
+      "anchor": [
+        115,
+        216
+      ]
+    },
+    {
+      "building": "rubble_slope_ul",
+      "variant": "b",
+      "file": "rubble_slope_ul__b.png",
+      "width": 230,
+      "height": 218,
+      "anchor": [
+        115,
+        218
+      ]
+    },
+    {
+      "building": "rubble_slope_ul",
+      "variant": "c",
+      "file": "rubble_slope_ul__c.png",
+      "width": 230,
+      "height": 218,
+      "anchor": [
+        115,
+        218
+      ]
+    },
+    {
+      "building": "rubble_slope_ur",
+      "variant": "a",
+      "file": "rubble_slope_ur__a.png",
+      "width": 230,
+      "height": 191,
+      "anchor": [
+        115,
+        191
+      ]
+    },
+    {
+      "building": "rubble_slope_ur",
+      "variant": "b",
+      "file": "rubble_slope_ur__b.png",
+      "width": 230,
+      "height": 218,
+      "anchor": [
+        115,
+        218
+      ]
+    },
+    {
+      "building": "rubble_slope_ur",
+      "variant": "c",
+      "file": "rubble_slope_ur__c.png",
+      "width": 230,
+      "height": 223,
+      "anchor": [
+        115,
+        223
+      ]
+    },
+    {
       "building": "ruin_1x1",
       "variant": "a",
       "file": "ruin_1x1__a.png",

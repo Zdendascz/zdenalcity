@@ -167,6 +167,11 @@ OBJECT_NAMES = (
     'derelict_commercial',
     'derelict_industrial',
     'rubble_pile',
+    # Suť ve svahu: čtyři směry, do kterých země klesá.
+    'rubble_slope_ur',
+    'rubble_slope_lr',
+    'rubble_slope_ll',
+    'rubble_slope_ul',
 )
 
 

@@ -391,21 +391,29 @@ místo se musí ptát se stejným posunem, s jakým se pak kreslí.
 
 ### T103: suť je plocha, ne bod
 
-Jedno pravidlo pro obojí nestačilo. Strom se země dotýká **kmenem**, tedy
-jedním bodem, a výška přesně pod patou je pro něj správně. Hromada suti má ale
-**plochou spodní hranu přes celou dlaždici** — je to kulatá halda, která
-dlaždici vyplní — a plochá hrana na nakloněné rovině sedět nemůže: na výšce
-pod patou jí polovina visí ve vzduchu. Autor to nahlásil slovy „suť je pořád
-nad kopcem, ne na stráni".
+Jedno pravidlo pro obojí nestačilo — a chyba byla jinde, než se zdálo.
 
-Suť proto sedá na **nejnižší roh dlaždice**. Radši ať se do svahu zaboří, než
-aby nad ním plavala: zabořená halda vypadá jako suť na stráni, plovoucí vypadá
-jako chyba. Na rovné dlaždici vyjde nejnižší roh a výška pod patou stejně,
-takže se v rovině nezměnilo nic.
+**Kotva.** Strom se země dotýká **kmenem**, tedy bodem uprostřed dlaždice.
+Hromada suti stojí na **celém kosočtverci** a její nejnižší bod je jižní roh
+dlaždice, přesně jako u budovy s obrázkem. Kotvená doprostřed seděla o půl
+dlaždice moc vysoko a přečuhovala nad severní půlku. Půl dlaždice je v téhle
+projekci **šestnáct pixelů**, tedy přesně tolik co jedna úroveň výšky — proto
+to vypadalo jako chyba ve výšce a hledalo se to marně ve sklonu terénu.
 
-Kreslit suť zvlášť pro každý sklon (osm tvarů × tři varianty) by šlo, ale
-neplatí se to: rozdíl mezi zabořenou haldou a haldou tvarovanou do svahu je
-mnohem menší než rozdíl mezi zabořenou a plovoucí.
+Změřeno na statickém náhledu (`gridToScreen` + kotva spritu + `DECOR_SHARE`,
+tedy tatáž geometrie, kterou počítá renderer): s kotvou uprostřed leží hromada
+nad dlaždicí i na dokonalé rovině.
+
+**Obrázky do svahu.** I se správnou kotvou má plochá halda plochou spodní
+hranu, kterou na nakloněné rovině nesloží. Vznikly proto čtyři sady kreslené
+do svahu — `rubble_slope_ur`, `_lr`, `_ll`, `_ul` — pojmenované podle toho,
+**kam na obrazovce klesá země**. Rohy dlaždice leží na obrazovce takhle: nw
+nahoře, ne vpravo, sw vlevo, se dole; vybírá se podle **nejnižší hrany**
+kosočtverce (`rubbleSlope` v `render/decor.ts`).
+
+Čtyři směry stačí. Dlaždice může klesat i k jednomu rohu, ale rozdíl mezi
+„klesá k rohu" a „klesá k nejbližší hraně" je půl dlaždice; rozdíl mezi plochou
+a nakloněnou hromadou je celá úroveň. Rovná dlaždice dostane dál `rubble_pile`.
 
 ## Obrázek požáru
 

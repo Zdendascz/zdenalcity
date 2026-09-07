@@ -996,8 +996,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (scenes.size > 0) disasterScenes.setScenes(scenes);
   });
 
-  void loadObject(content, 'rubble_pile').then((piles) => {
-    if (piles.length > 0) buildingRenderer.setRubblePiles(piles);
+  /*
+   * Suť: hromada pro rovinu a čtyři hromady kreslené do svahu.
+   *
+   * Klíč je **směr, kterým na obrazovce klesá země** — `flat`, `ur`, `lr`,
+   * `ll`, `ul`. Renderer si podle rohů dlaždice vybere, kterou sadu vzít;
+   * chybějící sada nevadí, spadne zpátky na rovnou hromadu (P5, mod nemusí
+   * dodat všechny).
+   */
+  void Promise.all(
+    (['flat', 'ur', 'lr', 'll', 'ul'] as const).map((slope) =>
+      loadObject(content, slope === 'flat' ? 'rubble_pile' : `rubble_slope_${slope}`).then(
+        (piles) => [slope, piles] as const,
+      ),
+    ),
+  ).then((sets) => {
+    const piles = new Map(sets.filter(([, list]) => list.length > 0));
+    if (piles.size > 0) buildingRenderer.setRubblePiles(piles);
   });
 
   void loadRoadMaterials(content).then((materials) => {
