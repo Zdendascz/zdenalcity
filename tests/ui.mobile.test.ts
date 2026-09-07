@@ -73,6 +73,7 @@ function callbacks(): HudCallbacks & { zoomed: number[]; speeds: number[]; views
 }
 
 const STATE: HudState = {
+  demandTerms: [],
   speedIndex: 1,
   layer: 'none',
   view: 'surface',

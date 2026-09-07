@@ -2,6 +2,7 @@ import type { ZoneType } from '@/sim/layers';
 import { ZONE } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { averageHappiness } from '@/sim/systems/happiness';
+import type { DemandBreakdown } from '@/sim/diagnostics';
 import { totalJobs, totalPopulation } from '@/sim/world';
 import { button, el } from './dom';
 import { formatNumber } from './format';
@@ -134,6 +135,13 @@ export interface HudState {
   powerNeeded: number;
   /** Financování podle třídy služby, 0–1. */
   funding: ReadonlyMap<string, number>;
+  /**
+   * Z čeho vyšly sloupečky poptávky.
+   *
+   * Hráč hlásil, že „váhy se zdají chaotické". Nejsou — jen z jednoho čísla
+   * není poznat, co ho udělalo. Sloupec to proto řekne po najetí myší.
+   */
+  demandTerms: readonly DemandBreakdown[];
   /** Už přeložená hláška o uložení či načtení. Prázdná = nic nezobrazovat. */
   message: string;
 }
@@ -298,6 +306,7 @@ export class Hud {
     financeVisible: false,
     transitVisible: false,
     disastersEnabled: true,
+    demandTerms: [],
     ghost: false,
     decor: true,
     grid: false,
@@ -432,6 +441,16 @@ export class Hud {
         // Poptávka je v <−100, 100>; sloupec roste nahoru pro kladnou, dolů pro zápornou.
         bar.style.height = `${Math.min(100, Math.abs(value))}%`;
         bar.classList.toggle('is-negative', value < 0);
+      }
+
+      // Popisek se přepisuje při každé změně, protože se mění i čísla v něm.
+      const column = this.values.get(`demand-column-${row.category}`);
+      const breakdown = state.demandTerms.find((item) => item.category === row.category);
+      if (column && breakdown) {
+        const lines = breakdown.terms.map(
+          (term) => `${this.i18n.t(term.key)}: ${term.value > 0 ? '+' : ''}${term.value}`,
+        );
+        column.title = [`${this.i18n.t(row.labelKey)}: ${value}`, ...lines].join('\n');
       }
     }
 
@@ -688,9 +707,9 @@ export class Hud {
 
       const value = el('span', 'demand__value', '0');
       column.append(track, el('span', 'demand__label', this.i18n.t(row.labelKey)), value);
-      column.title = `${this.i18n.t('ui.hud.demand')}: ${this.i18n.t(row.labelKey)}`;
       bars.appendChild(column);
 
+      this.values.set(`demand-column-${row.category}`, column);
       this.values.set(`demand-bar-${row.category}`, bar);
       this.values.set(`demand-value-${row.category}`, value);
     }

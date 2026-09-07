@@ -12,8 +12,13 @@ import {
   unpackSave,
 } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
-import { estimatePlacement, estimateRoad, estimateZoning } from '@/sim/commands';
-import { alertTarget, explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
+import {
+  estimateCornerHeight,
+  estimatePlacement,
+  estimateRoad,
+  estimateZoning,
+} from '@/sim/commands';
+import { alertTarget, explainDemand, explainParcel, growthBlocker, worstBlocker } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
@@ -2460,6 +2465,33 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       // čitelná při plném přiblížení i oddálení.
       const radius = CORNER_MARK_SIZE / camera.zoom;
 
+      /*
+       * **Kaskáda se ukáže dřív, než se klikne.**
+       *
+       * Zvednutí rohu táhne sousedy, aby si terén udržel spád po jedné úrovni,
+       * a hráč hlásil „nevím, co všechno se stane, než kliknu". Odhad, ze
+       * kterého se počítá cena, přesně tenhle seznam rohů vrací — tak se
+       * rovnou nakreslí. Zasažené rohy slabě, ten pod kurzorem naplno.
+       */
+      const delta = activeTool.action.kind === 'terraform' ? activeTool.action.delta : 0;
+      const plan = estimateCornerHeight(simWorld, corner.x, corner.y, delta, content.getBalance());
+      const side = world.size + 1;
+      for (const changed of plan.changes.keys()) {
+        const cx = changed % side;
+        const cy = (changed - cx) / side;
+        if (cx === corner.x && cy === corner.y) continue;
+        const spot = gridToScreen(cx, cy, world.cornerHeight[changed] ?? 0);
+        const small = radius * 0.6;
+        hover
+          .poly([
+            spot.x, spot.y - small,
+            spot.x + small, spot.y,
+            spot.x, spot.y + small,
+            spot.x - small, spot.y,
+          ])
+          .fill({ color: CORNER_MARK_COLOR, alpha: 0.35 });
+      }
+
       hover
         .poly([
           at.x, at.y - radius,
@@ -2470,7 +2502,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         .fill({ color: CORNER_MARK_COLOR, alpha: 0.9 })
         .stroke({ color: 0x000000, alpha: 0.5, width: 1 / camera.zoom });
 
-      priceTag.hide();
+      // Cena předem, stejně jako u staveb: kaskáda se platí po rozích a hráč
+      // má vědět kolik, ne to zjistit z kasy po kliknutí.
+      if (plan.cost > 0) priceTag.show(pointerX, pointerY, formatNumber(plan.cost));
+      else priceTag.hide();
     } else if (hoveredTile) {
       // Rámeček kreslí **každou dlaždici půdorysu zvlášť a podle jejích čtyř
       // rohů**. Dřív to byl jeden plochý kosočtverec v jedné výšce, takže na
@@ -2545,6 +2580,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     hud.update({
       powerProduced,
       powerNeeded,
+      // Rozpad poptávky se počítá tady, ne v HUD: potřebuje katalog i balanc.
+      demandTerms: explainDemand(simWorld, content, content.getBalance()),
       speedIndex,
       layer: layerMode,
       view: viewMode,

@@ -7,6 +7,7 @@ import { buildRoad, zoneArea } from '@/sim/commands';
 import { coarseIndex } from '@/sim/coarse';
 import {
   alertTarget,
+  explainDemand,
   explainLandValue,
   explainParcel,
   growthBlocker,
@@ -339,5 +340,43 @@ describe('kam ukázat po katastrofě', () => {
     placeBuilding(world, definition, 44, 44);
 
     expect(alertTarget(world, 5, 120)).toEqual({ x: 42, y: 42 });
+  });
+});
+
+/**
+ * Z čeho vyšly sloupečky O/K/P.
+ *
+ * Hráč to hlásil takhle: „váhy, co je kdy potřeba, se zdají chaotické."
+ * Model je přitom tři řádky a stojí na jediné myšlence — lidé chtějí práci
+ * a práce chce lidi. Rozpad se počítá **týmiž vzorci jako poptávka**, takže
+ * se s ní nemůže rozejít.
+ */
+describe('rozpad poptávky', () => {
+  it('pojmenuje sčítance a čísla sedí s tím, co ve městě stojí', async () => {
+    const content = await vanilla();
+    const balance = content.getBalance();
+    const world = createWorld(1, balance.economy);
+
+    const shop = content.get('vanilla:commercial_small');
+    expect(shop).toBeDefined();
+    if (!shop) return;
+    placeBuilding(world, shop, 20, 20);
+    const built = [...world.buildings.values()][0];
+    expect(built).toBeDefined();
+    if (!built) return;
+    built.jobs = 30;
+
+    const rows = explainDemand(world, content, balance);
+    const commercial = rows.find((row) => row.category === 'commercial');
+    expect(commercial).toBeDefined();
+    // Obchod bez obyvatel: zákazníci nula, míst třicet, tedy záporná poptávka.
+    expect(commercial?.terms.map((term) => term.key)).toEqual([
+      'ui.demand.term.shoppers',
+      'ui.demand.term.shops',
+    ]);
+    expect(commercial?.terms[1]?.value).toBe(-30);
+
+    const industrial = rows.find((row) => row.category === 'industrial');
+    expect(industrial?.terms[1]?.value, 'místa se odčítají').toBe(-30);
   });
 });

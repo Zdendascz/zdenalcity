@@ -13,6 +13,7 @@ import { roadReach } from './systems/growth';
 import { waterProximity } from './systems/landValue';
 import type { WorldState } from './world';
 import { roadCapacityFactor } from './transit';
+import { happinessDemandFactor } from './systems/happiness';
 
 /**
  * Diagnostika parcely (§12 zadání fáze 2).
@@ -575,4 +576,85 @@ function cityCentre(world: WorldState): { x: number; y: number } | null {
   }
   if (count === 0) return null;
   return { x: Math.round(sumX / count), y: Math.round(sumY / count) };
+}
+
+/** Jeden sčítanec poptávky: čím je a kolik dělá. */
+export interface DemandTerm {
+  /** Lokalizační klíč popisku, např. `ui.demand.term.jobs`. */
+  key: string;
+  value: number;
+}
+
+/** Rozpad poptávky jedné zóny na to, z čeho vyšla. */
+export interface DemandBreakdown {
+  category: RciCategory;
+  value: number;
+  terms: DemandTerm[];
+}
+
+/**
+ * Z čeho vyšly sloupečky O/K/P.
+ *
+ * Hráč to hlásil takhle: „váhy, co je kdy potřeba, se zdají chaotické… přijde
+ * mi to víceméně náhodné." Náhodné to není — model je tři řádky (`demand.ts`)
+ * a stojí na jediné myšlence, že **lidé chtějí práci a práce chce lidi**.
+ * Jenže z jednoho čísla se to nepozná, a tak to hra musí říct sama.
+ *
+ * Počítá se **stejnými vzorci jako samotná poptávka**, ne odhadem: kdyby se
+ * rozpad počítal zvlášť, rozešel by se s ní při první změně balancu.
+ */
+export function explainDemand(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  balance: Balance,
+): DemandBreakdown[] {
+  const { workerRatio, baseResidential, commercePerCapita } = balance.demand;
+
+  let population = 0;
+  let jobs = 0;
+  let commercialJobs = 0;
+  for (const building of world.buildings.values()) {
+    population += building.population;
+    jobs += building.jobs;
+    if (catalogue.get(building.definitionId)?.category === 'commercial') {
+      commercialJobs += building.jobs;
+    }
+  }
+
+  const workers = Math.round(population * workerRatio);
+  const shoppers = Math.round(population * commercePerCapita);
+
+  return [
+    {
+      category: 'residential',
+      value: world.demand.residential,
+      terms: [
+        { key: 'ui.demand.term.base', value: baseResidential },
+        { key: 'ui.demand.term.jobs', value: jobs },
+        { key: 'ui.demand.term.workers', value: -workers },
+        // Spokojenost násobí jen **kladnou** poptávku: přebytek bytů s náladou
+        // nesouvisí. V procentech, ať se to dá přečíst.
+        {
+          key: 'ui.demand.term.happiness',
+          value: Math.round(happinessDemandFactor(world, balance) * 100),
+        },
+      ],
+    },
+    {
+      category: 'commercial',
+      value: world.demand.commercial,
+      terms: [
+        { key: 'ui.demand.term.shoppers', value: shoppers },
+        { key: 'ui.demand.term.shops', value: -commercialJobs },
+      ],
+    },
+    {
+      category: 'industrial',
+      value: world.demand.industrial,
+      terms: [
+        { key: 'ui.demand.term.workers', value: workers },
+        { key: 'ui.demand.term.jobs', value: -jobs },
+      ],
+    },
+  ];
 }
