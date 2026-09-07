@@ -3,6 +3,39 @@
   "scale": 4,
   "sprites": [
     {
+      "building": "blast_smoke",
+      "variant": "a",
+      "file": "blast_smoke__a.png",
+      "width": 230,
+      "height": 231,
+      "anchor": [
+        115,
+        231
+      ]
+    },
+    {
+      "building": "blast_smoke",
+      "variant": "b",
+      "file": "blast_smoke__b.png",
+      "width": 230,
+      "height": 241,
+      "anchor": [
+        115,
+        241
+      ]
+    },
+    {
+      "building": "blast_smoke",
+      "variant": "c",
+      "file": "blast_smoke__c.png",
+      "width": 230,
+      "height": 229,
+      "anchor": [
+        115,
+        229
+      ]
+    },
+    {
       "building": "boulders",
       "variant": "a",
       "file": "boulders__a.png",
@@ -726,6 +759,39 @@
       "anchor": [
         256,
         481
+      ]
+    },
+    {
+      "building": "epidemic_care",
+      "variant": "a",
+      "file": "epidemic_care__a.png",
+      "width": 230,
+      "height": 206,
+      "anchor": [
+        115,
+        206
+      ]
+    },
+    {
+      "building": "epidemic_care",
+      "variant": "b",
+      "file": "epidemic_care__b.png",
+      "width": 230,
+      "height": 230,
+      "anchor": [
+        115,
+        230
+      ]
+    },
+    {
+      "building": "epidemic_care",
+      "variant": "c",
+      "file": "epidemic_care__c.png",
+      "width": 230,
+      "height": 183,
+      "anchor": [
+        115,
+        183
       ]
     },
     {
@@ -1488,6 +1554,39 @@
       ]
     },
     {
+      "building": "landslide_earth",
+      "variant": "a",
+      "file": "landslide_earth__a.png",
+      "width": 256,
+      "height": 255,
+      "anchor": [
+        128,
+        255
+      ]
+    },
+    {
+      "building": "landslide_earth",
+      "variant": "b",
+      "file": "landslide_earth__b.png",
+      "width": 256,
+      "height": 229,
+      "anchor": [
+        128,
+        229
+      ]
+    },
+    {
+      "building": "landslide_earth",
+      "variant": "c",
+      "file": "landslide_earth__c.png",
+      "width": 256,
+      "height": 252,
+      "anchor": [
+        128,
+        252
+      ]
+    },
+    {
       "building": "vanilla:metro_station",
       "variant": "a",
       "file": "metro_station__a.png",
@@ -1888,10 +1987,10 @@
       "variant": "a",
       "file": "residential_estate__a.png",
       "width": 768,
-      "height": 757,
+      "height": 576,
       "anchor": [
-        384,
-        757
+        386,
+        576
       ]
     },
     {
@@ -1899,10 +1998,10 @@
       "variant": "b",
       "file": "residential_estate__b.png",
       "width": 768,
-      "height": 475,
+      "height": 556,
       "anchor": [
-        384,
-        475
+        391,
+        556
       ]
     },
     {
@@ -1910,10 +2009,10 @@
       "variant": "c",
       "file": "residential_estate__c.png",
       "width": 768,
-      "height": 611,
+      "height": 837,
       "anchor": [
-        408,
-        611
+        387,
+        837
       ]
     },
     {
@@ -2676,6 +2775,72 @@
       ]
     },
     {
+      "building": "spill_hazmat",
+      "variant": "a",
+      "file": "spill_hazmat__a.png",
+      "width": 243,
+      "height": 245,
+      "anchor": [
+        121,
+        245
+      ]
+    },
+    {
+      "building": "spill_hazmat",
+      "variant": "b",
+      "file": "spill_hazmat__b.png",
+      "width": 243,
+      "height": 238,
+      "anchor": [
+        121,
+        238
+      ]
+    },
+    {
+      "building": "spill_hazmat",
+      "variant": "c",
+      "file": "spill_hazmat__c.png",
+      "width": 243,
+      "height": 233,
+      "anchor": [
+        121,
+        233
+      ]
+    },
+    {
+      "building": "strike_picket",
+      "variant": "a",
+      "file": "strike_picket__a.png",
+      "width": 218,
+      "height": 203,
+      "anchor": [
+        109,
+        203
+      ]
+    },
+    {
+      "building": "strike_picket",
+      "variant": "b",
+      "file": "strike_picket__b.png",
+      "width": 218,
+      "height": 221,
+      "anchor": [
+        109,
+        221
+      ]
+    },
+    {
+      "building": "strike_picket",
+      "variant": "c",
+      "file": "strike_picket__c.png",
+      "width": 218,
+      "height": 233,
+      "anchor": [
+        109,
+        233
+      ]
+    },
+    {
       "building": "vanilla:theatre",
       "variant": "a",
       "file": "theatre__a.png",
@@ -2706,6 +2871,39 @@
       "anchor": [
         254,
         353
+      ]
+    },
+    {
+      "building": "tornado_funnel",
+      "variant": "a",
+      "file": "tornado_funnel__a.png",
+      "width": 179,
+      "height": 182,
+      "anchor": [
+        89,
+        182
+      ]
+    },
+    {
+      "building": "tornado_funnel",
+      "variant": "b",
+      "file": "tornado_funnel__b.png",
+      "width": 179,
+      "height": 188,
+      "anchor": [
+        89,
+        188
+      ]
+    },
+    {
+      "building": "tornado_funnel",
+      "variant": "c",
+      "file": "tornado_funnel__c.png",
+      "width": 179,
+      "height": 201,
+      "anchor": [
+        89,
+        201
       ]
     },
     {

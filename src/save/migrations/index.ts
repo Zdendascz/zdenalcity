@@ -203,7 +203,7 @@ const migrateV5ToV6: Migration = (save) => ({
       infection: [],
       rubbleOf: [],
     },
-    transit: { lines: [], nextLineId: 1 },
+    transit: { lines: [], nextLineId: 1, lostStops: [] },
     finance: {
       loans: [],
       nextLoanId: 1,
@@ -296,6 +296,22 @@ const migrateV8ToV9: Migration = (save) => ({
   },
 });
 
+/**
+ * v9 → v10: paměť na zbořené zastávky (`lostStops`).
+ *
+ * Starý save ji nemá a mít nemůže — je to historie, ne odvozený stav. Prázdná
+ * je správná odpověď: město načtené z v9 prostě nikde nečeká na obnovenou
+ * zastávku.
+ */
+const migrateV9ToV10: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 10 },
+  state: {
+    ...save.state,
+    transit: { ...save.state.transit, lostStops: [] },
+  },
+});
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
@@ -306,6 +322,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   6: migrateV6ToV7,
   7: migrateV7ToV8,
   8: migrateV8ToV9,
+  9: migrateV9ToV10,
 };
 
 /**

@@ -121,11 +121,23 @@ než u jedné školy.
 
 ### `residential_estate` — Sídliště · 3 × 3, 7 pater, úroveň 4
 
+Přemalováno v T107. Původní tři obrázky kreslily **dva celé paneláky,
+vnitroblok, stromy a kiosk** — reálně zástavbu tak na 6 × 6 dlaždic, kdežto
+parcela je 3 × 3. Na mapě z ní stavba vytékala do ulice i do sousedních domů
+a autor to nahlásil slovy „vytéká z parcely úplně strašně". Změřeno statickým
+náhledem, který kreslí tutéž geometrii jako renderer: obrázek byl na šířku
+správný, jen na něm bylo dvakrát víc, než se na parcelu vejde.
+
+Nové prompty proto říkají **jednu budovu** a výslovně žádají, aby se celá
+i s okolím vešla dovnitř pozemku s rezervou. Původní obrázky leží
+v `art/sprites/archive/` — až přibudou větší půdorysy (5 × 5 a výš), sednou
+tam beze změny.
+
 | | prompt |
 |---|---|
-| **a** | A seven-storey housing estate: one long prefab slab with a shorter one behind, continuous loggias, flat roofs with lift overruns, drying frames and beaten paths on the lawn between them. |
-| **b** | Two seven-storey slabs forming an L around a paved court with a sandpit and carpet beaters, panel facades with coloured accent bays, a low boiler house at one end. |
-| **c** | A seven-storey stepped estate block: three linked sections of different heights, panel cladding, external glazed stairwells, concrete planters along the base. |
+| **a** | ONE seven-storey prefab slab block standing alone on its plot: a single straight rectangular block with continuous loggias down its long face, a flat roof with two lift overruns, pale panel cladding with a few coloured bays. A narrow strip of mown lawn with a drying frame runs along one side and a short paved path leads to the entrance. THE WHOLE BUILDING AND ITS GROUNDS FIT WELL INSIDE THE PLOT with a clear margin of empty ground on every side; nothing crosses the edge of the plot. |
+| **b** | ONE seven-storey panel block standing alone on its plot: a single straight slab with a slight setback at one end, external glazed stairwell on the long face, flat roof with a lift overrun and two ventilation stacks, panel facade with coloured accent bays. A small paved forecourt with two benches and a carpet beater sits in front of the entrance. THE WHOLE BUILDING AND ITS GROUNDS FIT WELL INSIDE THE PLOT with a clear margin of empty ground on every side; nothing crosses the edge of the plot. |
+| **c** | ONE seven-storey stepped block standing alone on its plot: a single building of two linked sections of slightly different height, panel cladding, recessed balconies, a flat roof with a lift overrun, concrete planters along the base. A short paved apron with a lamp post lies in front of it. THE WHOLE BUILDING AND ITS GROUNDS FIT WELL INSIDE THE PLOT with a clear margin of empty ground on every side; nothing crosses the edge of the plot. |
 
 ### `residential_spire` — Rezidenční věž · 2 × 2, 8 pater, úroveň 5
 

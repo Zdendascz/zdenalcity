@@ -107,6 +107,14 @@ DECOR = {
     'rubble_slope_lr': (1, 1, 1),
     'rubble_slope_ll': (1, 1, 1),
     'rubble_slope_ul': (1, 1, 1),
+    # Zbyle pohromy (T107). Vetsina je scena v ulici, takze jedna dlazdice.
+    # Tornado je vyjimka: sloup do vysky, jinak by nad mestem nebylo videt.
+    'tornado_funnel': (1, 1, 6),
+    'blast_smoke': (1, 1, 3),
+    'strike_picket': (1, 1, 1),
+    'epidemic_care': (1, 1, 1),
+    'spill_hazmat': (1, 1, 1),
+    'landslide_earth': (1, 1, 1),
 }
 
 # Kolik z té dlaždice předmět skutečně zabere.
@@ -130,6 +138,14 @@ DECOR_SHARE = {
     'rubble_slope_ul': 0.9,
     # Ohen ma prekryvat, co hori, ne prescuhovat na sousedni parcelu.
     'fire_blaze': 0.9,
+    # Tornado je uzke a vysoke: sirka jedne ulice, vyska sest pater.
+    'tornado_funnel': 0.7,
+    'blast_smoke': 0.9,
+    'strike_picket': 0.85,
+    'epidemic_care': 0.9,
+    'spill_hazmat': 0.95,
+    # Sesuv se rozlije, takze prekryje skoro celou dlazdici.
+    'landslide_earth': 1.0,
 }
 
 

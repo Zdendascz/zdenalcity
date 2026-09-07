@@ -164,6 +164,13 @@ function packTransit(world: WorldState): SaveTransitState {
         paused: line.paused,
       })),
     nextLineId: world.nextLineId,
+    // Pořadí podle dlaždice, ať je save z téhož města vždycky stejný.
+    lostStops: [...world.lostStops.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([tile, lost]) => [
+        tile,
+        lost.map((entry) => [entry.lineId, entry.index] as [number, number]),
+      ]),
   };
 }
 

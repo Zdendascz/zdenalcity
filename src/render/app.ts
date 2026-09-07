@@ -786,6 +786,17 @@ const DISASTER_SCENES: readonly (readonly [string, string])[] = [
   // a autor to nahlásil — je to nejčastější pohroma ze všech.
   ['fire', 'fire_blaze'],
   ['wildfire', 'fire_blaze'],
+  // T107: zbylých šest. Autor nahlásil epidemii bez obrázku — obrázek měla
+  // do té doby jen třetina pohrom. Bez obrázku zůstávají tři a je to záměr:
+  // blackout nemá střed, zemětřesení má epicentrum klidně v pustině a povodeň
+  // se kreslí vrstvou vody, ne objektem.
+  ['tornado', 'tornado_funnel'],
+  ['explosion', 'blast_smoke'],
+  ['industrialAccident', 'blast_smoke'],
+  ['strike', 'strike_picket'],
+  ['epidemic', 'epidemic_care'],
+  ['chemicalSpill', 'spill_hazmat'],
+  ['landslide', 'landslide_earth'],
 ];
 
 async function loadDisasterScenes(

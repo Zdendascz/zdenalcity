@@ -778,3 +778,58 @@ function rawBalance(): Record<string, unknown> {
   });
   return structuredClone(Object.values(modules)[0]) as Record<string, unknown>;
 }
+
+
+/**
+ * Zastávka postavená tam, kde jedna stávala, se vrátí na své linky.
+ *
+ * Po katastrofě padne půl města naráz a zastávky nemají jména, takže po obnově
+ * nebylo jak zjistit, která zastávka na které lince byla. Vyžádal si to autor:
+ * „v případě, že tam byla zastávka a hráč ji znovu postaví, nahradí na linkách
+ * tu předešlou."
+ */
+describe('obnovená zastávka se vrátí na linku', () => {
+  it('vrátí se na stejné místo v pořadí', async () => {
+    const content = await vanilla();
+    const world = street(content);
+    const balance = content.getBalance();
+
+    const a = addStop(world, content, 'vanilla:transit_stop', 12);
+    const b = addStop(world, content, 'vanilla:transit_stop', 30);
+    const c = addStop(world, content, 'vanilla:transit_stop', 48);
+    createTransitLine(world, balance, 'bus');
+    const line = lastLine(world);
+    addTransitStop(world, content, balance, line.id, a);
+    addTransitStop(world, content, balance, line.id, b);
+    addTransitStop(world, content, balance, line.id, c);
+    expect(line.stops).toEqual([a, b, c]);
+
+    // Prostřední spadne — a z linky vypadne, jak má.
+    removeBuilding(world, b);
+    expect(line.stops).toEqual([a, c]);
+
+    // Hráč ji postaví znovu na totéž místo.
+    const rebuilt = addStop(world, content, 'vanilla:transit_stop', 30);
+    expect(rebuilt).not.toBe(b);
+    expect(line.stops, 'nová zastávka sedí na místě staré').toEqual([a, rebuilt, c]);
+  });
+
+  it('na místě, kde vyroste něco jiného, linka čekat přestane', async () => {
+    const content = await vanilla();
+    const world = street(content);
+    const balance = content.getBalance();
+
+    const a = addStop(world, content, 'vanilla:transit_stop', 12);
+    const b = addStop(world, content, 'vanilla:transit_stop', 30);
+    createTransitLine(world, balance, 'bus');
+    const line = lastLine(world);
+    addTransitStop(world, content, balance, line.id, a);
+    addTransitStop(world, content, balance, line.id, b);
+
+    removeBuilding(world, b);
+    // Na uvolněné místo přijde park, ne zastávka.
+    expect(placeDefinition(world, content, 'vanilla:park_small', 30, 21, balance).ok).toBe(true);
+    expect(line.stops).toEqual([a]);
+    expect(world.lostStops.size, 'paměť místa se uvolnila').toBe(0);
+  });
+});

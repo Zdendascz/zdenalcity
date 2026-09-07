@@ -21,6 +21,18 @@ import type { WorldState } from './world';
  * potřebuje proud.
  */
 
+/**
+ * Zastávka, kterou hráč přišel — a linka, na které stála.
+ *
+ * `index` je pozice v pořadí zastávek. Vrací se na ni, ne na konec: linka
+ * objíždí zastávky v tom pořadí, v jakém jsou v seznamu, a přilepení na konec
+ * by z okružní trasy udělalo výlet tam a zpátky.
+ */
+export interface LostStop {
+  lineId: number;
+  index: number;
+}
+
 export interface TransitLine {
   id: number;
   /** Jméno módu z katalogu — `bus`, `tram`, `metro` ve vanille. */

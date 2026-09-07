@@ -165,6 +165,22 @@ function parseTransit(raw: Record<string, unknown>): SaveTransitState {
       };
     }),
     nextLineId: int(raw, 'nextLineId', what),
+    // **Shovívavě**: `lostStops` přibylo ve v10 a starší save je nemá.
+    // Parsuje se dřív než migrace, takže by na nich jinak spadl v1 až v9.
+    lostStops:
+      raw['lostStops'] === undefined
+        ? []
+        : asArray(raw['lostStops'], `${what}.lostStops`).map((entry, i) => {
+            const pair = asArray(entry, `${what}.lostStops[${i}]`);
+            const [tile, lost] = pair;
+            if (typeof tile !== 'number' || !Number.isInteger(tile)) {
+              fail(`${what}.lostStops[${i}][0] musí být dlaždice`);
+            }
+            return [tile, pairArray(lost, `${what}.lostStops[${i}][1]`)] as [
+              number,
+              [number, number][],
+            ];
+          }),
   };
 }
 
@@ -456,7 +472,7 @@ function parseState(
       : emptyDisasters(),
     transit: hasPhaseFour
       ? parseTransit(asRecord(raw['transit'], 'state.transit'))
-      : { lines: [], nextLineId: 1 },
+      : { lines: [], nextLineId: 1, lostStops: [] },
     finance: hasPhaseFour
       ? parseFinance(asRecord(raw['finance'], 'state.finance'))
       : emptyFinance(),
@@ -1041,6 +1057,14 @@ function applyTransitToWorld(world: WorldState, save: SaveData): void {
     fare: line.fare,
   }));
   world.nextLineId = save.state.transit.nextLineId;
+
+  world.lostStops.clear();
+  for (const [tile, lost] of save.state.transit.lostStops) {
+    world.lostStops.set(
+      tile,
+      lost.map(([lineId, at]) => ({ lineId, index: at })),
+    );
+  }
 
   world.lineStats.clear();
   world.transitRelief.clear();

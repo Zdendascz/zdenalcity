@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 9;
+export const CURRENT_FORMAT_VERSION = 10;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -221,6 +221,14 @@ export interface SaveModifier {
 export interface SaveTransitState {
   lines: SaveTransitLine[];
   nextLineId: number;
+  /**
+   * Kde stávaly zbořené zastávky a na kterých linkách byly (v10).
+   *
+   * Řídce jako `[dlaždice, [[id linky, pořadí], …]]`. Ukládá se, protože to
+   * **není odvozené**: je to historie, kterou po načtení nemá z čeho spočítat,
+   * a bez ní by obnovená zastávka po loadu na linku nenaskočila.
+   */
+  lostStops: [number, [number, number][]][];
 }
 
 export interface SaveTransitLine {

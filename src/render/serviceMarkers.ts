@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite } from 'pixi.js';
 import type { Texture } from 'pixi.js';
+import { isRubbleMarkOrigin } from '@/sim/disasters/rubble';
 import { tileCorners } from '@/sim/heights';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { MARKER_FILL, MARKER_LINE } from './palette';
@@ -34,11 +35,24 @@ const LIFT = 18;
 const RADIUS = 13;
 /** Jak vysoký je hrot špendlíku pod kolečkem. */
 const TIP = 10;
+/**
+ * Barva špendlíku nad troskami.
+ *
+ * Poplachová, ne modrá jako u živé stanice: hráč má na první pohled poznat
+ * rozdíl mezi „tady hasiči jsou" a „tady hasiči byli".
+ */
+const RUIN_FILL = 0xd9483a;
 
 export class ServiceMarkers {
   private readonly world: ReadonlyWorldView;
   private readonly container = new Container();
   private readonly pins = new Graphics();
+  /**
+   * Značky po **zničených** službách. Vlastní vrstva, protože se na rozdíl
+   * od těch živých kreslí pořád, ne jen u zapnuté mapy dosahu.
+   */
+  private readonly ruinLayer = new Container();
+  private readonly ruinPins = new Graphics();
   private textures: ReadonlyMap<string, Texture> = new Map();
   private sites: (definitionId: string) => ServiceSite | undefined = () => undefined;
   private classOf: (definitionId: string) => string | undefined = () => undefined;
@@ -48,6 +62,8 @@ export class ServiceMarkers {
     this.world = world;
     this.container.addChild(this.pins);
     this.container.visible = false;
+    this.ruinLayer.addChild(this.ruinPins);
+    parent.addChild(this.ruinLayer);
     parent.addChild(this.container);
   }
 
@@ -78,6 +94,67 @@ export class ServiceMarkers {
   /** Budovy vznikají a mizí; značky se překreslí, když se něco změnilo. */
   update(changed: boolean): void {
     if (this.active !== null && changed) this.redraw();
+    if (changed) this.redrawRuins();
+  }
+
+  /**
+   * Špendlík nad troskami po službě — **dokud tam hráč něco nepostaví**.
+   *
+   * Po katastrofě padne půl města naráz a z hromad suti se nepozná, co kde
+   * bylo. Autor: „mě takto teď popadalo x budov a netuším, co tam bylo."
+   * Hra to přitom ví: `rubbleOf` si pamatuje id definice. Do teď z toho
+   * kreslila jen bledý symbol na dlaždici, který mezi domy zapadl — tohle je
+   * týž špendlík jako u mapy dosahu, jen tlumený a s křížkem místo domu.
+   *
+   * Značka nese **jen levý horní roh** bloku, stejně jako symbol na dlaždici:
+   * nemocnice po sobě nechá devět hromad a devět špendlíků by z toho udělalo
+   * mřížku.
+   */
+  private redrawRuins(): void {
+    this.ruinPins.clear();
+    for (const child of [...this.ruinLayer.children]) {
+      if (child !== this.ruinPins) child.destroy();
+    }
+
+    for (const [tile, definitionId] of this.world.rubbleOf) {
+      const serviceClass = this.classOf(definitionId);
+      // Značka je pro **služby**: po obytném domě zbude suť a hráč zónu vidí.
+      if (serviceClass === undefined) continue;
+      if (!isRubbleMarkOrigin(this.world.rubbleOf, tile, this.world.size)) continue;
+
+      const site = this.sites(definitionId);
+      const width = site?.width ?? 1;
+      const depth = site?.depth ?? 1;
+      const x = tile % this.world.size;
+      const y = (tile - x) / this.world.size;
+
+      const corners = tileCorners(this.world.cornerHeight, x, y);
+      const base = Math.max(...corners);
+      const point = gridToScreen(x + width / 2, y + depth / 2, base);
+      const cx = point.x;
+      // Trosky jsou nízké, takže se výška budovy nezapočítává — špendlík sedí
+      // těsně nad hromadou.
+      const cy = point.y - LIFT - RADIUS;
+
+      this.ruinPins
+        .moveTo(cx, cy + RADIUS + TIP)
+        .lineTo(cx - RADIUS * 0.55, cy + RADIUS * 0.6)
+        .lineTo(cx + RADIUS * 0.55, cy + RADIUS * 0.6)
+        .fill({ color: RUIN_FILL });
+      this.ruinPins
+        .circle(cx, cy, RADIUS)
+        .fill({ color: RUIN_FILL })
+        .stroke({ color: MARKER_LINE, width: 2 });
+
+      const texture = this.textures.get(serviceClass);
+      if (texture === undefined) continue;
+      const icon = new Sprite(texture);
+      icon.anchor.set(0.5);
+      icon.width = RADIUS * 1.5;
+      icon.height = RADIUS * 1.5;
+      icon.position.set(cx, cy);
+      this.ruinLayer.addChild(icon);
+    }
   }
 
   private redraw(): void {
@@ -128,5 +205,6 @@ export class ServiceMarkers {
 
   destroy(): void {
     this.container.destroy({ children: true });
+    this.ruinLayer.destroy({ children: true });
   }
 }

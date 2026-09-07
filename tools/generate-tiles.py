@@ -172,6 +172,13 @@ OBJECT_NAMES = (
     'rubble_slope_lr',
     'rubble_slope_ll',
     'rubble_slope_ul',
+    # Zbyle pohromy (T107): sest objektu, ktere na mape chybely.
+    'tornado_funnel',
+    'blast_smoke',
+    'strike_picket',
+    'epidemic_care',
+    'spill_hazmat',
+    'landslide_earth',
 )
 
 

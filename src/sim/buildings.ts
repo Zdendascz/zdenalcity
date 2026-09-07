@@ -322,5 +322,38 @@ export function placeBuilding(
   markPowerNetworkDirty(world); // budova je vodič, síť se mění
   markWaterNetworkDirty(world); // a mohla to být vodárna nebo čerpací stanice
   if (definition.service) markCoverageDirty(world);
+  restoreLostStop(world, building, definition);
   return building;
+}
+
+/**
+ * Zastávka postavená tam, kde jedna stávala, se **vrátí na své linky**.
+ *
+ * Po katastrofě padne půl města naráz a zastávky nemají jména, takže po
+ * obnově nezbývalo než hádat, která zastávka na které lince byla. Hra to
+ * přitom ví: `lostStops` si u dlaždice pamatuje linky i pořadí. Autor si to
+ * vyžádal slovy „v případě, že tam byla zastávka a hráč ji znovu postaví,
+ * nahradí na linkách tu předešlou".
+ *
+ * Záznam mizí, **ať se na dlaždici postaví cokoli**. Když tam hráč chtěl něco
+ * jiného, linka na tu zastávku už čekat nemá.
+ */
+function restoreLostStop(world: WorldState, building: Building, definition: Definition): void {
+  const origin = index(building.x, building.y, world.size);
+  const lost = world.lostStops.get(origin);
+  if (lost === undefined) return;
+  world.lostStops.delete(origin);
+
+  // Zastávka se pozná podle toho, že má dopravní režim — ne podle jména
+  // budovy (P5). Tramvajová zastávka nahradí autobusovou a naopak; linka si
+  // režim hlídá sama a případné neshody hlásí jako problém linky.
+  if (definition.transit?.mode === undefined) return;
+
+  for (const { lineId, index: at } of lost) {
+    const line = world.lines.find((candidate) => candidate.id === lineId);
+    if (!line) continue; // linku mezitím někdo zrušil
+    if (line.stops.includes(building.id)) continue;
+    line.stops.splice(Math.min(at, line.stops.length), 0, building.id);
+    world.transitDirty = true;
+  }
 }

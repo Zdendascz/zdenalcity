@@ -470,6 +470,70 @@ je pod nimi — a to obrázek stejně nesmí přinést, jinak by pod ním zmizel
 | **b** | A SPREAD OF FLAMES close to the ground with thick black smoke billowing above, glowing embers, filling the picture. |
 | **c** | A COLUMN OF FIRE AND SMOKE, bright yellow at the base turning orange and then into a dark smoke plume, filling the picture. |
 
+### Zbylé pohromy (T107)
+
+Do T107 mělo obrázek pět pohrom z patnácti: požár, lesní požár, nepokoje, válka
+gangů a hromadná nehoda. Autor to nahlásil na epidemii — „hodilo mi to epidemii,
+ale žádný obrázek není". Doplňuje se šest dalších objektů; zbytek obrázek
+nedostane a je to rozhodnutí, ne opomenutí:
+
+- **Blackout a stávka bez místa.** Blackout nemá střed, týká se celé sítě.
+  (Stávka střed má — je u konkrétní budovy — a obrázek dostane.)
+- **Zemětřesení** má epicentrum kdekoli, klidně v pustině, a otřes se roznese
+  po celé mapě. Objekt na epicentru by ukazoval na prázdné pole.
+- **Povodeň** už nakreslená je: voda se kreslí vrstvou `flood`, ne objektem.
+
+### `tornado_funnel`
+
+| | prompt |
+|---|---|
+| **a** | A TORNADO FUNNEL: a dark grey-brown rotating column of cloud, wide and ragged at the top, narrowing to a whirling point at the bottom where dust and small debris spin outwards, filling the picture. |
+| **b** | A TORNADO FUNNEL leaning slightly to one side, grey and streaked with lifted soil, with planks, sheet metal and a torn branch caught in the whirl around its base, filling the picture. |
+| **c** | A NARROW TORNADO FUNNEL, rope-thin and twisted like a corkscrew, dark against a pale sky, a low ring of flying dust and scattered debris at its foot, filling the picture. |
+
+### `blast_smoke`
+
+Výbuch a průmyslová havárie sdílejí jeden objekt: sloup kouře nad ohništěm
+vypadá stejně, ať vybuchl sklad, nebo provoz.
+
+| | prompt |
+|---|---|
+| **a** | A COLUMN OF THICK BLACK SMOKE rising from a low burning wreck of twisted metal and broken concrete, orange flames at its base, scattered debris around it, filling the picture. |
+| **b** | A BILLOWING PLUME OF DARK SMOKE shot through with orange, rising from a blown-out heap of scorched machinery, bent steel beams and smouldering rubble, filling the picture. |
+| **c** | A DENSE GREY-BLACK SMOKE CLOUD boiling up from a burning ruptured storage tank lying on its side, flames licking along the ground, charred debris scattered wide, filling the picture. |
+
+### `strike_picket`
+
+| | prompt |
+|---|---|
+| **a** | A PICKET LINE OF ABOUT TEN WORKERS in overalls and donkey jackets standing shoulder to shoulder, arms folded, holding plain blank banners on wooden poles, a brazier smoking beside them, filling the picture. |
+| **b** | A GROUP OF ABOUT TWELVE WORKERS standing around an oil-drum brazier with their hands out to the warmth, plain blank placards leaning against a stack of pallets, thermos flasks and folding stools, filling the picture. |
+| **c** | A KNOT OF ABOUT EIGHT WORKERS in work clothes gathered around a small folding table with a megaphone on it, plain blank banners tied between two poles behind them, filling the picture. |
+
+### `epidemic_care`
+
+| | prompt |
+|---|---|
+| **a** | A WHITE MEDICAL TENT with its side flap open, two folding camp beds visible inside, a nurse in a white coat and mask standing at the entrance, crates of supplies stacked beside it, filling the picture. |
+| **b** | AN OLD BOXY 1980s AMBULANCE with its rear doors open and a stretcher being lifted in by two people in white coats and masks, a small queue of people waiting at a folding table, filling the picture. |
+| **c** | A FIELD TRIAGE POINT: two white tents joined by an awning, a trestle table with bottles and boxes on it, three people in white coats and masks attending someone seated on a stool, filling the picture. |
+
+### `spill_hazmat`
+
+| | prompt |
+|---|---|
+| **a** | AN OVERTURNED TANKER TRAILER leaking a wide dark-green puddle, three figures in yellow full-body hazmat suits and respirators laying absorbent booms around it, orange traffic cones and warning trestles, filling the picture. |
+| **b** | A ROW OF BURST STEEL DRUMS lying on their sides in a spreading yellow-green pool, two figures in yellow hazmat suits hosing it down, a white plastic barrier and cones around the spill, filling the picture. |
+| **c** | A HAZMAT DECONTAMINATION POINT: a small white inflatable tent, two figures in yellow suits and respirators scrubbing equipment, drums and a dark stain on the ground behind them, cones and tape around it, filling the picture. |
+
+### `landslide_earth`
+
+| | prompt |
+|---|---|
+| **a** | A TONGUE OF SLIPPED EARTH: a fan of wet brown soil, torn turf and loose stones spread out where a slope has given way, two uprooted small trees lying in it, filling the picture. |
+| **b** | A MUDSLIDE DEPOSIT: a broad lobe of grey-brown mud with boulders and broken branches embedded in it, its front edge curled and cracked as it dried, filling the picture. |
+| **c** | A COLLAPSED BANK OF EARTH: a heap of raw brown soil and shattered rock with a torn grass lip along its top edge, a bent fence post and a tangle of roots sticking out of it, filling the picture. |
+
 ## Silnice
 
 **Šestnáct hotových dlaždic na typ se zahazuje.** Vygenerovaly se, změřily

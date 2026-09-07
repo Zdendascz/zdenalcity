@@ -2,7 +2,7 @@ import { coarseCellsOf, createCoarseLayers } from './coarse';
 import { createDisasterState } from './disasters/state';
 import type { DisasterState } from './disasters/state';
 import type { Bond, Loan } from './finance';
-import type { LineStats, TransitLine } from './transit';
+import type { LineStats, LostStop, TransitLine } from './transit';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
 import { createLayers, DEFAULT_MAP_SIZE, inBounds, index, TERRAIN } from './layers';
@@ -383,6 +383,19 @@ export interface WorldState {
   lines: TransitLine[];
   nextLineId: number;
   /**
+   * Kde stávala zastávka a na kterých linkách byla.
+   *
+   * Klíč je **dlaždice**, ne id budovy: id zbořené zastávky se už nikdy
+   * nevrátí, kdežto místo zůstává. Když hráč na totéž místo postaví zastávku
+   * znovu, vrátí se **na stejné pozice v týchž linkách** — jinak by po
+   * katastrofě musel ručně poskládat každou linku, a protože zastávky nemají
+   * jména, ani by nepoznal kterou. Vyžádal si to autor.
+   *
+   * Záznam mizí, jakmile se na dlaždici cokoli postaví: buď se zastávka
+   * vrátila, nebo tam hráč chtěl něco jiného a linka na ni už nečeká.
+   */
+  lostStops: Map<number, LostStop[]>;
+  /**
    * Kolik kapacity ukusuje kolejová doprava, po silničních dlaždicích.
    *
    * **Odvozené** z linek, udržované (R20): kolony se počítají z každé silniční
@@ -503,6 +516,7 @@ export function createWorld(
     infection: new Map(),
     lines: [],
     nextLineId: 1,
+    lostStops: new Map<number, LostStop[]>(),
     tramTiles: new Map(),
     transitDirty: false,
     lineStats: new Map(),
@@ -794,6 +808,8 @@ export function markBuildingDirty(world: WorldState, buildingId: number): void {
  * hráče, ne věc tiku, takže 16 384 porovnání nikoho nebolí.
  */
 export function removeBuilding(world: WorldState, buildingId: number): boolean {
+  const building = world.buildings.get(buildingId);
+  const origin = building === undefined ? undefined : index(building.x, building.y, world.size);
   if (!world.buildings.delete(buildingId)) return false;
   world.downgradeStreak.delete(buildingId);
   world.jobAccess.delete(buildingId);
@@ -817,12 +833,17 @@ export function removeBuilding(world: WorldState, buildingId: number): boolean {
    *
    * Uklízí se tady, ne v dopravě: jediné místo, kudy budova z města mizí.
    */
+  const lost: LostStop[] = [];
   for (const line of world.lines) {
     const at = line.stops.indexOf(buildingId);
     if (at < 0) continue;
     line.stops.splice(at, 1);
+    lost.push({ lineId: line.id, index: at });
     world.transitDirty = true;
   }
+  // Místo si linky pamatují. Postaví-li tam hráč zastávku znovu, vrátí se na
+  // ně sama — viz `lostStops`.
+  if (lost.length > 0 && origin !== undefined) world.lostStops.set(origin, lost);
 
   markBuildingDirty(world, buildingId);
   markPowerNetworkDirty(world); // budova byla vodič i možný zdroj
