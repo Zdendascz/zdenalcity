@@ -111,6 +111,8 @@ for (const seed of seeds) {
 `);
   process.stdout.write(`  pohromy: ${top(result.disasters)}
 `);
+  process.stdout.write(`  odmitnuto podle prikazu: ${top(result.rejectedBy)}
+`);
 
   const f = result.final;
   process.stdout.write(

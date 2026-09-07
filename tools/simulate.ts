@@ -186,6 +186,8 @@ interface Plan {
    * 2,3 milionu a umřelo, protože nikdo ty díry nezaplátoval.
    */
   roads: Set<number>;
+  /** Proč hra odmítla poslední příkaz. Hráč to v rozhraní taky vidí. */
+  lastReason: string | null;
 }
 
 const CENTRE = 0.5;
@@ -338,6 +340,14 @@ export interface GameResult {
   /** Kolik příkazů hráč poslal a kolik jich hra odmítla, po druzích. */
   commands: Record<string, number>;
   rejected: Record<string, number>;
+  /**
+   * Odmítnutí i s příkazem, který je vyvolal (`příkaz/důvod`).
+   *
+   * Samotný důvod nestačí: „zvedat dno moře neumíme" vypadá stejně, ať přijde
+   * ze zónování, ze stavby, nebo z rovnání terénu, a bez toho se nedá dohledat,
+   * kde hráč mlátí hlavou do zdi.
+   */
+  rejectedBy: Record<string, number>;
   /** Kolik katastrof kterého druhu proběhlo. */
   disasters: Record<string, number>;
   /** Vteřiny, které partie stála. */
@@ -482,18 +492,23 @@ export function playGame(
     lastTax: -1,
     tried: new Map(),
     roads: new Set(),
+    lastReason: null,
   };
   const commands: Record<string, number> = {};
   const rejected: Record<string, number> = {};
+  const rejectedBy: Record<string, number> = {};
   const seen = new Set<number>();
   const disasters: Record<string, number> = {};
 
   const send = (cmd: Command): boolean => {
     commands[cmd.type] = (commands[cmd.type] ?? 0) + 1;
     const result = host.dispatch(cmd);
+    plan.lastReason = result.ok ? null : (result.reason ?? 'error.unknown');
     if (!result.ok) {
       const reason = result.reason ?? 'error.unknown';
       rejected[reason] = (rejected[reason] ?? 0) + 1;
+      const key = `${cmd.type}/${reason.replace(/^error\./, '')}`;
+      rejectedBy[key] = (rejectedBy[key] ?? 0) + 1;
     }
     return result.ok;
   };
@@ -534,6 +549,7 @@ export function playGame(
     final: sample(world, content, years),
     commands,
     rejected,
+    rejectedBy,
     disasters,
     seconds: Math.round((Date.now() - started) / 100) / 10,
     world,
@@ -692,7 +708,18 @@ class Player {
       const x = tile % this.world.size;
       const y = (tile - x) / this.world.size;
       budget--;
-      this.send({ type: 'build_road', x, y, roadType: ROAD.street });
+      if (this.send({ type: 'build_road', x, y, roadType: ROAD.street })) continue;
+      /*
+       * **Co nejde, to hráč vzdá.**
+       *
+       * Seznam „tady jsem chtěl silnici" se jinak plní dlaždicemi, na kterých
+       * vozovka nikdy nevznikne — po povodni je pod vodou, po sesuvu se pod ní
+       * nedá srovnat terén. Hráč je zkoušel čtyřicetkrát za rozhodnutí do
+       * konce partie: 50 715 hlášek „zvedat dno moře neumíme" a 34 820
+       * „terén tu nejde srovnat" v jediné partii. Když tudy silnice opravdu
+       * má vést, přidá si ji `grow` nebo `roadTo` znovu.
+       */
+      this.plan.roads.delete(tile);
     }
   }
 
@@ -1079,6 +1106,40 @@ class Player {
     this.send({ type: 'place_building', definitionId: pump.id, x, y });
   }
 
+  /**
+   * Potrubí od domova k vodárně, **i mimo silnici**.
+   *
+   * Páteří sítě je silnice, jenže cesta k břehu se vede po souši a jezero
+   * mezi městem a vodárnou ji přeruší. Potrubí pod městem pak není s vodárnou
+   * spojené a hra hlásí „chybí voda" na každé parcele: na seedu 9 stálo město
+   * dvacet let na dvou budovách s devatenácti vyznačenými parcelami, ke kterým
+   * voda nikdy nedotekla. Trubka se přitom smí položit na jakoukoli souš.
+   *
+   * Vede se hladově: krok po delší ose, a když je tam voda, po té druhé.
+   * Není to nejkratší cesta, ale je to cesta.
+   */
+  private pipeTo(tx: number, ty: number): void {
+    let x = this.homeX;
+    let y = this.homeY;
+    for (let step = 0; step < 200; step++) {
+      if (x === tx && y === ty) return;
+      const dx = Math.sign(tx - x);
+      const dy = Math.sign(ty - y);
+      const alongX = Math.abs(tx - x) >= Math.abs(ty - y);
+      const first: [number, number] = alongX ? [x + dx, y] : [x, y + dy];
+      const second: [number, number] = alongX ? [x, y + dy] : [x + dx, y];
+
+      const step1 = this.isLand(first[0], first[1]) ? first : second;
+      if (!this.isLand(step1[0], step1[1])) return;
+      [x, y] = step1;
+
+      const tile = index(x, y, this.world.size);
+      if ((this.world.layers.pipe[tile] ?? 0) !== 0) continue;
+      if ((this.world.rubble[tile] ?? 0) !== 0) continue;
+      this.send({ type: 'build_pipe', x, y });
+    }
+  }
+
   /** Potrubí pod hlavní osy. Bez vody dům chátrá. */
   private layPipes(): void {
     const size = this.world.size;
@@ -1130,6 +1191,22 @@ class Player {
         budget--;
         this.send({ type: 'build_pipe', x, y });
       }
+    }
+
+    // A pojistka na spojení s vodárnou. Dělá se jen když voda opravdu chybí,
+    // protože trubka mimo silnici je zbytečný výdaj, když síť drží.
+    let dry = 0;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const tile = index(x, y, size);
+        if ((this.world.layers.zone[tile] ?? ZONE.none) === ZONE.none) continue;
+        if ((this.world.waterSupply[tile] ?? 0) === 0) dry++;
+      }
+    }
+    if (dry < 5) return;
+    for (const building of this.world.buildings.values()) {
+      if ((this.content.get(building.definitionId)?.water?.production ?? 0) <= 0) continue;
+      this.pipeTo(building.x, building.y + 1);
     }
   }
 
@@ -1344,14 +1421,40 @@ class Player {
         if (touches) out.push([x, y]);
       }
     }
-    // Nejbližší břeh první: silnice k němu se platí po dlaždicích.
-    out.sort(
-      (a, b) =>
-        Math.abs(a[0] - half) +
-        Math.abs(a[1] - halfY) -
-        (Math.abs(b[0] - half) + Math.abs(b[1] - halfY)),
-    );
-    return out.slice(0, 40);
+    /*
+     * Řadí se podle **vzdálenosti k nejbližší silnici**, ne k domovu.
+     *
+     * Cesta k vodárně se vede písmenem L z domova; když jí do cesty přijde
+     * voda, přeruší se a stavba u břehu pak nemá u sebe vozovku. Deset
+     * nejbližších míst k domovu bylo takhle nedosažitelných čtrnáct let po
+     * sobě: město mělo tři sta tisíc v kase, výrobu vody 600 proti potřebě
+     * 1 800, čtyřicet volných břehů — a nepostavilo ani jednu vodárnu.
+     * Místo u stávající ulice je skoro vždycky dosažitelné.
+     */
+    const roadNear = (x: number, y: number): number => {
+      for (let radius = 1; radius <= 12; radius++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+            const tx = x + dx;
+            const ty = y + dy;
+            if (tx < 0 || ty < 0 || tx >= this.world.size || ty >= this.world.size) continue;
+            if ((this.world.layers.road[index(tx, ty, this.world.size)] ?? ROAD.none) !== ROAD.none) {
+              return radius;
+            }
+          }
+        }
+      }
+      return 99;
+    };
+
+    const scored = out.map((spot) => ({
+      spot,
+      road: roadNear(spot[0], spot[1]),
+      home: Math.abs(spot[0] - half) + Math.abs(spot[1] - halfY),
+    }));
+    scored.sort((a, b) => a.road - b.road || a.home - b.home);
+    return scored.slice(0, 40).map((entry) => entry.spot);
   }
 
   /**
@@ -1465,17 +1568,39 @@ class Player {
     const threshold = { 'skoupý': 25, 'vyvážený': 70, 'štědrý': 120 }[this.strategy.services];
     if (this.world.buildings.size < 6) return;
 
-    let worst: { serviceClass: string; value: number } | null = null;
-    for (const serviceClass of this.byClass.keys()) {
-      const value = this.coverageAtHome(serviceClass);
-      if (worst === null || value < worst.value) worst = { serviceClass, value };
+    /*
+     * Zkouší se **všechny třídy odshora**, ne jen ta nejhorší.
+     *
+     * Kultura má pokrytí čtyři body a galerie potřebuje budovu, kterou město
+     * ještě nemá — takže se hráč pokoušel o kulturu, neuspěl a **skončil**.
+     * Hasiči, nemocnice ani školy se nestavěly vůbec: ve městě o 349 domech
+     * stálo **sedm služeb** a pokrytí drželo mezi čtyřmi a padesáti body proti
+     * prahu sedmdesáti. Nespokojené město pak přestane růst a začne chátrat.
+     */
+    /*
+     * **Nejvýš jedna služba na dvanáct domů.**
+     *
+     * Jakmile hráč začal zkoušet všechny třídy, měl co stavět pořád — a
+     * rozhoduje se šestatřicetkrát do roka. Pokrytí vyskočilo na 94 až 200
+     * bodů, jenže město zůstalo na devětadvaceti domech: všechno šlo do služeb
+     * a jejich údržby. Poměr drží stavbu služeb za růstem, ne před ním.
+     */
+    let services = 0;
+    for (const building of this.world.buildings.values()) {
+      if (this.content.get(building.definitionId)?.service !== undefined) services++;
     }
-    if (!worst || worst.value >= threshold) return;
+    if ((services + 1) * 12 > this.world.buildings.size) return;
 
-    const options = this.byClass.get(worst.serviceClass) ?? [];
-    for (const definition of options) {
-      if (!this.canSpend(definition.construction.cost)) continue;
-      if (this.place(definition)) return;
+    const byNeed = [...this.byClass.keys()]
+      .map((serviceClass) => ({ serviceClass, value: this.coverageAtHome(serviceClass) }))
+      .filter((entry) => entry.value < threshold)
+      .sort((a, b) => a.value - b.value);
+
+    for (const { serviceClass } of byNeed) {
+      for (const definition of this.byClass.get(serviceClass) ?? []) {
+        if (!this.canSpend(definition.construction.cost)) continue;
+        if (this.place(definition)) return;
+      }
     }
   }
 
@@ -1555,7 +1680,7 @@ class Player {
     // táhne silnice a ta se platí po dlaždicích.
     // Místa pro tenhle půdorys se spočítají **jednou**, ne při každém pokusu.
     const options = shore ?? this.spotsFor(definition, reach);
-    const tries = shore ? Math.min(shore.length, 10) : Math.min(options.length, 24);
+    const tries = shore ? Math.min(shore.length, 20) : Math.min(options.length, 24);
     for (let attempt = 0; attempt < tries; attempt++) {
       const spot = shore ? shore[attempt] : null;
       if (shore && !spot) return false;
@@ -1581,6 +1706,16 @@ class Player {
       if (this.send({ type: 'place_building', definitionId: definition.id, x, y })) {
         this.plan.tried.delete(definition.id);
         return true;
+      }
+      /*
+       * „Nejdřív potřebuješ jinou budovu" se za měsíc nezmění. Hráč se na to
+       * podívá v nabídce staveb a **pár let se o ni nepokouší**; bez toho jich
+       * nasbíral 22 635 za partii, protože služeb je patnáct druhů a na půlku
+       * z nich město dlouho nemá.
+       */
+      if (this.plan.lastReason === 'error.requiresBuilding') {
+        this.plan.tried.set(definition.id, this.world.tick + 4 * TICKS_PER_YEAR);
+        return false;
       }
 
       // Les, balvany, trosky: hráč je odveze buldozerem a zkusí to znovu.
@@ -1671,6 +1806,14 @@ interface Options {
   runs: number;
   out: string;
   offset: number;
+  /**
+   * Kolikátou partii si tenhle proces bere.
+   *
+   * Šestnáct procesů se pustí s `--stride 16` a `--offset 0..15`; každý pak
+   * bere každou šestnáctou partii, takže se strategie rozprostřou rovnoměrně
+   * a když se jeden běh nedokončí, chybí z každé skupiny stejně.
+   */
+  stride: number;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -1689,6 +1832,7 @@ function parseArgs(argv: string[]): Options {
     runs: value('runs', 10),
     out: text('out', 'data/sim'),
     offset: value('offset', 0),
+    stride: Math.max(1, value('stride', 1)),
   };
 }
 
@@ -1703,12 +1847,30 @@ async function main(): Promise<void> {
   const games = resolve(outDir, `games-${options.offset}.jsonl`);
   writeFileSync(games, '');
 
-  // Partie se řadí strategie po strategii, aby šel běh přerušit a data dávala
-  // smysl i z půlky.
+  /*
+   * Partie se **zamíchají**, aby každý kus běhu byl vzorkem celého prostoru.
+   *
+   * Strategie vznikají kartézským součinem, takže v přirozeném pořadí jde
+   * nejdřív pět set partií s ambicí „malé" a teprve pak ostatní. Přerušený
+   * nebo zkrácený běh pak neměří hru, ale jeden roh prostoru: v prvním
+   * pětisetpartiovém běhu vyšla osa ambice se **single hodnotou** a osa služeb
+   * jen se dvěma ze tří. Míchá se ze semínka, takže je pořadí pořád stejné
+   * a běh jde zopakovat.
+   */
   const planned: { strategy: Strategy; seed: number }[] = [];
   for (let run = 0; run < options.runs; run++) {
     for (const strategy of strategies) {
       planned.push({ strategy, seed: (planned.length + 1) * 2654435761 });
+    }
+  }
+  const shuffle = new Rng(0x5eed_1234);
+  for (let i = planned.length - 1; i > 0; i--) {
+    const j = Math.floor(shuffle.next() * (i + 1));
+    const a = planned[i];
+    const b = planned[j];
+    if (a && b) {
+      planned[i] = b;
+      planned[j] = a;
     }
   }
 
