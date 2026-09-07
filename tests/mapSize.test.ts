@@ -186,8 +186,18 @@ describe('simulace na jiné velikosti', () => {
   });
 });
 
+/**
+ * Kolečko savu se zkouší jen na **skutečných** velikostech.
+ *
+ * Vrstvy si poradí s jakoukoli hranou — proto je `SIZES` malé a rychlé — jenže
+ * od bezpečnostního auditu (N2) save jinou než nabízenou velikost odmítne:
+ * `meta.grid.size` jde rovnou do alokace třinácti polí, takže z něj nesmí
+ * přijít cokoli. Nejmenší dvě nabízené mapy tu roli zastanou.
+ */
+const SAVE_SIZES = [128, 192] as const;
+
 describe('save nese velikost mapy', () => {
-  it.each(SIZES)('projde kolečkem uložit → načíst na hraně %i', (size) => {
+  it.each(SAVE_SIZES)('projde kolečkem uložit → načíst na hraně %i', (size) => {
     const world = createWorld(7, undefined, size);
     applyGeneratedMap(world, generateTerrain(7, VANILLA_BALANCE, size));
 

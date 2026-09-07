@@ -616,3 +616,80 @@ strhne z kasy.
 **Ikona zavření** byla lososový křížek na světlém štítku — ve 20 px z toho byl
 prázdný čtvereček a hráč tvrdil, že tlačítko chybí. Nová je bílý křížek na šedém
 štítku jako zbytek sady.
+
+## T106: bezpečnostní audit savu
+
+Audit ze 7. 9. 2026 nad revizí `81a26b8`. Hra nemá server, účty ani síť —
+jediný vstup nedůvěryhodných dat je **soubor savu**, který si hráč načte
+z disku nebo dostane od někoho jiného. A tam byla i celá slabina: parser hlídal
+*typy* polí, ale ne *pořadí* operací a ne *rozsahy* hodnot.
+
+**Neúspěšný import mazal rozehrané město (N1).** `applySaveToWorld` zapisovalo
+rovnou do živého světa: nejdřív přestavělo mřížku a nahradilo budovy, teprve
+potom kontrolovalo délku `coarse.bin`. Když kontrola neprošla, hráč viděl
+„načtení selhalo" — jenže město už bylo přepsané tím, co bylo v cizím souboru,
+a nejbližší autosave to zafixoval. Sonda to změřila na městě se šesti budovami
+a 21 dlaždicemi silnice: po neúspěšném importu z něj zbylo 0 a 0.
+
+Oprava je `checkSaveFits`, která projde **celý** save dřív, než se sáhne na
+svět. Pouští se až po migraci, protože teprve ta doplní starším verzím soubory,
+které tehdy neexistovaly.
+
+**Velikost mapy se alokovala dřív, než se cokoli ověřilo (N2).**
+`meta.grid.size` prošlo jen kontrolou „celé číslo". Hra zná čtyři velikosti,
+save směl přinést jakoukoli — a `resizeWorld` z ní udělalo třináct typovaných
+polí o `size²` prvcích. Se `size = 4096` to byla jedna vrstva katastrof
+o 16 MB, s hodnotou kolem 60 000 desítky gigabajtů a pád karty. Velikost se
+proto bere **jen z `MAP_SIZES`** a `coarseSize` k ní musí sedět. Kontrola je
+v `parseMeta`, tedy před migrací, protože alokovat umí i migrace.
+
+**ZIP bomba (N3).** `unzipSync` rozbalí každou položku archivu do paměti a
+validace přišla až potom. Nuly se komprimují zhruba 1000 : 1, takže
+262 kB souboru vyrobilo 268 MB v paměti za 353 ms; čtyři megabajty by
+znamenaly čtyři gigabajty. Nově má každý soubor v archivu **strop podle toho,
+co v něm může být**: binární spočítaný pro největší mapu, JSON pevný. Filtr
+běží nad hlavičkami, tedy dřív než dekomprese, a neznámá jména se přeskočí.
+Délka se pro jistotu kontroluje ještě jednou po rozbalení, protože hlavička umí
+lhát. Nad tím vším je strop na celý soubor (`MAX_SAVE_FILE_BYTES`), který platí
+i pro rozcestník — ten ho hlásí dřív, než soubor vůbec přečte.
+
+**Poškozený autosave se mazal (N4).** Záměr byl dobrý: hráč se má do hry dostat
+vždycky. Jenže tou samou větví by prošla i regrese v deserializeru po nasazení
+nové verze — a pak by o města přišli všichni naráz a nikdo by neměl co poslat,
+protože důkaz se právě smazal. Nově se odkládá do slotu `corrupt` a rozcestník
+při dalším spuštění nabídne, že ho stáhne jako soubor.
+
+Při té příležitosti se našla ještě jedna vada v téže větvi: mazal se autosave
+i tehdy, když se nepodařilo otevřít **soubor vybraný na rozcestníku**. Rozehrané
+město s ním přitom nemá nic společného.
+
+**Rozsahy hodnot (N5).** Sonda nechala běžet 400 tiků se savem, ve kterém byla
+budova na `x = 99999`, úroveň 99, populace −10⁹ a půjčka se zápornou jistinou.
+Nespadlo nic — město jen mělo miliardu záporných obyvatel a z devíti milionů
+v kase se staly biliony. V jednohráčové hře to není bezpečnost, ale integrita:
+takový save vypadá jako chyba hry a hráč ji hlásí autorovi. Souřadnice teď musí
+být v mřížce, `id` budovy se vejít do dvoubajtové vrstvy `buildingId`, úroveň do
+`1..MAX_LEVEL`, počty nezáporné a sazby daně v pásmu posuvníku.
+
+Zastávky se **nekontrolují** na existující budovu: zbořená z linky vypadne, jak
+to za běhu dělá `removeBuilding`. Odmítnout kvůli ní celý save by bylo horší než
+vada, kterou to řeší.
+
+**Autosave zahazoval výsledek zápisu (N8).** Platformní vrstva správně vrací
+`false`, když je úložiště plné; volající to ignoroval. Kvóta `localStorage` je
+kolem pěti megabajtů a base64 save nafoukne o třetinu, takže velké město se
+uložit nemusí — a hráč se to dozvěděl až po obnovení stránky. Teď to řekne hned,
+jednou, ne při každé uzávěrce.
+
+**Hlavičky a provoz (N6, N7).** `public/.htaccess` dostal CSP, `nosniff`
+a `Referrer-Policy`; skutečné místo, kde je nastavit, je ale Transform Rule
+v Cloudflaru — postup je v `DEPLOY.md`. Dnes nic neopravují, jsou dopředu kvůli
+modům: obrázek z modu jde do `img.src`, takže by bez CSP mohl ukazovat na cizí
+server. Z `DEPLOY.md` zmizela IP originu (kdo ji zná, obejde Cloudflare i s jeho
+ochranou proti zahlcení) a z lokálního allowlistu trvalá povolení pro `ssh` na
+produkci.
+
+Co audit **neodhalil**: v repozitáři ani ve 239 commitech historie není žádný
+klíč, rozhraní nepoužívá `innerHTML`, ladicí `__city` je jen ve vývojovém
+buildu, service worker keší jen vlastní původ a všech 207 závislostí je
+z `registry.npmjs.org`.

@@ -3,12 +3,20 @@
 Pokyny pro session, která má na cílový server funkční SSH. Hra je **statická** —
 na serveru neběží žádný Node, žádný proces, jen soubory.
 
+> **`ORIGIN` v příkazech níž je adresa serveru za Cloudflarem a v repozitáři
+> schválně není** (bezpečnostní audit, nález N7). Kdo zná IP originu, obejde
+> Cloudflare i s jeho ochranou proti zahlcení — a dokument s návodem, jak
+> s Apachem mluvit přímo přes hlavičku `Host`, je k tomu rovnou kuchařka.
+> Adresa je v `~/.ssh/config` toho stroje, který nasazuje, a v Cloudflare DNS.
+> Na serveru samotném má firewall pouštět na porty 80 a 443 **jen rozsahy
+> Cloudflaru**; jinak je zveřejnění IP jen otázka času.
+
 ## Cíl
 
 | | |
 |---|---|
 | URL | `https://games.zdendas.cz/zdenalcity/` |
-| Server | 88.222.220.200, Debian 12, OpenSSH 9.2p1 |
+| Server | `ORIGIN` (viz rámeček výš), Debian 12, OpenSSH 9.2p1 |
 | Uživatel | `zdendas` |
 | Web server | **Apache** (404 stránka je jeho, kořen domény odpovídá 200) |
 | Před tím | Cloudflare proxy (DNS ukazuje na 104.21.26.10 / 172.67.135.30) |
@@ -43,7 +51,7 @@ cd D:/Projekty/citybuilder && tar -czf /c/Users/Intel/Downloads/zdenalcity-build
 ```
 
 ```bash
-scp /c/Users/Intel/Downloads/zdenalcity-build.tar.gz zdendas@88.222.220.200:/tmp/
+scp /c/Users/Intel/Downloads/zdenalcity-build.tar.gz zdendas@ORIGIN:/tmp/
 ```
 
 ## 3. Najít webroot
@@ -52,7 +60,7 @@ Vhost pro `games.zdendas.cz` je na serveru; jeho `DocumentRoot` je to, co
 hledáme. Na Debianu s Apachem:
 
 ```bash
-ssh zdendas@88.222.220.200 'grep -rn "games.zdendas.cz" /etc/apache2/sites-enabled/ 2>/dev/null; apache2ctl -S 2>/dev/null | grep -i games'
+ssh zdendas@ORIGIN 'grep -rn "games.zdendas.cz" /etc/apache2/sites-enabled/ 2>/dev/null; apache2ctl -S 2>/dev/null | grep -i games'
 ```
 
 Když je za Apachem ještě panel (ISPConfig, Plesk, cPanel), bývá webroot
@@ -64,11 +72,11 @@ Když je za Apachem ještě panel (ISPConfig, Plesk, cPanel), bývá webroot
 tohohle postupu, který nejde vrátit:
 
 ```bash
-ssh zdendas@88.222.220.200 'test -d WEBROOT/zdenalcity && mv WEBROOT/zdenalcity WEBROOT/zdenalcity.bak-$(date +%Y%m%d-%H%M) || echo "nic tam neni, zaloha netreba"'
+ssh zdendas@ORIGIN 'test -d WEBROOT/zdenalcity && mv WEBROOT/zdenalcity WEBROOT/zdenalcity.bak-$(date +%Y%m%d-%H%M) || echo "nic tam neni, zaloha netreba"'
 ```
 
 ```bash
-ssh zdendas@88.222.220.200 'mkdir -p WEBROOT/zdenalcity && tar -xzf /tmp/zdenalcity-build.tar.gz -C WEBROOT/zdenalcity && chmod -R a+rX WEBROOT/zdenalcity && find WEBROOT/zdenalcity -type f | wc -l'
+ssh zdendas@ORIGIN 'mkdir -p WEBROOT/zdenalcity && tar -xzf /tmp/zdenalcity-build.tar.gz -C WEBROOT/zdenalcity && chmod -R a+rX WEBROOT/zdenalcity && find WEBROOT/zdenalcity -type f | wc -l'
 ```
 
 Poslední příkaz musí vypsat **tolik souborů, kolik jich má `dist/`** — porovnej
@@ -81,7 +89,7 @@ takže žádné rewrite pravidlo není potřeba.
 Nejdřív **na serveru**, mimo Cloudflare cache:
 
 ```bash
-ssh zdendas@88.222.220.200 'curl -sI -H "Host: games.zdendas.cz" http://127.0.0.1/zdenalcity/ | head -3; curl -s -H "Host: games.zdendas.cz" http://127.0.0.1/zdenalcity/ | grep -o "src=\"[^\"]*\""'
+ssh zdendas@ORIGIN 'curl -sI -H "Host: games.zdendas.cz" http://127.0.0.1/zdenalcity/ | head -3; curl -s -H "Host: games.zdendas.cz" http://127.0.0.1/zdenalcity/ | grep -o "src=\"[^\"]*\""'
 ```
 
 Čekáme `200 OK` a `src="./assets/index-*.js"`.
@@ -191,6 +199,28 @@ Nastavit se to dá i z příkazové řádky, když je v prostředí token
 curl -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE/rulesets/phases/http_request_cache_settings/entrypoint"   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json"   --data @cache-rule.json
 ```
 
+### Bezpečnostní hlavičky (audit N6)
+
+`public/.htaccess` je nese, ale spolehnout se na něj nedá ze dvou důvodů:
+platí jen s `AllowOverride FileInfo` a Cloudflare hlavičky přepisuje, jak už se
+jednou ukázalo u keše. **Nastavit je patří do Cloudflare Transform Rules**
+(*Rules → Transform Rules → Modify Response Header*), na `http.host eq
+"games.zdendas.cz" and starts_with(http.request.uri.path, "/zdenalcity/")`:
+
+| Hlavička | Hodnota |
+|---|---|
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Content-Security-Policy` | viz `public/.htaccess`, jedna dlouhá řádka |
+
+Pixi potřebuje `worker-src blob:` a `img-src 'self' blob: data:`, jinak se
+nevykreslí nic. Externí fonty hra nepoužívá, takže pro ně není co povolovat.
+Ověřit se dá zvenčí:
+
+```bash
+curl -sI "https://games.zdendas.cz/zdenalcity/" | grep -i "content-security-policy\|x-content-type\|referrer"
+```
+
 ### Protočení keše po nasazení
 
 Po každém dalším nasazení protočit cache pro `games.zdendas.cz/zdenalcity/*`,
@@ -208,7 +238,7 @@ curl -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/purge_cache"   -H
 ## Rollback
 
 ```bash
-ssh zdendas@88.222.220.200 'rm -rf WEBROOT/zdenalcity && mv WEBROOT/zdenalcity.bak-* WEBROOT/zdenalcity'
+ssh zdendas@ORIGIN 'rm -rf WEBROOT/zdenalcity && mv WEBROOT/zdenalcity.bak-* WEBROOT/zdenalcity'
 ```
 
 ## Co říct testerům
@@ -218,14 +248,15 @@ ssh zdendas@88.222.220.200 'rm -rf WEBROOT/zdenalcity && mv WEBROOT/zdenalcity.b
 - **Zpětná vazba přes savy**: „Uložit do souboru" vyrobí `.city`, který se dá
   poslat zpátky a rozebrat. Rychlé uložení sedí v localStorage prohlížeče,
   takže ho smaže vyčištění dat webu.
-- Save je formátu **verze 3**. Starší savy hra zmigruje sama; save z novější
-  verze hry odmítne a řekne to nahlas.
+- Save je formátu **verze 9**. Starší savy hra zmigruje sama; save z novější
+  verze hry odmítne a řekne to nahlas. Soubor, který savem není — nebo je
+  poškozený — rozehrané město **nepřepíše** (audit N1).
 - Hra je česky i anglicky, jazyk se bere z prohlížeče.
 
 ## Známé meze téhle verze (ať to tester nehlásí jako chybu)
 
-- Načíst uložené město jde jen zevnitř rozehrané hry — dialog nové hry tlačítko
-  „načíst" zatím nemá.
-- Není převýšení terénu, kanalizace ani katastrofy; to je fáze 3b a dál.
+- Mapa se **neotáčí** a nikdy nebude: budovy jsou kreslené z jednoho úhlu.
+- Zastávky MHD nemají vlastní jména, jen souřadnice.
+- Okna panelů se nedají posouvat ani skládat vedle sebe.
 - Vanilla obsah nemá vyplněné prerekvizity kromě zastávky MHD, která potřebuje
   vozovnu.

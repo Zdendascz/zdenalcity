@@ -1,12 +1,20 @@
 import { strFromU8, unzipSync } from 'fflate';
 import type { BuildingCatalogue } from '@/sim/catalogue';
-import { coarseCellsOf } from '@/sim/coarse';
+import { coarseCellsOf, coarseSizeOf } from '@/sim/coarse';
 import { cornerCellsOf } from '@/sim/heights';
 import type { CoarseLayers } from '@/sim/coarse';
 import type { Layers } from '@/sim/layers';
+import { MAP_SIZES } from '@/sim/layers';
+import { MAX_LEVEL } from '@/content/schema';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
-import { NEUTRAL_HAPPINESS, rebuildTileIndex, resizeWorld } from '@/sim/world';
+import {
+  MAX_TAX_RATE,
+  MIN_TAX_RATE,
+  NEUTRAL_HAPPINESS,
+  rebuildTileIndex,
+  resizeWorld,
+} from '@/sim/world';
 import type {
   Building,
   DemandState,
@@ -14,6 +22,7 @@ import type {
   WorldState,
 } from '@/sim/world';
 import {
+  MAX_SAVE_FILE_BYTES,
   SAVE_COARSE_LAYER_ORDER,
   SAVE_DISASTER_LAYER_ORDER,
   SAVE_FILES,
@@ -256,6 +265,22 @@ function pairArray(value: unknown, what: string): [number, number][] {
   });
 }
 
+/**
+ * Velikost mapy ze savu smí být jen jedna ze čtyř, které hra zná.
+ *
+ * A hrubá mřížka k ní musí sedět: `coarseSize` se jinde nepoužívá, ale kdyby
+ * lhal, znamenalo by to, že soubor psal někdo jiný než tahle hra.
+ */
+function checkGrid(grid: { size: number; coarseSize: number }): void {
+  if (!(MAP_SIZES as readonly number[]).includes(grid.size)) {
+    fail(`meta.grid.size je ${grid.size}; hra zná jen ${MAP_SIZES.join(', ')}`);
+  }
+  const expected = coarseSizeOf(grid.size);
+  if (grid.coarseSize !== expected) {
+    fail(`meta.grid.coarseSize je ${grid.coarseSize}, k mapě ${grid.size} patří ${expected}`);
+  }
+}
+
 export function parseMeta(raw: Record<string, unknown>): SaveMeta {
   const city = asRecord(raw['city'], 'meta.city');
   const content = asRecord(raw['content'], 'meta.content');
@@ -273,6 +298,13 @@ export function parseMeta(raw: Record<string, unknown>): SaveMeta {
   });
 
   // Rozměry mřížek nese až verze 2; ve verzi 1 je doplní migrace.
+  //
+  // **Velikost se hlídá tady, ne až u prvního čtení.** `meta.grid.size` jde
+  // rovnou do `resizeWorld`, kde se z něj alokuje třináct polí o `size²`
+  // prvcích — a to dřív, než kdokoli zjistí, že `layers.bin` na tu velikost
+  // nesedí. Save s `size = 60000` by tedy nechtěl gigabajty a shodil kartu,
+  // aniž by měl jedinou platnou dlaždici. Hra zná čtyři velikosti mapy a nic
+  // jiného vzniknout nemůže, takže se bere jen z nich.
   let grid: SaveMeta['grid'];
   if (raw['grid'] !== undefined) {
     const rawGrid = asRecord(raw['grid'], 'meta.grid');
@@ -280,6 +312,7 @@ export function parseMeta(raw: Record<string, unknown>): SaveMeta {
       size: int(rawGrid, 'size', 'meta.grid'),
       coarseSize: int(rawGrid, 'coarseSize', 'meta.grid'),
     };
+    checkGrid(grid);
   }
 
   // Původ mapy nese až verze 3; ve starším savu ho doplní migrace.
@@ -550,14 +583,79 @@ export function unpackLayersInto(
   }
 }
 
-/** Rozbalí celý save z bajtů ZIPu. Migrace se pouští až nad výsledkem. */
-export function unpackSave(bytes: Uint8Array): SaveData {
+/**
+ * Kolik bajtů smí mít který soubor v archivu po rozbalení.
+ *
+ * ZIP se sám o sobě neomezuje: nuly se komprimují zhruba tisíc ku jedné, takže
+ * čtyřmegabajtový soubor umí vyrobit čtyři gigabajty v paměti — a `unzipSync`
+ * je rozbalí **všechny naráz**, dřív než se cokoli validuje. Na telefonu, kde
+ * hra taky běží, stačí mnohem míň.
+ *
+ * Binární soubory mají přesně spočítaný strop pro největší mapu, kterou hra
+ * zná. JSON strop spočítat nejde — počet budov nemá horní mez — tak má
+ * velkorysý pevný, který pořád zastaví bombu o několik řádů dřív než paměť.
+ */
+const MAX_JSON_BYTES = 32 * 1024 * 1024;
+
+function maxUnpackedBytes(name: string): number {
+  const biggest = Math.max(...MAP_SIZES);
+  const cells = biggest * biggest;
+  switch (name) {
+    case SAVE_FILES.meta:
+      return 64 * 1024;
+    case SAVE_FILES.layers:
+      return expectedLayersByteLength(biggest);
+    case SAVE_FILES.coarse:
+      return expectedCoarseByteLength(biggest);
+    case SAVE_FILES.heights:
+      return expectedHeightsByteLength(biggest);
+    case SAVE_FILES.disasters:
+      return cells * SAVE_DISASTER_LAYER_ORDER.length;
+    case SAVE_FILES.terraform:
+      return cells * 2;
+    default:
+      return MAX_JSON_BYTES;
+  }
+}
+
+/** Jména, která do savu patří. Cokoli jiného se přeskočí, ne rozbalí. */
+const KNOWN_FILES: readonly string[] = Object.values(SAVE_FILES);
+
+/**
+ * Rozbalí archiv a **do paměti pustí jen to, co má smysl**.
+ *
+ * `filter` běží nad hlavičkami, tedy dřív, než se cokoli dekomprimuje: neznámé
+ * jméno se přeskočí, příliš velká položka taky. Hlavička ale umí lhát, tak se
+ * délka po rozbalení kontroluje ještě jednou.
+ */
+function unzipGuarded(bytes: Uint8Array, wanted?: string): Record<string, Uint8Array> {
+  if (bytes.byteLength > MAX_SAVE_FILE_BYTES) {
+    fail(`soubor má ${bytes.byteLength} B, save hry má nejvýš ${MAX_SAVE_FILE_BYTES} B`);
+  }
+
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(bytes);
+    files = unzipSync(bytes, {
+      filter: (file) =>
+        (wanted === undefined ? KNOWN_FILES.includes(file.name) : file.name === wanted) &&
+        file.originalSize <= maxUnpackedBytes(file.name),
+    });
   } catch {
     fail('save není čitelný ZIP');
   }
+
+  for (const [name, content] of Object.entries(files)) {
+    const limit = maxUnpackedBytes(name);
+    if (content.byteLength > limit) {
+      fail(`${name} má po rozbalení ${content.byteLength} B, povoleno je nejvýš ${limit} B`);
+    }
+  }
+  return files;
+}
+
+/** Rozbalí celý save z bajtů ZIPu. Migrace se pouští až nad výsledkem. */
+export function unpackSave(bytes: Uint8Array): SaveData {
+  const files = unzipGuarded(bytes);
 
   const layers = files[SAVE_FILES.layers];
   if (!layers) fail(`v savu chybí ${SAVE_FILES.layers}`);
@@ -593,12 +691,7 @@ export function unpackSave(bytes: Uint8Array): SaveData {
  * je meta v ZIPu nekomprimovaná — seznam uložených her se vykreslí okamžitě.
  */
 export function readSaveMeta(bytes: Uint8Array): SaveMeta {
-  let files: Record<string, Uint8Array>;
-  try {
-    files = unzipSync(bytes, { filter: (file) => file.name === SAVE_FILES.meta });
-  } catch {
-    fail('save není čitelný ZIP');
-  }
+  const files = unzipGuarded(bytes, SAVE_FILES.meta);
   return parseMeta(parseJson(files[SAVE_FILES.meta], SAVE_FILES.meta));
 }
 
@@ -653,6 +746,114 @@ export function collectLoadWarnings(
   return { missingSources, missingDefinitions, waterlessBuildings };
 }
 
+/** Číslo, které musí být celé a v mezích. Jinak je save poškozený. */
+function inRange(value: number, low: number, high: number, what: string): void {
+  if (!Number.isInteger(value) || value < low || value > high) {
+    fail(`${what} je ${value}, čeká se celé číslo mezi ${low} a ${high}`);
+  }
+}
+
+/**
+ * Projde celý save **dřív, než se sáhne na svět**.
+ *
+ * Tohle je jádro opravy po auditu. `applySaveToWorld` zapisuje rovnou do
+ * živého světa, a když někde uprostřed vyletí výjimka, volající sice ukáže
+ * „načtení selhalo", ale rozehrané město už je přepsané tím, co bylo
+ * v souboru — a nejbližší autosave to zafixuje. Cizí save s poškozeným
+ * `coarse.bin` tak uměl město **smazat**, přestože se ani nenačetl.
+ *
+ * Kontroluje se proto všechno naráz a předem: délky binárních souborů proti
+ * velikosti mapy a rozsahy hodnot, které by jinak vyrobily město s milionem
+ * záporných obyvatel a hráč by to hlásil jako chybu hry.
+ *
+ * Pouští se **po migraci**, protože teprve ta doplní starším verzím soubory,
+ * které tehdy neexistovaly.
+ */
+export function checkSaveFits(save: SaveData): void {
+  const size = saveMapSize(save.meta);
+  const grid = save.meta.grid;
+  if (grid) checkGrid(grid);
+
+  const cells = size * size;
+  const lengths: [string, number, number][] = [
+    [SAVE_FILES.layers, save.layers.byteLength, expectedLayersByteLength(size)],
+    [SAVE_FILES.coarse, save.coarse.byteLength, expectedCoarseByteLength(size)],
+    [SAVE_FILES.heights, save.heights.byteLength, expectedHeightsByteLength(size)],
+    [SAVE_FILES.disasters, save.disasters.byteLength, cells * SAVE_DISASTER_LAYER_ORDER.length],
+    [SAVE_FILES.terraform, save.terraform.byteLength, cells * 2],
+  ];
+  for (const [name, actual, expected] of lengths) {
+    if (actual !== expected) {
+      fail(`${name} má ${actual} B, k mapě ${size} × ${size} patří ${expected} B`);
+    }
+  }
+
+  // Budovy. `id` se ukládá do vrstvy `buildingId`, a ta je dvoubajtová —
+  // nula znamená prázdnou dlaždici, takže id nad 65 535 by se do mapy vůbec
+  // nevešlo a budova by na ní stála neviditelně.
+  const seen = new Set<number>();
+  for (const building of save.entities.buildings) {
+    const where = `entities.buildings[id=${building.id}]`;
+    inRange(building.id, 1, 0xffff, `${where}.id`);
+    if (seen.has(building.id)) fail(`${where}.id se v savu opakuje`);
+    seen.add(building.id);
+    inRange(building.x, 0, size - 1, `${where}.x`);
+    inRange(building.y, 0, size - 1, `${where}.y`);
+    inRange(building.level, 1, MAX_LEVEL, `${where}.level`);
+    inRange(building.population, 0, 1e9, `${where}.population`);
+    inRange(building.jobs, 0, 1e9, `${where}.jobs`);
+    inRange(building.builtAtTick, 0, Number.MAX_SAFE_INTEGER, `${where}.builtAtTick`);
+    inRange(building.levelChangedAtTick, 0, Number.MAX_SAFE_INTEGER, `${where}.levelChangedAtTick`);
+  }
+  inRange(save.entities.nextBuildingId, 1, 0xffff, 'entities.nextBuildingId');
+
+  // Linky. Zastávky se **nekontrolují na existující budovu** — zbořená
+  // zastávka z linky sama vypadne při načtení (viz `applyTransitToWorld`),
+  // stejně jako při zbourání za běhu.
+  const lines = new Set<number>();
+  for (const line of save.state.transit.lines) {
+    const where = `state.transit.lines[id=${line.id}]`;
+    inRange(line.id, 1, Number.MAX_SAFE_INTEGER, `${where}.id`);
+    if (lines.has(line.id)) fail(`${where}.id se v savu opakuje`);
+    lines.add(line.id);
+    inRange(line.vehicles, 0, 10000, `${where}.vehicles`);
+    if (!Number.isFinite(line.fare) || line.fare < 0) fail(`${where}.fare nesmí být záporné`);
+  }
+
+  // Závazky. Záporná jistina městu při splátce **přidávala** peníze; sonda
+  // z devíti milionů udělala bilion.
+  for (const loan of save.state.finance.loans) {
+    const where = `state.finance.loans[id=${loan.id}]`;
+    inRange(loan.principal, 0, Number.MAX_SAFE_INTEGER, `${where}.principal`);
+    inRange(loan.remaining, 0, Number.MAX_SAFE_INTEGER, `${where}.remaining`);
+    inRange(loan.payment, 0, Number.MAX_SAFE_INTEGER, `${where}.payment`);
+    inRange(loan.termMonths, 1, 1200, `${where}.termMonths`);
+    inRange(loan.paidMonths, 0, loan.termMonths, `${where}.paidMonths`);
+    if (!Number.isFinite(loan.rate) || loan.rate < 0 || loan.rate > 100) {
+      fail(`${where}.rate je ${loan.rate}, čeká se procento mezi 0 a 100`);
+    }
+  }
+  for (const bond of save.state.finance.bonds) {
+    const where = `state.finance.bonds[id=${bond.id}]`;
+    inRange(bond.offered, 0, Number.MAX_SAFE_INTEGER, `${where}.offered`);
+    inRange(bond.subscribed, 0, bond.offered, `${where}.subscribed`);
+    if (!Number.isFinite(bond.rate) || bond.rate < 0 || bond.rate > 100) {
+      fail(`${where}.rate je ${bond.rate}, čeká se procento mezi 0 a 100`);
+    }
+  }
+
+  // Sazby daně. Posuvník je drží v <0, 20> a mimo ten rozsah je ekonomika
+  // nepopsaná — ne rozbitá, ale nikdo ji tam neměřil.
+  for (const category of RCI_CATEGORIES) {
+    inRange(
+      save.state.economy.taxRates[category],
+      MIN_TAX_RATE,
+      MAX_TAX_RATE,
+      `state.economy.taxRates.${category}`,
+    );
+  }
+}
+
 /**
  * Nasype save do **existujícího** světa.
  *
@@ -660,6 +861,10 @@ export function collectLoadWarnings(
  * pohled (T2), takže výměna objektu by jim nechala zastaralou referenci.
  */
 export function applySaveToWorld(world: WorldState, save: SaveData): void {
+  // **Nejdřív kontrola, teprve pak zápis.** Rozehrané město se nesmí přepsat
+  // savem, který se stejně nenačte — viz `checkSaveFits`.
+  checkSaveFits(save);
+
   // Velikost mapy nese save (T42). Přestavba musí být **první**: všechno pod
   // ní zapisuje do vrstev, které tím teprve vzniknou ve správné délce.
   const size = saveMapSize(save.meta);
@@ -824,10 +1029,13 @@ function applyDisastersToWorld(world: WorldState, save: SaveData, size: number):
  * špinavý, aby se dopočítal hned.
  */
 function applyTransitToWorld(world: WorldState, save: SaveData): void {
+  // Zastávka, kterou svět nezná, z linky **vypadne**. Za běhu to dělá
+  // `removeBuilding` při zbourání; v savu to je totéž — jen budova zmizela
+  // dřív, než se stav uložil, nebo si se souborem někdo hrál.
   world.lines = save.state.transit.lines.map((line) => ({
     id: line.id,
     mode: line.mode,
-    stops: [...line.stops],
+    stops: line.stops.filter((stop) => world.buildings.has(stop)),
     vehicles: line.vehicles,
     paused: line.paused,
     fare: line.fare,

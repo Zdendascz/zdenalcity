@@ -860,6 +860,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Rozcestník: značka, snímky ze hry a tři cesty dál — pokračovat, nové
   // město, nebo načíst soubor. Dialog nové hry z něj vychází, nezanikl.
   const canResume = await platform.storage.has('autosave');
+  // Autosave, který se minule nepodařilo načíst. Neleží tam nic než důkaz —
+  // hráč si ho může stáhnout a poslat, nebo ho zahodit (audit N4).
+  const damagedSave = await platform.storage.read('corrupt');
   // Po „načíst novou verzi" se rozcestník **přeskočí**. Hráč si vyžádal jen
   // novou verzi hry, ne návrat do menu — a město mu při té cestě zůstalo
   // v prohlížeči právě proto, aby se do něj vrátil.
@@ -870,6 +873,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           canResume,
           readFile: (file) => platform.files.read(file),
           catalogue: content,
+          ...(damagedSave
+            ? {
+                damaged: {
+                  download: () =>
+                    platform.files.save(damagedSave, 'zdenalcity-poskozene-mesto.city'),
+                  discard: () => void platform.storage.remove('corrupt'),
+                },
+              }
+            : {}),
         });
   const newGame =
     choice.kind === 'game'
@@ -910,19 +922,29 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   disasterRegistry.register(createChemicalSpillDisaster());
   disasterRegistry.register(createLandslideDisaster());
 
-  // Obnovení rozehraného města. Nečitelný autosave se **zahodí a hra začne
-  // nové město** — spadnout na startu kvůli poškozenému úložišti by znamenalo,
-  // že se hráč do hry nedostane vůbec.
+  // Obnovení rozehraného města. Nečitelný autosave hru **nezastaví** — spadnout
+  // na startu kvůli poškozenému úložišti by znamenalo, že se hráč do hry
+  // nedostane vůbec — ale ani se nemaže: odloží se do slotu „poškozený", odkud
+  // si ho na rozcestníku stáhne a může ho poslat (audit N4).
   let cityName = newGame.cityName;
   const resumed = openedFile ?? (newGame.resume ? await platform.storage.read('autosave') : null);
   let restored = false;
+  /** Načtení selhalo a hráč místo svého města dostal nové. Musí to vědět. */
+  let loadFailed = false;
   if (resumed) {
     try {
       applySaveToWorld(simWorld, migrate(unpackSave(resumed)));
       cityName = readSaveMeta(resumed).city.name;
       restored = true;
     } catch {
-      void platform.storage.remove('autosave');
+      // **Jen když šlo o autosave.** Když se nepovede otevřít soubor, který
+      // hráč vybral na rozcestníku, nemá s tím rozehrané město nic společného
+      // a smazat ho by byla ztráta z čistého nebe.
+      if (!openedFile) {
+        await platform.storage.write('corrupt', resumed);
+        await platform.storage.remove('autosave');
+      }
+      loadFailed = true;
     }
   }
 
@@ -1135,6 +1157,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const costPopup = new CostPopup(mount);
   const priceTag = new PriceTag(mount);
   const notifications = new Notifications(mount);
+  // Když se rozehrané město nepodařilo načíst, hráč vidí prázdnou mapu a neví
+  // proč. Soubor přitom zůstal ležet ve slotu „poškozený" (audit N4).
+  if (loadFailed) notifications.show(i18n.t('ui.save.loadFailedAtStart'));
   const legend = new Legend(mount, i18n);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
   const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance(), (terrain) => {
@@ -1241,12 +1266,26 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * Volá se při odchodu ze stránky a jednou za čas i během hry — `pagehide`
    * sám nestačí, prohlížeč ho po pádu karty nezavolá.
    */
+  /** Aby se hláška o plném úložišti neopakovala každou uzávěrku. */
+  let autosaveWarned = false;
+
   function autosaveNow(): void {
     try {
       // Bez `await`: na `pagehide` už není kam čekat. Zápis v prohlížeči běží
       // synchronně, takže se stihne — a kdyby jednou neběžel, je to věc
       // platform vrstvy, ne tohohle místa.
-      void platform.storage.write('autosave', serializeSave(simWorld, saveOptions()));
+      //
+      // Výsledek se ale **nezahazuje** (audit N8): kvóta `localStorage` je
+      // kolem pěti megabajtů a base64 save nafoukne o třetinu, takže velké
+      // město se jednou uložit nemusí. Rychlé uložení chybu hlásilo, tohle ne
+      // — a hráč se o ztrátě dozvídal až po obnovení stránky.
+      void platform.storage
+        .write('autosave', serializeSave(simWorld, saveOptions()))
+        .then((stored) => {
+          if (stored || autosaveWarned) return;
+          autosaveWarned = true;
+          notifications.show(i18n.t('ui.save.autosaveFailed'));
+        });
     } catch {
       // Rozehranou hru neshodí ani plné úložiště.
     }

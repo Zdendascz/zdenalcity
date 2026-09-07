@@ -16,6 +16,16 @@ export const CURRENT_FORMAT_VERSION = 9;
 export const GAME_VERSION = '0.1.0';
 
 /**
+ * Nejdelší soubor, který má cenu otevírat jako save.
+ *
+ * Největší mapa, kterou hra umí, se sbalí hluboko pod jeden megabajt; šestnáct
+ * je tedy strop s velkou rezervou a přitom zastaví soubor, jehož jediným
+ * úkolem je se v paměti nafouknout (audit N3). Kontroluje se **dřív, než se
+ * sáhne na ZIP**, aby to platilo i pro rozcestník a pro tlačítko ve hře.
+ */
+export const MAX_SAVE_FILE_BYTES = 16 * 1024 * 1024;
+
+/**
  * Pořadí vrstev v `layers.bin`. **Je součástí `formatVersion`** — přeházení
  * nebo doplnění vrstvy je nová verze plus migrace.
  *

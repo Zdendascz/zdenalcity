@@ -19,6 +19,8 @@ const PREFIX = 'citybuilder:';
 const KEYS: Readonly<Record<SaveSlot, string>> = {
   autosave: `${PREFIX}autosave`,
   quick: `${PREFIX}quicksave`,
+  /** Odložený nečitelný autosave, aby ho šlo poslat autorovi (T106). */
+  corrupt: `${PREFIX}corrupt`,
 };
 
 /** Do base64 po blocích — `String.fromCharCode(...bytes)` přeteče zásobník. */

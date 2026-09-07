@@ -628,3 +628,164 @@ describe('oprava po načtení', () => {
     expect(restored.roadTiles.size).toBe(3);
   });
 });
+
+/**
+ * Bezpečnostní audit ze 7. 9. 2026, nálezy N1 až N5.
+ *
+ * Společný jmenovatel všech pěti: parser hlídal **typy** polí, ale ne pořadí
+ * operací a ne rozsahy hodnot. Cizí soubor tak uměl přepsat rozehrané město,
+ * naalokovat gigabajty nebo vyrobit město se záporným počtem obyvatel.
+ */
+describe('načtení cizích dat (audit N1–N5)', () => {
+  async function validSave(): Promise<SaveData> {
+    const { world } = await builtCity();
+    return toSaveData(world, OPTIONS);
+  }
+
+  /** Save z bajtů, ve kterém se dá sáhnout na jednotlivé soubory archivu. */
+  function pack(save: SaveData, patch: Record<string, Uint8Array> = {}): Uint8Array {
+    return zipSync({
+      [SAVE_FILES.meta]: strToU8(JSON.stringify(save.meta)),
+      [SAVE_FILES.layers]: save.layers,
+      [SAVE_FILES.coarse]: save.coarse,
+      [SAVE_FILES.heights]: save.heights,
+      [SAVE_FILES.disasters]: save.disasters,
+      [SAVE_FILES.terraform]: save.terraform,
+      [SAVE_FILES.entities]: strToU8(JSON.stringify(save.entities)),
+      [SAVE_FILES.state]: strToU8(JSON.stringify(save.state)),
+      ...patch,
+    });
+  }
+
+  it('N1: neúspěšný import nesáhne na rozehrané město', async () => {
+    const { world } = await builtCity();
+    const before = { buildings: world.buildings.size, roads: world.roadTiles.size };
+    expect(before.buildings).toBeGreaterThan(0);
+    expect(before.roads).toBeGreaterThan(0);
+
+    // Cizí prázdné město s poškozeným coarse.bin. Dřív se stihly přepsat
+    // vrstvy i budovy a teprve pak vyletěla výjimka.
+    const other = toSaveData(createWorld(99), OPTIONS);
+    const bytes = pack(other, { [SAVE_FILES.coarse]: new Uint8Array(5) });
+
+    expect(() => applySaveToWorld(world, migrate(unpackSave(bytes)))).toThrow(SaveFormatError);
+    expect(world.buildings.size, 'budovy přežily neúspěšný import').toBe(before.buildings);
+    expect(world.roadTiles.size, 'silnice přežily neúspěšný import').toBe(before.roads);
+  });
+
+  it('N2: velikost mapy mimo nabídku se odmítne před alokací', async () => {
+    const save = await validSave();
+    const meta = { ...save.meta, grid: { size: 4096, coarseSize: 1024 } };
+    const bytes = pack({ ...save, meta });
+
+    expect(() => unpackSave(bytes)).toThrow(/meta\.grid\.size/);
+  });
+
+  it('N2: hrubá mřížka musí k velikosti mapy sedět', async () => {
+    const save = await validSave();
+    const grid = save.meta.grid;
+    expect(grid).toBeDefined();
+    const meta = { ...save.meta, grid: { size: grid!.size, coarseSize: grid!.coarseSize + 1 } };
+
+    expect(() => unpackSave(pack({ ...save, meta }))).toThrow(/coarseSize/);
+  });
+
+  it('N2: svět zůstane celý i po odmítnuté velikosti', async () => {
+    const { world } = await builtCity();
+    const before = world.size;
+    const save = toSaveData(world, OPTIONS);
+    const meta = { ...save.meta, grid: { size: 4096, coarseSize: 1024 } };
+
+    expect(() => applySaveToWorld(world, migrate(unpackSave(pack({ ...save, meta }))))).toThrow();
+    expect(world.size).toBe(before);
+  });
+
+  it('N3: nafouknutý soubor se nerozbalí', async () => {
+    const save = await validSave();
+    // Osm megabajtů nul se zkomprimuje na pár kilobajtů. Skutečný layers.bin
+    // největší mapy má pod dva megabajty, takže tohle je zjevná bomba.
+    const bytes = pack(save, { [SAVE_FILES.layers]: new Uint8Array(8 * 1024 * 1024) });
+    expect(bytes.byteLength).toBeLessThan(200 * 1024);
+
+    expect(() => unpackSave(bytes)).toThrow(/layers\.bin/);
+  });
+
+  it('N3: cizí soubor v archivu se ignoruje, save projde', async () => {
+    const save = await validSave();
+    const bytes = pack(save, { 'neco-ciziho.bin': new Uint8Array(64 * 1024 * 1024) });
+
+    expect(() => applySaveToWorld(createWorld(1), migrate(unpackSave(bytes)))).not.toThrow();
+  });
+
+  it('N5: záporný počet obyvatel je poškozený save', async () => {
+    const save = await validSave();
+    const buildings = save.entities.buildings.map((b, i) =>
+      i === 0 ? { ...b, population: -1_000_000_000 } : b,
+    );
+    const entities = strToU8(JSON.stringify({ ...save.entities, buildings }));
+
+    expect(() =>
+      applySaveToWorld(createWorld(1), migrate(unpackSave(pack(save, { [SAVE_FILES.entities]: entities })))),
+    ).toThrow(/population/);
+  });
+
+  it('N5: budova mimo mapu je poškozený save', async () => {
+    const save = await validSave();
+    const buildings = save.entities.buildings.map((b, i) =>
+      i === 0 ? { ...b, x: 99999, y: -4 } : b,
+    );
+    const entities = strToU8(JSON.stringify({ ...save.entities, buildings }));
+
+    expect(() =>
+      applySaveToWorld(createWorld(1), migrate(unpackSave(pack(save, { [SAVE_FILES.entities]: entities })))),
+    ).toThrow(/\.x/);
+  });
+
+  it('N5: úroveň nad maximem je poškozený save', async () => {
+    const save = await validSave();
+    const buildings = save.entities.buildings.map((b, i) => (i === 0 ? { ...b, level: 99 } : b));
+    const entities = strToU8(JSON.stringify({ ...save.entities, buildings }));
+
+    expect(() =>
+      applySaveToWorld(createWorld(1), migrate(unpackSave(pack(save, { [SAVE_FILES.entities]: entities })))),
+    ).toThrow(/level/);
+  });
+
+  it('N5: půjčka se zápornou jistinou je poškozený save', async () => {
+    const save = await validSave();
+    const finance = {
+      ...save.state.finance,
+      loans: [
+        {
+          id: 1,
+          principal: -1_000_000,
+          remaining: -1_000_000,
+          rate: 4,
+          payment: -50_000,
+          termMonths: 60,
+          paidMonths: 0,
+        },
+      ],
+      nextLoanId: 2,
+    };
+    const state = strToU8(JSON.stringify({ ...save.state, finance }));
+
+    expect(() =>
+      applySaveToWorld(createWorld(1), migrate(unpackSave(pack(save, { [SAVE_FILES.state]: state })))),
+    ).toThrow(/principal/);
+  });
+
+  it('N5: zastávka na neexistující budově z linky vypadne', async () => {
+    const save = await validSave();
+    const transit = {
+      lines: [{ id: 1, mode: 'vanilla:bus', stops: [-1, 1_000_000_000], vehicles: 2, fare: 1, paused: false }],
+      nextLineId: 2,
+    };
+    const state = strToU8(JSON.stringify({ ...save.state, transit }));
+
+    const world = createWorld(1);
+    applySaveToWorld(world, migrate(unpackSave(pack(save, { [SAVE_FILES.state]: state }))));
+
+    expect(world.lines[0]?.stops).toEqual([]);
+  });
+});

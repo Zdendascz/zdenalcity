@@ -1,5 +1,6 @@
 import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
+import { MAX_SAVE_FILE_BYTES } from '@/save/format';
 import { button, el } from './dom';
 import { iconSvg } from './icons';
 import { showHelp } from './help';
@@ -42,6 +43,14 @@ export interface HomeOptions {
   catalogue?: { getAll(type: string): Definition[] };
   /** Přečte vybraný soubor. Jde přes platform vrstvu (§9), ne přes `File` API. */
   readFile: (file: File) => Promise<Uint8Array>;
+  /**
+   * Město, které se při minulém startu nepodařilo načíst (audit N4).
+   *
+   * Nemaže se, odkládá — a tady je jediné místo, kde se s ním dá něco dělat:
+   * stáhnout ho jako soubor a poslat autorovi, nebo ho zahodit. Kdyby se
+   * poškozený autosave mazal, byla by regrese v načítání ztráta bez důkazu.
+   */
+  damaged?: { download: () => void; discard: () => void };
 }
 
 /** Kam se hlásí chyby. Adresa autora, ne obecná schránka. */
@@ -186,6 +195,13 @@ export function showHome(
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    // **Velikost se hlídá dřív, než se soubor přečte** (audit N3). Save
+    // největšího města má hluboko pod megabajt; co je o řád větší, není save
+    // a nemá se dostat ani do paměti, natož do rozbalovače.
+    if (file.size > MAX_SAVE_FILE_BYTES) {
+      note.textContent = t('ui.home.fileTooBig');
+      return;
+    }
     void options.readFile(file).then((bytes) => finish({ kind: 'file', bytes }));
   });
 
@@ -194,6 +210,26 @@ export function showHome(
   actions.append(open, input);
 
   hero.appendChild(actions);
+
+  /** Řádek pod tlačítky: odmítnutý soubor, poškozené město. */
+  const note = el('p', 'home__note');
+  hero.appendChild(note);
+
+  const damaged = options.damaged;
+  if (damaged) {
+    note.textContent = t('ui.home.damaged');
+    const download = button('home__link-button', () => damaged.download());
+    download.textContent = t('ui.home.damagedDownload');
+    const discard = button('home__link-button', () => {
+      damaged.discard();
+      note.textContent = '';
+      row.remove();
+    });
+    discard.textContent = t('ui.home.damagedDiscard');
+    const row = el('p', 'home__note');
+    row.append(download, discard);
+    hero.appendChild(row);
+  }
 
   // Značka sestavení. Datum samo neodpoví na otázku „je to staré?", tak se
   // vypisuje i stáří slovy — a hash, aby šlo nahlášenou chybu přiřadit

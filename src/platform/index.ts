@@ -27,8 +27,14 @@ export interface ModInfo {
  *
  * Pojmenované, ne číslované: `'quick'` a `'autosave'` mají různý životní cyklus
  * a míchat je do jednoho pole by znamenalo pamatovat si, který index je který.
+ *
+ * `'corrupt'` je odkladiště: autosave, který se nepodařilo načíst, se sem
+ * **přesune místo smazání**. Do T106 se mazal, což vypadá jako milosrdenství
+ * — hráč se vždycky dostane do hry — jenže stejnou větví by prošla i regrese
+ * v deserializeru po nasazení nové verze. Pak by o města přišli všichni naráz
+ * a nikdo by neměl co poslat autorovi, protože důkaz se právě smazal.
  */
-export type SaveSlot = 'autosave' | 'quick';
+export type SaveSlot = 'autosave' | 'quick' | 'corrupt';
 
 /**
  * Úložiště savů.

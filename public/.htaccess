@@ -9,6 +9,22 @@
 # (nebo `All`). Když ne, musí tytéž hlavičky nastavit vhost přímo — a Cloudflare
 # před ním navíc potřebuje Cache Rule, protože si svoje TTL řídí sám.
 <IfModule mod_headers.c>
+  # Bezpečnostní hlavičky (bezpečnostní audit, nález N6).
+  #
+  # Dnes nic nerozbíjí a ani neopravují: stránka nespouští cizí skripty, nemá
+  # účty a jediná data, která přijímá, jsou savy. **Jsou tu dopředu kvůli
+  # modům.** Obrázek z modu jde do `img.src`, takže by mod bez CSP mohl
+  # ukazovat na cizí server a hlásit mu, kdo hru hraje.
+  #
+  # `worker-src blob:` a `img-src blob: data:` potřebuje Pixi — jinak by se
+  # nevykreslilo nic. `connect-src 'self'` je to podstatné: hra nikam nevolá.
+  #
+  # Pozor, tohle platí **jen když ho Cloudflare nepřepíše**. Skutečné místo,
+  # kde se hlavičky nastavují, je Transform Rule v Cloudflaru; viz DEPLOY.md.
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+
   # Worker a rozcestník: **nikdy z keše bez zeptání**. Jsou to dva malé soubory
   # a jsou to jediné dva, které rozhodují, jakou verzi hráč uvidí.
   <FilesMatch "^(service-worker\.js|index\.html|manifest\.webmanifest)$">
