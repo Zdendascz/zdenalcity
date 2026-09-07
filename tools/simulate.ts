@@ -500,7 +500,16 @@ export function playGame(
     registry.register(make());
   }
 
-  const systems = createDefaultSystems(content, balance, registry);
+  /*
+   * **Granty se předávají stejně jako ve hře.**
+   *
+   * `createDefaultSystems` je má jako nepovinný parametr s prázdným polem, tak
+   * se na ně dalo zapomenout — a zapomnělo se: simulace celou dobu běžela bez
+   * nich a v datech vycházel medián přiznaných grantů nula. Přitom prahy jsou
+   * na dosah (tisíc obyvatel) a hra za ně platí. `render/app.ts` posílá
+   * `content.grants()`, tak je posílá i simulace.
+   */
+  const systems = createDefaultSystems(content, balance, registry, content.grants());
   // Příkazy jdou přes hosta — tytéž dveře jako klikání v rozhraní. Tikáme ale
   // přímo, protože `step()` je jen přepočet reálného času na tiky a simulace
   // žádný reálný čas nemá.
@@ -1032,6 +1041,24 @@ class Player {
     // Rezerva zůstává dvojnásobná; bourá se až to, co je i nad ní.
     const keep = needed / POWER_HEADROOM + POWER_BASE;
     if (produced <= keep * 2) return;
+
+    /*
+     * **Prodělečná linka se ruší.**
+     *
+     * Vozidla mají údržbu a jízdné ji nemusí pokrýt: po propadu města zbyde
+     * linka, která veze pár lidí a stojí jako dřív. Hráč, který škrtá, ji
+     * zruší — je to jediné, co se s ní dá udělat, a je to i jediné použití
+     * `delete_line` v celé simulaci.
+     */
+    for (const line of this.world.lines) {
+      const stats = this.world.lineStats.get(line.id);
+      if (!stats || stats.upkeep <= 0) continue;
+      if (stats.income >= stats.upkeep) continue;
+      if (this.send({ type: 'delete_line', lineId: line.id })) {
+        this.plan.lines = this.plan.lines.filter((id) => id !== line.id);
+        return;
+      }
+    }
 
     let smallest: { x: number; y: number; output: number } | null = null;
     for (const building of this.world.buildings.values()) {
@@ -1866,6 +1893,31 @@ class Player {
         if (this.send({ type: 'place_building', definitionId: definition.id, x, y })) {
           this.plan.tried.delete(definition.id);
           return true;
+        }
+
+        /*
+         * Když ani rovnání nepomůže, sáhne hráč po **jednotlivém rohu**.
+         *
+         * Je to druhý terénní nástroj ve hře a používá se přesně takhle: plocha
+         * se srovnala, ale jeden roh vyčnívá — třeba proto, že ho drží sousední
+         * silnice, kterou rovnání nesmí rozbít. Sníží se nejvyšší roh parcely
+         * o patro a stavba se zkusí znovu.
+         */
+        const side = this.world.size + 1;
+        let highest = { corner: -1, height: -1, cx: 0, cy: 0 };
+        for (let cy = y; cy <= y + d; cy++) {
+          for (let cx = x; cx <= x + w; cx++) {
+            const height = this.world.cornerHeight[cy * side + cx] ?? 0;
+            if (height <= highest.height) continue;
+            highest = { corner: cy * side + cx, height, cx, cy };
+          }
+        }
+        if (highest.corner >= 0 && highest.height > 0) {
+          this.send({ type: 'terraform_corner', x: highest.cx, y: highest.cy, delta: -1 });
+          if (this.send({ type: 'place_building', definitionId: definition.id, x, y })) {
+            this.plan.tried.delete(definition.id);
+            return true;
+          }
         }
       }
     }
