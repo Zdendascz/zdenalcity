@@ -215,12 +215,16 @@ export function showHome(
     ),
   );
 
+  // Odkazy o hře patří **do hlavičky, vpravo nahoře**, ne pod galerii
+  // (rozhodnutí autora). Dole splývaly s obsahem stránky a hráč je hledal;
+  // v rohu nad obrázkem jsou hned vidět a nic nepřebíjejí.
+  hero.appendChild(aboutRow(t, root, options));
+
   root.appendChild(hero);
 
   // --- řady karet ---------------------------------------------------------
 
   root.appendChild(galleryRow(t, root));
-  root.appendChild(aboutRow(t, root, options));
 
   parent.appendChild(root);
 
@@ -422,19 +426,20 @@ const SHARE_NOTE_MS = 2500;
 /**
  * Odkazy o hře: sdílení, nápověda, autor a Discord.
  *
- * **Sloupec vpravo, ne řada přes celou stránku.** Čtyři široké karty pod
- * galerií vypadaly jako druhá nabídka a přetahovaly pozornost obrázkům, kvůli
- * kterým na stránce jsou. Autor to popsal takhle: „doprava pod sebe, trochu
- * menší, méně nápadně." Jsou to odkazy, ne rozcestník — hráč po nich sáhne až
- * potom, co si hru prohlédl.
+ * **Sloupec vpravo nahoře, přes hlavičku.** Čtyři široké karty přes celou
+ * stránku vypadaly jako druhá nabídka a přetahovaly pozornost obrázkům, kvůli
+ * kterým na stránce jsou; pod galerií zase splývaly s koncem stránky a hráč je
+ * hledal. Autor to popsal takhle: „vpravo nahoře přes hero, pod sebe, trochu
+ * menší, méně nápadně." Jsou to odkazy, ne rozcestník.
  *
  * Ikona je z téže sady jako ve hře, takže sloupec drží styl a řádek se dá
  * poznat dřív, než se přečte.
  */
 function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOptions): HTMLElement {
-  const section = el('section', 'home__row home__row--about');
+  const section = el('section', 'home__about');
+  // Nadpis „O hře" tu **není schválně**: nad fotkou by se špatně četl a čtyři
+  // pojmenované řádky s ikonou se představovat nemusí.
   const strip = el('div', 'home__links');
-  strip.appendChild(el('h2', 'home__links-title', t('ui.home.about')));
 
   /** Jeden řádek sloupce: ikona, název, popisek pod ním. */
   function fill(node: HTMLElement, icon: string, title: string, note: string): HTMLElement {

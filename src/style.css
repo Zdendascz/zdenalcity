@@ -1554,26 +1554,23 @@ body {
  * Teď je to sloupec u pravého okraje, menší písmo a tiché pozadí; odkazy jsou
  * po ruce, ale nekřičí.
  */
-.home__row--about {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
+/*
+ * Sloupec leží **v hlavičce vpravo nahoře, nad obrázkem**. Absolutně, aby
+ * neposouval nadpis ani tlačítka: hlavička se skládá zespodu (`flex-end`)
+ * a odkazy do toho toku nepatří.
+ */
+.home__about {
+  position: absolute;
+  top: clamp(16px, 3vw, 28px);
+  right: clamp(16px, 4vw, 48px);
+  z-index: 1;
 }
 
 .home__links {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: min(320px, 100%);
-}
-
-.home__links-title {
-  margin: 0 0 2px;
-  color: #8fa3ab;
-  font-weight: 600;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  width: min(280px, 60vw);
 }
 
 .home__link {
@@ -1581,9 +1578,11 @@ body {
   gap: 10px;
   align-items: center;
   padding: 8px 10px;
-  border: 1px solid rgb(238 243 245 / 8%);
+  border: 1px solid rgb(238 243 245 / 10%);
   border-radius: 8px;
-  background: rgb(14 32 40 / 45%);
+  /* Nad fotkou musí být podklad hutnější než dole nad tmavou stránkou. */
+  background: rgb(9 24 30 / 62%);
+  backdrop-filter: blur(4px);
   color: #dbe6ea;
   font: inherit;
   text-align: left;
