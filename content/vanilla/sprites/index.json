@@ -1205,11 +1205,11 @@
       "building": "vanilla:industrial_hall",
       "variant": "b",
       "file": "industrial_hall__b.png",
-      "width": 640,
-      "height": 398,
+      "width": 512,
+      "height": 318,
       "anchor": [
-        384,
-        398
+        307,
+        318
       ]
     },
     {
@@ -1359,11 +1359,11 @@
       "building": "vanilla:industrial_row",
       "variant": "a",
       "file": "industrial_row__a.png",
-      "width": 384,
-      "height": 206,
+      "width": 315,
+      "height": 169,
       "anchor": [
-        233,
-        206
+        210,
+        169
       ]
     },
     {
@@ -1491,33 +1491,33 @@
       "building": "vanilla:industrial_yard",
       "variant": "a",
       "file": "industrial_yard__a.png",
-      "width": 384,
-      "height": 203,
+      "width": 256,
+      "height": 135,
       "anchor": [
-        256,
-        203
+        171,
+        135
       ]
     },
     {
       "building": "vanilla:industrial_yard",
       "variant": "b",
       "file": "industrial_yard__b.png",
-      "width": 384,
-      "height": 465,
+      "width": 264,
+      "height": 320,
       "anchor": [
-        256,
-        465
+        176,
+        320
       ]
     },
     {
       "building": "vanilla:industrial_yard",
       "variant": "c",
       "file": "industrial_yard__c.png",
-      "width": 384,
-      "height": 333,
+      "width": 235,
+      "height": 204,
       "anchor": [
-        256,
-        333
+        157,
+        204
       ]
     },
     {
@@ -2338,11 +2338,11 @@
       "building": "vanilla:residential_terraces",
       "variant": "c",
       "file": "residential_terraces__c.png",
-      "width": 640,
-      "height": 534,
+      "width": 463,
+      "height": 387,
       "anchor": [
-        384,
-        534
+        278,
+        387
       ]
     },
     {
@@ -2855,11 +2855,11 @@
       "building": "vanilla:theatre",
       "variant": "b",
       "file": "theatre__b.png",
-      "width": 512,
-      "height": 512,
+      "width": 254,
+      "height": 254,
       "anchor": [
-        256,
-        512
+        127,
+        254
       ]
     },
     {

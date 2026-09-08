@@ -282,6 +282,59 @@ def base_diamond(image: Image.Image) -> tuple[float, int] | None:
     return (x1 - x0) / (2 * half), int(round(bottom_x))
 
 
+def base_corners(image: Image.Image) -> tuple[float, float] | None:
+    """Kolik dlaždic je podstava široká a hluboká. `None`, když to nejde změřit.
+
+    Čte se z týchž dvou spodních hran jako `base_diamond`, jen se z nich místo
+    poměru dopočítají **výšky rohů nad spodním vrcholem**. Geometrie: proti
+    jižnímu vrcholu leží západní roh výš o `šířku` dlaždic a východní o
+    `hloubku` — plyne to přímo z projekce, kde krok v ose x jde doprava dolů
+    a krok v ose y doleva dolů.
+
+    Měří se **až na hotovém obrázku**, tedy po zmáčknutí na 2 : 1 a po zvětšení
+    na šířku parcely. Do té doby jsou to jiné jednotky.
+    """
+    alpha = np.asarray(image)[:, :, 3] > 40
+    cols = np.where(alpha.any(axis=0))[0]
+    if cols.size < 64:
+        return None
+
+    x0, x1 = int(cols[0]), int(cols[-1])
+    xs = np.arange(x0, x1 + 1)
+    bottom = np.array([np.where(alpha[:, x])[0][-1] for x in xs], dtype=float)
+    apex = int(np.argmax(bottom))
+    if apex < 8 or apex > len(xs) - 9:
+        return None
+
+    def fit(a: int, b: int) -> tuple[float, float] | None:
+        if b - a < 16:
+            return None
+        px = xs[a:b + 1].astype(float)
+        py = bottom[a:b + 1]
+        slope, intercept = np.polyfit(px, py, 1)
+        span = max(1.0, abs(slope) * (px[-1] - px[0]))
+        if np.median(np.abs(py - (slope * px + intercept))) > span * 0.02:
+            return None
+        return float(slope), float(intercept)
+
+    left = fit(0, apex)
+    right = fit(apex, len(xs) - 1)
+    if left is None or right is None:
+        return None
+
+    y_left = left[0] * x0 + left[1]
+    y_right = right[0] * x1 + right[1]
+    bottom_x = (right[1] - left[1]) / (left[0] - right[0])
+    bottom_y = left[0] * bottom_x + left[1]
+
+    tile = (TILE_H // 2) * SCALE
+    width_tiles = (bottom_y - y_left) / tile
+    depth_tiles = (bottom_y - y_right) / tile
+    if width_tiles <= 0.1 or depth_tiles <= 0.1:
+        return None
+    return width_tiles, depth_tiles
+
+
 # Poslední pojistka. Že je úhel neobvyklý, **není** důvod k zamítnutí —
 # generátor kreslí od 1,19 : 1 po 1,60 : 1 a všechno z toho jsou poctivé
 # projekce. Tvar podstavy hlídá `base_diamond`; tohle chytá jen nesmysl.
@@ -289,6 +342,20 @@ def base_diamond(image: Image.Image) -> tuple[float, int] | None:
 # Podíl šířky spritu. Šest procent je zhruba desetina dlaždice — na to, aby to
 # pobralo převis stromů a balkonů, ale ne špatně poznanou podstavu.
 ANCHOR_TOLERANCE = 0.06
+
+# O kolik smí podstava přerůst parcelu, než se obrázek zmenší.
+#
+# Pětina, ne pár procent. Měření podstavy má vlastní chybu — na rohu stojí
+# strom nebo lampa, hrana není úplně rovná — a při pěti procentech vyšlo
+# 54 obrázků z 285 „přes parcelu", většina o osm procent. To není nález,
+# to je šum, a přeladit kvůli němu půlku obrázků by v diffu utopilo tu
+# hrstku, kde je opravdu problém. Skutečné případy trčí: 1,2 a výš.
+PLATE_TOLERANCE = 1.2
+
+# Když podstavu změřit nejde, rozhoduje výška — a ta je měřítko hrubé, takže
+# se povoluje víc. Nad tímhle násobkem `heightLevels` už to není vysoká
+# architektura, ale obrázek nakreslený na větší parcelu.
+HEIGHT_FALLBACK = 1.35
 
 RATIO_MIN, RATIO_MAX = 0.7, 3.0
 # Pod tímhle rozdílem se neopravuje. Zmenšit o procento nemá cenu a jen by to
@@ -472,6 +539,68 @@ def process(path: Path, definitions: dict[str, dict], write: bool) -> tuple[str,
             resized = resized.transpose(Image.FLIP_LEFT_RIGHT)
             measured_x = target_w - measured_x
             notes.append('  ← nakreslený napříč parcelou, zrcadlím (světlo se překlopí)')
+    # Podstava se musí **vejít do parcely**.
+    #
+    # Do teď se hlídala jen šířka obrázku a poměr stran podstavy. To stačí,
+    # dokud generátor nakreslí zem přesně na tvar, o který se ho prosí — jenže
+    # on kreslí, co uzná: `industrial_yard` má u všech tří variant podstavu
+    # zhruba čtvercovou (1,5 × 1,5 a 2,9 × 1,6) přesto, že parcela je 2 × 1.
+    # Šířka obrázku pak sedí, ale zem přeteče o půl dlaždice dozadu a budova
+    # leze sousedovi na střechu. Autor to hlásil takhle: „tady jsou úplně ujeté
+    # budovy... úplně mimo!" — a klikl přesně na tři takové haly.
+    #
+    # Obrázek se proto **zmenší, dokud se podstava do parcely nevejde**.
+    # Zmenšená hala na velké parcele není hezká, ale je to poctivé: budova
+    # stojí na svém a nikam nepřetéká. Sedne si k jižnímu rohu, tedy k ulici,
+    # což je u haly u silnice to správné místo. Skutečná oprava je obrázek
+    # překreslit, což tenhle nástroj neumí — proto se to hlásí.
+    #
+    # Zkosit podstavu do správného tvaru nejde: obrázek je pohled na hotovou
+    # stavbu, ne textura. Zkosením by se rozjela svislice.
+    plate = base_corners(resized)
+    if plate is None:
+        # Podstavu nejde změřit, když stavba sahá až ke spodní hraně obrázku
+        # a silueta zdola nemá „V". Zbývá **výška**: o kolik je obrázek vyšší,
+        # než kolik čeká `heightLevels`. Je to hrubší měřítko, tak se povoluje
+        # větší odchylka — architektura smí být vyšší, než hra počítá, ale ne
+        # o polovinu. Přesně tak vypadá `industrial_yard__b`, hala nakreslená
+        # na parcelu skoro dvakrát hlubší, na kterou autor klikl jako první.
+        tall = target_h / spec['height']
+        if tall > HEIGHT_FALLBACK:
+            shrunk_w = max(1, round(target_w / tall))
+            shrunk_h = max(1, round(target_h / tall))
+            resized = resized.resize((shrunk_w, shrunk_h), Image.LANCZOS)
+            notes.append(
+                f'  ← podstavu nejde změřit a obrázek je o {(tall - 1) * 100:.0f} % vyšší, '
+                f'než čeká {spec["levels"]} pater, zmenšuji na {100 / tall:.0f} % '
+                f'(obrázek patří překreslit)'
+            )
+            target_w, target_h = shrunk_w, shrunk_h
+            again = base_diamond(resized)
+            measured_x = again[1] if again else None
+            expected_x = round(target_w * footprint_w / (footprint_w + footprint_d))
+            tolerance = target_w * ANCHOR_TOLERANCE
+        else:
+            notes.append('  ← podstavu nejde změřit, velikost nekontroluji')
+    else:
+        overflow = max(plate[0] / footprint_w, plate[1] / footprint_d)
+        if overflow > PLATE_TOLERANCE:
+            shrunk_w = max(1, round(target_w / overflow))
+            shrunk_h = max(1, round(target_h / overflow))
+            resized = resized.resize((shrunk_w, shrunk_h), Image.LANCZOS)
+            notes.append(
+                f'  ← podstava {plate[0]:.1f} × {plate[1]:.1f} nesedí na parcelu '
+                f'{footprint_w} × {footprint_d}, zmenšuji na {100 / overflow:.0f} % '
+                f'(obrázek patří překreslit)'
+            )
+            target_w, target_h = shrunk_w, shrunk_h
+            # Kotva se po zmenšení musí změřit znovu — spodní vrchol podstavy
+            # je jinde a dopočet z půdorysu by zmenšenou budovu posadil na jižní
+            # roh parcely místo doprostřed.
+            again = base_diamond(resized)
+            measured_x = again[1] if again else None
+            expected_x = round(target_w * footprint_w / (footprint_w + footprint_d))
+            tolerance = target_w * ANCHOR_TOLERANCE
 
     if measured_x is None:
         anchor_x = expected_x
@@ -524,6 +653,17 @@ def main() -> int:
         print(f'V {RAW.relative_to(ROOT)} nic není.')
         return 0
 
+    # `--only <text>` zpracuje jen obrázky, jejichž jméno ten text obsahuje.
+    # Přeladit jednu budovu je běžnější než přeladit všech dvě stě osmdesát,
+    # a přepsat je všechny kvůli jedné znamená dvě stě osmdesát řádků v diffu,
+    # ze kterých se ta jedna změna nedá vyčíst.
+    if '--only' in sys.argv:
+        needle = sys.argv[sys.argv.index('--only') + 1]
+        files = [p for p in files if needle in p.stem]
+        print(f'Filtr „{needle}": {len(files)} obrázků.')
+        if not files:
+            return 0
+
     ok = 0
     failed: list[str] = []
     for order, path in enumerate(files, 1):
@@ -566,6 +706,14 @@ def main() -> int:
                 ANCHORS[stem] = keep
         print()
         print(f'Nepovedlo se {len(failed)}; jejich záznamy zůstávají z minula.')
+
+    # Co se tenhle běh nezpracovalo — protože to odfiltroval `--only` — si
+    # ponechá záznam z minula. Bez toho by manifest obsahoval jen zpracované
+    # sprity a hra by zbytku města nakreslila kvádry.
+    if write:
+        for path in sorted(OUT.glob('*.png')):
+            if path.stem not in ANCHORS and path.stem in PREVIOUS:
+                ANCHORS[path.stem] = PREVIOUS[path.stem]
 
     if write and ok:
         index = {

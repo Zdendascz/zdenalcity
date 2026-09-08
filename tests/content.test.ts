@@ -472,10 +472,28 @@ describe('sprity sedí na svém půdorysu', () => {
         const sprite = registry.getSprite(definition.id, variant);
         if (!sprite) continue;
 
-        // Podstava je široká `(w + d)` půldlaždic; `scale` je nadvzorkování.
+        /*
+         * Podstava je široká `(w + d)` půldlaždic; `scale` je nadvzorkování.
+         *
+         * Do T113 se čekala **rovnost**. Jenže generátor kreslí zem, jakou
+         * uzná, ne jakou si objednáme: `industrial_yard` má u všech tří
+         * variant podstavu skoro čtvercovou, přestože parcela je 2 × 1. Šířka
+         * pak seděla, ale zem přetekla o půl dlaždice dozadu a hala lezla
+         * sousedovi na střechu — autor to hlásil jako „úplně ujeté budovy".
+         * `fit-sprites.py` takový obrázek zmenší, aby se podstava do parcely
+         * vešla, takže je **užší** než parcela. Přerůst ji nesmí nikdy.
+         */
         const expectedWidth = (w + d) * 32 * sprite.scale;
-        if (sprite.width !== expectedWidth) {
-          problems.push(`${definition.id}|${variant}: šířka ${sprite.width}, čekám ${expectedWidth}`);
+        if (sprite.width > expectedWidth) {
+          problems.push(
+            `${definition.id}|${variant}: šířka ${sprite.width} přerůstá parcelu (${expectedWidth})`,
+          );
+        }
+        // A zmenšit se smí jen potud, aby budova na parcele nebyla ztracená.
+        if (sprite.width < expectedWidth * 0.45) {
+          problems.push(
+            `${definition.id}|${variant}: šířka ${sprite.width} je proti parcele (${expectedWidth}) drobek`,
+          );
         }
 
         const expectedX = (sprite.width * w) / (w + d);
