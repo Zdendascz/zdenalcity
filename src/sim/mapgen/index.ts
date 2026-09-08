@@ -55,6 +55,49 @@ export interface GeneratedMap {
   cornerHeight: Uint8Array;
 }
 
+/**
+ * Co si o krajině přeje hráč, než se mapa vygeneruje.
+ *
+ * Autor: „při vytváření nové mapy musí být možnost upravit podíl vody, souše
+ * a kopců." Souš je doplněk vody, takže čísla jsou dvě.
+ *
+ * `seaLevel` je **kvantil**, ne hladina — 0,3 vždycky znamená „třetina mapy
+ * je voda", ať šum u toho seedu vyšel jakkoli. `maxHeight` je počet pater
+ * nejvyššího kopce; nula dá placku.
+ */
+export interface MapChoice {
+  seaLevel: number;
+  maxHeight: number;
+}
+
+/**
+ * Volba hráče vražená do balancu. Generátor jiný vstup nezná (P5).
+ *
+ * Přepisují se **tři** čísla, ne dvě. To třetí je `minLandShare`: generátor
+ * si hlídá, aby souš nebyla roztříštěná na ostrůvky, a když je, **ubere vodu**
+ * a zkusí to znovu (`shapeCoastline`). Při výchozích 28 % to je záchranná
+ * brzda, ale hráči, který si posuvníkem vyžádal 55 % vody, vrátila mapu
+ * s 28 % — pětkrát po sobě ubrala pětinu a skončila skoro tam, kde začala.
+ * Změřeno: souš 72 % při obou nastaveních.
+ *
+ * Čím víc vody než kolik chce obsah, tím míň se proto trvá na jednom celistvém
+ * kusu. Archipel je při padesáti procentech vody **přání, ne porucha** — a most
+ * hra umí. Výchozí generování se tím nemění: bez přání je přírůstek nula.
+ */
+export function balanceWithMap(balance: Balance, choice: MapChoice | undefined): Balance {
+  if (!choice) return balance;
+  const extraWater = Math.max(0, choice.seaLevel - balance.map.seaLevel);
+  return {
+    ...balance,
+    map: {
+      ...balance.map,
+      seaLevel: choice.seaLevel,
+      maxHeight: choice.maxHeight,
+      minLandShare: Math.max(0.5, balance.map.minLandShare - extraWater * 1.2),
+    },
+  };
+}
+
 export function generateTerrain(
   seed: number,
   balance: Balance,

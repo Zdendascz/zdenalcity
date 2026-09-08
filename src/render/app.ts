@@ -33,7 +33,7 @@ import type { CommandResult } from '@/sim/result';
 import { cornerIndex, tileBaseHeight, tileCorners } from '@/sim/heights';
 import { DEFAULT_MAP_SIZE, TERRAIN, ZONE, index } from '@/sim/layers';
 import type { MapSize } from '@/sim/layers';
-import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
+import { applyGeneratedMap, balanceWithMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
 import { createSimHost, SPEEDS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
@@ -969,7 +969,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   if (!restored) {
     applyGeneratedMap(
       simWorld,
-      generateTerrain(newGame.seed, content.getBalance(), simWorld.size),
+      // Krajina podle posuvníků z dialogu. Generátor o dialogu neví — dostane
+      // balanc s přepsanými dvěma čísly a počítá jako vždycky.
+      generateTerrain(newGame.seed, balanceWithMap(content.getBalance(), newGame.map), simWorld.size),
     );
     // Ze seedu jde tenhle terén kdykoli vygenerovat znovu, tak ať to save ví.
     simWorld.map = { seed: newGame.seed, generated: true };

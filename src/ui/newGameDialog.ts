@@ -1,7 +1,10 @@
 import type { Balance } from '@/content/balance';
 import { DEFAULT_MAP_SIZE, MAP_SIZES, TERRAIN } from '@/sim/layers';
+import { cornerSizeOf } from '@/sim/heights';
 import type { MapSize } from '@/sim/layers';
-import { generateTerrain } from '@/sim/mapgen';
+import { balanceWithMap, generateTerrain } from '@/sim/mapgen';
+import type { MapChoice } from '@/sim/mapgen';
+import { MAX_HEIGHT } from '@/sim/heights';
 import { button, el } from './dom';
 import type { I18n } from './i18n';
 
@@ -29,11 +32,29 @@ export interface NewGame {
    */
   disasters: boolean;
   /**
+   * Jakou krajinu si hráč nastavil. Generátor ji dostane jako přepis balancu,
+   * takže sám o dialogu nic neví (P5).
+   *
+   * Chybí u návratu do rozehraného města a u načteného souboru: tam si mapu
+   * nese save a generátor se nespouští vůbec.
+   */
+  map?: MapChoice;
+  /**
    * Hráč chce pokračovat v rozehraném městě, ne zakládat nové. Jméno a seed
    * si pak hra vezme ze savu, ne odsud.
    */
   resume?: boolean;
 }
+
+/**
+ * Meze posuvníků krajiny.
+ *
+ * Voda se nepouští k nule ani k jedné: mapa úplně bez vody nemá kde vzít
+ * vodárnu a mapa ze tří čtvrtin pod vodou nemá kde stavět. Kopce smějí až na
+ * placku — rovina je legitimní přání, ne chyba.
+ */
+const WATER_MIN = 0.05;
+const WATER_MAX = 0.6;
 
 export interface NewGameOptions {
   /** Je co obnovit? Bez toho se tlačítko „Pokračovat" vůbec neukáže. */
@@ -67,6 +88,40 @@ function randomSeed(): number {
 }
 
 /**
+ * Jeden posuvník s popiskem a hodnotou vpravo.
+ *
+ * Hodnotu píše volající do `readout`, ne tenhle kód: u vody jsou to procenta,
+ * u kopců patra, a formátovat obojí jednou funkcí by znamenalo parametr navíc
+ * jen kvůli znaku procenta.
+ */
+function slider(
+  parent: HTMLElement,
+  label: string,
+  readout: HTMLElement,
+  min: number,
+  max: number,
+  value: number,
+  onChange: (value: number) => void,
+): HTMLInputElement {
+  const field = el('label', 'dialog__field dialog__field--slider');
+  const head = el('div', 'dialog__slider-head');
+  head.appendChild(el('span', undefined, label));
+  head.appendChild(readout);
+  field.appendChild(head);
+
+  const input = el('input', 'dialog__slider');
+  input.type = 'range';
+  input.min = String(min);
+  input.max = String(max);
+  input.step = '1';
+  input.value = String(value);
+  input.addEventListener('input', () => onChange(Number(input.value)));
+  field.appendChild(input);
+  parent.appendChild(field);
+  return input;
+}
+
+/**
  * Ukáže dialog a počká, až hráč vybere. Vrací zvolené jméno a seed.
  *
  * `Math.random` tady vadit nemůže: P2 zakazuje náhodu **v simulaci**, ne v UI,
@@ -79,6 +134,9 @@ export function showNewGameDialog(
   options: NewGameOptions = { canResume: false },
 ): Promise<NewGame> {
   const t = (key: string) => i18n.t(key);
+  const t2 = (key: string, params: Record<string, string | number>) => i18n.t(key, params);
+  // Výchozí krajina je ta z obsahu, ne z kódu: mod si ji přenastaví (P5).
+  const choice: MapChoice = { seaLevel: balance.map.seaLevel, maxHeight: balance.map.maxHeight };
   let resolveGame: (game: NewGame) => void = () => {};
 
   const overlay = el('div', 'dialog__backdrop');
@@ -121,8 +179,47 @@ export function showNewGameDialog(
   seedLabel.appendChild(seedInput);
   form.appendChild(seedLabel);
 
+  /*
+   * Posuvníky krajiny.
+   *
+   * Vedle sebe, hned nad náhledem — hráč jimi hýbe a dívá se, co to udělá,
+   * takže mezi ovladačem a obrázkem nemá co stát. Náhled se překresluje při
+   * každém posunu, ne až po puštění: generátor 128×128 trvá jednotky
+   * milisekund a čekání by z posuvníku udělalo hádanku.
+   */
+  const terrainFields = el('div', 'dialog__terrain');
+
+  const waterValue = el('span', 'dialog__slider-value');
+  slider(
+    terrainFields,
+    t('ui.newGame.water'),
+    waterValue,
+    Math.round(WATER_MIN * 100),
+    Math.round(WATER_MAX * 100),
+    Math.round(choice.seaLevel * 100),
+    (percent) => {
+      choice.seaLevel = percent / 100;
+      draw();
+    },
+  );
+
+  const hillsValue = el('span', 'dialog__slider-value');
+  slider(
+    terrainFields,
+    t('ui.newGame.hills'),
+    hillsValue,
+    0,
+    MAX_HEIGHT,
+    choice.maxHeight,
+    (levels) => {
+      choice.maxHeight = levels;
+      draw();
+    },
+  );
+
   dialog.appendChild(form);
   dialog.appendChild(sizeLabel);
+  dialog.appendChild(terrainFields);
   dialog.appendChild(disasterLabel);
 
   const canvas = el('canvas', 'dialog__preview');
@@ -160,7 +257,7 @@ export function showNewGameDialog(
     if (!context) return;
 
     const started = performance.now();
-    const { terrain } = generateTerrain(seed, balance, size);
+    const { terrain, cornerHeight } = generateTerrain(seed, balanceWithMap(balance, choice), size);
 
     // Jeden pixel na dlaždici; roztažení na 384 bodů obstará CSS
     // (`image-rendering: pixelated`). Do T43 se kreslily obdélníky, což u
@@ -169,15 +266,31 @@ export function showNewGameDialog(
     canvas.width = size;
     canvas.height = size;
     const image = context.createImageData(size, size);
+    // Náhled **stínuje podle výšky**. Bez toho by posuvník kopců nedělal na
+    // obrázku vůbec nic — barva terénu na patrech nezávisí — a hráč by hýbal
+    // něčím, co nevidí. Roh stačí jeden: jde o dojem z reliéfu, ne o měření.
+    const corners = cornerSizeOf(size);
     for (let tile = 0; tile < terrain.length; tile++) {
       const rgb = PREVIEW_RGB[terrain[tile] ?? TERRAIN.grass] ?? BLACK;
+      const x = tile % size;
+      const y = (tile - x) / size;
+      const floors = cornerHeight[y * corners + x] ?? 0;
+      const shade = choice.maxHeight > 0 ? 0.78 + (floors / choice.maxHeight) * 0.42 : 1;
       const at = tile * 4;
-      image.data[at] = rgb[0];
-      image.data[at + 1] = rgb[1];
-      image.data[at + 2] = rgb[2];
+      image.data[at] = Math.min(255, Math.round(rgb[0] * shade));
+      image.data[at + 1] = Math.min(255, Math.round(rgb[1] * shade));
+      image.data[at + 2] = Math.min(255, Math.round(rgb[2] * shade));
       image.data[at + 3] = 255;
     }
     context.putImageData(image, 0, 0);
+
+    waterValue.textContent = t2('ui.newGame.waterValue', {
+      percent: Math.round(choice.seaLevel * 100),
+    });
+    hillsValue.textContent =
+      choice.maxHeight === 0
+        ? t('ui.newGame.hillsFlat')
+        : t2('ui.newGame.hillsValue', { levels: choice.maxHeight });
 
     let land = 0;
     for (const value of terrain) if (value !== TERRAIN.water) land++;
@@ -197,7 +310,14 @@ export function showNewGameDialog(
   if (options.canResume) {
     const resume = button('chip chip--primary', () => {
       overlay.remove();
-      resolveGame({ cityName: '', seed, size, disasters: disasterInput.checked, resume: true });
+      resolveGame({
+        cityName: '',
+        seed,
+        size,
+        disasters: disasterInput.checked,
+        map: { ...choice },
+        resume: true,
+      });
     });
     resume.textContent = t('ui.newGame.resume');
     actions.appendChild(resume);
@@ -224,6 +344,7 @@ export function showNewGameDialog(
       seed,
       size,
       disasters: disasterInput.checked,
+      map: { ...choice },
     });
   });
   start.textContent = t('ui.newGame.start');

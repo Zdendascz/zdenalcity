@@ -1241,6 +1241,40 @@ body {
   gap: 6px;
 }
 
+/*
+ * Posuvníky krajiny stojí **nad náhledem** a vedle sebe: hráč jimi hýbe
+ * a dívá se, co to udělá s obrázkem, takže mezi ovladačem a náhledem nemá
+ * co stát.
+ */
+.dialog__terrain {
+  display: flex;
+  gap: 16px;
+}
+
+.dialog__field--slider {
+  flex: 1;
+  gap: 4px;
+}
+
+.dialog__slider-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+/* Hodnota vpravo od popisku, tlumeně: čte se až po tom, co posuvník ukázal. */
+.dialog__slider-value {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dialog__slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
 /* Náhled je bitmapa o hraně mapy; bez tohohle by ho prohlížeč rozmazal. */
 .dialog__preview {
   width: 384px;
