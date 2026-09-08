@@ -755,7 +755,26 @@ export interface Balance {
     thresholds: number[];
     hysteresis: number;
     cooldown: number;
+    /**
+     * Kolik vyhodnocení po sobě musí být budova pod prahem, než klesne.
+     *
+     * Je to **lhůta z důvěry**, ne potvrzení měření: budova, které spadla cena
+     * půdy, drží ještě nějakou dobu v očekávání, že to hráč spraví — postaví
+     * park, dotáhne služby, uklidí trosky. Jedno vyhodnocení je 20 tiků, rok
+     * má 360, takže devět vyhodnocení je zhruba půl roku.
+     */
     downgradeConfirm: number;
+    /**
+     * O kolik je lhůta delší u velkých budov.
+     *
+     * Rozhodnutí autora: „malý domek zchátrá pětkrát rychleji než největší
+     * budova". Velký dům se staví dlouho, stojí majlant a jeho zánik je pro
+     * čtvrť pohroma — má mít odpovídající setrvačnost. Násobek se počítá
+     * z **plochy půdorysu**: `1 + (dlaždice − 1) × perTile`, shora omezený.
+     * U vanilla obsahu jde plocha od 1 (1 × 1) do 9 (3 × 3), takže s `perTile`
+     * 0,5 vyjde přesně pětinásobek.
+     */
+    sizePatience: { perTile: number; max: number };
     decayAge: number;
     decayCoverageThreshold: number;
     /**
@@ -1252,6 +1271,24 @@ export function validateBalance(raw: unknown): {
       hysteresis: num(issues, levels, 'hysteresis', 'levels.hysteresis', 0, 255),
       cooldown: num(issues, levels, 'cooldown', 'levels.cooldown', 0, 100000),
       downgradeConfirm: num(issues, levels, 'downgradeConfirm', 'levels.downgradeConfirm', 1, 100),
+      sizePatience: {
+        perTile: num(
+          issues,
+          asRecord(levels?.['sizePatience']),
+          'perTile',
+          'levels.sizePatience.perTile',
+          0,
+          10,
+        ),
+        max: num(
+          issues,
+          asRecord(levels?.['sizePatience']),
+          'max',
+          'levels.sizePatience.max',
+          1,
+          100,
+        ),
+      },
       decayAge: num(issues, levels, 'decayAge', 'levels.decayAge', 0, 1000000),
       decayCoverageThreshold: num(
         issues,

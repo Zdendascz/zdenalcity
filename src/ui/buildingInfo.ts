@@ -2,6 +2,8 @@ import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
 import type { ParcelExplanation } from '@/sim/diagnostics';
 import { buildingMonthlyTax, buildingMonthlyUpkeep } from '@/sim/systems/economy';
+import { downgradeGrace, LEVEL_INTERVAL } from '@/sim/systems/levels';
+import { TICKS_PER_YEAR } from '@/sim/disasters/risk';
 import type { Building, WorldState } from '@/sim/world';
 import { ROAD, TERRAIN } from '@/sim/layers';
 import { iconSvg } from './icons';
@@ -367,6 +369,30 @@ export class BuildingInfo {
                   : city.waterNeeded,
             ),
           }),
+        ),
+      );
+    }
+
+    /*
+     * Odpočet chátrání.
+     *
+     * Budova pod prahem nespadne hned — drží lhůtu, která roste s její
+     * velikostí (`downgradeGrace`). Bez tohohle řádku o tom hráč neví vůbec
+     * a povýšený dům mu prostě jednou zmizí. Tady vidí, že se něco děje,
+     * a hlavně **kolik času má na nápravu**.
+     */
+    const waiting = world.downgradeStreak.get(building.id) ?? 0;
+    if (waiting > 0) {
+      const grace = downgradeGrace(this.balance, definition);
+      const months = Math.max(
+        1,
+        Math.round(((grace - waiting) * LEVEL_INTERVAL * 12) / TICKS_PER_YEAR),
+      );
+      left.appendChild(
+        el(
+          'p',
+          'sheet__warning',
+          t(building.level > 1 ? 'ui.info.decayWarning' : 'ui.info.decayWarningLast', { months }),
         ),
       );
     }

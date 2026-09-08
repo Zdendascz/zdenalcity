@@ -20,6 +20,7 @@ import {
   createHealthSystem,
   createLevelSystem,
 } from '@/sim/systems';
+import { downgradeGrace } from '@/sim/systems/levels';
 import { computeBudget } from '@/sim/systems/economy';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { Building, WorldState } from '@/sim/world';
@@ -352,7 +353,10 @@ describe('systém úrovní', () => {
     building.builtAtTick = 0;
 
     const system = createLevelSystem(catalogue, wide);
-    for (let i = 0; i < wide.levels.cooldown + system.interval * 5; i++) {
+    // Lhůta z důvěry (T108) — domek ji má nejkratší, ale i tak delší než pět
+    // vyhodnocení, se kterými test počítal, dokud byla lhůta pevná trojka.
+    const evaluations = downgradeGrace(wide, HOUSE) + 1;
+    for (let i = 0; i < wide.levels.cooldown + system.interval * evaluations; i++) {
       tickWorld(world, [system]);
     }
 
@@ -377,7 +381,8 @@ describe('systém úrovní', () => {
       ),
     );
 
-    for (let i = 0; i < balance.levels.cooldown + levels.interval * 5; i++) {
+    const evaluations = downgradeGrace(balance, HOUSE_L2) + 1;
+    for (let i = 0; i < balance.levels.cooldown + levels.interval * evaluations; i++) {
       tickWorld(world, [levels]);
     }
 
@@ -442,24 +447,55 @@ describe('snížení a opuštění', () => {
     return Math.max(0, (thresholds[level] ?? 0) - hysteresis - demandRelief - 1);
   }
 
-  /** Odtiká cooldown a k tomu tolik vyhodnocení, kolik snížení potřebuje. */
-  function run(world: WorldState, evaluations = balance.levels.downgradeConfirm): void {
-    const ticks = balance.levels.cooldown + levels.interval * (evaluations + 1);
+  /**
+   * Odtiká cooldown a k tomu tolik vyhodnocení, kolik lhůta vyžaduje.
+   *
+   * Lhůta se počítá **z definice**, ne z jednoho čísla v balancu: od T108 roste
+   * s plochou půdorysu, takže věž ji má delší než domek.
+   */
+  function run(world: WorldState, definition: Definition, extra = 1): void {
+    const evaluations = downgradeGrace(balance, definition) + extra;
+    const ticks = balance.levels.cooldown + levels.interval * evaluations;
     for (let i = 0; i < ticks; i++) tickWorld(world, [levels]);
   }
 
-  it('jeden výkyv budovu neshodí, teprve několik za sebou', () => {
+  it('jeden výkyv budovu neshodí, teprve celá lhůta', () => {
     const world = zonedWorld();
     const building = placeBuilding(world, HOUSE_L2, 6, 6);
     setLandValue(world, 6, 6, belowFloor(2));
 
-    // O jedno vyhodnocení míň, než kolik potvrzení vyžaduje.
-    run(world, balance.levels.downgradeConfirm - 2);
+    // O dvě vyhodnocení míň, než kolik lhůta vyžaduje.
+    run(world, HOUSE_L2, -2);
     expect(building.definitionId).toBe(HOUSE_L2.id);
 
-    run(world);
+    run(world, HOUSE_L2);
     expect(building.definitionId).toBe(HOUSE.id);
     expect(building.level).toBe(1);
+  });
+
+  /**
+   * Setrvačnost podle velikosti (T108).
+   *
+   * Autor si vyžádal, aby „malý domek zchátral pětkrát rychleji než největší
+   * budova". Test hlídá **poměr**, ne konkrétní čísla: ta jsou v balancu a
+   * mají se dát ladit bez přepisování testu.
+   */
+  it('větší budova drží pod prahem déle než malá', () => {
+    const small = downgradeGrace(balance, HOUSE_L2);
+    const big = downgradeGrace(balance, TOWER);
+    expect(big).toBeGreaterThan(small);
+
+    const world = zonedWorld();
+    const house = placeBuilding(world, HOUSE_L2, 6, 6);
+    const tower = placeBuilding(world, TOWER, 10, 10);
+    // Pod spodním prahem obou: domek je úroveň 2, věž 3, takže stačí ta nižší.
+    setLandValue(world, 6, 6, belowFloor(2));
+    setLandValue(world, 10, 10, belowFloor(2));
+
+    // Přesně na lhůtu domku: ten spadne, věž ještě drží.
+    run(world, HOUSE_L2);
+    expect(house.definitionId, 'domek už klesl').toBe(HOUSE.id);
+    expect(tower.definitionId, 'věž ještě drží').toBe(TOWER.id);
   });
 
   it('hystereze drží budovu těsně pod prahem', () => {
@@ -468,7 +504,7 @@ describe('snížení a opuštění', () => {
     // Pod prahem úrovně 2, ale ne o víc než hystereze.
     setLandValue(world, 6, 6, (balance.levels.thresholds[2] ?? 0) - 1);
 
-    run(world);
+    run(world, HOUSE_L2);
 
     expect(building.definitionId).toBe(HOUSE_L2.id);
   });
@@ -478,7 +514,7 @@ describe('snížení a opuštění', () => {
     const building = placeBuilding(world, TOWER, 6, 6);
     setLandValue(world, 6, 6, belowFloor(3));
 
-    run(world);
+    run(world, TOWER);
 
     // Pro 2×2 na úrovni 2 definice není, takže zbyde největší, co se vejde.
     expect(building.definitionId).toBe(ROW_L2.id);
@@ -497,7 +533,7 @@ describe('snížení a opuštění', () => {
     // Ruinu z něj udělá až zanedbanost: starý dům v neobsloužené buňce.
     world.tick = balance.levels.decayAge + 1;
 
-    run(world);
+    run(world, HOUSE);
 
     expect(building.abandoned).toBe(true);
     expect(building.population).toBe(0);
@@ -513,7 +549,7 @@ describe('snížení a opuštění', () => {
     building.abandoned = true;
     setLandValue(world, 6, 6, 255);
 
-    run(world);
+    run(world, HOUSE);
 
     expect(building.definitionId).toBe(HOUSE.id);
     expect(building.abandoned).toBe(true);
@@ -546,7 +582,7 @@ describe('snížení a opuštění', () => {
     const young = zonedWorld();
     const youngBuilding = placeBuilding(young, HOUSE_L2, 6, 6);
     setLandValue(young, 6, 6, landValue);
-    run(young);
+    run(young, HOUSE_L2);
     expect(youngBuilding.definitionId).toBe(HOUSE_L2.id);
 
     const old = zonedWorld();
@@ -554,7 +590,7 @@ describe('snížení a opuštění', () => {
     const oldBuilding = placeBuilding(old, HOUSE_L2, 6, 6);
     oldBuilding.builtAtTick = 0; // stojí od začátku hry
     setLandValue(old, 6, 6, landValue);
-    run(old);
+    run(old, HOUSE_L2);
 
     // Stejná cena půdy, jiný osud: penalizace za zanedbanost ji stlačí pod práh.
     expect(oldBuilding.definitionId).toBe(HOUSE.id);
@@ -570,7 +606,7 @@ describe('snížení a opuštění', () => {
     // Plné pokrytí jediné třídy, kterou město má.
     world.coverage.set('police', new Uint8Array(COARSE_CELLS).fill(255));
 
-    run(world);
+    run(world, HOUSE_L2);
 
     expect(building.definitionId).toBe(HOUSE_L2.id);
   });

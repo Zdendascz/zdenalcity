@@ -1,4 +1,5 @@
 import type { Balance } from '@/content/balance';
+import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
 import { tryDowngrade, tryUpgrade } from '../levels';
@@ -25,6 +26,33 @@ import type { System } from './index';
  * by se převrátilo a budovy by kmitaly nahoru a dolů donekonečna.
  */
 const INTERVAL = 20;
+
+/**
+ * Kolik vyhodnocení budova vydrží pod prahem, než klesne o úroveň.
+ *
+ * **Lhůta z důvěry, ne potvrzení měření.** Budova, které spadla cena půdy,
+ * drží ještě nějakou dobu v očekávání, že to hráč spraví — a čím je větší,
+ * tím déle. Rozhodnutí autora: „malý domek zchátrá pětkrát rychleji než
+ * největší budova." Velká stavba se dlouho staví, stojí majlant a její pád
+ * vezme čtvrť s sebou, takže má mít odpovídající setrvačnost.
+ *
+ * Násobek se počítá z **plochy půdorysu**, ne z úrovně: úroveň říká, jak je
+ * dům hodnotný, kdežto o setrvačnosti rozhoduje, jak je velký. U vanilla
+ * obsahu jde plocha od jedné dlaždice do devíti, takže při `perTile` 0,5 je
+ * rozdíl mezi nejmenším a největším přesně pětinásobný.
+ *
+ * Jedno vyhodnocení je `INTERVAL` tiků, rok má 360 — devět vyhodnocení je
+ * tedy zhruba půl roku a pětačtyřicet dva a půl roku.
+ */
+export function downgradeGrace(balance: Balance, definition: Definition): number {
+  const [width, depth] = definition.footprint;
+  const { perTile, max } = balance.levels.sizePatience;
+  const factor = Math.min(max, 1 + (width * depth - 1) * perTile);
+  return Math.max(1, Math.round(balance.levels.downgradeConfirm * factor));
+}
+
+/** Kolik tiků je jedno vyhodnocení úrovní. Rozhraní z toho počítá zbývající čas. */
+export const LEVEL_INTERVAL = INTERVAL;
 /** Offset mimo růst (12/2) i cenu půdy (16/5), ze které systém čte. */
 const OFFSET = 9;
 
@@ -79,7 +107,7 @@ export function createLevelSystem(catalogue: BuildingCatalogue, balance: Balance
             : (balance.levels.thresholds[building.level] ?? 0) - balance.levels.hysteresis - relief;
         if (landValue < floor) {
           const streak = (world.downgradeStreak.get(id) ?? 0) + 1;
-          if (streak < balance.levels.downgradeConfirm) {
+          if (streak < downgradeGrace(balance, definition)) {
             world.downgradeStreak.set(id, streak);
             continue;
           }

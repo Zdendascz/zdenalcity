@@ -330,6 +330,8 @@
   "ui.info.requirements": "Podmínky",
   "ui.info.unknownDefinition": "Tuhle budovu neumí žádný načtený obsah popsat — nejspíš chybí mod.",
   "ui.info.abandonedWarning": "Budova je opuštěná. Nic nevydělává, nic nestojí a kazí okolí — sama nezmizí, musíš ji zbourat.",
+  "ui.info.decayWarning": "Dům chátrá: cena půdy v okolí spadla pod to, co jeho úroveň potřebuje. Zvedni ji do {months} měsíců — parkem, službami, úklidem trosek — jinak klesne o úroveň.",
+  "ui.info.decayWarningLast": "Dům chátrá a je na nejnižší úrovni: pokud cena půdy do {months} měsíců nestoupne, obyvatelé se odstěhují a zůstane ruina.",
   "ui.info.noPowerWarning": "Bez proudu je budova mimo provoz: nevydělává, ale ani nic nestojí.",
   "ui.info.dryRelayWarning": "K téhle čerpací stanici voda nedoteče, takže síť neprodlužuje. Stanice není zdroj — musí stát na potrubí, kam voda došla.",
   "error.outOfBounds": "Mimo mapu.",

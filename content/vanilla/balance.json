@@ -153,7 +153,11 @@
     ],
     "hysteresis": 35,
     "cooldown": 60,
-    "downgradeConfirm": 3,
+    "downgradeConfirm": 9,
+    "sizePatience": {
+      "perTile": 0.5,
+      "max": 5
+    },
     "decayAge": 3600,
     "decayCoverageThreshold": 20,
     "decayPenalty": 25,

@@ -330,6 +330,8 @@
   "ui.info.requirements": "Requirements",
   "ui.info.unknownDefinition": "No loaded content describes this building — a mod is probably missing.",
   "ui.info.abandonedWarning": "This building is abandoned. It earns nothing, costs nothing and drags the area down — it will not go away on its own, you have to bulldoze it.",
+  "ui.info.decayWarning": "This building is running down: land value around it has fallen below what its level needs. Raise it within {months} months — a park, services, clearing rubble — or it drops a level.",
+  "ui.info.decayWarningLast": "This building is running down and is already at the lowest level: unless land value rises within {months} months, the residents leave and a ruin stays behind.",
   "ui.info.noPowerWarning": "Without power the building is idle: it earns nothing and costs nothing.",
   "ui.info.dryRelayWarning": "Water never reaches this pump station, so it extends nothing. A station is not a source — it must stand on a pipe the water already reached.",
   "error.outOfBounds": "Outside the map.",
