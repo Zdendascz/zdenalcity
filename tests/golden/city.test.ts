@@ -228,7 +228,7 @@ function findSite(world: WorldState): { x: number; y: number } {
  */
 /*
  * Posun po zavedení náskoku průmyslu (T111): budov 32 → 61, obyvatel 58 → 192,
- * práce 50 → 122, kasa 30 787 → 42 036, hashe jiné.
+ * práce 50 → 122, kasa 30 787 → 39 769, hashe jiné.
  *
  * Zředění průmyslu obsahem (T109) je **vráceno** — měřením prohrálo — a místo
  * něj dostala průmyslová poptávka vlastní náskok. Na malém městě je to znát

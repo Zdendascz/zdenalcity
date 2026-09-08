@@ -13,10 +13,10 @@
       "floor": 5
     },
     "baseIndustrial": {
-      "start": 8,
+      "start": 15,
       "holdYears": 5,
-      "perYear": 0.5,
-      "floor": 4
+      "perYear": 1,
+      "floor": 7
     },
     "commercePerCapita": 0.2,
     "limit": 100

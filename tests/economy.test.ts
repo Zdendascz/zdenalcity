@@ -139,11 +139,12 @@ describe('RCI poptávka', () => {
   it('práce obytnou poptávku vrátí do plusu', () => {
     const world = createWorld(1);
     for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 5);
-    for (let i = 0; i < 3; i++) place(world, FACTORY, 5 + i, 8);
+    for (let i = 0; i < 4; i++) place(world, FACTORY, 5 + i, 8);
 
     tickDemand(world, catalogueOf(HOUSE, FACTORY));
 
-    // 36 míst proti 24 pracujícím.
+    // 48 míst proti 24 pracujícím. Přebytek musí přerůst i **náskok průmyslu**,
+    // jinak je P pořád kladná — o to ten náskok je.
     expect(world.demand.residential).toBeGreaterThan(0);
     expect(world.demand.industrial).toBeLessThan(0);
   });
@@ -179,11 +180,15 @@ describe('poptávka řídí růst', () => {
     /*
      * Od T111 má průmysl **vlastní náskok**, takže úplně prázdná zóna nezůstane
      * — a to je ten účel: bez první haly nemá kdo dát práci prvním lidem.
-     * Náskok je ale osmička a jedna hala nabízí dvanáct míst, takže poptávka
-     * hned spadne do mínusu a růst se zastaví. Deset volných parcel zůstane
-     * prázdných, dokud se někdo nenastěhuje.
+     * Postaví se jich ale jen tolik, kolik náskok unese: každá nabízí dvanáct
+     * míst a jakmile jejich součet náskok přeroste, poptávka spadne do mínusu
+     * a růst se zastaví. Zbytek z deseti parcel zůstane prázdný, dokud se
+     * někdo nenastěhuje.
      */
-    expect(world.buildings.size).toBe(1);
+    const jobsPerHall = FACTORY.jobs?.capacity ?? 0;
+    expect(world.buildings.size).toBe(
+      Math.ceil(BALANCE.demand.baseIndustrial.start / jobsPerHall),
+    );
 
     // Přistěhuj lidi ručně a průmysl se rozjede.
     for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 8);
@@ -481,7 +486,8 @@ describe('důsledek elektřiny', () => {
     const catalogue = catalogueOf(HOUSE, FACTORY);
     const world = createWorld(1);
     for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 5, false);
-    for (let i = 0; i < 3; i++) place(world, FACTORY, 5 + i, 8, false);
+    // Čtyři fabriky, ať přebytek míst přeroste i náskok průmyslu.
+    for (let i = 0; i < 4; i++) place(world, FACTORY, 5 + i, 8, false);
 
     tickDemand(world, catalogue);
 

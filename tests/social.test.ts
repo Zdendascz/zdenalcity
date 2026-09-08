@@ -312,6 +312,11 @@ describe('stávka', () => {
     world.economy.taxRates.residential = 20;
     world.economy.taxRates.commercial = 20;
     world.economy.taxRates.industrial = 20;
+    // A město jinak spokojené. Bez toho soupeří daň s nespokojeností z kouře
+    // — testovací město je pruh domů přilepený na pruh fabrik — a vyhrává ta
+    // nespokojenost. Test se ptá na to, jestli hlášení sedí s výpočtem rizika,
+    // ne na to, který člen zrovna vede.
+    world.happiness.fill(255);
 
     const registry = registryOf(createStrikeDisaster());
     const entry = startDisaster(world, content, balance, registry, 'strike', 25, 18);
@@ -319,6 +324,7 @@ describe('stávka', () => {
 
     // A při nízké dani to musí být něco jiného.
     const calm = growCity(content);
+    calm.happiness.fill(255);
     calm.economy.taxRates.residential = 5;
     calm.economy.taxRates.commercial = 5;
     calm.economy.taxRates.industrial = 5;
