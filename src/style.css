@@ -1107,6 +1107,63 @@ body {
   color: #ff8e78;
 }
 
+/* --- poradce starosty ---------------------------------------------------- */
+
+/*
+ * Rada je **karta, ne odstavec**. Hráč sem chodí s otázkou „co teď" a musí
+ * dostat odpověď na dvě mrknutí: název bolesti, čím to je, co s tím.
+ */
+.sheet--advisor {
+  max-width: 460px;
+}
+
+.advisor__heading {
+  margin: 14px 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.advisor__item {
+  padding: 10px 12px;
+  border-left: 3px solid #ff8e78;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.advisor__item + .advisor__item {
+  margin-top: 8px;
+}
+
+/* Pochvala je zelená a bez vykřičníku: je to poznámka, ne úkol. */
+.advisor__item--praise {
+  border-left-color: #7fd18a;
+}
+
+.advisor__name {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+/* Konkrétní čísla té které bolesti. Tučně, protože jsou to ta, co platí teď. */
+.advisor__detail {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.advisor__cause {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* Návod je to, kvůli čemu se panel otevírá — proto plnou barvou, ne tlumeně. */
+.advisor__fix {
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+
 /* --- bublina s cenou ---------------------------------------------------- */
 
 .price-tag {

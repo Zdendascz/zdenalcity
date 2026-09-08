@@ -30,6 +30,7 @@ export interface HudCallbacks {
   /** Pohled se nastavuje: povrch a podzemí jsou dva stavy, ne přepínač. */
   onSetView(id: string): void;
   onToggleBudget(): void;
+  onToggleAdvisor(): void;
   /** Půjčky a dluhopisy (§8 fáze 4). */
   onToggleFinance(): void;
   /** Linky MHD (§7 fáze 4). */
@@ -120,6 +121,7 @@ export interface HudState {
   /** `'surface'` nebo `'underground'`. */
   view: string;
   budgetVisible: boolean;
+  advisorVisible: boolean;
   financeVisible: boolean;
   transitVisible: boolean;
   /** Spouští hra náhodné katastrofy? */
@@ -297,6 +299,7 @@ export class Hud {
   private readonly viewButtons = new Map<string, HTMLButtonElement>();
   private layerMenu: Menu | null = null;
   private budgetButton: HTMLButtonElement | null = null;
+  private advisorButton: HTMLButtonElement | null = null;
   private financeButton: HTMLButtonElement | null = null;
   private transitButton: HTMLButtonElement | null = null;
   private disasterMenu: Menu | null = null;
@@ -324,6 +327,7 @@ export class Hud {
     layer: 'none',
     view: 'surface',
     budgetVisible: false,
+    advisorVisible: false,
     financeVisible: false,
     transitVisible: false,
     disastersEnabled: true,
@@ -520,6 +524,7 @@ export class Hud {
     }
     this.viewToggle?.classList.toggle('is-active', state.view === 'underground');
     this.layerMenu?.setSelected(state.layer);
+    this.advisorButton?.classList.toggle('is-active', state.advisorVisible);
     this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
     this.financeButton?.classList.toggle('is-active', state.financeVisible);
     this.transitButton?.classList.toggle('is-active', state.transitVisible);
@@ -1095,6 +1100,11 @@ export class Hud {
   }
 
   private buildBudget(): void {
+    // Poradce stojí **před** rozpočtem: je to první věc, kterou hráč otevře,
+    // když neví, co dělat, a poslední, kterou hledá, když ví.
+    this.advisorButton = this.panelButton('chat', 'ui.advisor.toggle', () =>
+      this.callbacks.onToggleAdvisor(),
+    );
     this.budgetButton = this.panelButton('budget', 'ui.budget.toggle', () =>
       this.callbacks.onToggleBudget(),
     );
