@@ -227,17 +227,16 @@ function findSite(world: WorldState): { x: number; y: number } {
  * uklidilo terén — nezasáhlo do růstu.
  */
 /*
- * Posun po zředění průmyslu (T109): budov 32 → 27, obyvatel 58 → 84, práce
- * 50 → 33, kasa 30 787 → 30 402, hashe jiné.
+ * Posun po zavedení náskoku průmyslu (T111): budov 32 → 61, obyvatel 58 → 192,
+ * práce 50 → 122, kasa 30 787 → 42 036, hashe jiné.
  *
- * Průmyslová budova dává **polovinu prací** za polovinu ceny a údržby; proud
- * a kouř na pozemku zůstaly, protože patří pozemku, ne osazenstvu. Město
- * s pevným scénářem tedy postaví za tytéž peníze míň průmyslu — a protože
- * je průmysl slabší odběratel pracovní síly, zbude poptávka po bydlení a
- * vyroste víc lidí na míň budovách.
- *
- * Kasa se skoro nehnula (−385), takže to není o penězích: je to čistě jiný
- * mix města, přesně jak měl zásah zamýšlet.
+ * Zředění průmyslu obsahem (T109) je **vráceno** — měřením prohrálo — a místo
+ * něj dostala průmyslová poptávka vlastní náskok. Na malém městě je to znát
+ * nejvíc: bez náskoku byla průmyslová poptávka na začátku nulová, takže první
+ * hala vyrostla až z přebytku pracujících, a do té doby nebylo kam chodit do
+ * práce. S osmičkou vznikne pár míst hned a smyčka „lidé chtějí práci, práce
+ * chce lidi" se rozjede o desítky tiků dřív. Kasa roste s městem, ne proti
+ * němu, takže to není o penězích.
  */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {

@@ -111,12 +111,15 @@ function tickDemand(world: WorldState, catalogue: BuildingCatalogue): void {
 }
 
 describe('RCI poptávka', () => {
-  it('na prázdné mapě chtějí lidé bydlet, ale po práci a obchodech není poptávka', () => {
+  it('na prázdné mapě chtějí lidé bydlet a průmysl má jen svůj náskok', () => {
     const world = createWorld(1);
     tickDemand(world, catalogueOf());
 
     expect(world.demand.residential).toBeGreaterThan(0);
-    expect(world.demand.industrial).toBe(0);
+    // Náskok z dat, ne opsané číslo: kdyby se `baseIndustrial` v obsahu hnul,
+    // test má měřit pravidlo, ne starou hodnotu.
+    expect(world.demand.industrial).toBe(BALANCE.demand.baseIndustrial.start);
+    // Obchody náskok nemají — komerce roste za lidmi, ne před nimi.
     expect(world.demand.commercial).toBe(0);
   });
 
@@ -128,8 +131,8 @@ describe('RCI poptávka', () => {
 
     tickDemand(world, catalogueOf(HOUSE));
 
-    // 48 obyvatel → 24 pracujících, nula míst.
-    expect(world.demand.industrial).toBe(24);
+    // 48 obyvatel → 24 pracujících, nula míst, plus náskok průmyslu.
+    expect(world.demand.industrial).toBe(24 + BALANCE.demand.baseIndustrial.start);
     expect(world.demand.residential).toBeLessThan(0); // dokud není práce, nikdo další nepřijde
   });
 
@@ -161,7 +164,7 @@ describe('RCI poptávka', () => {
 });
 
 describe('poptávka řídí růst', () => {
-  it('průmyslová zóna zůstane prázdná, dokud nejsou lidé bez práce (§13 krok 5)', () => {
+  it('průmyslová zóna se bez lidí zastaví na náskoku (§13 krok 5)', () => {
     const catalogue = catalogueOf(FACTORY);
     const world = createWorld(1);
     for (let x = 5; x <= 15; x++) buildRoad(world, x, 10);
@@ -173,7 +176,14 @@ describe('poptávka řídí růst', () => {
       tickWorld(world, [demand, growth]);
     }
 
-    expect(world.buildings.size).toBe(0);
+    /*
+     * Od T111 má průmysl **vlastní náskok**, takže úplně prázdná zóna nezůstane
+     * — a to je ten účel: bez první haly nemá kdo dát práci prvním lidem.
+     * Náskok je ale osmička a jedna hala nabízí dvanáct míst, takže poptávka
+     * hned spadne do mínusu a růst se zastaví. Deset volných parcel zůstane
+     * prázdných, dokud se někdo nenastěhuje.
+     */
+    expect(world.buildings.size).toBe(1);
 
     // Přistěhuj lidi ručně a průmysl se rozjede.
     for (let i = 0; i < 6; i++) place(world, HOUSE, 5 + i, 8);

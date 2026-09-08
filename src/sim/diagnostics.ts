@@ -14,7 +14,7 @@ import { waterProximity } from './systems/landValue';
 import type { WorldState } from './world';
 import { roadCapacityFactor } from './transit';
 import { happinessDemandFactor } from './systems/happiness';
-import { residentialBase } from './systems/demand';
+import { industrialBase, residentialBase } from './systems/demand';
 
 /**
  * Diagnostika parcely (§12 zadání fáze 2).
@@ -611,6 +611,7 @@ export function explainDemand(
 ): DemandBreakdown[] {
   const { workerRatio, commercePerCapita } = balance.demand;
   const baseResidential = residentialBase(balance, world.tick);
+  const baseIndustrial = industrialBase(balance, world.tick);
 
   let population = 0;
   let jobs = 0;
@@ -654,6 +655,7 @@ export function explainDemand(
       category: 'industrial',
       value: world.demand.industrial,
       terms: [
+        { key: 'ui.demand.term.base', value: baseIndustrial },
         { key: 'ui.demand.term.workers', value: workers },
         { key: 'ui.demand.term.jobs', value: -jobs },
       ],

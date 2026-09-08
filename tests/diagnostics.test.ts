@@ -377,6 +377,14 @@ describe('rozpad poptávky', () => {
     expect(commercial?.terms[1]?.value).toBe(-30);
 
     const industrial = rows.find((row) => row.category === 'industrial');
-    expect(industrial?.terms[1]?.value, 'místa se odčítají').toBe(-30);
+    // Náskok je první sčítanec i tady — rozpad musí ukazovat totéž, z čeho
+    // poptávka vyšla, jinak hráči nesedí součet.
+    expect(industrial?.terms.map((term) => term.key)).toEqual([
+      'ui.demand.term.base',
+      'ui.demand.term.workers',
+      'ui.demand.term.jobs',
+    ]);
+    expect(industrial?.terms[0]?.value).toBe(balance.demand.baseIndustrial.start);
+    expect(industrial?.terms[2]?.value, 'místa se odčítají').toBe(-30);
   });
 });

@@ -335,26 +335,40 @@ describe('tornádo', () => {
     const registry = new DisasterRegistry();
     registry.register(createTornadoDisaster());
     const disaster = createTornadoDisaster();
-    const entry = startDisaster(world, content, content.getBalance(), registry, 'tornado', 25, 0);
-    if (!entry) throw new Error('tornádo nezačalo');
 
-    const startX = entry.state['x'] as number;
-    const startY = entry.state['y'] as number;
+    /*
+     * Zkouší se **víc tornád**, ne jedno.
+     *
+     * Směr je los a město je pruh šesti řad kolem dvacítky — tornádo od
+     * severního okraje ho tedy nemusí protnout vůbec. Test na jednom průchodu
+     * stál jen shodou okolností a padl, jakmile se změnil obsah a zástavba
+     * vyšla jinak. Pravidlo („po dráze ničí") přitom platí o dráze, která
+     * městem vede, takže se ověřuje na sérii.
+     */
+    let moved = false;
+    let damaged = false;
+    for (let attempt = 0; attempt < 8 && !damaged; attempt++) {
+      const entry = startDisaster(world, content, content.getBalance(), registry, 'tornado', 25, 0);
+      if (!entry) throw new Error('tornádo nezačalo');
+      const startX = entry.state['x'] as number;
+      const startY = entry.state['y'] as number;
 
-    for (let tick = 0; tick < 40; tick++) {
-      if (disaster.isFinished(world, entry)) break;
-      disaster.tick(
-        { world, catalogue: content, balance: content.getBalance(), x: entry.x, y: entry.y },
-        entry,
-      );
+      for (let tick = 0; tick < 40; tick++) {
+        if (disaster.isFinished(world, entry)) break;
+        disaster.tick(
+          { world, catalogue: content, balance: content.getBalance(), x: entry.x, y: entry.y },
+          entry,
+        );
+      }
+      world.disasters.active.length = 0;
+
+      if (entry.state['x'] !== startX && entry.state['y'] !== startY) moved = true;
+      const rubble = [...world.rubble].filter((value) => value !== 0).length;
+      if (world.buildings.size < before || rubble > 0) damaged = true;
     }
 
-    // Posunulo se.
-    expect(entry.state['x']).not.toBe(startX);
-    expect(entry.state['y']).not.toBe(startY);
-    // A něco po sobě nechalo — buď zbořené domy, nebo aspoň trosky.
-    const rubble = [...world.rubble].filter((value) => value !== 0).length;
-    expect(world.buildings.size < before || rubble > 0).toBe(true);
+    expect(moved, 'tornádo se ani jednou neposunulo').toBe(true);
+    expect(damaged, 'ani jedno tornádo nenechalo trosky').toBe(true);
   });
 
   it('skončí, až mu vyprší život', async () => {

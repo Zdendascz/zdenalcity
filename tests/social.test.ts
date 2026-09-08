@@ -360,14 +360,34 @@ describe('stávka', () => {
       if (building.x < 25) building.population = 0;
     }
 
+    /*
+     * Váha je hustota **hrubé buňky**, ne jedné budovy. Buňka, která leží na
+     * hranici, tedy nese obyvatele z východní půlky i pro budovu ze západní —
+     * a los takovou budovu právem vybere. Test proto neměří souřadnici, ale
+     * pravidlo: los nikdy nesmí padnout do čtvrti, kde nikdo nebydlí.
+     */
+    const inhabited = new Set<number>();
+    for (const building of world.buildings.values()) {
+      if (building.population > 0) {
+        inhabited.add(coarseIndex(building.x, building.y, MAP_SIZE));
+      }
+    }
+
     const disaster = createStrikeDisaster();
     let east = 0;
     const draws = 200;
     for (let attempt = 0; attempt < draws; attempt++) {
       const origin = disaster.pickOrigin(world, content, content.getBalance());
-      if (origin && origin.x >= 25) east++;
+      expect(origin, 'los nenašel nikoho').not.toBeNull();
+      if (!origin) break;
+      expect(
+        inhabited.has(coarseIndex(origin.x, origin.y, MAP_SIZE)),
+        'stávka vznikla ve vylidněné čtvrti',
+      ).toBe(true);
+      if (origin.x >= 25) east++;
     }
-    expect(east / draws).toBeGreaterThan(0.9);
+    // A těžiště je stejně na východě: hraniční buňky jsou jen pár procent.
+    expect(east / draws).toBeGreaterThan(0.8);
   });
 });
 

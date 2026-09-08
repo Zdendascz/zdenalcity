@@ -1,4 +1,4 @@
-import type { Balance } from '@/content/balance';
+import type { Balance, DemandBase } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import type { WorldState } from '../world';
 import { happinessDemandFactor } from './happiness';
@@ -14,7 +14,7 @@ import type { System } from './index';
  * a práce chce lidi.** Z toho vyjde celá smyčka §13 sama.
  *
  * - obytná: kladná, dokud je kam chodit do práce (plus základ, aby vůbec začalo)
- * - průmyslová: kladná, když je víc pracujících než míst
+ * - průmyslová: kladná, když je víc pracujících než míst (rovněž plus základ)
  * - komerční: kladná, když je víc lidí než obchodů
  *
  * Čísla jsou provizorní balanc, ne výsledek ladění — na to je T10.
@@ -24,29 +24,46 @@ import type { System } from './index';
  * kdyby se násobila i ta, nespokojené město by hlásilo menší přebytek, tedy
  * přesný opak toho, co se v něm děje.
  *
- * Základ obytné poptávky **s časem slábne** (T108). Obytná a průmyslová jsou
- * zrcadlo — jejich součet je vždycky ten základ — takže konstantní dvacítka
+ * Základ obytné poptávky **s časem slábne** (T108). Obytná a průmyslová byly
+ * zrcadlo — jejich součet byl vždycky ten základ — takže konstantní dvacítka
  * znamenala, že v rovnováze vyjde obytná na dvacet a průmyslová na nulu, ať
  * město dělá cokoli. Startér zůstal, palec na váze zmizel: po pěti letech
  * ubývá bod za rok až na pětku.
+ *
+ * Zrcadlo přesto zůstávalo křivé: i po vyblednutí základu byla průmyslová
+ * poptávka po roce 20 kladná jen v pětině vzorků. Změřeno na 12 000 partiích,
+ * a **oprava obsahem to jen zhoršila** — poloviční počet prací na dlaždici
+ * (T109) sice kladnou poptávku zdvojnásobil, ale sebral městu práci a tím
+ * i obyvatele. Vráceno. Průmysl má od T111 **vlastní náskok**: součet už není
+ * konstanta a obě strany můžou být v rovnováze kladné zároveň.
  */
 
 /**
- * Náskok obytné poptávky v daném tiku.
+ * Náskok poptávky v daném tiku.
  *
  * Prvních pár let drží na plné hodnotě, aby se město vůbec rozjelo — bez
  * něj je na začátku nula obyvatel, nula prací a tím pádem nulová poptávka
- * po čemkoli. Pak ubývá po bodu za rok, dokud nedosedne na podlahu.
+ * po čemkoli. Pak ubývá po `perYear` za rok, dokud nedosedne na podlahu.
  *
  * Exportuje se, protože **totéž musí umět i rozpis poptávky v HUD** (§12):
  * kdyby si ho panel počítal po svém, ukazoval by po první změně pravidel
  * jiné číslo, než podle kterého město roste.
  */
-export function residentialBase(balance: Balance, tick: number): number {
-  const { start, holdYears, perYear, floor } = balance.demand.baseResidential;
+export function demandBase(spec: DemandBase, tick: number): number {
+  const { start, holdYears, perYear, floor } = spec;
   const year = Math.floor(tick / TICKS_PER_YEAR);
   const faded = start - Math.max(0, year - holdYears) * perYear;
   return Math.max(floor, Math.min(start, faded));
+}
+
+/** Náskok obytné poptávky v daném tiku. */
+export function residentialBase(balance: Balance, tick: number): number {
+  return demandBase(balance.demand.baseResidential, tick);
+}
+
+/** Náskok průmyslové poptávky v daném tiku. */
+export function industrialBase(balance: Balance, tick: number): number {
+  return demandBase(balance.demand.baseIndustrial, tick);
 }
 
 export function createDemandSystem(catalogue: BuildingCatalogue, balance: Balance): System {
@@ -81,7 +98,7 @@ export function createDemandSystem(catalogue: BuildingCatalogue, balance: Balanc
       world.demand.residential = clampDemand(
         rawResidential > 0 ? rawResidential * happiness : rawResidential,
       );
-      world.demand.industrial = clampDemand(workers - jobs);
+      world.demand.industrial = clampDemand(industrialBase(balance, world.tick) + (workers - jobs));
       world.demand.commercial = clampDemand(population * commercePerCapita - commercialJobs);
     },
   };

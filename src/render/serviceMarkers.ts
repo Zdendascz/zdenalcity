@@ -42,6 +42,19 @@ const TIP = 10;
  * rozdíl mezi „tady hasiči jsou" a „tady hasiči byli".
  */
 const RUIN_FILL = 0xd9483a;
+/**
+ * Jak moc je ikona nad troskami vybledlá a o kolik menší než u živé stanice.
+ *
+ * Autor u téhle značky napsal: „ikonka mi ukazuje na neexistující budovu."
+ * A měl pravdu — ikony služeb jsou plné oblé dlaždice, které kolečko špendlíku
+ * překryly do posledního pixelu, takže z rozdílu „tady škola je" a „tady škola
+ * byla" zbyl jeden proužek barvy pod hrotem. Značka nad sutí proto ikonu
+ * **zmenší** (aby byl rudý lem vidět), **ztlumí** a **přeškrtne**.
+ */
+const RUIN_ICON_SCALE = 1.15;
+const RUIN_ICON_ALPHA = 0.55;
+/** Tloušťka škrtu přes kolečko. */
+const RUIN_STRIKE = 3;
 
 export class ServiceMarkers {
   private readonly world: ReadonlyWorldView;
@@ -53,6 +66,12 @@ export class ServiceMarkers {
    */
   private readonly ruinLayer = new Container();
   private readonly ruinPins = new Graphics();
+  /**
+   * Škrty přes kolečka. Vlastní kresba, protože musí ležet **nad ikonami** —
+   * ty se přidávají jako samostatné uzly, takže jedna kresba pod nimi by
+   * škrtla jen prázdné špendlíky.
+   */
+  private readonly ruinStrikes = new Graphics();
   private textures: ReadonlyMap<string, Texture> = new Map();
   private sites: (definitionId: string) => ServiceSite | undefined = () => undefined;
   private classOf: (definitionId: string) => string | undefined = () => undefined;
@@ -63,6 +82,7 @@ export class ServiceMarkers {
     this.container.addChild(this.pins);
     this.container.visible = false;
     this.ruinLayer.addChild(this.ruinPins);
+    this.ruinLayer.addChild(this.ruinStrikes);
     parent.addChild(this.ruinLayer);
     parent.addChild(this.container);
   }
@@ -112,8 +132,9 @@ export class ServiceMarkers {
    */
   private redrawRuins(): void {
     this.ruinPins.clear();
+    this.ruinStrikes.clear();
     for (const child of [...this.ruinLayer.children]) {
-      if (child !== this.ruinPins) child.destroy();
+      if (child !== this.ruinPins && child !== this.ruinStrikes) child.destroy();
     }
 
     for (const [tile, definitionId] of this.world.rubbleOf) {
@@ -146,15 +167,27 @@ export class ServiceMarkers {
         .fill({ color: RUIN_FILL })
         .stroke({ color: MARKER_LINE, width: 2 });
 
+      // Škrt se kreslí i tam, kde ikona chybí — je to on, ne ikona, co říká
+      // „tahle služba už tu není".
+      const reach = RADIUS * 0.62;
+      this.ruinStrikes
+        .moveTo(cx - reach, cy - reach)
+        .lineTo(cx + reach, cy + reach)
+        .stroke({ color: MARKER_LINE, width: RUIN_STRIKE, cap: 'round' });
+
       const texture = this.textures.get(serviceClass);
       if (texture === undefined) continue;
       const icon = new Sprite(texture);
       icon.anchor.set(0.5);
-      icon.width = RADIUS * 1.5;
-      icon.height = RADIUS * 1.5;
+      icon.width = RADIUS * RUIN_ICON_SCALE;
+      icon.height = RADIUS * RUIN_ICON_SCALE;
+      icon.alpha = RUIN_ICON_ALPHA;
       icon.position.set(cx, cy);
       this.ruinLayer.addChild(icon);
     }
+
+    // Škrty nakonec navrch: `addChild` na už přidaný uzel ho přesune na konec.
+    this.ruinLayer.addChild(this.ruinStrikes);
   }
 
   private redraw(): void {

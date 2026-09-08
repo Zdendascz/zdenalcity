@@ -177,7 +177,24 @@ describe('round-trip', () => {
     // a `abandoned`.
     expect([...restored.buildings.values()]).toEqual(before.buildings);
     expect(restored.nextBuildingId).toBe(before.nextBuildingId);
-    expect(restored.economy).toEqual(before.economy);
+    /*
+     * `lastPopulation` se **neporovnává**, protože se neukládá: `applySaveToWorld`
+     * ho dopočítá z načtených budov, aby načaté město nestartovalo s falešným
+     * skokem růstu proti nule. Ostatní kasa a sazby přežít musí.
+     */
+    const withoutPopulation = (
+      economy: typeof restored.economy,
+    ): Omit<typeof restored.economy, 'lastPopulation'> => {
+      const copy = { ...economy };
+      delete (copy as { lastPopulation?: number }).lastPopulation;
+      return copy;
+    };
+    expect(withoutPopulation(restored.economy)).toEqual(
+      withoutPopulation(before.economy as typeof restored.economy),
+    );
+    expect(restored.economy.lastPopulation).toBe(
+      [...restored.buildings.values()].reduce((sum, building) => sum + building.population, 0),
+    );
     expect(restored.demand).toEqual(before.demand);
     expect(restored.seed).toBe(before.seed);
 

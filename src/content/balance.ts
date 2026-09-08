@@ -535,6 +535,21 @@ export interface FireBalance {
   byClass: Readonly<Record<string, { flammability: number; fuel: number }>>;
 }
 
+/**
+ * Slábnoucí náskok poptávky po jedné zóně.
+ *
+ * Prvních `holdYears` let drží na `start`, pak ubývá po `perYear` za rok,
+ * dokud nedosedne na `floor`. Náskok je **startér, ne trvalý palec na váze**:
+ * rozjede město z nuly obyvatel a nuly prací, ale zralé město už si má řídit
+ * vlastní bilance práce, ne konstanta.
+ */
+export interface DemandBase {
+  start: number;
+  holdYears: number;
+  perYear: number;
+  floor: number;
+}
+
 export interface Balance {
   /**
    * Ekonomika. Původně konstanty fáze 1 v kódu — přesunuty sem, aby šel balanc
@@ -547,22 +562,26 @@ export interface Balance {
     /**
      * Náskok obytné poptávky, který **s časem slábne**.
      *
-     * Obytná je `základ + (práce − pracující)` a průmyslová `pracující − práce`,
-     * takže **jejich součet je vždycky ten základ**. Konstantní dvacítka proto
-     * znamenala, že hra celou partii tlačí stavět bydlení: v rovnováze vyšla
-     * obytná na dvacet a průmyslová na nulu, ať město dělalo cokoli.
-     *
-     * Rozhodnutí autora: základ má být **startér, ne trvalý palec na váze**.
-     * Prvních `holdYears` let drží na `start`, pak ubývá po `perYear` za rok,
-     * dokud nedosedne na `floor`. Zralé město tak řídí vlastní bilance práce,
-     * ne konstanta.
+     * Konstantní dvacítka znamenala, že hra celou partii tlačí stavět bydlení:
+     * obytná je `základ + (práce − pracující)`, takže v rovnováze vyšla přesně
+     * na základ, ať město dělalo cokoli.
      */
-    baseResidential: {
-      start: number;
-      holdYears: number;
-      perYear: number;
-      floor: number;
-    };
+    baseResidential: DemandBase;
+    /**
+     * Totéž pro průmysl — a je to **oprava měřením doloženého vychýlení**.
+     *
+     * Průmyslová poptávka byla `pracující − práce`, tedy bez základu, a s tím
+     * byla po roce 20 kladná jen v pětině vzorků: hra o průmysl skoro nikdy
+     * nestála. Pokus spravit to obsahem (poloviční počet prací na dlaždici,
+     * T109) sice zvedl podíl kladné poptávky na 23 %, ale sebral městu práci
+     * — přežití spadlo z 69 % na 60 % a města byla v šedesátém roce čtyřikrát
+     * menší. Vráceno; místo toho dostal průmysl **vlastní náskok**, který
+     * poptávku zvedne přímo, aniž by z ekonomiky ubyl jediný úvazek.
+     *
+     * Menší než obytný, protože průmysl je odvozený: práce chce lidi, a ti se
+     * musí nejdřív někam nastěhovat.
+     */
+    baseIndustrial: DemandBase;
     commercePerCapita: number;
     limit: number;
   };
@@ -1152,10 +1171,15 @@ export function validateBalance(raw: unknown): {
     },
     demand: {
       workerRatio: num(issues, demand, 'workerRatio', 'demand.workerRatio', 0, 1),
-      baseResidential: validateResidentialBase(
+      baseResidential: validateDemandBase(
         issues,
         asRecord(demand?.['baseResidential']),
         'demand.baseResidential',
+      ),
+      baseIndustrial: validateDemandBase(
+        issues,
+        asRecord(demand?.['baseIndustrial']),
+        'demand.baseIndustrial',
       ),
       commercePerCapita: num(
         issues,
@@ -1494,12 +1518,12 @@ function indicatorName(issues: ValidationIssue[], raw: unknown, field: string): 
   return raw;
 }
 
-/** Slábnoucí náskok obytné poptávky. Čtyři čísla, všechna v datech (P5). */
-function validateResidentialBase(
+/** Slábnoucí náskok poptávky. Čtyři čísla, všechna v datech (P5). */
+function validateDemandBase(
   issues: ValidationIssue[],
   raw: Record<string, unknown> | null,
   where: string,
-): { start: number; holdYears: number; perYear: number; floor: number } {
+): DemandBase {
   if (!raw) {
     issues.push({ field: where, message: 'musí být objekt' });
     return { start: 0, holdYears: 0, perYear: 0, floor: 0 };

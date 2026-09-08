@@ -183,10 +183,13 @@ describe('temná služba nepokrývá', () => {
     const world = grid(content);
     setCoverage(world, 'fire', 0);
 
-    expect(placeDefinition(world, content, 'vanilla:fire_station', 12, 21, balance).ok).toBe(true);
+    // Stanice stojí **za zónami** (x 50), ne v nich: zóna se za 500 tiků
+    // zastaví a stavba na obsazené parcele by se neodehrála vůbec. Ulice
+    // vede až k šedesátce, takže na silnici dosáhne stejně jako uvnitř města.
+    expect(placeDefinition(world, content, 'vanilla:fire_station', 50, 21, balance).ok).toBe(true);
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 30; tick++) tickWorld(world, systems);
-    const before = world.coverage.get('fire')?.[coarseIndex(12, 21, MAP_SIZE)] ?? 0;
+    const before = world.coverage.get('fire')?.[coarseIndex(50, 21, MAP_SIZE)] ?? 0;
     expect(before).toBeGreaterThan(0);
 
     // Vypni všechny elektrárny.
@@ -198,7 +201,7 @@ describe('temná služba nepokrývá', () => {
     world.powerNetworkDirty = true;
     for (let tick = 0; tick < 3; tick++) tickWorld(world, systems);
 
-    expect(world.coverage.get('fire')?.[coarseIndex(12, 21, MAP_SIZE)] ?? 0).toBe(0);
+    expect(world.coverage.get('fire')?.[coarseIndex(50, 21, MAP_SIZE)] ?? 0).toBe(0);
   });
 
   it('skládka smrdí i po tmě', async () => {
