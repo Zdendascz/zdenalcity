@@ -737,32 +737,50 @@ describe('výbuch a průmyslová havárie', () => {
     const registry = new DisasterRegistry();
     registry.register(createExplosionDisaster());
 
-    const building = [...world.buildings.values()].find((b) => b.x > 20 && b.x < 30);
-    if (!building) throw new Error('nic nevyrostlo');
-    building.level = 5;
+    /*
+     * Zkouší se **víc výbuchů**, ne jeden.
+     *
+     * Na okraji zápalného pásma je šance úměrná vzdálenosti: `igniteChance`
+     * krát útlum, takže úplně na kraji vyjde pár procent. Jeden výbuch tedy
+     * může legitimně nezapálit nic za kráterem a test na něm dlouho stál jen
+     * shodou okolností — padl, jakmile se změnil obsah a město vyrostlo jinak.
+     * Pravidlo je pravděpodobnostní, takže se i ověřuje pravděpodobnostně.
+     */
+    const candidates = [...world.buildings.values()].filter((b) => b.x > 20 && b.x < 40);
+    expect(candidates.length, 'nic nevyrostlo').toBeGreaterThan(0);
 
-    const entry = startDisaster(
-      world,
-      content,
-      content.getBalance(),
-      registry,
-      'explosion',
-      building.x,
-      building.y,
-    );
-    if (!entry) throw new Error('výbuch nezačal');
-    const radius = entry.state['radius'] as number;
+    let reachedBeyond = false;
+    for (const building of candidates.slice(0, 12)) {
+      building.level = 5;
+      world.fire.fill(0);
 
-    let farthestFire = 0;
-    for (let tile = 0; tile < world.fire.length; tile++) {
-      if ((world.fire[tile] ?? 0) === 0) continue;
-      const x = tile % MAP_SIZE;
-      const y = (tile - x) / MAP_SIZE;
-      farthestFire = Math.max(farthestFire, Math.hypot(x - building.x, y - building.y));
+      const entry = startDisaster(
+        world,
+        content,
+        content.getBalance(),
+        registry,
+        'explosion',
+        building.x,
+        building.y,
+      );
+      if (!entry) continue;
+      const radius = entry.state['radius'] as number;
+      world.disasters.active.length = 0;
+
+      let farthestFire = 0;
+      for (let tile = 0; tile < world.fire.length; tile++) {
+        if ((world.fire[tile] ?? 0) === 0) continue;
+        const x = tile % MAP_SIZE;
+        const y = (tile - x) / MAP_SIZE;
+        farthestFire = Math.max(farthestFire, Math.hypot(x - building.x, y - building.y));
+      }
+      if (farthestFire > radius) {
+        reachedBeyond = true;
+        break;
+      }
     }
 
-    expect(farthestFire, 'nehoří vůbec nic').toBeGreaterThan(0);
-    expect(farthestFire).toBeGreaterThan(radius);
+    expect(reachedBeyond, 'ani jeden výbuch nezapálil nic za kráterem').toBe(true);
   });
 
   it('bouchne spíš tam, kde hráč nechal starou nekrytou továrnu', async () => {

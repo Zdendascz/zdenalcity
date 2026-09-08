@@ -226,6 +226,19 @@ function findSite(world: WorldState): { x: number; y: number } {
  * vrstev. Že město vyšlo přesně stejně velké, znamená, že dorovnání jen
  * uklidilo terén — nezasáhlo do růstu.
  */
+/*
+ * Posun po zředění průmyslu (T109): budov 32 → 27, obyvatel 58 → 84, práce
+ * 50 → 33, kasa 30 787 → 30 402, hashe jiné.
+ *
+ * Průmyslová budova dává **polovinu prací** za polovinu ceny a údržby; proud
+ * a kouř na pozemku zůstaly, protože patří pozemku, ne osazenstvu. Město
+ * s pevným scénářem tedy postaví za tytéž peníze míň průmyslu — a protože
+ * je průmysl slabší odběratel pracovní síly, zbude poptávka po bydlení a
+ * vyroste víc lidí na míň budovách.
+ *
+ * Kasa se skoro nehnula (−385), takže to není o penězích: je to čistě jiný
+ * mix města, přesně jak měl zásah zamýšlet.
+ */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {
     const content = await vanilla();

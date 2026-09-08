@@ -10,7 +10,7 @@
   ],
   "level": 5,
   "construction": {
-    "cost": 18240,
+    "cost": 6083,
     "requiresRoad": true,
     "requiresPower": false,
     "requiresWater": true,
@@ -20,10 +20,10 @@
     ]
   },
   "economy": {
-    "upkeep": 365
+    "upkeep": 122
   },
   "jobs": {
-    "capacity": 248
+    "capacity": 82
   },
   "power": {
     "consumption": 5850
