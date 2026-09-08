@@ -57,6 +57,7 @@ function callbacks(): HudCallbacks & { zoomed: number[]; speeds: number[]; views
     onSetView: (id) => void views.push(id),
     onToggleBudget: () => {},
     onToggleAdvisor: () => {},
+    onStatClick: () => {},
     onToggleFinance: () => {},
     onToggleTransit: () => {},
     onToggleGhost: () => {},

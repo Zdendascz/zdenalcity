@@ -19,6 +19,8 @@ import {
   estimateZoning,
 } from '@/sim/commands';
 import { cityAdvice } from '@/sim/advisor';
+import { explainStat } from '@/sim/statBreakdown';
+import type { ExplainedStat } from '@/sim/statBreakdown';
 import {
   alertTarget,
   cityUtilities,
@@ -63,6 +65,7 @@ import { coarseCellsOf, coarseIndex } from '@/sim/coarse';
 import { createWorld, NEUTRAL_HAPPINESS } from '@/sim/world';
 import { BudgetPanel } from '@/ui/budgetPanel';
 import { AdvisorPanel } from '@/ui/advisorPanel';
+import { StatPanel } from '@/ui/statPanel';
 import { BuildingInfo } from '@/ui/buildingInfo';
 import { FinancePanel } from '@/ui/financePanel';
 import { TransitPanel } from '@/ui/transitPanel';
@@ -1186,6 +1189,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const legend = new Legend(mount, i18n);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
   const advisorPanel = new AdvisorPanel(mount, i18n);
+  const statPanel = new StatPanel(mount, i18n);
   const buildingInfo = new BuildingInfo(mount, i18n, content.getBalance(), (terrain) => {
     // Náhled povrchu v rozboru parcely. Bere **první variantu**, ne tu, která
     // na dlaždici padla: v panelu jde o materiál, ne o konkrétní kus mapy.
@@ -1777,6 +1781,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onSetView: setView,
     onToggleBudget: () => budgetPanel.toggle(),
     onToggleAdvisor: () => advisorPanel.toggle(),
+    onStatClick: (key) => statPanel.toggle(key),
     onToggleFinance: () => financePanel.toggle(),
     onToggleTransit: () => transitPanel.toggle(),
     onToggleDisasters: () => {
@@ -2763,6 +2768,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       message: message ? i18n.t(message.key, message.params) : '',
     });
 
+    // Rozpis údaje z lišty. Taky jen když je otevřený — rozpad spokojenosti
+    // projde všechny buňky a to není práce na každý snímek.
+    const openStat = statPanel.openKey();
+    if (openStat !== null) {
+      statPanel.update(
+        explainStat(simWorld, content, content.getBalance(), openStat as ExplainedStat),
+      );
+    }
     // Poradce se počítá, jen když je otevřený: prochází budovy, buňky i pokrytí
     // všech tříd, což je práce na úrovni jednoho systému, ne popisku.
     if (advisorPanel.isVisible()) {

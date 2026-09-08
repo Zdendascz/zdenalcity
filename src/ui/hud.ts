@@ -1,5 +1,6 @@
 import type { ZoneType } from '@/sim/layers';
 import { ZONE } from '@/sim/layers';
+import { EXPLAINED_STATS } from '@/sim/statBreakdown';
 import { disasterProgress } from '@/sim/disasters/state';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { averageHappiness } from '@/sim/systems/happiness';
@@ -31,6 +32,8 @@ export interface HudCallbacks {
   onSetView(id: string): void;
   onToggleBudget(): void;
   onToggleAdvisor(): void;
+  /** Hráč klikl na číslo v liště a chce vědět, z čeho je. */
+  onStatClick(key: string): void;
   /** Půjčky a dluhopisy (§8 fáze 4). */
   onToggleFinance(): void;
   /** Linky MHD (§7 fáze 4). */
@@ -752,8 +755,19 @@ export class Hud {
     parent.appendChild(popover.root);
   }
 
+  /**
+   * Jeden údaj v liště.
+   *
+   * Údaj, který se dá rozepsat, je **tlačítko**. Autor: „u statistik by bylo
+   * fajn, kdyby šlo každou z hodnot rozkliknout a naskočí tabulka, z čeho se
+   * čísla skládají." Datum tlačítko není — z čeho by se skládalo.
+   */
   private stat(key: string, labelKey: string): HTMLElement {
-    const stat = el('div', 'stat');
+    const explainable = (EXPLAINED_STATS as readonly string[]).includes(key);
+    const stat = explainable
+      ? button('stat stat--button', () => this.callbacks.onStatClick(key))
+      : el('div', 'stat');
+    if (explainable) stat.title = this.i18n.t('ui.stat.explain');
     stat.appendChild(el('span', 'stat__label', this.i18n.t(labelKey)));
     const value = el('span', 'stat__value', '-');
     stat.appendChild(value);
