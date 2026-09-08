@@ -288,6 +288,52 @@ function isSet(layer: Uint8Array, x: number, y: number): boolean {
   return inBounds(x, y, size) && (layer[index(x, y, size)] ?? 0) !== 0;
 }
 
+/**
+ * Kolik dlaždic budova **doopravdy drží**.
+ *
+ * Není to totéž co `definition.footprint`. Půdorys je vlastnost obsahu a ten
+ * se mění: uhelná elektrárna byla 4 × 4 a v T44 povyrostla na 5 × 5. Budovy
+ * postavené předtím ale pořád stojí na čtyřech dlaždicích — dlaždice se
+ * zapisují při stavbě a zpětně je nikdo nepřekreslil. Save autorova města:
+ * šest elektráren drží 16 dlaždic místo 25, zbylých 933 budov sedí přesně.
+ *
+ * Kdo kreslí, musí vycházet **z dlaždic, ne z definice**. Obrázek pro 5 × 5
+ * nakreslený na parcelu 4 × 4 přeteče o půl dlaždice na každou stranu a leze
+ * do sousedů — autor to hlásil slovy „tady jsou úplně ujeté budovy". Přerůst
+ * do těch dlaždic zpětně nejde: leží na nich mezitím parky, čerpací stanice
+ * i druhá elektrárna, a bourat je při načtení savu by hráči sebralo město.
+ *
+ * Vrací se rozsah **shora omezený definicí**: víc než svůj půdorys budova
+ * nedrží nikdy a hledat dál by byla zbytečná práce.
+ */
+export interface FootprintView {
+  readonly size: number;
+  readonly layers: { readonly buildingId: Readonly<Uint16Array> };
+}
+
+export function placedFootprint(
+  world: FootprintView,
+  building: { readonly id: number; readonly x: number; readonly y: number },
+  footprint: readonly [number, number],
+): [number, number] {
+  const [width, depth] = footprint;
+  let ownedWidth = 1;
+  let ownedDepth = 1;
+
+  for (let dy = 0; dy < depth; dy++) {
+    for (let dx = 0; dx < width; dx++) {
+      const x = building.x + dx;
+      const y = building.y + dy;
+      if (!inBounds(x, y, world.size)) continue;
+      if (world.layers.buildingId[index(x, y, world.size)] !== building.id) continue;
+      ownedWidth = Math.max(ownedWidth, dx + 1);
+      ownedDepth = Math.max(ownedDepth, dy + 1);
+    }
+  }
+
+  return [ownedWidth, ownedDepth];
+}
+
 export function placeBuilding(
   world: WorldState,
   definition: Definition,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '@/sim/catalogue';
+import { placeBuilding, placedFootprint } from '@/sim/buildings';
 import { buildRoad, bulldoze, placeDefinition, zoneArea } from '@/sim/commands';
 import { index, TERRAIN, ZONE } from '@/sim/layers';
 import { createSimHost } from '@/sim/simHost';
@@ -238,5 +239,52 @@ describe('cesta přes SimHost.dispatch', () => {
 
     expect(host.consumeDirty().tiles.size).toBe(5);
     expect(host.consumeDirty().tiles.size).toBe(0);
+  });
+});
+
+describe('skutečný půdorys', () => {
+  /*
+   * Půdorys je **obsah** a ten se mění. Uhelná elektrárna povyrostla ze 4 × 4
+   * na 5 × 5 a budovy postavené předtím zůstaly na čtyřech dlaždicích: v savu
+   * autorova města jich takhle stálo šest, zbylých 933 budov sedělo přesně.
+   * Obrázek pro pět dlaždic pak přetekl na sousedy — „tady jsou úplně ujeté
+   * budovy, úplně mimo".
+   *
+   * Přerůst do těch dlaždic zpětně nejde: leží na nich mezitím parky i druhá
+   * elektrárna. Kdo kreslí, musí proto vycházet z dlaždic, ne z definice.
+   */
+  it('vrátí to, co budova opravdu drží, ne co jí slibuje definice', () => {
+    const world = createWorld(1);
+    const building = placeBuilding(world, TOWER, 10, 10);
+    expect(placedFootprint(world, building, TOWER.footprint)).toEqual([2, 2]);
+
+    // Obsah povyrostl: táž budova má nově půdorys 3 × 3. Dlaždice se tím
+    // nepřekreslily — budova pořád drží dvě na dvě.
+    expect(placedFootprint(world, building, [3, 3])).toEqual([2, 2]);
+  });
+
+  it('menší definice než parcela vrátí jen tolik, kolik hledá', () => {
+    // Opačný směr: obsah se zmenšil. Hledá se jen v novém půdorysu, protože
+    // víc než ten se stejně nekreslí.
+    const world = createWorld(1);
+    const building = placeBuilding(world, TOWER, 10, 10);
+    expect(placedFootprint(world, building, [1, 1])).toEqual([1, 1]);
+  });
+
+  it('cizí dlaždice se nepočítají', () => {
+    const world = createWorld(1);
+    const first = placeBuilding(world, TOWER, 10, 10);
+    // Soused stojí přesně tam, kam by větší definice chtěla přerůst.
+    placeBuilding(world, { ...TOWER, id: 'test:tower2' }, 12, 10);
+    expect(placedFootprint(world, first, [4, 4])).toEqual([2, 2]);
+  });
+
+  it('budova bez jediné dlaždice se kreslí aspoň na jednu', () => {
+    // Ruina po katastrofě může přijít o dlaždice dřív, než se překreslí.
+    // Nula by znamenala dělení nulou v měřítku obrázku.
+    const world = createWorld(1);
+    const building = placeBuilding(world, TOWER, 10, 10);
+    world.layers.buildingId.fill(0);
+    expect(placedFootprint(world, building, TOWER.footprint)).toEqual([1, 1]);
   });
 });

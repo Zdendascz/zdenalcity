@@ -15,6 +15,7 @@ import {
   WALL_RIGHT_SHADE,
   FOUNDATION_COLOR,
 } from './palette';
+import { placedFootprint } from '@/sim/buildings';
 import { areaHeightRange, groundHeightAt } from '@/sim/heights';
 import { depthOrder } from './depth';
 import type { DepthBox } from './depth';
@@ -441,7 +442,23 @@ export class BuildingRenderer {
           }
         : found;
 
-    const [width, depth] = appearance.footprint;
+    /*
+     * Kreslí se na dlaždice, které budova **doopravdy drží**, ne na ty, které
+     * jí přisuzuje dnešní definice. Půdorys je obsah a ten se mění: uhelná
+     * elektrárna povyrostla ze 4 × 4 na 5 × 5 a budovy postavené předtím
+     * zůstaly na čtyřech dlaždicích. Obrázek pro pět dlaždic pak přetekl
+     * o půl dlaždice na každou stranu a lezl do sousedů — autor to hlásil
+     * slovy „tady jsou úplně ujeté budovy, úplně mimo". Ve stejné situaci
+     * skončí každý mod, který sáhne na půdorys už postavené budovy.
+     */
+    const [width, depth] = placedFootprint(this.world, building, appearance.footprint);
+    // Zmenšení obrázku na parcelu, na které budova stojí. Zúžit ho nejde —
+    // roztažením jedné strany by se rozešla izometrie — takže se zmenší celý
+    // podle té strany, které chybí víc.
+    const shrunk = Math.min(
+      width / appearance.footprint[0],
+      depth / appearance.footprint[1],
+    );
 
     if (appearance.sprite) {
       // Zpustlá budova má **jeden obrázek na dvě dlaždice na dvě** a nosí ho
@@ -456,7 +473,7 @@ export class BuildingRenderer {
       // menší, což je pořád lepší než hromada suti přes chodník.
       const fit = building.abandoned
         ? Math.min(1, Math.min(width, depth) / DERELICT_TILES)
-        : 1;
+        : shrunk;
       this.drawSprite(id, building.x, building.y, width, depth, appearance.sprite, fit);
       return;
     }
