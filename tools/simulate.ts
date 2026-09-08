@@ -1162,20 +1162,59 @@ class Player {
       .sort((a, b) => capacity(a) - capacity(b));
   }
 
+  /**
+   * Vodáren tolik, kolik jich město vypije.
+   *
+   * Do T107 se počítalo `budov × 12`, protože `water.production` byla jen
+   * vypínač a na čísle nezáleželo. Teď je to strop: co se za něj nevejde,
+   * vyschne — takže hráč musí počítat **totéž, co simulace**, jinak měří
+   * vlastní chybu místo hry.
+   */
   private keepWater(): void {
     let produced = 0;
+    let needed = 0;
     for (const building of this.world.buildings.values()) {
-      produced += this.content.get(building.definitionId)?.water?.production ?? 0;
-    }
-    const needed = this.world.buildings.size * 12;
-    if (produced >= needed + 40) return;
-
-    for (const works of this.waterWorks) {
-      if (this.world.economy.funds < works.construction.cost * 1.5) continue;
-      if (this.place(works)) {
-        this.layPipes();
-        return;
+      if (building.abandoned) continue;
+      const definition = this.content.get(building.definitionId);
+      const production = definition?.water?.production ?? 0;
+      produced += production;
+      // Vodárna sama vodu nespotřebuje, stejně jako v rozvodu.
+      if (production === 0) {
+        needed +=
+          building.population * this.balance.water.perCitizen +
+          building.jobs * this.balance.water.perWorker;
       }
+    }
+    /*
+     * **Vodárna není jen kapacita, je to hlavně další zdroj v síti.**
+     *
+     * Voda dojde jen 24 dlaždic po potrubí od vodárny, takže o tom, jestli má
+     * čtvrť vodu, rozhoduje víc dosah než litry. Když se pravidlo přepsalo na
+     * čistou spotřebu (obyvatelé × 0,1), stavěl hráč **jednu vodárnu na město**
+     * — kapacitu měl, ale půlka města byla mimo dosah a uschla. Změřeno A/B na
+     * 360 partiích: medián populace na konci spadl z 937 na 110, přežití
+     * ze 57 na 51 %.
+     *
+     * Bere se proto **to větší z obojího**: `budov × 12` je hrubý odhad
+     * potřebného dosahu (funguje od první verze) a spotřeba s rezervou je
+     * strop, který přidala kapacita vody. Kdo splní obojí, má vodu všude.
+     */
+    const forReach = this.world.buildings.size * 12;
+    const forCapacity = needed * 1.5 + 40;
+    if (produced >= Math.max(forReach, forCapacity)) return;
+
+    for (let built = 0; built < 2; built++) {
+      let placed = false;
+      for (const works of this.waterWorks) {
+        if (this.world.economy.funds < works.construction.cost * 1.5) continue;
+        if (!this.place(works)) continue;
+        produced += works.water?.production ?? 0;
+        placed = true;
+        break;
+      }
+      if (!placed) break;
+      this.layPipes();
+      if (produced >= needed * 1.5 + 40) break;
     }
   }
 
