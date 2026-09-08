@@ -544,7 +544,25 @@ export interface Balance {
 
   demand: {
     workerRatio: number;
-    baseResidential: number;
+    /**
+     * Náskok obytné poptávky, který **s časem slábne**.
+     *
+     * Obytná je `základ + (práce − pracující)` a průmyslová `pracující − práce`,
+     * takže **jejich součet je vždycky ten základ**. Konstantní dvacítka proto
+     * znamenala, že hra celou partii tlačí stavět bydlení: v rovnováze vyšla
+     * obytná na dvacet a průmyslová na nulu, ať město dělalo cokoli.
+     *
+     * Rozhodnutí autora: základ má být **startér, ne trvalý palec na váze**.
+     * Prvních `holdYears` let drží na `start`, pak ubývá po `perYear` za rok,
+     * dokud nedosedne na `floor`. Zralé město tak řídí vlastní bilance práce,
+     * ne konstanta.
+     */
+    baseResidential: {
+      start: number;
+      holdYears: number;
+      perYear: number;
+      floor: number;
+    };
     commercePerCapita: number;
     limit: number;
   };
@@ -1115,7 +1133,11 @@ export function validateBalance(raw: unknown): {
     },
     demand: {
       workerRatio: num(issues, demand, 'workerRatio', 'demand.workerRatio', 0, 1),
-      baseResidential: num(issues, demand, 'baseResidential', 'demand.baseResidential', 0, 1000),
+      baseResidential: validateResidentialBase(
+        issues,
+        asRecord(demand?.['baseResidential']),
+        'demand.baseResidential',
+      ),
       commercePerCapita: num(
         issues,
         demand,
@@ -1433,6 +1455,29 @@ function indicatorName(issues: ValidationIssue[], raw: unknown, field: string): 
     return 'none';
   }
   return raw;
+}
+
+/** Slábnoucí náskok obytné poptávky. Čtyři čísla, všechna v datech (P5). */
+function validateResidentialBase(
+  issues: ValidationIssue[],
+  raw: Record<string, unknown> | null,
+  where: string,
+): { start: number; holdYears: number; perYear: number; floor: number } {
+  if (!raw) {
+    issues.push({ field: where, message: 'musí být objekt' });
+    return { start: 0, holdYears: 0, perYear: 0, floor: 0 };
+  }
+  const start = num(issues, raw, 'start', `${where}.start`, 0, 1000);
+  const floor = num(issues, raw, 'floor', `${where}.floor`, 0, 1000);
+  if (floor > start) {
+    issues.push({ field: `${where}.floor`, message: 'nesmí být větší než start' });
+  }
+  return {
+    start,
+    holdYears: num(issues, raw, 'holdYears', `${where}.holdYears`, 0, 1000),
+    perYear: num(issues, raw, 'perYear', `${where}.perYear`, 0, 1000),
+    floor,
+  };
 }
 
 function validateUnless(

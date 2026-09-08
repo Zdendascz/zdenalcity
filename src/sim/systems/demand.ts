@@ -2,6 +2,9 @@ import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import type { WorldState } from '../world';
 import { happinessDemandFactor } from './happiness';
+// Délka roku je definovaná jednou, u rizika katastrof; druhá konstanta by se
+// s ní dřív nebo později rozešla a kalendář by v každém systému běžel jinak.
+import { TICKS_PER_YEAR } from '../disasters/risk';
 import type { System } from './index';
 
 /**
@@ -20,10 +23,34 @@ import type { System } from './index';
  * kladná: záporná poptávka znamená „bytů je dost“ a to s náladou nesouvisí —
  * kdyby se násobila i ta, nespokojené město by hlásilo menší přebytek, tedy
  * přesný opak toho, co se v něm děje.
+ *
+ * Základ obytné poptávky **s časem slábne** (T108). Obytná a průmyslová jsou
+ * zrcadlo — jejich součet je vždycky ten základ — takže konstantní dvacítka
+ * znamenala, že v rovnováze vyjde obytná na dvacet a průmyslová na nulu, ať
+ * město dělá cokoli. Startér zůstal, palec na váze zmizel: po pěti letech
+ * ubývá bod za rok až na pětku.
  */
 
+/**
+ * Náskok obytné poptávky v daném tiku.
+ *
+ * Prvních pár let drží na plné hodnotě, aby se město vůbec rozjelo — bez
+ * něj je na začátku nula obyvatel, nula prací a tím pádem nulová poptávka
+ * po čemkoli. Pak ubývá po bodu za rok, dokud nedosedne na podlahu.
+ *
+ * Exportuje se, protože **totéž musí umět i rozpis poptávky v HUD** (§12):
+ * kdyby si ho panel počítal po svém, ukazoval by po první změně pravidel
+ * jiné číslo, než podle kterého město roste.
+ */
+export function residentialBase(balance: Balance, tick: number): number {
+  const { start, holdYears, perYear, floor } = balance.demand.baseResidential;
+  const year = Math.floor(tick / TICKS_PER_YEAR);
+  const faded = start - Math.max(0, year - holdYears) * perYear;
+  return Math.max(floor, Math.min(start, faded));
+}
+
 export function createDemandSystem(catalogue: BuildingCatalogue, balance: Balance): System {
-  const { workerRatio, baseResidential, commercePerCapita, limit } = balance.demand;
+  const { workerRatio, commercePerCapita, limit } = balance.demand;
   const clampDemand = (value: number): number =>
     Math.max(-limit, Math.min(limit, Math.round(value)));
 
@@ -49,7 +76,7 @@ export function createDemandSystem(catalogue: BuildingCatalogue, balance: Balanc
 
       const workers = population * workerRatio;
 
-      const rawResidential = baseResidential + (jobs - workers);
+      const rawResidential = residentialBase(balance, world.tick) + (jobs - workers);
       const happiness = happinessDemandFactor(world, balance);
       world.demand.residential = clampDemand(
         rawResidential > 0 ? rawResidential * happiness : rawResidential,

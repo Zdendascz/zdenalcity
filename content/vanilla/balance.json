@@ -6,7 +6,12 @@
   },
   "demand": {
     "workerRatio": 0.5,
-    "baseResidential": 20,
+    "baseResidential": {
+      "start": 20,
+      "holdYears": 5,
+      "perYear": 1,
+      "floor": 5
+    },
     "commercePerCapita": 0.2,
     "limit": 100
   },
