@@ -979,7 +979,7 @@
         "unless": [
           {
             "indicator": "powerReserve",
-            "above": 0.5
+            "above": 0.35
           }
         ],
         "risk": [
