@@ -17,6 +17,8 @@ import {
 } from '@/sim/disasters/effects';
 import { computeIndicators } from '@/sim/disasters/indicators';
 import { DisasterRegistry } from '@/sim/disasters/registry';
+import { disasterProgress, setClock } from '@/sim/disasters/state';
+import type { ActiveDisaster } from '@/sim/disasters/state';
 import type { Disaster } from '@/sim/disasters/registry';
 import {
   computeMetrics,
@@ -561,6 +563,55 @@ describe('tvary zásahu', () => {
     const world = createWorld(1);
     const cells = coarseCellsOfShape(world, { kind: 'radius', x: 20, y: 20, radius: 2 });
     expect(new Set(cells).size).toBe(cells.length);
+  });
+});
+
+describe('hodiny katastrofy', () => {
+  /*
+   * Odznak v liště se plní zleva doprava podle toho, jak katastrofa dobíhá —
+   * autor si to vyžádal větou „bylo by fajn, kdyby tam byl nějaký odpočet,
+   * do kdy katastrofa skončí". Podíl počítá `disasterProgress`, a musí umět
+   * obojí zápis, který se v pohromách vyskytuje.
+   */
+  const clockOf = (state: Record<string, unknown>): ActiveDisaster => ({
+    id: 1,
+    kind: 'test',
+    startedAtTick: 0,
+    x: 0,
+    y: 0,
+    state,
+    finished: false,
+  });
+
+  it('odpočítávající pohroma hlásí, kolik už je za ní', () => {
+    const active = clockOf({});
+    setClock(active, 40);
+    expect(disasterProgress(active)).toBe(0);
+
+    active.state['left'] = 30;
+    expect(disasterProgress(active)).toBeCloseTo(0.25);
+    active.state['left'] = 0;
+    expect(disasterProgress(active)).toBe(1);
+  });
+
+  it('pohroma, která počítá nahoru, se čte stejně', () => {
+    // Tornádo a blackout mají `age`, ne `left`. Sjednocovat je zpětně by
+    // znamenalo sáhnout do každé jedné a nic tím nezískat.
+    expect(disasterProgress(clockOf({ span: 90, age: 45 }))).toBeCloseTo(0.5);
+  });
+
+  it('bez hodin nehlásí nic, a to je taky odpověď', () => {
+    // Oheň hoří, dokud je co, povodeň opadá po svém. Lišta u nich zůstane
+    // prázdná — lepší než odpočet, který si hra vymyslí.
+    expect(disasterProgress(clockOf({}))).toBeNull();
+    expect(disasterProgress(clockOf({ span: 0, left: 0 }))).toBeNull();
+    expect(disasterProgress(clockOf({ left: 5 }))).toBeNull();
+  });
+
+  it('podíl nepřeteče, i když se odpočet přehoupne', () => {
+    // Válka gangů ubývá zlomkem za tik a poslední krok jde pod nulu.
+    expect(disasterProgress(clockOf({ span: 10, left: -3 }))).toBe(1);
+    expect(disasterProgress(clockOf({ span: 10, left: 12 }))).toBe(0);
   });
 });
 

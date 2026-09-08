@@ -11,6 +11,7 @@ import {
 import { computeIndicators } from './indicators';
 import type { Disaster, DisasterContext } from './registry';
 import { dominantTerm } from './risk';
+import { setClock } from './state';
 import type { ActiveDisaster } from './state';
 import {
   areaHappiness,
@@ -59,7 +60,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
   const radius = strike.radiusMin + world.rng.int(strike.radiusMax - strike.radiusMin + 1);
   const cells = cellsAround(world, context.x, context.y, radius);
 
-  active.state['left'] = duration;
+  setClock(active, duration);
   active.state['radius'] = radius;
   active.state['cells'] = cells;
   active.state['reason'] = dominantReason(context);

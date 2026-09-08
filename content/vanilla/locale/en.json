@@ -186,6 +186,7 @@
   "ui.alert.body.chemicalSpill": "A chemical spill. The waterworks is out and the surroundings stay poisoned even after the leak ends.",
   "ui.alert.body.landslide": "A landslide. The slope gave way and took what stood on it.",
   "ui.disaster.title": "Disasters",
+  "ui.disaster.progress": "{name} — {percent}% through",
   "ui.disaster.armed": "{name}: click the map where it should strike.",
   "ui.disaster.started": "Started: {name}.",
   "ui.disaster.fire": "Fire",

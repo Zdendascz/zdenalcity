@@ -36,9 +36,12 @@ export function createTornadoDisaster(): Disaster {
       const { world, balance } = context;
       const tornado = balance.disasters.tornado;
 
-      active.state['life'] =
+      const life =
         tornado.lifetimeMin + world.rng.int(tornado.lifetimeMax - tornado.lifetimeMin + 1);
+      active.state['life'] = life;
       active.state['age'] = 0;
+      // Tornádo počítá nahoru, takže hodiny pro lištu v HUD nese `span`.
+      active.state['span'] = life;
       active.state['width'] =
         tornado.widthMin + world.rng.int(tornado.widthMax - tornado.widthMin + 1);
       active.state['x'] = context.x;

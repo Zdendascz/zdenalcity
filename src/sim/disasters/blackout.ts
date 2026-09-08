@@ -64,6 +64,10 @@ function advance(context: DisasterContext, active: ActiveDisaster): void {
 
   const age = ((active.state['age'] as number | undefined) ?? 0) + 1;
   active.state['age'] = age;
+  // Hodiny pro lištu v HUD. Zapisují se tady, ne v `start`, aby je dostala
+  // i partie rozehraná dřív — a hlavně proto, že strop je v balancu a ten
+  // `start` sice dostane, ale `isFinished` už ne.
+  active.state['span'] = blackout.maxTicks;
 
   /*
    * Strop na délku. Vrátí všechno a tím katastrofu ukončí.

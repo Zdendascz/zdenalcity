@@ -53,6 +53,46 @@ export interface ActiveDisaster {
   finished: boolean;
 }
 
+/**
+ * Hodiny katastrofy: kolik tiků potrvá a kolik jich zbývá.
+ *
+ * Ukládá se **dvojice**, ne jen zbytek. Bez celku se z „zbývá 40" nedá říct
+ * nic — je to skoro konec, nebo teprve začátek? Lišta v HUD ukazuje přesně
+ * tenhle podíl a autor si ji vyžádal větou „bylo by fajn, kdyby tam byl
+ * nějaký odpočet, do kdy katastrofa skončí".
+ *
+ * Klíče jsou dva a schválně obecné: každá pohroma si stav drží po svém
+ * (`registry.ts`), ale kdo chce lištu, musí umět tyhle dva. Kdo hodiny nemá
+ * — oheň končí, až dohoří, povodeň, až voda opadne — lištu prostě nedostane.
+ */
+export function setClock(active: ActiveDisaster, duration: number): void {
+  active.state['left'] = duration;
+  active.state['span'] = duration;
+}
+
+/**
+ * Kolik z katastrofy je za námi, 0–1. `null` znamená „nedá se říct".
+ *
+ * Bere obojí zápis, který se v pohromách vyskytuje: `left` + `span` u těch,
+ * co odpočítávají, a `age` + `span` u těch, co počítají nahoru. Sjednocovat
+ * je zpětně by znamenalo sáhnout do každé jedné a nic tím nezískat.
+ */
+export function disasterProgress(active: ActiveDisaster): number | null {
+  const span = active.state['span'];
+  if (typeof span !== 'number' || span <= 0) return null;
+
+  const left = active.state['left'];
+  if (typeof left === 'number') return clamp01(1 - left / span);
+
+  const age = active.state['age'];
+  if (typeof age === 'number') return clamp01(age / span);
+  return null;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
 export interface DisasterState {
   /**
    * Smí katastrofy vůbec nastat? (R18)

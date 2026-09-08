@@ -186,6 +186,7 @@
   "ui.alert.body.chemicalSpill": "Chemická havárie. Vodárna je mimo provoz a okolí zůstane otrávené i po tom, co únik skončí.",
   "ui.alert.body.landslide": "Sesuv půdy. Svah se utrhl a vzal s sebou, co na něm stálo.",
   "ui.disaster.title": "Katastrofy",
+  "ui.disaster.progress": "{name} — hotovo z {percent} %",
   "ui.disaster.armed": "{name}: klikni na mapu, kde má udeřit.",
   "ui.disaster.started": "Spuštěno: {name}.",
   "ui.disaster.fire": "Požár",

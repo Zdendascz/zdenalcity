@@ -4,6 +4,7 @@ import { index } from '../layers';
 import type { Building, WorldState } from '../world';
 import { CITY_WIDE, happinessPenalty, suppressService } from './effects';
 import type { Disaster, DisasterContext } from './registry';
+import { setClock } from './state';
 import type { ActiveDisaster } from './state';
 import { densityOfCell, populationPerCell } from './unrest';
 
@@ -57,8 +58,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
 
   const duration =
     epidemic.durationMin + world.rng.int(epidemic.durationMax - epidemic.durationMin + 1);
-  active.state['left'] = duration;
-  active.state['span'] = duration;
+  setClock(active, duration);
   active.state['lost'] = 0;
 
   const cell = coarseIndex(context.x, context.y, world.size);

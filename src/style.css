@@ -773,22 +773,42 @@ body {
  * Řada u hodin. Souběh je normální stav — hoří a zároveň stávkuje — takže se
  * ikony řadí vedle sebe a je jich klidně víc.
  */
+/*
+ * Odznaky běžících pohrom sedí vedle tabulky statistik a **jsou stejně
+ * vysoké**: `stretch` je natáhne na výšku nejvyššího souseda v řadě.
+ * Rozhodnutí autora — ikona byla proti tlačítku pauzy drobná.
+ */
 .hud__disasters {
   display: flex;
+  align-self: stretch;
   gap: 4px;
-  align-items: center;
+  align-items: stretch;
 }
 
+/*
+ * Pozadí odznaku je **odpočet**. Plní se zleva doprava, jak katastrofa
+ * dobíhá; `--disaster-progress` píše HUD každý snímek. Ostrý předěl místo
+ * přechodu je záměr: rozmazaná hrana se na malém odznaku nedá odečíst.
+ *
+ * Pohroma bez hodin nechá proměnnou na nule a odznak vypadá jako dřív.
+ */
 .hud__disaster {
+  --disaster-progress: 0%;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  min-height: 32px;
   padding: 0;
   border: 1px solid #ff7a63;
   border-radius: 6px;
-  background: rgb(217 72 58 / 22%);
+  background:
+    linear-gradient(
+      to right,
+      rgb(255 122 99 / 55%) var(--disaster-progress),
+      rgb(0 0 0 / 55%) var(--disaster-progress)
+    );
   cursor: pointer;
   /* Horní lišta je klikací skrz; ovládací prvky si příjem kliků zapínají samy. */
   pointer-events: auto;
@@ -797,15 +817,15 @@ body {
 }
 
 .hud__disaster:hover {
-  background: rgb(217 72 58 / 45%);
+  border-color: #fff;
 }
 
 /* Ikona přijde jako `<img>` i jako `<svg>` podle toho, co dodal obsah. */
 .hud__disaster svg,
 .hud__disaster img {
   display: block;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
 }
 
 @keyframes disaster-pulse {

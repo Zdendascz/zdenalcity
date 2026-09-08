@@ -13,6 +13,7 @@ import {
 } from './effects';
 import { flammableAt, igniteTile } from './fire';
 import type { Disaster, DisasterContext } from './registry';
+import { setClock } from './state';
 import type { ActiveDisaster } from './state';
 import { areaCoverage, areaHappiness, drain, happinessChange, remainingOf } from './unrest';
 
@@ -49,7 +50,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
   const riot = balance.disasters.riot;
 
   const duration = riot.durationMin + world.rng.int(riot.durationMax - riot.durationMin + 1);
-  active.state['left'] = duration;
+  setClock(active, duration);
   active.state['happinessBefore'] = areaHappiness(world, []);
 
   // Síla podle kriminality v epicentru; zmrazí se na celé trvání.

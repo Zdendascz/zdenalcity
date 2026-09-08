@@ -12,6 +12,7 @@ import type { Losses } from './damage';
 import { igniteTile } from './fire';
 import { floodTile } from './flood';
 import type { Disaster, DisasterContext } from './registry';
+import { setClock } from './state';
 
 /**
  * Zemětřesení (katalog 4).
@@ -49,7 +50,7 @@ export function createEarthquakeDisaster(): Disaster {
       const count =
         quake.aftershocksMin +
         world.rng.int(quake.aftershocksMax - quake.aftershocksMin + 1);
-      active.state['left'] = count;
+      setClock(active, count);
       active.state['next'] = world.tick + nextDelay(world, context);
 
       shake(context, magnitude);

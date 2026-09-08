@@ -17,6 +17,16 @@ export class BudgetPanel {
   private readonly i18n: I18n;
   private readonly definitions: readonly Definition[];
   private visible = false;
+  /**
+   * Otisk stavu, ze kterého je tabulka nakreslená.
+   *
+   * Bez něj se tabulka **přestavovala každý snímek** — `update` běží ve
+   * smyčce vykreslování a začíná `replaceChildren()`. Tlačítko pod kurzorem
+   * se tak každých šestnáct milisekund vyhodilo a nahradilo novým, takže se
+   * na něj nedalo kliknout: myš stiskla jeden uzel a pustila jiný. Autor to
+   * hlásil jako „u tabulky Ekonomický přehled nefunguje X".
+   */
+  private drawn: string | null = null;
 
   constructor(parent: HTMLElement, i18n: I18n, definitions: readonly Definition[]) {
     this.i18n = i18n;
@@ -33,11 +43,18 @@ export class BudgetPanel {
   toggle(): boolean {
     this.visible = !this.visible;
     this.root.classList.toggle('is-hidden', !this.visible);
+    // Zavřená tabulka zahodí otisk, ať se po otevření nakreslí z čerstvých
+    // čísel, a ne z těch, u kterých se zavírala.
+    this.drawn = null;
     return this.visible;
   }
 
   update(budget: Budget, funds: number): void {
     if (!this.visible) return;
+
+    const signature = BudgetPanel.signature(budget, funds);
+    if (signature === this.drawn) return;
+    this.drawn = signature;
 
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     const counts = new Map(budget.lines.map((line) => [line.definitionId, line]));
@@ -169,6 +186,41 @@ export class BudgetPanel {
   }
 
   /** Slovní rozpis jednoho řádku: odkud se vzal příjem a odkud údržba. */
+  /** Čísla, na kterých tabulka stojí. Změní se jednou za měsíc, ne za snímek. */
+  private static signature(budget: Budget, funds: number): string {
+    const parts: (string | number)[] = [
+      funds,
+      budget.income,
+      budget.expenses,
+      budget.valuePerUnit,
+      budget.roads.count,
+      budget.roads.upkeep,
+      budget.transit.lines,
+      budget.transit.vehicles,
+      budget.transit.income,
+      budget.transit.upkeep,
+      budget.debt.loans,
+      budget.debt.owed,
+      budget.debt.payment,
+    ];
+    for (const line of budget.lines) {
+      parts.push(
+        line.definitionId,
+        line.count,
+        line.poweredCount,
+        line.income,
+        line.upkeep,
+        // I rozpis pod řádkem: bez toho by se zastavil na číslech, se kterými
+        // se tabulka kreslila naposledy.
+        line.taxBase,
+        line.taxRate ?? '-',
+        line.upkeepCount,
+        line.upkeepEach,
+      );
+    }
+    return parts.join('|');
+  }
+
   private describe(line: BudgetLine, valuePerUnit: number): string {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     const parts: string[] = [];

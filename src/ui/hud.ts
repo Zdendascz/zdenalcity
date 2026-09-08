@@ -1,5 +1,6 @@
 import type { ZoneType } from '@/sim/layers';
 import { ZONE } from '@/sim/layers';
+import { disasterProgress } from '@/sim/disasters/state';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { averageHappiness } from '@/sim/systems/happiness';
 import type { DemandBreakdown } from '@/sim/diagnostics';
@@ -313,6 +314,8 @@ export class Hud {
   private readonly disasters: readonly string[];
   /** Ikony běžících pohrom u hodin. */
   private disasterBadges: HTMLElement | null = null;
+  /** Odznaky podle id pohromy — odpočet se přepisuje, ne překresluje. */
+  private readonly disasterNodes = new Map<number, HTMLElement>();
   /** Podle čeho se pozná, že se řada ikon musí přestavět. */
   private badgeKey = '';
   private readonly fundingInputs = new Map<string, HTMLInputElement>();
@@ -598,6 +601,7 @@ export class Hud {
     this.disasterBadges = el('div', 'hud__disasters');
     left.appendChild(this.disasterBadges);
     this.badgeKey = '';
+    this.disasterNodes.clear();
     this.buildSpeed(left);
     this.buildDemand();
 
@@ -673,19 +677,41 @@ export class Hud {
 
     const active = this.view.disasters.active.filter((disaster) => !disaster.finished);
     const key = active.map((disaster) => `${disaster.id}:${disaster.kind}`).join(',');
-    if (key === this.badgeKey) return;
-    this.badgeKey = key;
+    if (key !== this.badgeKey) {
+      this.badgeKey = key;
+      this.disasterNodes.clear();
+      badges.replaceChildren();
+      for (const disaster of active) {
+        const name = this.i18n.t(`ui.disaster.${disaster.kind}`);
+        const node = button('hud__disaster', () =>
+          this.callbacks.onDisasterClick(disaster.kind, disaster.x, disaster.y),
+        );
+        node.setAttribute('aria-label', name);
+        node.appendChild(iconSvg(disaster.kind));
+        badges.appendChild(node);
+        this.disasterNodes.set(disaster.id, node);
+      }
+    }
 
-    badges.replaceChildren();
+    /*
+     * Odpočet do konce. Kreslí se jako **pozadí odznaku**, které se plní
+     * zleva doprava — přidávat vedle ikony ještě proužek by z lišty udělalo
+     * další tabulku.
+     *
+     * Přepisuje se každý snímek, ne jen při změně řady: je to jediná věc na
+     * odznaku, která se hýbe. Pohromy bez hodin (oheň hoří, dokud je co,
+     * povodeň opadá po svém) `null` a lišta u nich zůstane prázdná.
+     */
     for (const disaster of active) {
+      const node = this.disasterNodes.get(disaster.id);
+      if (!node) continue;
+      const done = disasterProgress(disaster);
+      node.style.setProperty('--disaster-progress', done === null ? '0%' : `${Math.round(done * 100)}%`);
       const name = this.i18n.t(`ui.disaster.${disaster.kind}`);
-      const node = button('hud__disaster', () =>
-        this.callbacks.onDisasterClick(disaster.kind, disaster.x, disaster.y),
-      );
-      node.title = name;
-      node.setAttribute('aria-label', name);
-      node.appendChild(iconSvg(disaster.kind));
-      badges.appendChild(node);
+      node.title =
+        done === null
+          ? name
+          : this.i18n.t('ui.disaster.progress', { name, percent: Math.round(done * 100) });
     }
   }
 

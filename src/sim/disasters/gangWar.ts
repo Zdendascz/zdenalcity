@@ -12,6 +12,7 @@ import {
   taxLoss
 } from './effects';
 import type { Disaster, DisasterContext } from './registry';
+import { setClock } from './state';
 import type { ActiveDisaster } from './state';
 import {
   areaCoverage,
@@ -62,7 +63,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
   const duration = war.durationMin + world.rng.int(war.durationMax - war.durationMin + 1);
   const radius = war.radiusMin + world.rng.int(war.radiusMax - war.radiusMin + 1);
 
-  active.state['left'] = duration;
+  setClock(active, duration);
   active.state['radius'] = radius;
   active.state['destroyed'] = 0;
 

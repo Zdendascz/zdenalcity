@@ -9,6 +9,7 @@ import {
   suppressService,
 } from './effects';
 import type { Disaster, DisasterContext } from './registry';
+import { setClock } from './state';
 import type { ActiveDisaster } from './state';
 import { cellsAround, remainingOf } from './unrest';
 
@@ -50,7 +51,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
   const health = (world.coverage.get('health')?.[cell] ?? 0) / 255;
   const duration = pileup.durationBase + Math.round(pileup.durationSpan * (1 - health));
 
-  active.state['left'] = duration;
+  setClock(active, duration);
   active.state['tile'] = coarseIndex(context.x, context.y, world.size);
 
   const tile = context.y * world.size + context.x;
