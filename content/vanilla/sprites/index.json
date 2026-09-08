@@ -249,10 +249,10 @@
       "variant": "b",
       "file": "commercial_centre__b.png",
       "width": 512,
-      "height": 483,
+      "height": 328,
       "anchor": [
-        256,
-        483
+        272,
+        328
       ]
     },
     {
@@ -326,10 +326,10 @@
       "variant": "c",
       "file": "commercial_gallery__c.png",
       "width": 640,
-      "height": 736,
+      "height": 434,
       "anchor": [
         384,
-        736
+        434
       ]
     },
     {
@@ -1205,11 +1205,11 @@
       "building": "vanilla:industrial_hall",
       "variant": "b",
       "file": "industrial_hall__b.png",
-      "width": 512,
-      "height": 318,
+      "width": 640,
+      "height": 435,
       "anchor": [
-        307,
-        318
+        363,
+        435
       ]
     },
     {
@@ -1359,11 +1359,11 @@
       "building": "vanilla:industrial_row",
       "variant": "a",
       "file": "industrial_row__a.png",
-      "width": 315,
-      "height": 169,
+      "width": 384,
+      "height": 221,
       "anchor": [
-        210,
-        169
+        241,
+        221
       ]
     },
     {
@@ -1491,33 +1491,33 @@
       "building": "vanilla:industrial_yard",
       "variant": "a",
       "file": "industrial_yard__a.png",
-      "width": 256,
-      "height": 135,
+      "width": 384,
+      "height": 259,
       "anchor": [
-        171,
-        135
+        256,
+        259
       ]
     },
     {
       "building": "vanilla:industrial_yard",
       "variant": "b",
       "file": "industrial_yard__b.png",
-      "width": 264,
-      "height": 320,
+      "width": 384,
+      "height": 179,
       "anchor": [
-        176,
-        320
+        256,
+        179
       ]
     },
     {
       "building": "vanilla:industrial_yard",
       "variant": "c",
       "file": "industrial_yard__c.png",
-      "width": 235,
-      "height": 204,
+      "width": 384,
+      "height": 260,
       "anchor": [
-        157,
-        204
+        256,
+        260
       ]
     },
     {
@@ -2338,11 +2338,11 @@
       "building": "vanilla:residential_terraces",
       "variant": "c",
       "file": "residential_terraces__c.png",
-      "width": 463,
-      "height": 387,
+      "width": 640,
+      "height": 522,
       "anchor": [
-        278,
-        387
+        384,
+        522
       ]
     },
     {
@@ -2855,11 +2855,11 @@
       "building": "vanilla:theatre",
       "variant": "b",
       "file": "theatre__b.png",
-      "width": 254,
-      "height": 254,
+      "width": 512,
+      "height": 360,
       "anchor": [
-        127,
-        254
+        267,
+        360
       ]
     },
     {

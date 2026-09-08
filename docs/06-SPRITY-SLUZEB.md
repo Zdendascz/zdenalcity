@@ -197,10 +197,12 @@ architecture — flat roofs with parapets, steel window frames, panel or
 rendered facades, concrete planters, terrazzo paving. Colours are slightly
 more saturated than reality, but the forms stay period-correct.
 
-The building stands on its own square plot. The plot is a perfect isometric
-diamond with four SHARP corners — not rounded, not a square, not a rectangle —
-and those four corners touch the edges of the image. Nothing except the roof
-may stick out past it, and nothing may be cut off.
+The building stands on its own plot, whose exact shape is given below. The
+plot is a perfect isometric diamond with four SHARP corners — not rounded, and
+never drawn as an axis-aligned square — and those four corners touch the edges
+of the image. The paving, kerbs, planters and fences all stay inside it: they
+are part of the plot, not of the ground around it. Nothing except the roof may
+stick out past it, and nothing may be cut off.
 
 Lighting is fixed: sunlight from the left. The left-facing wall is clearly
 brighter than the right-facing wall; the roof is the brightest surface.
@@ -217,8 +219,33 @@ as a sign without any lettering on it.
 
 Clean hard edges, no blur, no depth of field, no vignette.
 
-Square canvas, 1024 × 1024.
+The plot fills the full WIDTH of the image and sits at the BOTTOM of it; if
+the canvas is taller than the plot needs, the space above it stays empty.
 ```
+
+### Proč hlavička neříká rozměr plátna
+
+Stálo tu „Square canvas, 1024 × 1024", jenže vysoká budova se do čtverce
+nevejde a generátor jí proto dostane plátno 1024 × 1536 (`canvas_for`).
+Prompt pak tvrdil jedno a požadavek druhé. Místo rozměru je tam teď pravidlo,
+které platí na obou: podstava vyplní **šířku** a sedí u **spodní** hrany.
+
+### Proč hlavička o tvaru pozemku mlčí
+
+Do T113 tu stálo „its own **square** plot… not a square, not a rectangle".
+Byla to protimluva: věta o skutečném tvaru se připojuje až za hlavičku
+(`plot_sentence` v `tools/generate-sprites.py`, odvozená z půdorysu v datech),
+takže generátor dostal „čtvercový pozemek" a hned za tím „obdélník 2 × 1".
+Poslechl to první.
+
+Změřeno na hotových obrázcích: podstava `industrial_yard` vyšla u všech tří
+variant skoro čtvercová (1,5 × 1,5 a 2,9 × 1,6) proti parcele 2 × 1. Ve hře
+pak hala přetekla o půl dlaždice dozadu a lehla si sousedovi na střechu —
+autor to hlásil slovy „tady jsou úplně ujeté budovy... úplně mimo!". Sedm
+obrázků z 285 mělo tuhle vadu a všech sedm je obdélníkových nebo vysokých.
+
+Hlavička proto o tvaru **nerozhoduje**, jen řekne, že je pozemek diamant a že
+se do něj musí vejít i dlažba a plot. Tvar dodá věta z dat.
 
 ### Proč „žádný text"
 
