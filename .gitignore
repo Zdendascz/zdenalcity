@@ -38,4 +38,8 @@ tools/.build/
 
 # Výstup simulace: statisíce řádků měření, do repa nepatří.
 data/
+# Přeložené nástroje. `tools/.build/` je ta obvyklá; `tools/.b-*` vzniká, když
+# běží A/B dvou verzí zároveň — `vite build` maže celý outDir, takže se dvě
+# varianty nedají přeložit do jednoho.
 tools/.build/
+tools/.b-*/
