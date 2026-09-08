@@ -165,6 +165,59 @@ soubory samy v pořádku byly: všech pět ikon panelu vrací na produkci 200.
 Od T99 se skořápka podstrčí jen tehdy, když `request.mode === 'navigate'`.
 Ostatní požadavky dostanou buď svou verzi z keše, nebo poctivou chybu.
 
+### 5c. Zkouška CSP na hotovém buildu
+
+**Tenhle krok vznikl proto, že se přeskočil.** CSP z nálezu N6 se nasadila
+s poznámkou „dnes nic nerozbíjí" a **vypnula hru na produkci úplně**: text
+rozcestníku naběhl, ale žádný canvas, žádný HUD, nula tlačítek v liště.
+Pixi si při startu WebGL rendereru generuje synchronizaci uniformů přes
+`new Function` a bez `'unsafe-eval'` odmítne naběhnout. Ve vývoji se to
+neprojeví — `.htaccess` čte až Apache, takže `npm run dev` o hlavičce neví.
+
+Hra proto importuje `pixi.js/unsafe-eval` (v `src/main.ts`), což je podbalík
+téhož `pixi.js`, ne nová závislost. **Do CSP se `'unsafe-eval'` nepíše**, tím
+by ztratila smysl.
+
+Ověřit se to dá lokálně, bez Apache: vezme se hotový build a CSP se mu vloží
+do `<head>` jako `<meta>`.
+
+```bash
+cd D:/Projekty/citybuilder && npm run build
+```
+
+Pak kopie buildu s hlavičkou vzatou přímo z `public/.htaccess`, ať se zkouší
+to, co se nasazuje:
+
+```bash
+python - <<'PY'
+import io, os, re, shutil
+ht = io.open('public/.htaccess', encoding='utf-8').read()
+csp = re.search(r'Content-Security-Policy "([^"]+)"', ht).group(1)
+if os.path.exists('dist-csp'):
+    shutil.rmtree('dist-csp')
+shutil.copytree('dist', 'dist-csp')
+page = os.path.join('dist-csp', 'index.html')
+html = io.open(page, encoding='utf-8').read()
+tag = '<meta http-equiv="Content-Security-Policy" content="%s">' % csp
+io.open(page, 'w', encoding='utf-8', newline='').write(html.replace('<head>', '<head>' + tag, 1))
+print(csp)
+PY
+```
+
+Naservíruje se přes `preview_start` s konfigurací `citybuilder-csp`
+(`.claude/launch.json`, port 4180) a v prohlížeči se **musí založit město** —
+samotný rozcestník nestačí, renderer vzniká až s ním. Čeká se:
+
+| co | hodnota |
+|---|---|
+| `#app canvas` | jeden, nenulová šířka |
+| `.hud` | existuje |
+| `.toolbar__button` | víc než nula |
+| konzole | bez chyb kromě `frame-ancestors … via a <meta> element` |
+
+Ta jediná povolená hláška je artefakt zkoušky: `frame-ancestors` přes `<meta>`
+neplatí, přes skutečnou hlavičku ano. `dist-csp/` je v `.gitignore`.
+
 ## 6. Cloudflare
 
 ### Cache Rule (nastaveno 2026-09-05)

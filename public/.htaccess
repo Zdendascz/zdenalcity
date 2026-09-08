@@ -11,19 +11,32 @@
 <IfModule mod_headers.c>
   # Bezpečnostní hlavičky (bezpečnostní audit, nález N6).
   #
-  # Dnes nic nerozbíjí a ani neopravují: stránka nespouští cizí skripty, nemá
-  # účty a jediná data, která přijímá, jsou savy. **Jsou tu dopředu kvůli
-  # modům.** Obrázek z modu jde do `img.src`, takže by mod bez CSP mohl
-  # ukazovat na cizí server a hlásit mu, kdo hru hraje.
+  # Stránka nespouští cizí skripty, nemá účty a jediná data, která přijímá,
+  # jsou savy. **Jsou tu dopředu kvůli modům**: obrázek z modu jde do
+  # `img.src`, takže by mod bez CSP mohl ukazovat na cizí server a hlásit mu,
+  # kdo hru hraje.
   #
-  # `worker-src blob:` a `img-src blob: data:` potřebuje Pixi — jinak by se
-  # nevykreslilo nic. `connect-src 'self'` je to podstatné: hra nikam nevolá.
+  # **Původní verze hru na produkci vypnula** a stálo u ní „dnes nic
+  # nerozbíjí". Pixi si při startu WebGL rendereru generuje synchronizaci
+  # uniformů přes `new Function` a bez `'unsafe-eval'` odmítne naběhnout —
+  # naskočil text rozcestníku a dál nic: žádný canvas, žádný HUD, nula
+  # tlačítek. Řešením **není** dopsat sem `'unsafe-eval'`, tím by CSP ztratila
+  # smysl; hra proto importuje `pixi.js/unsafe-eval` (viz `src/main.ts`).
   #
-  # Pozor, tohle platí **jen když ho Cloudflare nepřepíše**. Skutečné místo,
-  # kde se hlavičky nastavují, je Transform Rule v Cloudflaru; viz DEPLOY.md.
+  # `data:` v `connect-src` je kvůli Pixi taky: jeho detekce podpory
+  # `ImageBitmap` si ve workeru stáhne jednopixelový PNG přes `fetch` na
+  # `data:` URI. Bez něj hra běží dál — výjimku odchytí a dekóduje obrázky
+  # v hlavním vlákně — ale zbytečně pomaleji a konzole je plná chyb.
+  #
+  # `worker-src blob:` a `img-src blob: data:` potřebuje Pixi na textury.
+  #
+  # **Ověřovat se to musí na hotovém buildu**, ne ve vývoji: `.htaccess` čte
+  # až Apache, takže `npm run dev` o hlavičce neví. Postup je v DEPLOY.md
+  # („Zkouška CSP na hotovém buildu"). Pozor, tohle platí jen když ho
+  # Cloudflare nepřepíše — skutečné místo je Transform Rule; viz DEPLOY.md.
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
   # Worker a rozcestník: **nikdy z keše bez zeptání**. Jsou to dva malé soubory
   # a jsou to jediné dva, které rozhodují, jakou verzi hráč uvidí.

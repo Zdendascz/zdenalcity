@@ -1,4 +1,23 @@
 import './style.css';
+/*
+ * Pixi bez `eval` (T110).
+ *
+ * Pixi si při startu WebGL rendereru generuje synchronizaci uniformů přes
+ * `new Function` a předem si ověří, že to prostředí dovolí. Produkce dostala
+ * v T106 hlavičku `Content-Security-Policy: script-src 'self'` a hra tím
+ * **přestala jít spustit** — text rozcestníku naběhl, ale žádný canvas,
+ * žádný HUD a nula tlačítek v liště. Ve vývoji se to neprojeví, protože
+ * `.htaccess` čte až Apache.
+ *
+ * `pixi.js/unsafe-eval` je oficiální podbalík téhož `pixi.js` (ne nová
+ * závislost) a vymění generované funkce za obecné. Importuje se **jako první
+ * a jen pro vedlejší účinek**: sám si při načtení přepíše prototypy
+ * rendereru, takže musí být načtený dřív, než vznikne `Application`.
+ *
+ * Cena je o kus pomalejší nahrávání uniformů. Alternativa — dopsat do CSP
+ * `'unsafe-eval'` — by zrušila přesně tu ochranu, kvůli které CSP vznikla.
+ */
+import 'pixi.js/unsafe-eval';
 import { startApp } from '@/render/app';
 
 const mount = document.getElementById('app');

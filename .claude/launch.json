@@ -22,6 +22,20 @@
         "--strictPort"
       ],
       "port": 4173
+    },
+    {
+      "name": "citybuilder-csp",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--outDir",
+        "dist-csp",
+        "--port",
+        "4180",
+        "--strictPort"
+      ],
+      "port": 4180
     }
   ]
 }
