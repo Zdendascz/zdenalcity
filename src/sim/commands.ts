@@ -12,6 +12,7 @@ import {
 } from './heights';
 import { inBounds, index, ROAD, TERRAIN, terrainNameKey, ZONE } from './layers';
 import type { ZoneType } from './layers';
+import { earn, spend } from './ledger';
 import { categoryForZone } from './rci';
 import { gradeForRoads, planRoadGradeAround } from './roads';
 import { checkRequirements, presentDefinitions } from './requirements';
@@ -241,7 +242,7 @@ export function buildRoad(
   if (world.economy.funds < cost) {
     return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
   }
-  world.economy.funds -= cost;
+  spend(world, 'roads', cost);
 
   // Nejdřív srovnat, pak vyklidit, pak položit. Obráceně by vozovka na chvíli
   // ležela na sedle a renderer by ji tak i nakreslil.
@@ -488,7 +489,7 @@ export function placeDefinition(
     return reject('error.notEnoughFunds', { cost: plan.total, funds: world.economy.funds });
   }
 
-  world.economy.funds -= plan.total;
+  spend(world, 'build', plan.total);
   reshapeTerrain(world, plan.changes, plan.core);
   placeBuilding(world, definition, x, y);
   return OK;
@@ -564,7 +565,7 @@ export function zoneArea(
     return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
   }
 
-  world.economy.funds -= cost;
+  spend(world, 'zoning', cost);
   reshapeTerrain(world, changes);
 
   for (const tile of toZone) {
@@ -716,7 +717,7 @@ export function bulldoze(
     if (world.economy.funds < cost) {
       return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
     }
-    world.economy.funds -= cost;
+    spend(world, 'bulldoze', cost);
     clearRubble(world, tile);
     markTileDirty(world, x, y);
     return OK;
@@ -736,7 +737,7 @@ export function bulldoze(
     if (world.economy.funds < cost) {
       return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
     }
-    world.economy.funds -= cost;
+    spend(world, 'terrain', cost);
     world.layers.terrain[tile] = TERRAIN.grass;
     markTerrainChanged(world);
     markTileDirty(world, x, y);
@@ -754,7 +755,7 @@ export function bulldoze(
     if (world.economy.funds < cost) {
       return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
     }
-    world.economy.funds -= cost;
+    spend(world, 'terrain', cost);
     world.layers.terrain[tile] = TERRAIN.grass;
     markTerrainChanged(world);
     markTileDirty(world, x, y);
@@ -807,7 +808,7 @@ export function plantTrees(
     return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
   }
 
-  world.economy.funds -= cost;
+  spend(world, 'terrain', cost);
   world.layers.terrain[tile] = TERRAIN.forest;
   markTerrainChanged(world);
   markTileDirty(world, x, y);
@@ -868,7 +869,7 @@ export function buildPipe(
     return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
   }
 
-  world.economy.funds -= cost;
+  spend(world, 'pipes', cost);
   world.layers.pipe[tile] = 1;
   markTileDirty(world, x, y);
   markWaterNetworkDirty(world);
@@ -1069,7 +1070,7 @@ function commit(world: WorldState, plan: TerraformEstimate): CommandResult {
   if (world.economy.funds < plan.cost) {
     return reject('error.notEnoughFunds', { cost: plan.cost, funds: world.economy.funds });
   }
-  world.economy.funds -= plan.cost;
+  spend(world, 'terrain', plan.cost);
 
   reshapeTerrain(world, plan.changes, plan.core);
   return OK;
@@ -1207,7 +1208,9 @@ export function setLineVehicles(
     return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
   }
 
-  world.economy.funds -= cost;
+  // Odebrané vozidlo se proplácí celé, takže cena může být záporná.
+  if (cost >= 0) spend(world, 'vehicles', cost);
+  else earn(world, 'refund', -cost);
   line.vehicles = vehicles;
   return OK;
 }

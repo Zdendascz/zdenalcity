@@ -4,6 +4,8 @@ import type { BuildingCatalogue } from '../catalogue';
 import { cellOfTile, strongestModifier } from '../disasters/effects';
 import { index, ROAD } from '../layers';
 import { isRciCategory } from '../rci';
+import type { RciCategory } from '../rci';
+import { closeYearIfDue } from '../ledger';
 import { annualCoupons, bondDebt, monthlyPayments, totalDebt } from '../finance';
 import { transitTotals } from '../transit';
 import { serviceFunding } from '../world';
@@ -292,7 +294,45 @@ export function createEconomySystem(catalogue: BuildingCatalogue, balance: Balan
       const budget = computeBudget(world, catalogue, balance);
       world.economy.lastIncome = budget.income;
       world.economy.lastExpenses = budget.expenses;
-      world.economy.funds += budget.income - budget.expenses;
+
+      /*
+       * Do kasy jde **jen to, co platí tenhle systém**.
+       *
+       * Splátky půjček a kupóny dluhopisů jsou v rozpočtu proto, aby hráč
+       * viděl celý měsíční náklad, jenže peníze za ně strhává `finance`
+       * o tik později (`payLoans`, `serviceBonds`). Do T112 se odečítaly
+       * i tady, takže se **platily dvakrát**: změřeno na půjčce se splátkou
+       * 540 — kasa klesla o 1080 za měsíc, dluh jen o 540.
+       */
+      const paidElsewhere = budget.debt.payment + budget.debt.bondPayment;
+      const cash = budget.income - (budget.expenses - paidElsewhere);
+      world.economy.funds += cash;
+
+      // Do knihy se zapisuje po položkách, ne jednou částkou: vyúčtování má
+      // říct, kde ty peníze byly, ne jen kolik jich zbylo.
+      for (const line of budget.lines) {
+        const category = catalogue.get(line.definitionId)?.category;
+        if (line.income > 0 && isTaxable(category)) {
+          record(world.economy.ledger.income, `tax.${category}`, line.income);
+        }
+        record(world.economy.ledger.expenses, 'upkeep.buildings', line.upkeep);
+      }
+      record(world.economy.ledger.expenses, 'upkeep.roads', budget.roads.upkeep);
+      record(world.economy.ledger.expenses, 'upkeep.transit', budget.transit.upkeep);
+      record(world.economy.ledger.income, 'fare', budget.transit.income);
+
+      closeYearIfDue(world);
     },
   };
+}
+
+/** Daní se jen zóny; služby a infrastruktura mají v knize jen údržbu. */
+function isTaxable(category: string | undefined): category is RciCategory {
+  return category === 'residential' || category === 'commercial' || category === 'industrial';
+}
+
+/** Přičte do knihy. Nula ani záporná částka řádek nezaloží. */
+function record(side: Record<string, number>, key: string, amount: number): void {
+  if (amount <= 0) return;
+  side[key] = (side[key] ?? 0) + amount;
 }

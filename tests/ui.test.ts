@@ -15,6 +15,7 @@ import { uiIconShape } from '@/ui/icons';
 import { fromBase64, toBase64 } from '@/platform/browser';
 import { groupTools } from '@/ui/toolbar';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
+import { YearReport } from '@/ui/yearReport';
 
 /** Všechny druhy pohrom, které hra registruje. Sedlo by se sem sáhnout do
  * registru, jenže ten žije až v `app.ts` a ten potřebuje Pixi i canvas. */
@@ -391,5 +392,65 @@ describe('varianta obrázku budovy', () => {
       expect(n).toBeGreaterThan(3000 / 3 * 0.8);
       expect(n).toBeLessThan(3000 / 3 * 1.2);
     }
+  });
+});
+
+describe('roční vyúčtování', () => {
+  /*
+   * Autor: „vždy 1. 1. každého roku vyskočí celoroční vyúčtování: levý sloupec
+   * příjmy, prostřední výdaje, pravý výsledek, dole souhrn."
+   *
+   * Testuje se tvar výkazu, ne vzhled: tři sloupce, položky setříděné odshora
+   * podle velikosti a součty, které sedí — výkaz, který nesouhlasí sám se
+   * sebou, je horší než žádný.
+   */
+  async function reportFor(): Promise<{ root: HTMLElement; report: YearReport }> {
+    const content = await vanilla();
+    const i18n = new I18n(await tables(content), 'cs');
+    const root = document.createElement('div');
+    const report = new YearReport(root, i18n, { onClose: () => {} });
+    return { root, report };
+  }
+
+  it('ukáže příjmy, výdaje i výsledek a součty sedí', async () => {
+    const { root, report } = await reportFor();
+    const opened = report.show(
+      { year: 3, income: { 'tax.residential': 900, grant: 100 }, expenses: { roads: 400 } },
+      12345,
+    );
+
+    expect(opened).toBe(true);
+    const columns = root.querySelectorAll('.year__column');
+    expect(columns.length).toBe(3);
+
+    const totals = [...root.querySelectorAll('.year__row--total .year__amount')].map(
+      (node) => node.textContent,
+    );
+    // Formátování čísel je věc `format.ts` — tady jde o to, že součet sedí.
+    expect(totals.map((text) => text?.replace(/\D/g, ''))).toEqual(['1000', '400']);
+    expect(root.querySelector('.year__result')?.textContent).toContain('600');
+    expect(root.querySelector('.year__result')?.classList.contains('is-negative')).toBe(false);
+  });
+
+  it('schodek je vidět i barvou, nejen znaménkem', async () => {
+    const { root, report } = await reportFor();
+    report.show({ year: 2, income: { fare: 10 }, expenses: { build: 510 } }, -50);
+    expect(root.querySelector('.year__result')?.classList.contains('is-negative')).toBe(true);
+    expect(root.querySelector('.year__result')?.textContent).toContain('500');
+  });
+
+  it('týž rok se podruhé neotevře', async () => {
+    // Okno zastavuje hru. Kdyby se otevíralo každý snímek, hráč by se
+    // z ledna nedostal.
+    const { report } = await reportFor();
+    const ledger = { year: 4, income: {}, expenses: { roads: 10 } };
+    expect(report.show(ledger, 0)).toBe(true);
+    expect(report.show(ledger, 0)).toBe(false);
+  });
+
+  it('prázdná strana to řekne, místo aby zůstala prázdná', async () => {
+    const { root, report } = await reportFor();
+    report.show({ year: 5, income: {}, expenses: { roads: 10 } }, 0);
+    expect(root.textContent).toContain('nic nezaúčtovalo');
   });
 });

@@ -162,6 +162,11 @@ export class DisasterAlert {
     return true;
   }
 
+  /** Je okno na obrazovce? Roční uzávěrka mu nesmí skočit přes hlavu. */
+  isVisible(): boolean {
+    return !this.root.classList.contains('is-hidden');
+  }
+
   hide(): void {
     this.root.classList.add('is-hidden');
     this.target = null;

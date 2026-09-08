@@ -3,6 +3,7 @@ import { coarseSizeOf } from '@/sim/coarse';
 import type { CoarseLayers } from '@/sim/coarse';
 import type { Layers } from '@/sim/layers';
 import { totalPopulation } from '@/sim/world';
+import type { Ledger } from '@/sim/ledger';
 import type { WorldState } from '@/sim/world';
 import {
   CURRENT_FORMAT_VERSION,
@@ -187,6 +188,15 @@ function packFinance(world: WorldState): SaveFinanceState {
 }
 
 /** Mapa na objekt se setříděnými klíči — save musí být bajtově stabilní. */
+function copyLedger(ledger: Ledger): Ledger {
+  const sorted = (side: Record<string, number>): Record<string, number> => {
+    const out: Record<string, number> = {};
+    for (const key of Object.keys(side).sort()) out[key] = side[key] ?? 0;
+    return out;
+  };
+  return { year: ledger.year, income: sorted(ledger.income), expenses: sorted(ledger.expenses) };
+}
+
 function sortedRecord(map: ReadonlyMap<string, number>): Record<string, number> {
   return Object.fromEntries([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
@@ -229,7 +239,15 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
     state: {
       tick: world.tick,
       rngState: world.rng.getState(),
-      economy: { ...world.economy, taxRates: { ...world.economy.taxRates } },
+      // Kniha se kopíruje **do hloubky a setříděně**: mělká kopie by nechala
+      // v savu odkaz na živý objekt a nesetříděné klíče by dělaly z každého
+      // uložení jiné bajty.
+      economy: {
+        ...world.economy,
+        taxRates: { ...world.economy.taxRates },
+        ledger: copyLedger(world.economy.ledger),
+        lastYear: world.economy.lastYear ? copyLedger(world.economy.lastYear) : null,
+      },
       demand: { ...world.demand },
       trafficCursor: world.trafficCursor,
       // Setříděné klíče, ať je save bajtově stabilní.

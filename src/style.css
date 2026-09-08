@@ -1107,6 +1107,98 @@ body {
   color: #ff8e78;
 }
 
+/* --- roční vyúčtování ---------------------------------------------------- */
+
+/*
+ * Uzávěrka je **okno přes obrazovku**, ne řádek v rohu. Měsíční bilance
+ * v liště zevšední; jednou za rok stojí za to hru zastavit a ukázat, kam ty
+ * peníze celý rok tekly.
+ */
+.year {
+  pointer-events: auto;
+  background: rgb(8 14 24 / 78%);
+}
+
+.year__panel {
+  width: min(920px, 94vw);
+  max-width: none;
+}
+
+/*
+ * Tři sloupce vedle sebe: příjmy, výdaje, výsledek. Přesně tak si to autor
+ * vyžádal a je to i jediné rozvržení, ve kterém se dvě strany dají porovnat
+ * pohledem, ne odečítáním.
+ */
+.year__columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 12px;
+}
+
+@media (width <= 720px) {
+  .year__columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.year__heading {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.year__row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+/* Součet se odděluje linkou, ne tučností: v tabulce čísel by se ztratila. */
+.year__row--total {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
+  font-weight: 600;
+}
+
+.year__name {
+  color: var(--muted);
+}
+
+.year__amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.year__amount.is-income {
+  color: #7fd18a;
+}
+
+.year__amount.is-expense {
+  color: #ffb3a5;
+}
+
+/* Výsledek je to jediné číslo, kvůli kterému se okno otevírá. */
+.year__result {
+  margin: 0;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.year__funds {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.year__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 /* --- poradce starosty ---------------------------------------------------- */
 
 /*

@@ -312,6 +312,26 @@ const migrateV9ToV10: Migration = (save) => ({
   },
 });
 
+/**
+ * Verze 11: účetní kniha (§12).
+ *
+ * Rozehraná partie o svých loňských číslech nic neví a **vymýšlet si je
+ * nebude** — kniha začne prázdná od roku, ve kterém se save nachází, a první
+ * vyúčtování přijde na konci toho roku. Falešný výkaz by byl horší než žádný.
+ */
+const migrateV10ToV11: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 11 },
+  state: {
+    ...save.state,
+    economy: {
+      ...save.state.economy,
+      ledger: { year: Math.floor(save.state.tick / 360) + 1, income: {}, expenses: {} },
+      lastYear: null,
+    },
+  },
+});
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
@@ -323,6 +343,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   7: migrateV7ToV8,
   8: migrateV8ToV9,
   9: migrateV9ToV10,
+  10: migrateV10ToV11,
 };
 
 /**

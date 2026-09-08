@@ -8,6 +8,7 @@ import { MAP_SIZES } from '@/sim/layers';
 import { MAX_LEVEL } from '@/content/schema';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
+import type { Ledger } from '@/sim/ledger';
 import {
   MAX_TAX_RATE,
   MIN_TAX_RATE,
@@ -99,6 +100,35 @@ function parseJson(bytes: Uint8Array | undefined, what: string): Record<string, 
  * a mod si smí přidat vlastní. Bere se, jak přišel — kdo mu nerozumí, ten
  * katastrofu při načtení ukončí (dělá to plánovač).
  */
+/**
+ * Účetní kniha ze savu.
+ *
+ * Čte se **shovívavě**: záporné ani nečíselné položky se zahodí místo aby
+ * shodily načtení, protože kniha je výkaz, ne pravidlo hry. Poškozená položka
+ * pokazí jeden řádek vyúčtování; odmítnutý save pokazí celé město.
+ */
+function parseLedger(raw: unknown, tick: number): Ledger {
+  const record = raw === undefined || raw === null ? null : asRecord(raw, 'state.economy.ledger');
+  const fallbackYear = Math.floor(tick / 360) + 1;
+  if (!record) return { year: fallbackYear, income: {}, expenses: {} };
+
+  const side = (value: unknown): Record<string, number> => {
+    const out: Record<string, number> = {};
+    if (typeof value !== 'object' || value === null) return out;
+    for (const [key, amount] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) out[key] = amount;
+    }
+    return out;
+  };
+
+  const year = record['year'];
+  return {
+    year: typeof year === 'number' && Number.isFinite(year) && year > 0 ? Math.floor(year) : fallbackYear,
+    income: side(record['income']),
+    expenses: side(record['expenses']),
+  };
+}
+
 function parseDisasters(raw: Record<string, unknown>): SaveDisasterState {
   const what = 'state.disasters';
   const active = asArray(raw['active'], `${what}.active`).map((value, i) => {
@@ -494,6 +524,14 @@ function parseState(
         economyRaw['lastPopulation'] === undefined
           ? 0
           : int(economyRaw, 'lastPopulation', 'state.economy'),
+      // Účetní knihu nese verze 11. Starší save ji nemá a začne prázdnou
+      // od roku, ve kterém se nachází — vymýšlet mu loňská čísla by znamenalo
+      // ukázat výkaz, který se nikdy nestal.
+      ledger: parseLedger(economyRaw['ledger'], int(raw, 'tick', 'state')),
+      lastYear:
+        economyRaw['lastYear'] === undefined || economyRaw['lastYear'] === null
+          ? null
+          : parseLedger(economyRaw['lastYear'], int(raw, 'tick', 'state')),
     },
     demand,
   };

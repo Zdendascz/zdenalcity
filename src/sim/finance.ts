@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { GrantDefinition } from '@/content/schema';
 import type { BuildingCatalogue } from './catalogue';
+import { earn, spend } from './ledger';
 import type { WorldState } from './world';
 
 /**
@@ -124,7 +125,7 @@ export function takeLoan(
   };
 
   world.loans.push(loan);
-  world.economy.funds += amount;
+  earn(world, 'loan', amount);
   return loan;
 }
 
@@ -149,7 +150,7 @@ export function payLoans(world: WorldState, balance: Balance): number {
       continue;
     }
 
-    world.economy.funds -= due;
+    spend(world, 'loanPayment', due);
     loan.remaining -= due;
     loan.paidMonths++;
   }
@@ -241,7 +242,7 @@ export function awardGrants(
 
     world.grantsAwarded.add(grant.id);
     world.grantProgress.delete(grant.id);
-    world.economy.funds += grant.amount;
+    earn(world, 'grant', grant.amount);
     awarded.push(grant.id);
   }
 
@@ -422,8 +423,8 @@ export function issueBond(
     defaulted: false,
   };
 
-  world.economy.funds -= issueFee(balance, offered);
-  world.economy.funds += bond.subscribed;
+  spend(world, 'bondFee', issueFee(balance, offered));
+  earn(world, 'bond', bond.subscribed);
   world.bonds.push(bond);
   return bond;
 }
@@ -452,7 +453,7 @@ export function serviceBonds(
     if (world.tick - bond.lastCouponTick >= YEAR) {
       const coupon = Math.round((bond.subscribed * bond.rate) / 100);
       if (world.economy.funds >= coupon) {
-        world.economy.funds -= coupon;
+        spend(world, 'bondCoupon', coupon);
         bond.lastCouponTick += YEAR;
       } else {
         missedCoupons++;
@@ -465,7 +466,7 @@ export function serviceBonds(
     if (world.tick < bond.maturityTick) continue;
 
     if (world.economy.funds >= bond.subscribed) {
-      world.economy.funds -= bond.subscribed;
+      spend(world, 'bondRepay', bond.subscribed);
       bond.defaulted = false;
       bond.subscribed = 0;
     } else {

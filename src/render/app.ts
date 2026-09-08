@@ -78,6 +78,7 @@ import { layoutMode, watchLayout } from '@/ui/layout';
 import type { LocaleTables } from '@/ui/i18n';
 import { createBrowserPlatform } from '@/platform';
 import { DisasterAlert, nextToAnnounce } from '@/ui/disasterAlert';
+import { YearReport } from '@/ui/yearReport';
 import { showHelp } from '@/ui/help';
 import { showHome } from '@/ui/home';
 import type { HomeChoice } from '@/ui/home';
@@ -1204,6 +1205,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Zastávky nemají jméno, tak ať se na ně dá aspoň podívat.
     onShowStop: (x, y) => centreOn(x, y),
   });
+  /*
+   * Roční uzávěrka. Otevře se **1. ledna**, hned jak simulace uzavře knihu.
+   *
+   * Hra se přitom zastaví ze stejného důvodu jako u katastrofy: výkaz, přes
+   * který město dál roste, si nikdo nepřečte. Rychlost se po zavření vrací
+   * na výchozí, ne na tu předchozí — hráč se po ročence obvykle rozhoduje,
+   * ne spěchá.
+   */
+  const yearReport = new YearReport(mount, i18n, {
+    onClose: () => setSpeed(DEFAULT_SPEED_INDEX),
+  });
+  // Totéž pro město obnovené hned při startu.
+  if (simWorld.economy.lastYear) yearReport.markSeen(simWorld.economy.lastYear.year);
+
   const alert = new DisasterAlert(mount, i18n, {
     onIgnore: () => setSpeed(DEFAULT_SPEED_INDEX),
     onShow: (x, y) => {
@@ -1260,6 +1275,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const save = migrate(unpackSave(bytes));
       const warnings = collectLoadWarnings(save, content, content.getLoadedSources());
       applySaveToWorld(simWorld, save);
+      // Loňskou uzávěrku už hráč viděl, když se zavírala. Bez tohohle by mu
+      // vyskočila znovu při každém načtení téhož města.
+      if (simWorld.economy.lastYear) yearReport.markSeen(simWorld.economy.lastYear.year);
 
       const missing = [...warnings.missingSources.map((s) => s.id), ...warnings.missingDefinitions];
       message =
@@ -2433,6 +2451,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Hlásí se **po kroku**: pohroma, která právě vznikla, se má ohlásit
     // v témž snímku, ve kterém začala hořet, ne až v tom dalším.
     announceDisasters();
+
+    // Uzávěrka roku. Okno se otevře jednou za rok a hru zastaví; katastrofa
+    // má přednost, protože ta hoří teď.
+    const closed = simWorld.economy.lastYear;
+    if (closed && !alert.isVisible() && yearReport.show(closed, simWorld.economy.funds)) {
+      setSpeed(0);
+    }
 
     const dirty = host.consumeDirty();
     const viewport = viewportFor(

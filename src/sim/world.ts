@@ -2,6 +2,8 @@ import { coarseCellsOf, createCoarseLayers } from './coarse';
 import { createDisasterState } from './disasters/state';
 import type { DisasterState } from './disasters/state';
 import type { Bond, Loan } from './finance';
+import { createLedger } from './ledger';
+import type { Ledger } from './ledger';
 import type { LineStats, LostStop, TransitLine } from './transit';
 import { createCornerHeights } from './heights';
 import type { CoarseLayers } from './coarse';
@@ -88,6 +90,16 @@ export interface EconomyState {
    * vstupuje do úspěšnosti emise dluhopisů.
    */
   lastPopulation: number;
+  /**
+   * Účetní kniha běžícího roku. Sbírá se do ní **každý** pohyb kasy, protože
+   * jinudy peníze nechodí (`sim/ledger.ts`).
+   */
+  ledger: Ledger;
+  /**
+   * Uzavřený loňský rok. Z něj se kreslí vyúčtování, které vyskočí 1. ledna.
+   * `null`, dokud město neprožilo celý rok — nebo když byl prázdný.
+   */
+  lastYear: Ledger | null;
 }
 
 /**
@@ -474,6 +486,8 @@ export function createWorld(
       lastPopulation: 0,
       lastIncome: 0,
       lastExpenses: 0,
+      ledger: createLedger(1),
+      lastYear: null,
     },
     demand: { residential: 0, commercial: 0, industrial: 0 },
     rng: new Rng(seed),
