@@ -1817,6 +1817,15 @@ body {
   overflow: hidden;
 }
 
+/*
+ * Zastávka, kvůli které linka stojí. Rámeček, ne výplň — čip zůstane
+ * čitelný a zároveň je z řady na první pohled vidět, která to je.
+ */
+.chip--stop.is-fault {
+  border-color: #ff8e78;
+  color: #ffb3a5;
+}
+
 .chip__label,
 .chip__drop {
   padding: 4px 8px;

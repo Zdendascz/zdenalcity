@@ -17,6 +17,7 @@ import { coarseIndex } from '@/sim/coarse';
 import { coarseCongestion } from '@/sim/diagnostics';
 import {
   corridorTiles,
+  lineFault,
   lineProblems,
   lineRuns,
   modeOf,
@@ -664,6 +665,17 @@ describe('jede, nebo nejede', () => {
 
     expect(lineRuns(world, content, balance, tram), 'tramvaj jede bez proudu').toBe(false);
     expect(lineRuns(world, content, balance, bus), 'autobus stojí kvůli elektřině').toBe(true);
+
+    /*
+     * A hlavně **řekne proč a kde**. Autor u stojícího metra napsal: „já se
+     * zaboha nemám jak dozvědět kde, jak a proč." Rudé „stojí" bez důvodu je
+     * v panelu nejhorší možná hláška — u linky o dvanácti zastávkách nezbývá
+     * než obcházet město.
+     */
+    const fault = lineFault(world, balance, tram);
+    expect(fault?.kind).toBe('noPower');
+    expect(fault?.stops).toEqual(tram.stops);
+    expect(lineFault(world, balance, bus)).toBeNull();
   });
 
   it('kolej ukusuje z vozovky i za blackoutu', async () => {
@@ -702,8 +714,11 @@ describe('jede, nebo nejede', () => {
     addTransitStop(world, content, balance, line.id, b);
 
     expect(lineRuns(world, content, balance, line)).toBe(false);
+    // A panel ví, že chybí vozidla, ne že je rozbitá sestava.
+    expect(lineFault(world, balance, line)?.kind).toBe('noVehicles');
     setLineVehicles(world, balance, line.id, 1);
     expect(lineRuns(world, content, balance, line)).toBe(true);
+    expect(lineFault(world, balance, line)).toBeNull();
   });
 
   it('zbouraná zastávka z linky zmizí sama a linka jede dál', async () => {

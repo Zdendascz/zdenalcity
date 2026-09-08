@@ -340,6 +340,96 @@ describe('blackout', () => {
     expect(disaster.isFinished(world, entry)).toBe(true);
   });
 
+  it('z úplné tmy se město dostane zpátky, i když spotřeba pořád převyšuje', async () => {
+    /*
+     * Nález z hraní: autor poslal město, kde blackout běžel **1692 tiků**
+     * (skoro pět herních let) a drželo dole 42 elektráren.
+     *
+     * Kaskáda dojela na dno, po chvíli klidu se vrátila jedna elektrárna — a
+     * protože se zatížení počítá proti spotřebě celého města, i toho potmě,
+     * hned zase vyšlo nad práh a tatáž elektrárna šla znovu dolů. Zotavení
+     * je proto **jednosměrné**: co se jednou začalo vracet, se už neodpojuje.
+     */
+    const content = await vanilla();
+    const balance = content.getBalance();
+    // Dvě elektrárny po 100, spotřeba 300: zatížení nespadne pod práh nikdy.
+    const { world, catalogue } = powerGrid(2, 6);
+
+    const registry = registryOf(createBlackoutDisaster());
+    const disaster = createBlackoutDisaster();
+    const entry = startDisaster(world, catalogue, balance, registry, 'blackout', 10, 10);
+    if (!entry) throw new Error('blackout nezačal');
+
+    for (let tick = 0; tick < balance.disasters.blackout.maxTicks - 1; tick++) {
+      world.tick++;
+      disaster.tick({ world, catalogue, balance, x: 10, y: 10 }, entry);
+      if (disaster.isFinished(world, entry)) break;
+    }
+
+    expect(world.disasters.offlinePlants.size, 'elektrárny se nevrátily').toBe(0);
+    expect(disaster.isFinished(world, entry)).toBe(true);
+  });
+
+  it('nově postavená elektrárna už do kaskády nespadne', async () => {
+    // Tohle byla ta past: hráč přistavěl zdroj, `biggestOnline` si vzal
+    // zrovna ten nejnovější a shodil ho taky. Z výpadku pak nevedla cesta
+    // ven ani za peníze.
+    const content = await vanilla();
+    const balance = content.getBalance();
+    const { world, catalogue } = powerGrid(2, 6);
+
+    const registry = registryOf(createBlackoutDisaster());
+    const disaster = createBlackoutDisaster();
+    const entry = startDisaster(world, catalogue, balance, registry, 'blackout', 10, 10);
+    if (!entry) throw new Error('blackout nezačal');
+
+    // Nech kaskádu dojet na dno — dvě elektrárny, dva cykly.
+    for (let tick = 0; tick < balance.disasters.blackout.cascadeEvery * 2; tick++) {
+      world.tick++;
+      disaster.tick({ world, catalogue, balance, x: 10, y: 10 }, entry);
+    }
+    expect(world.disasters.offlinePlants.size).toBe(2);
+
+    const rescue = placeBuilding(world, PLANT, 10, 14);
+    expect(rescue).not.toBeNull();
+    for (let tick = 0; tick < 20; tick++) {
+      world.tick++;
+      disaster.tick({ world, catalogue, balance, x: 10, y: 10 }, entry);
+      expect(
+        rescue === null || !world.disasters.offlinePlants.has(rescue.id),
+        'kaskáda shodila i novou elektrárnu',
+      ).toBe(true);
+    }
+  });
+
+  it('strop délky vrátí elektrárny i savu, který ho ve stavu nemá', async () => {
+    /*
+     * Strop se dřív bral z `active.state`, kam si ho zapsal `start`. Save,
+     * který vznikl dřív, než strop existoval, ho tam nemá — a v takové partii
+     * se blackout neukončil nikdy. Teď si ho hlídá `tick`, který dostane
+     * balanc, takže platí i pro rozehrané město.
+     */
+    const content = await vanilla();
+    const balance = content.getBalance();
+    const { world, catalogue } = powerGrid(2, 6);
+
+    const registry = registryOf(createBlackoutDisaster());
+    const disaster = createBlackoutDisaster();
+    const entry = startDisaster(world, catalogue, balance, registry, 'blackout', 10, 10);
+    if (!entry) throw new Error('blackout nezačal');
+
+    // Starý save: ve stavu není ani strop, ani příznak zotavení.
+    delete entry.state['maxTicks'];
+    delete entry.state['recovering'];
+    entry.state['age'] = balance.disasters.blackout.maxTicks - 1;
+
+    world.tick++;
+    disaster.tick({ world, catalogue, balance, x: 10, y: 10 }, entry);
+
+    expect(world.disasters.offlinePlants.size).toBe(0);
+    expect(disaster.isFinished(world, entry)).toBe(true);
+  });
+
   it('po skončení nezůstane odpojená ani jedna, i když blackout skončí náhle', async () => {
     // Plánovač uklízí. Bez toho by po blackoutu zbyla elektrárna, která nikdy
     // nenaběhne, a hráč by neměl jak zjistit proč.

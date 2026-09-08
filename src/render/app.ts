@@ -1907,6 +1907,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   /** Totéž pro nedostatek proudu. */
   let hadPowerShortage = false;
+  /** Kolik kapacity drží dole běžící blackout. Hlásí se jen při změně. */
+  let lastPowerOffline = 0;
 
   /**
    * Odpočet snímků do další kontroly „zóny bez vody" a příznak, že se hláška
@@ -2631,12 +2633,35 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // o znečištění celé mapy: nepokrytý zbytek se rozlije do každé buňky.
     // Autor to popsal takhle: „odpady vůbec nikde nevidím, nevnímám, že by
     // měly nějaký efekt." Čte se to stejně jako proud — kapacita / potřeba.
-    for (const building of world.buildings.values()) {
+    /*
+     * Odstavená elektrárna se do kapacity **nepočítá**.
+     *
+     * Autor poslal město, kde HUD hlásil 498 800 / 315 850 — tedy velkou
+     * rezervu — a přitom byla půlka města potmě a metro stálo. Kaskáda
+     * blackoutu měla dole 42 elektráren, jenže tenhle součet je bral jako
+     * kdyby jely. Číslo, které během výpadku tvrdí, že je proudu dost, je
+     * horší než žádné: hráč podle něj hledá chybu úplně jinde.
+     */
+    let powerOffline = 0;
+    for (const [id, building] of world.buildings) {
       if (building.powered) poweredBuildings++;
       if (building.abandoned) continue;
       const definition = content.get(building.definitionId);
-      powerProduced += definition?.power?.production ?? 0;
+      const produced = definition?.power?.production ?? 0;
+      if (produced > 0 && simWorld.disasters.offlinePlants.has(id)) powerOffline += produced;
+      else powerProduced += produced;
       powerNeeded += definition?.power?.consumption ?? 0;
+    }
+
+    // Hlásí se při změně počtu odstavených elektráren, ne každý snímek: během
+    // kaskády jich ubývá po jedné a hráč má vidět, že se to hýbe.
+    if (powerOffline !== lastPowerOffline) {
+      lastPowerOffline = powerOffline;
+      if (powerOffline > 0) {
+        notifications.show(
+          i18n.t('ui.notice.plantsOffline', { capacity: formatNumber(powerOffline) }),
+        );
+      }
     }
     const utilities = cityUtilities(simWorld, content, content.getBalance());
 

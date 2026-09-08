@@ -2,7 +2,7 @@ import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import type { Command } from '@/sim/commands';
 import type { LineStats, TransitLine } from '@/sim/transit';
-import { lineProblems, lineRuns, modeOf, noStats } from '@/sim/transit';
+import { lineFault, lineProblems, lineRuns, modeOf, noStats } from '@/sim/transit';
 import type { WorldState } from '@/sim/world';
 import { button, el } from './dom';
 import { formatNumber } from './format';
@@ -240,10 +240,15 @@ export class TransitPanel {
      * Zbořená zastávka se v seznamu neobjeví: mizí z linky sama, hned jak
      * budova zmizí z města (`removeBuilding`).
      */
+    const fault = lineFault(world, balance, line);
+    const dark = new Set(fault?.kind === 'noPower' ? fault.stops : []);
+
     for (const [order, stopId] of line.stops.entries()) {
       const building = world.buildings.get(stopId);
       if (!building) continue;
-      const chip = el('span', 'chip chip--stop');
+      // Zastávka, kvůli které linka stojí, je vidět **v seznamu**, ne jen ve
+      // větě pod ním: u dvanácti zastávek se jinak hledá podle souřadnic.
+      const chip = el('span', dark.has(stopId) ? 'chip chip--stop is-fault' : 'chip chip--stop');
 
       const show = button('chip__label', () =>
         this.callbacks.onShowStop(building.x, building.y),
@@ -312,6 +317,29 @@ export class TransitPanel {
           min: balance.transit.minStops,
           max: balance.transit.maxStops,
         })),
+      );
+    }
+
+    /*
+     * Provozní důvod, proč linka stojí.
+     *
+     * Odstavená linka ho nemá — tu si hráč vypnul sám a hlásit mu to jako
+     * závadu by bylo matoucí. U zbytku platí, že „stojí" bez důvodu je ta
+     * nejhorší hláška ve hře: autor u metra napsal, že se zaboha nemá jak
+     * dozvědět kde, jak a proč.
+     */
+    if (fault && !line.paused) {
+      const where = fault.stops
+        .map((stopId) => {
+          const building = world.buildings.get(stopId);
+          const order = line.stops.indexOf(stopId) + 1;
+          return building
+            ? t('ui.transit.stopAt', { order, x: building.x, y: building.y })
+            : String(order);
+        })
+        .join(', ');
+      section.appendChild(
+        el('p', 'sheet__warning', t(`ui.transit.problem.${fault.kind}`, { stops: where })),
       );
     }
     return section;

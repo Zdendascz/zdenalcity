@@ -127,8 +127,8 @@ export function lineProblems(
  * elektřiny nehnou, a je to jeden z důvodů, proč blackout otevírá dveře všemu
  * ostatnímu. Autobus jezdí dál; naftu blackout nezastaví.
  *
- * Stačí, aby byla bez proudu **jediná** zastávka: linka je jeden okruh, ne
- * několik nezávislých kusů.
+ * Důvod, proč zrovna tahle linka stojí, umí `lineFault` — panel ho vypisuje
+ * i se jmény zastávek.
  */
 export function lineRuns(
   world: WorldState,
@@ -137,16 +137,38 @@ export function lineRuns(
   line: TransitLine,
 ): boolean {
   if (line.paused) return false;
-  if (line.vehicles <= 0) return false;
   if (lineProblems(world, catalogue, balance, line).length > 0) return false;
+  return lineFault(world, balance, line) === null;
+}
+
+/**
+ * Proč linka stojí, když je sama o sobě sestavená správně.
+ *
+ * `lineProblems` mluví o **sestavě** — málo zastávek, cizí druh dopravy —
+ * a panel ji vypisuje odjakživa. Tyhle dva důvody ale panel neuměl říct
+ * vůbec, takže hráč viděl jen rudé „stojí" a nic dalšího: „metro mi stojí,
+ * ale já se zaboha nemám jak dozvědět kde, jak a proč."
+ *
+ * `stops` nese **konkrétní zastávky bez proudu**, ne jen příznak. Odpověď na
+ * „kde" je celý smysl téhle funkce — linka o dvanácti zastávkách se jinak
+ * prochází klikáním.
+ */
+export interface LineFault {
+  kind: 'noVehicles' | 'noPower';
+  stops: number[];
+}
+
+export function lineFault(world: WorldState, balance: Balance, line: TransitLine): LineFault | null {
+  if (line.vehicles <= 0) return { kind: 'noVehicles', stops: [] };
 
   const mode = modeOf(balance, line.mode);
-  if (!mode?.needsPower) return true;
+  if (!mode?.needsPower) return null;
 
-  for (const stop of line.stops) {
-    if (world.buildings.get(stop)?.powered !== true) return false;
-  }
-  return true;
+  // Stačí **jediná** zastávka bez proudu: linka je jeden okruh, ne několik
+  // nezávislých kusů. Vypisují se přesto všechny — hráč, kterému zhasla celá
+  // čtvrť, má vidět rozsah, ne první nález.
+  const dark = line.stops.filter((stop) => world.buildings.get(stop)?.powered !== true);
+  return dark.length > 0 ? { kind: 'noPower', stops: dark } : null;
 }
 
 /**

@@ -28,24 +28,17 @@ export function createBlackoutDisaster(): Disaster {
     start: (context, active) => begin(context, active),
     tick: (context, active) => advance(context, active),
     /*
-     * Konec je dvojí: buď se všechny elektrárny vrátily, **nebo došel čas**.
+     * Konec je jediný: **vrátily se všechny elektrárny**.
      *
-     * Ten strop tu není pro pořádek. Bez něj je blackout past bez východu:
-     * zatížení se počítá proti spotřebě celého města, i toho potmě, takže
-     * jedna vrácená elektrárna ho neunese, hned padne zpátky a klid se počítá
-     * od nuly. Změřeno na simulované partii — dvě elektrárny šly dolů ve
-     * čtvrtém roce a za dalších šestatřicet let se nevrátila ani jedna.
-     * Město bez proudu nevybírá daň, takže si ani nepůjčí a nemá z čeho
-     * přistavět. To není katastrofa, to je konec hry.
-     *
-     * Délka je v datech (`disasters.blackout.maxTicks`, P5) a bere se ze
-     * začátku, protože `isFinished` balanc nedostane.
+     * Strop na délku je taky, ale hlídá si ho `advance`, protože jedině ten
+     * dostane balanc. Když dojde čas, vrátí elektrárny sám a tahle podmínka
+     * pak platí. Dřív se strop bral z `active.state`, kam si ho zapsal
+     * `start` — a to je špatně u savu, který vznikl dřív, než strop existoval:
+     * v takové partii se blackout neukončil **nikdy**. Autor ho poslal
+     * s věkem 1692 tiků, tedy skoro pět herních let.
      */
-    isFinished: (_world, active) => {
-      if (((active.state['offline'] as number[] | undefined) ?? []).length === 0) return true;
-      const max = (active.state['maxTicks'] as number | undefined) ?? 0;
-      return max > 0 && ((active.state['age'] as number | undefined) ?? 0) >= max;
-    },
+    isFinished: (_world, active) =>
+      ((active.state['offline'] as number[] | undefined) ?? []).length === 0,
     cooldownFromEnd: true,
   };
 }
@@ -60,7 +53,6 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
   active.state['offline'] = [];
   active.state['calm'] = 0;
   active.state['age'] = 0;
-  active.state['maxTicks'] = context.balance.disasters.blackout.maxTicks;
   if (id === null) return;
 
   takeOffline(world, active, id);
@@ -72,6 +64,23 @@ function advance(context: DisasterContext, active: ActiveDisaster): void {
 
   const age = ((active.state['age'] as number | undefined) ?? 0) + 1;
   active.state['age'] = age;
+
+  /*
+   * Strop na délku. Vrátí všechno a tím katastrofu ukončí.
+   *
+   * Bez něj je blackout past bez východu a strop je jediné, co ji rozbije
+   * spolehlivě: zatížení se počítá proti spotřebě celého města, i toho potmě,
+   * takže dokud je většina sítě dole, neunese ji ani vrácená elektrárna.
+   * Délka je v datech (`disasters.blackout.maxTicks`, P5).
+   */
+  if (blackout.maxTicks > 0 && age >= blackout.maxTicks) {
+    for (const id of (active.state['offline'] as number[] | undefined) ?? []) {
+      world.disasters.offlinePlants.delete(id);
+    }
+    active.state['offline'] = [];
+    world.powerNetworkDirty = true;
+    return;
+  }
 
   // Spokojenost klesá až po pár tikách a kumulativně: krátký výpadek si nikdo
   // nevšimne, dlouhý se pozná.
@@ -98,7 +107,22 @@ function advance(context: DisasterContext, active: ActiveDisaster): void {
   const { production, consumption } = networkLoad(world, catalogue, active);
   const load = production <= 0 ? Number.POSITIVE_INFINITY : consumption / production;
 
-  if (load > blackout.overloadRatio) {
+  /*
+   * Kaskáda běží **jen dokud se nezačalo zotavovat**. Pak už se neodpojuje nic.
+   *
+   * Bez toho hra vyrábí neřešitelný stav a autor v něm skončil: 42 elektráren
+   * dole, věk blackoutu skoro pět let. Kaskáda dojela na dno, po pár ticích
+   * klidu se vrátila jedna elektrárna — a protože se zatížení počítá proti
+   * spotřebě **celého** města, i toho potmě, hned zase vyšlo nad práh a tatáž
+   * elektrárna šla znovu dolů. A s ní každá nová, kterou hráč mezitím postavil:
+   * `biggestOnline` bere největší běžící, tedy zrovna tu čerstvou. Město tak
+   * nemělo jak se z výpadku dostat ani za peníze.
+   *
+   * Zotavení je jednosměrné schválně. Kaskáda je moment poruchy, ne stav sítě.
+   */
+  const recovering = active.state['recovering'] === true;
+
+  if (!recovering && load > blackout.overloadRatio) {
     const next = biggestOnline(world, catalogue, active);
     if (next !== null) {
       active.state['calm'] = 0;
@@ -110,14 +134,16 @@ function advance(context: DisasterContext, active: ActiveDisaster): void {
     // napořád: bez výroby je zatížení nekonečné a podmínka zotavení by
     // nikdy neplatila. Blackout, ze kterého není cesty ven, není katastrofa,
     // ale konec hry.
-  } else if (load >= blackout.recoveryRatio) {
+    active.state['recovering'] = true;
+  } else if (!recovering && load >= blackout.recoveryRatio) {
     active.state['calm'] = 0;
     return;
   }
 
-  // Klid: pod prahem po `calmTicks` cyklů se začne připojovat zpátky, jedna
-  // elektrárna za cyklus. Zotavení je pomalé schválně — hráč má vidět, jak se
-  // město rozsvěcuje po částech, ne skokem.
+  // Odsud dál se **jen zotavuje**: pod prahem po `calmCycles` cyklech se
+  // začne připojovat zpátky, jedna elektrárna za cyklus. Zotavení je pomalé
+  // schválně — hráč má vidět, jak se město rozsvěcuje po částech, ne skokem.
+  active.state['recovering'] = true;
   const calm = ((active.state['calm'] as number | undefined) ?? 0) + 1;
   active.state['calm'] = calm;
   if (calm < blackout.calmCycles) return;
