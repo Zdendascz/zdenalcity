@@ -96,6 +96,22 @@ export function cityAdvice(
   world: WorldState,
   catalogue: BuildingCatalogue,
   balance: Balance,
+  /**
+   * Třídy služeb, kterými má smysl být pokrytý.
+   *
+   * Předává se **zvenčí a schválně**: `world.coverage` nese vedle služeb i
+   * obtěžování — věznice do něj zapisuje třídu `prison` úplně stejnou cestou
+   * jako hasičárna třídu `fire` (`systems/services.ts`). Poradce dřív bral
+   * celou tu mapu a hledal v ní nejhůř pokrytou třídu, takže jakmile ve městě
+   * stála věznice, vyhrála pokaždé: kolem věznice nikdo být „pokrytý" nechce,
+   * takže její podíl je vždycky nula. Rada pak zněla „nejhůř je na tom
+   * ui.service.prison: pokrytí 0 %" — s neexistujícím překladem, protože
+   * `prison` žádná třída služeb není. Hlásil to autor.
+   *
+   * Padala tím i pochvala: nejhorší podíl byl kvůli věznici trvale nula,
+   * takže „služby dosáhnou všude" nemohlo padnout, ani kdyby to byla pravda.
+   */
+  serviceClasses: readonly string[],
 ): CityAdvice {
   const problems: Advice[] = [];
   const praises: Advice[] = [];
@@ -210,8 +226,12 @@ export function cityAdvice(
   /* --- služby ------------------------------------------------------------ */
   let worstClass: string | null = null;
   let worstGap = 0;
-  let bestCoverage = 1;
-  for (const [serviceClass, coverage] of world.coverage) {
+  // Nejhorší podíl ze všech tříd, ne nejlepší. Pochvala „služby dosáhnou
+  // všude" má padnout, teprve když je dobře pokrytá i ta nejzanedbanější.
+  let worstShare = 1;
+  for (const serviceClass of serviceClasses) {
+    const coverage = world.coverage.get(serviceClass);
+    if (!coverage) continue;
     let covered = 0;
     let people = 0;
     for (const [cell, count] of perCell) {
@@ -221,7 +241,7 @@ export function cityAdvice(
     }
     if (people <= 0) continue;
     const share = covered / people;
-    bestCoverage = Math.min(bestCoverage, share);
+    worstShare = Math.min(worstShare, share);
     if (1 - share > worstGap) {
       worstGap = 1 - share;
       worstClass = serviceClass;
@@ -234,7 +254,7 @@ export function cityAdvice(
       percent: Math.round((1 - worstGap) * 100),
     });
   }
-  if (bestCoverage > 0.6) add(praises, 'services', clamp(bestCoverage));
+  if (worstShare > PRAISE_FLOOR) add(praises, 'services', clamp(worstShare));
 
   /* --- co po sobě město nechalo ------------------------------------------ */
   add(problems, 'abandoned', clamp((abandoned / Math.max(1, buildings)) * 4), { abandoned });

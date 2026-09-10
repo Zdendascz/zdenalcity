@@ -2897,7 +2897,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Poradce se počítá, jen když je otevřený: prochází budovy, buňky i pokrytí
     // všech tříd, což je práce na úrovni jednoho systému, ne popisku.
     if (advisorPanel.isVisible()) {
-      advisorPanel.update(cityAdvice(simWorld, content, content.getBalance()));
+      advisorPanel.update(cityAdvice(simWorld, content, content.getBalance(), serviceClasses));
     }
     // Rozpočet se počítá jen když se na něj někdo dívá.
     if (budgetPanel.isVisible()) {

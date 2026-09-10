@@ -50,6 +50,18 @@ const UTILITIES: Definition = {
   sewage: { capacity: 100000 },
 };
 
+/** Třídy služeb, kterými má smysl být pokrytý. Ve vanille jich je osm. */
+const SERVICE_CLASSES = [
+  'culture',
+  'education',
+  'fire',
+  'health',
+  'parks',
+  'police',
+  'social',
+  'transit',
+] as const;
+
 function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
   return {
     get: (id) => definitions.find((definition) => definition.id === id),
@@ -70,14 +82,14 @@ describe('poradce starosty', () => {
     // Rady o kriminalitě na mapě bez lidí by byly komické — a hlavně by
     // hráče naučily poradce nečíst.
     const world = createWorld(1, VANILLA_BALANCE.economy);
-    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE);
+    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE, SERVICE_CLASSES);
     expect(advice.problems).toEqual([]);
     expect(advice.praise).toBeNull();
   });
 
   it('vrací nejvýš dvě bolesti, seřazené od nejhorší', () => {
     const world = town(20);
-    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE);
+    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE, SERVICE_CLASSES);
 
     expect(advice.problems.length).toBeLessThanOrEqual(2);
     for (let i = 1; i < advice.problems.length; i++) {
@@ -92,7 +104,7 @@ describe('poradce starosty', () => {
     // detail, takže musí stát první.
     const world = town(20);
     world.economy.funds = -5000;
-    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE);
+    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE, SERVICE_CLASSES);
     expect(advice.problems[0]?.id).toBe('bankrupt');
   });
 
@@ -101,7 +113,7 @@ describe('poradce starosty', () => {
     world.economy.funds = 100000;
     for (const building of world.buildings.values()) building.powered = false;
 
-    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE);
+    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE, SERVICE_CLASSES);
     expect(advice.problems.map((item) => item.id)).toContain('needsPower');
   });
 
@@ -124,7 +136,7 @@ describe('poradce starosty', () => {
       finished: false,
     });
 
-    const ids = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE).problems.map((i) => i.id);
+    const ids = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE, SERVICE_CLASSES).problems.map((i) => i.id);
     expect(ids).toContain('blackout');
     expect(ids).not.toContain('needsPower');
   });
@@ -154,6 +166,61 @@ describe('poradce starosty', () => {
       }
       for (const key of ['title', 'toggle', 'problems', 'praiseTitle', 'allGood']) {
         expect(table[`ui.advisor.${key}`], `${language}: ui.advisor.${key}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('věznice není zanedbaná služba, je to obtěžování', async () => {
+    /*
+     * `world.coverage` nese vedle služeb i **obtěžování**: věznice do něj
+     * zapisuje třídu `prison` stejnou cestou jako hasičárna třídu `fire`.
+     * Poradce dřív procházel celou tu mapu, takže jakmile ve městě stála
+     * věznice, vyhrála soutěž o nejhorší pokrytí pokaždé — kolem věznice
+     * nikdo pokrytý být nechce, takže je její podíl vždycky nula. Hráč pak
+     * četl „nejhůř je na tom ui.service.prison: pokrytí 0 %", tedy syrový
+     * klíč, protože `prison` žádná třída služeb není. Nahlásil to autor.
+     */
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const world = town(20);
+    world.coverage.set('prison', new Uint8Array(world.coarse.crime.length));
+    for (const serviceClass of SERVICE_CLASSES) {
+      const full = new Uint8Array(world.coarse.crime.length);
+      full.fill(255);
+      world.coverage.set(serviceClass, full);
+    }
+
+    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE, SERVICE_CLASSES);
+    // Všechny skutečné třídy jsou pokryté naplno, takže se o pokrytí nemá
+    // co říkat. Dřív tu visela rada s věznicí a mezerou sto procent.
+    expect(advice.problems.map((item) => item.id)).not.toContain('services');
+  });
+
+  it('každý popisek, který poradce vyrobí, má překlad', async () => {
+    /*
+     * Statické klíče hlídá test nad ním. Tenhle jde po tom, co poradce složí
+     * **až za běhu** — jméno třídy služby přijde do hlášky jako klíč a nic
+     * ho předtím nekontroluje. Přesně tudy prošlo `ui.service.prison`.
+     */
+    const content = new ContentRegistry();
+    await content.load(createVanillaSource());
+
+    const world = town(20);
+    world.coverage.set('prison', new Uint8Array(world.coarse.crime.length));
+    for (const serviceClass of SERVICE_CLASSES) {
+      world.coverage.set(serviceClass, new Uint8Array(world.coarse.crime.length));
+    }
+
+    const advice = cityAdvice(world, catalogueOf(HOUSE, UTILITIES), VANILLA_BALANCE, SERVICE_CLASSES);
+    for (const language of content.getLanguages()) {
+      const table = content.getLocaleTable(language);
+      for (const item of [...advice.problems, ...(advice.praise ? [advice.praise] : [])]) {
+        for (const value of Object.values(item.detail ?? {})) {
+          // Popisek je klíč jen tehdy, když tak vypadá; čísla a jména měst ne.
+          if (typeof value !== 'string' || !value.startsWith('ui.')) continue;
+          expect(table[value], `${language}: ${value}`).toBeTruthy();
+        }
       }
     }
   });
