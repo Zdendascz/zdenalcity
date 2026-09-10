@@ -1380,17 +1380,32 @@ body {
   z-index: 100;
   display: grid;
   place-items: center;
+  padding: 12px;
   background: rgb(10 12 16 / 82%);
 }
 
+/*
+ * Dialog se **vejde na obrazovku, nebo se v něm dá rolovat**.
+ *
+ * Do T113 měl pevnou výšku. Na telefonu na šířku (375 bodů) z něj zbyl na
+ * obrazovce vršek a tlačítko „Vytvořit" leželo pod spodní hranou, kam se
+ * nedalo dostat: pozadí roluje stránku, ne dialog. Autor to nahlásil jako
+ * „na mobilu na šířku nejde kliknout na vytvořit".
+ *
+ * `max-height: 100%` se měří proti odsazené mřížce na pozadí, takže dialog
+ * nikdy nepřeteče, a `overflow-y` z něj udělá vlastní rolovací plochu.
+ */
 .dialog {
   display: flex;
+  max-height: 100%;
   flex-direction: column;
   gap: 12px;
   padding: 20px 24px;
+  overflow-y: auto;
   border-radius: 8px;
   background: var(--panel-bg);
   box-shadow: 0 20px 60px rgb(0 0 0 / 55%);
+  overscroll-behavior: contain;
 }
 
 .dialog__title {
@@ -1474,10 +1489,18 @@ body {
   accent-color: var(--accent);
 }
 
-/* Náhled je bitmapa o hraně mapy; bez tohohle by ho prohlížeč rozmazal. */
+/*
+ * Náhled je bitmapa o hraně mapy; bez `pixelated` by ho prohlížeč rozmazal.
+ *
+ * Šířka se **řídí obrazovkou**, ne pevným číslem. Na monitoru je to pořád
+ * 384 bodů, na telefonu na šířku se scvrkne na necelou polovinu výšky okna —
+ * jinak by sám o sobě vytlačil tlačítka mimo obrazovku.
+ */
 .dialog__preview {
-  width: 384px;
-  height: 384px;
+  width: min(384px, 46vh, 74vw);
+  height: auto;
+  align-self: center;
+  aspect-ratio: 1;
   border-radius: 4px;
   image-rendering: pixelated;
 }
@@ -1493,10 +1516,18 @@ body {
   color: #e0b64a;
 }
 
+/*
+ * Tlačítka drží u spodní hrany dialogu i při rolování. Kdo si dialog odroluje
+ * kvůli posuvníkům krajiny, nesmí kvůli tomu přijít na „Vytvořit".
+ */
 .dialog__actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  padding-top: 10px;
+  background: var(--panel-bg);
 }
 
 .chip--primary {
