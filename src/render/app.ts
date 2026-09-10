@@ -1,6 +1,7 @@
 import { Application, Assets, Container, Graphics, RenderTexture } from 'pixi.js';
 import type { Texture } from 'pixi.js';
 import type { TerrainDecor } from './decor';
+import { PlacementGhost } from './placementGhost';
 import { sampleSmooth } from './textures';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
@@ -1178,6 +1179,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const hover = new Graphics();
   worldContainer.addChild(hover);
 
+  // Průhledný dům pod prstem. Kreslí se jen při míření prstem — myš nic
+  // nezakrývá a rámeček jí stačí.
+  const placementGhost = new PlacementGhost(
+    world,
+    worldContainer,
+    createAppearanceLookup(content),
+  );
+
 
   const debug = new DebugOverlay(mount);
   debug.setVisible(false);
@@ -2187,6 +2196,24 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   /** O kolik pixelů se musí ukazatel posunout, než nástroj zabere podruhé. */
   const PAINT_STEP = 10;
 
+  /**
+   * Prst, kterým se právě míří budovou. `null`, když se nemíří.
+   *
+   * Na dotyku se budova **nepokládá při doteku, ale při zvednutí prstu**.
+   * Autor: „silnice a zóny fungují dobře, ale budovy jsou špatně. Musí to
+   * fungovat tak, že v okamžiku doteku se objeví částečně průhledná budova,
+   * která má být umístěna, a spolu s ní se bíle vysvítí oblast, kde by zrovna
+   * měla být. Táhnutím prstu se ta pozice může měnit. Po zvednutí prstu se
+   * teprve budova umístí."
+   *
+   * Důvod je prostý a myší se nedá zažít: **prst kryje přesně to místo, na
+   * které míří.** Kdo staví naslepo, staví vedle — a zaplatí za to.
+   *
+   * Silnic a zón se to netýká schválně. Ty se kreslí tažením a hráč u nich
+   * vidí, co vzniká, protože roste za prstem, ne pod ním.
+   */
+  let aimingPointer: number | null = null;
+
   canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
 
@@ -2226,8 +2253,32 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       return;
     }
 
+    // Budova prstem: míří se, dokud je prst dole, a staví se až po zvednutí.
+    // Zachycení ukazatele je nutné — bez něj přestanou chodit `pointermove`,
+    // jakmile prst opustí místo, kde začal.
+    if (aimsWithFinger(event)) {
+      aimingPointer = event.pointerId;
+      // Malování tažením se musí vypnout, jinak by prst při míření postavil
+      // budovu na každé dlaždici, přes kterou přejede.
+      paintButton = null;
+      hoveredTile = tile;
+      pointerX = event.offsetX;
+      pointerY = event.offsetY;
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+
     applyTool(tile, event.offsetX, event.offsetY);
   });
+
+  /** Míří se tímhle stiskem budovou po dotykovém displeji? */
+  function aimsWithFinger(event: PointerEvent): boolean {
+    return (
+      event.pointerType === 'touch' &&
+      event.button === 0 &&
+      activeTool.action.kind === 'place'
+    );
+  }
 
   canvas.addEventListener('pointermove', (event) => {
     if (dragPointerId === event.pointerId) {
@@ -2305,6 +2356,26 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   function endDrag(event: PointerEvent): void {
+    /*
+     * Zvednutí prstu **postaví** to, na co se mířilo.
+     *
+     * Bere se poslední dlaždice pod prstem, ne ta, kde dotek začal: celý smysl
+     * míření je, že se pozice dá tažením opravit. Náhled se pak schová hned,
+     * ať po zvednutí prstu nezůstane viset průhledný dům bez majitele.
+     */
+    if (aimingPointer === event.pointerId) {
+      aimingPointer = null;
+      // Zrušený ukazatel už zachycený není a uvolnit ho podruhé je výjimka.
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+      const tile = hoveredTile;
+      hoveredTile = null;
+      paintButton = null;
+      if (event.type === 'pointerup' && tile) applyTool(tile, pointerX, pointerY);
+      return;
+    }
+
     if (dragAnchor !== null && paintButton === 0) {
       commitDrag();
     }
@@ -2340,6 +2411,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
   canvas.addEventListener('pointerleave', () => {
+    // Míření prstem má zachycený ukazatel a `pointerleave` mu chodí i tehdy,
+    // když prst z plátna neodešel. Zhasnout ho tady by náhled zabilo hned
+    // v první milisekundě tahu.
+    if (aimingPointer !== null) return;
     hoveredTile = null;
     paintButton = null;
     panStartedAt = null;
@@ -2660,6 +2735,26 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       showPlacementPrice(hoveredTile);
     } else {
       priceTag.hide();
+    }
+
+    /*
+     * Průhledný dům pod prstem.
+     *
+     * Podmínka je `aimingPointer`, ne „drží se budova": na myši nic
+     * nezakrývá a rámeček stačí. Na dotyku je to naopak jediné, co hráč
+     * o poloze ví, protože přesně to místo mu kryje prst.
+     */
+    const aimed = activeTool.action;
+    if (aimingPointer !== null && hoveredTile && aimed.kind === 'place') {
+      const [width, depth] = activeFootprint();
+      placementGhost.show(
+        aimed.definitionId,
+        hoveredTile.x,
+        hoveredTile.y,
+        !placementFits(hoveredTile, width, depth),
+      );
+    } else {
+      placementGhost.hide();
     }
 
     // Bankrot zastaví veškerý růst (§9 fáze 2) a do teď o tom hra mlčela:

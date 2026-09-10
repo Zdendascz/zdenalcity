@@ -36,6 +36,14 @@ body {
   display: block;
   /* Kurzor nad mapou nikdy nesmí vypadat jako výběr textu. */
   cursor: crosshair;
+
+  /*
+   * Prohlížeč si z tahu prstem po mapě nesmí udělat rolování stránky. Bez
+   * tohohle gesto někdy sebere dřív, než se k němu hra dostane, a tah se
+   * uprostřed utne jako `pointercancel` — na míření budovou to je vidět
+   * nejvíc, protože se tím zruší i to, co se mělo postavit.
+   */
+  touch-action: none;
 }
 
 .is-hidden {
