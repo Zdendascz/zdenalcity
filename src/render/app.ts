@@ -2264,7 +2264,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       hoveredTile = tile;
       pointerX = event.offsetX;
       pointerY = event.offsetY;
-      canvas.setPointerCapture(event.pointerId);
+      // Zachycení smí selhat (prst, který mezitím zmizel). Míření tím
+      // nekončí — jen se hůř drží, když prst sjede z plátna.
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch {
+        // Nic. Sáhnout po výjimce je tu jediná rozumná reakce.
+      }
       return;
     }
 

@@ -546,7 +546,12 @@ export class Hud {
       if (level > 1) {
         note.textContent = this.i18n.t('ui.funding.over', {
           effect: Math.round(this.fundingRules.effect(level) * 100),
-          cost: this.fundingRules.cost(level).toFixed(1),
+          // Desetinná čárka, ne tečka: `toFixed` píše po anglicku a v české
+          // liště by to byl jediný takový údaj.
+          cost: this.fundingRules.cost(level).toLocaleString('cs-CZ', {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+          }),
         });
       }
     }

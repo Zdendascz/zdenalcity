@@ -516,3 +516,41 @@ describe('ikony a texty mobilní lišty', () => {
     }
   });
 });
+
+/**
+ * Nadfinancování v liště (T113).
+ *
+ * Posuvník smí nad sto procent a hráč u něj musí vidět, co to dělá — jinak
+ * je to páka bez ceníku. Testuje se, že se poznámka objeví jen nad stem
+ * a že v ní stojí čísla ze simulace, ne z nějakého druhého výpočtu v UI.
+ */
+describe('posuvník financování', () => {
+  it('nad sto procent řekne účinek i cenu, do sta mlčí', async () => {
+    const { root, hud } = await hudFor('full');
+    const note = (): HTMLElement | null => {
+      for (const group of root.querySelectorAll('.panel__group')) {
+        if (group.textContent?.startsWith('Hasiči')) {
+          return group.querySelector('.panel__note');
+        }
+      }
+      return null;
+    };
+
+    hud.update({ ...STATE, funding: new Map([['fire', 1]]) });
+    expect(note()?.classList.contains('is-hidden')).toBe(true);
+
+    hud.update({ ...STATE, funding: new Map([['fire', 2]]) });
+    const shown = note();
+    expect(shown?.classList.contains('is-hidden')).toBe(false);
+    // Účinek 150 %, cena dvanáctinásobek — přesně to, co si autor vyžádal.
+    expect(shown?.textContent).toContain('150');
+    expect(shown?.textContent).toContain('12,0');
+  });
+
+  it('posuvník sahá až na dvojnásobek', async () => {
+    const { root } = await hudFor('full');
+    const slider = root.querySelector<HTMLInputElement>('.panel__group .slider');
+    expect(slider?.max).toBe(String(MAX_FUNDING * 100));
+  });
+});
+
