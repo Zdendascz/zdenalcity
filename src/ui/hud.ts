@@ -154,7 +154,7 @@ export interface HudState {
   /** Vodovod: kolik se načerpá a kolik město vypije. */
   waterCapacity: number;
   waterNeeded: number;
-  /** Financování podle třídy služby, 0–1. */
+  /** Financování podle třídy služby. 1 = sto procent, víc je nadfinancování. */
   funding: ReadonlyMap<string, number>;
   /**
    * Z čeho vyšly sloupečky poptávky.
@@ -165,6 +165,21 @@ export interface HudState {
   demandTerms: readonly DemandBreakdown[];
   /** Už přeložená hláška o uložení či načtení. Prázdná = nic nezobrazovat. */
   message: string;
+}
+
+/**
+ * Pravidla financování služeb tak, jak je potřebuje posuvník.
+ *
+ * Hodnoty počítá simulace (`sim/funding.ts`) z balancu — lišta si je nesmí
+ * dopočítávat sama, jinak by ukazovala jinou cenu, než jaká se strhne.
+ */
+export interface FundingRules {
+  /** Kam až smí posuvník. 1 = sto procent, 2 = dvojnásobek. */
+  max: number;
+  /** Jaký účinek dané financování doopravdy má. */
+  effect(level: number): number;
+  /** Kolikanásobek běžné údržby se za ně platí. */
+  cost(level: number): number;
 }
 
 /** Běžící pohroma tak, jak ji HUD potřebuje: ikona a místo, kam skočit. */
@@ -316,6 +331,7 @@ export class Hud {
   private readonly views: readonly OverlayOption[];
   private readonly layers: readonly OverlayOption[];
   private readonly serviceClasses: readonly string[];
+  private readonly fundingRules: FundingRules;
   /** Druhy katastrof, které umí registr spustit. Prázdné = menu se neukáže. */
   private readonly disasters: readonly string[];
   /** Ikony běžících pohrom u hodin. */
@@ -359,6 +375,7 @@ export class Hud {
     views: readonly OverlayOption[],
     layers: readonly OverlayOption[],
     serviceClasses: readonly string[],
+    fundingRules: FundingRules,
     disasters: readonly string[],
     layout: LayoutMode,
     callbacks: HudCallbacks,
@@ -370,6 +387,7 @@ export class Hud {
     this.views = views;
     this.layers = layers;
     this.serviceClasses = serviceClasses;
+    this.fundingRules = fundingRules;
     this.disasters = disasters;
     this.callbacks = callbacks;
 
@@ -516,10 +534,21 @@ export class Hud {
       state.speedIndex >= Math.max(2, this.speedButtons.length) ? String(state.speedIndex) : null,
     );
     for (const [serviceClass, input] of this.fundingInputs) {
-      const percent = Math.round((state.funding.get(serviceClass) ?? 1) * 100);
+      const level = state.funding.get(serviceClass) ?? 1;
+      const percent = Math.round(level * 100);
       // Posuvník se nepřepisuje, když s ním hráč zrovna hýbe.
       if (document.activeElement !== input) input.value = String(percent);
       this.setValue(`funding-${serviceClass}`, `${percent} %`);
+
+      const note = this.values.get(`funding-note-${serviceClass}`);
+      if (!note) continue;
+      note.classList.toggle('is-hidden', level <= 1);
+      if (level > 1) {
+        note.textContent = this.i18n.t('ui.funding.over', {
+          effect: Math.round(this.fundingRules.effect(level) * 100),
+          cost: this.fundingRules.cost(level).toFixed(1),
+        });
+      }
     }
 
     for (const [id, node] of this.viewButtons) {
@@ -1089,13 +1118,17 @@ export class Hud {
     popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.funding.title')));
 
     for (const serviceClass of this.serviceClasses) {
+      const group = el('div', 'panel__group');
       const row = el('div', 'panel__row');
       row.appendChild(el('span', 'panel__label', this.i18n.t(`ui.service.${serviceClass}`)));
 
       const slider = el('input', 'slider');
       slider.type = 'range';
       slider.min = '0';
-      slider.max = '100';
+      // Nad sto procent se smí od T113. Krok je pořád po pěti procentech:
+      // jemnější by u progresivní ceny znamenal, že se hráč trefuje myší do
+      // rozdílu několika tisíc měsíčně.
+      slider.max = String(Math.round(this.fundingRules.max * 100));
       slider.step = '5';
       slider.value = '100';
       slider.addEventListener('input', () => {
@@ -1107,7 +1140,16 @@ export class Hud {
       this.values.set(`funding-${serviceClass}`, value);
 
       row.append(slider, value);
-      popover.panel.appendChild(row);
+      group.appendChild(row);
+
+      // Co nadfinancování dělá, se **píše pod posuvník**, ne skrývá do
+      // bublinky. Hráč, který jde nad sto procent, má rovnou vidět obojí:
+      // že účinek roste polovinou a cena násobkem.
+      const note = el('span', 'panel__note is-hidden');
+      this.values.set(`funding-note-${serviceClass}`, note);
+      group.appendChild(note);
+
+      popover.panel.appendChild(group);
     }
 
     this.slot(false).appendChild(popover.root);

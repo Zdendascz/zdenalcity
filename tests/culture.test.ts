@@ -24,7 +24,7 @@ async function vanilla(): Promise<ContentRegistry> {
 
 function run(world: WorldState, content: ContentRegistry, runs: number): void {
   powerAll(world);
-  const systems = [createServiceSystem(content), createLandValueSystem(content.getBalance())];
+  const systems = [createServiceSystem(content, content.getBalance()), createLandValueSystem(content.getBalance())];
   for (let tick = 0; tick < runs * 16 + 11; tick++) tickWorld(world, systems);
 }
 

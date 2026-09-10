@@ -65,7 +65,7 @@ function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
 /** Odtiká tolik tiků, aby spokojenost proběhla `runs`krát (interval 16, offset 13). */
 function run(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
   const systems = [
-    createServiceSystem(catalogue),
+    createServiceSystem(catalogue, VANILLA_BALANCE),
     createCrimeSystem(VANILLA_BALANCE),
     createLandValueSystem(VANILLA_BALANCE),
     createHappinessSystem(VANILLA_BALANCE),

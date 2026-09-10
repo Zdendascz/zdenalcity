@@ -89,7 +89,7 @@ describe('MHD ubírá dopravu (§6)', () => {
       }
 
       const systems = [
-        createServiceSystem(content),
+        createServiceSystem(content, balance),
         createTransitSystem(content, balance),
         createTrafficSystem(content, balance),
       ];

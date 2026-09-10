@@ -354,6 +354,23 @@ body {
   text-align: center;
 }
 
+/* Řádek a poznámka pod ním drží u sebe: patří k jednomu posuvníku. */
+.panel__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/*
+ * Co nadfinancování stojí a co za ně je. Ukáže se, teprve když hráč přejde
+ * sto procent — do té doby by to byl řádek, který pořád tvrdí totéž.
+ */
+.panel__note {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
 /* --- tlačítka ----------------------------------------------------------- */
 
 .chip,

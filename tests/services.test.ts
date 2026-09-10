@@ -56,7 +56,7 @@ function catalogueOf(...definitions: Definition[]): BuildingCatalogue {
 /** Pokrytí se přepočítá jedním tikem, protože systém běží každý tik. */
 function recomputeCoverage(world: WorldState, catalogue: BuildingCatalogue): void {
   powerAll(world);
-  tickWorld(world, [createServiceSystem(catalogue)]);
+  tickWorld(world, [createServiceSystem(catalogue, VANILLA_BALANCE)]);
 }
 
 function coverage(world: WorldState, x: number, y: number): number {
@@ -148,7 +148,7 @@ describe('pokrytí službami', () => {
 describe('kriminalita', () => {
   /** Odtiká tolik tiků, aby kriminalita proběhla `runs`krát (interval 16, offset 11). */
   function runCrime(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
-    const systems = [createServiceSystem(catalogue), createCrimeSystem(VANILLA_BALANCE)];
+    const systems = [createServiceSystem(catalogue, VANILLA_BALANCE), createCrimeSystem(VANILLA_BALANCE)];
     powerAll(world);
     for (let tick = 0; tick < runs * 16 + 11; tick++) tickWorld(world, systems);
   }
@@ -199,7 +199,7 @@ describe('kriminalita', () => {
 
 describe('vazba na cenu půdy', () => {
   function runAll(world: WorldState, catalogue: BuildingCatalogue, runs: number): void {
-    const systems = [createServiceSystem(catalogue), createCrimeSystem(VANILLA_BALANCE), createLandValueSystem(VANILLA_BALANCE)];
+    const systems = [createServiceSystem(catalogue, VANILLA_BALANCE), createCrimeSystem(VANILLA_BALANCE), createLandValueSystem(VANILLA_BALANCE)];
     powerAll(world);
     for (let tick = 0; tick < runs * 16 + 11; tick++) tickWorld(world, systems);
   }

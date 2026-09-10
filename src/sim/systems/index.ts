@@ -67,7 +67,7 @@ export function createDefaultSystems(
     // Voda hned za elektřinou: růst i chátrání z ní čtou ve stejném tiku.
     createWaterSystem(catalogue, balance),
     // Pokrytí se musí přepočítat dřív, než z něj čte cena půdy a kriminalita.
-    createServiceSystem(catalogue),
+    createServiceSystem(catalogue, balance),
     createDemandSystem(catalogue, balance),
     createGrowthSystem(catalogue, balance),
     // Úrovně až za růstem: čerstvě postavená budova má na povýšení čekat

@@ -10,6 +10,7 @@ import {
   planFillArea,
   planLevelArea,
 } from './heights';
+import { MAX_FUNDING } from './funding';
 import { inBounds, index, ROAD, TERRAIN, terrainNameKey, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { earn, spend } from './ledger';
@@ -816,8 +817,12 @@ export function plantTrees(
 }
 
 /**
- * Financování třídy služeb, 0–1. Mění dosah, sílu i skutečnou údržbu naráz —
+ * Financování třídy služeb. Mění dosah, sílu i skutečnou údržbu naráz —
  * hráč musí vidět, na čem šetří.
+ *
+ * Horní mez je v balancu, protože od T113 se dá jít i **nad sto procent**:
+ * nadfinancovat hasiče na dobu požáru je legitimní tah. Platí se za to
+ * progresivně a účinek roste jen poloviční rychlostí (`sim/funding.ts`).
  */
 export function setServiceFunding(
   world: WorldState,
@@ -826,7 +831,7 @@ export function setServiceFunding(
 ): CommandResult {
   if (!Number.isFinite(funding)) return reject('error.invalidFunding');
 
-  world.serviceFunding.set(serviceClass, Math.max(0, Math.min(1, funding)));
+  world.serviceFunding.set(serviceClass, Math.max(0, Math.min(MAX_FUNDING, funding)));
   markCoverageDirty(world);
   return OK;
 }

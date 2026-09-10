@@ -1,6 +1,8 @@
+import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { COARSE_FACTOR, coarseCellsOf, coarseIndex, coarseSizeOf } from '../coarse';
 import { strongestModifier } from '../disasters/effects';
+import { fundingEffect } from '../funding';
 import { serviceFunding } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
@@ -13,16 +15,19 @@ import type { System } from './index';
  * stanice vedle sebe jsou lepší než jedna, ale se snižujícím se přínosem.
  *
  * ```
- * r    = radius * financování
- * síla = strength * financování
+ * r    = radius * účinek(financování)
+ * síla = strength * účinek(financování)
  * coverage[třída][c] += síla * (1 - d / r)     pro d ≤ r
  * ```
+ *
+ * Účinek se od financování liší jen nad stem procent, kde roste poloviční
+ * rychlostí (`sim/funding.ts`). Pod stem je to totéž číslo.
  *
  * Běží každý tik, ale počítá jen při `coverageDirty` — po vzoru elektřiny.
  * Bez toho by se 1024 buněk krát počet stanic přepočítávalo čtyřikrát za sekundu
  * pro nic.
  */
-export function createServiceSystem(catalogue: BuildingCatalogue): System {
+export function createServiceSystem(catalogue: BuildingCatalogue, balance: Balance): System {
   return {
     name: 'services',
     interval: 1,
@@ -60,7 +65,7 @@ export function createServiceSystem(catalogue: BuildingCatalogue): System {
           // jen u `funded`, tedy u služeb.
           if (funded && !building.powered) continue;
 
-          const funding = funded ? serviceFunding(world, source.class) : 1;
+          const funding = funded ? fundingEffect(balance, serviceFunding(world, source.class)) : 1;
           const radius = source.radius * funding;
           const strength = source.strength * funding;
           if (radius <= 0 || strength <= 0) continue;

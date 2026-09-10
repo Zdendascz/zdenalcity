@@ -707,6 +707,17 @@ export interface Balance {
     police: number;
   };
 
+  /**
+   * Financování služeb (T113). Meze a tvar křivky, ne seznam tříd — třídy
+   * jsou obsah a berou se z definic.
+   */
+  services: {
+    /** Sklon mezní ceny nad stem procent. Viz `sim/funding.ts`. */
+    costSlope: number;
+    /** Jakým podílem se nad stem procent počítá přebytek do účinku. */
+    effectAbove: number;
+  };
+
   waste: { perCitizen: number; toPollution: number };
 
   /**
@@ -968,6 +979,7 @@ export function validateBalance(raw: unknown): {
   const diffusion = section(issues, root, 'diffusion');
   const landValue = section(issues, root, 'landValue');
   const crime = section(issues, root, 'crime');
+  const services = section(issues, root, 'services');
   const waste = section(issues, root, 'waste');
   const sewage = section(issues, root, 'sewage');
   const happiness = section(issues, root, 'happiness');
@@ -1279,6 +1291,10 @@ export function validateBalance(raw: unknown): {
     sewage: {
       perCitizen: num(issues, sewage, 'perCitizen', 'sewage.perCitizen', 0, 100),
       toPollution: num(issues, sewage, 'toPollution', 'sewage.toPollution', 0, 100),
+    },
+    services: {
+      costSlope: num(issues, services, 'costSlope', 'services.costSlope', 0, 1000),
+      effectAbove: num(issues, services, 'effectAbove', 'services.effectAbove', 0, 1),
     },
     waste: {
       perCitizen: num(issues, waste, 'perCitizen', 'waste.perCitizen', 0, 100),

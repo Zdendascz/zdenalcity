@@ -8,6 +8,7 @@ import type { RciCategory } from '../rci';
 import { closeYearIfDue } from '../ledger';
 import { annualCoupons, bondDebt, monthlyPayments, totalDebt } from '../finance';
 import { transitTotals } from '../transit';
+import { fundingCost } from '../funding';
 import { serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
 import type { System } from './index';
@@ -132,6 +133,7 @@ export function buildingMonthlyTax(
  */
 export function buildingMonthlyUpkeep(
   world: WorldState,
+  balance: Balance,
   definition: Definition,
   building: Building,
 ): number {
@@ -139,8 +141,11 @@ export function buildingMonthlyUpkeep(
   if (isRciCategory(definition.category) && !building.powered) return 0;
 
   const serviceClass = definition.service?.class;
+  // Nadfinancování se **platí progresivně** (T113): dvojnásobný rozpočet
+  // služby stojí dvanáctinásobek údržby, ne dvojnásobek. Křivka je jedna
+  // a bydlí v `sim/funding.ts`, ať se cena nemůže rozejít s posuvníkem.
   const funding = serviceClass === undefined ? 1 : serviceFunding(world, serviceClass);
-  return Math.round(definition.economy.upkeep * funding);
+  return Math.round(definition.economy.upkeep * fundingCost(balance, funding));
 }
 
 /**
@@ -215,7 +220,7 @@ export function computeBudget(
       line.taxBase += lost === 0 ? taxable : taxable - Math.round(taxable * lost);
     }
 
-    const upkeep = buildingMonthlyUpkeep(world, definition, building);
+    const upkeep = buildingMonthlyUpkeep(world, balance, definition, building);
     // Skutečná částka za kus, ne ta z definice — u služeb ji škáluje financování
     // a rozpis v UI by jinak tvrdil „1 × 120 = 60".
     line.upkeepEach = upkeep;

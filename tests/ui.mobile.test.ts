@@ -14,6 +14,7 @@ import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { SPEEDS } from '@/sim/simHost';
 import type { ReadonlyWorldView } from '@/sim/simHost';
+import { MAX_FUNDING, fundingCost, fundingEffect } from '@/sim/funding';
 import { createWorld } from '@/sim/world';
 import { createLayerOptions, createTools, createViewOptions, serviceClassesOf } from '@/render/app';
 import { Hud } from '@/ui/hud';
@@ -121,6 +122,11 @@ async function hudFor(mode: LayoutMode): Promise<Built> {
     createViewOptions(),
     createLayerOptions(content),
     serviceClassesOf(content),
+    {
+      max: MAX_FUNDING,
+      effect: (level) => fundingEffect(content.getBalance(), level),
+      cost: (level) => fundingCost(content.getBalance(), level),
+    },
     ['fire'],
     mode,
     calls,

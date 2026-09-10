@@ -4,6 +4,10 @@
     "startingFunds": 60000,
     "defaultTaxRate": 7
   },
+  "services": {
+    "costSlope": 20,
+    "effectAbove": 0.5
+  },
   "demand": {
     "workerRatio": 0.5,
     "baseResidential": {

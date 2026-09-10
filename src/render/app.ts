@@ -33,6 +33,7 @@ import { migrate } from '@/save/migrations';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
 import type { CommandResult } from '@/sim/result';
+import { MAX_FUNDING, fundingCost, fundingEffect } from '@/sim/funding';
 import { cornerIndex, tileBaseHeight, tileCorners } from '@/sim/heights';
 import { DEFAULT_MAP_SIZE, TERRAIN, ZONE, index } from '@/sim/layers';
 import type { MapSize } from '@/sim/layers';
@@ -1757,7 +1758,22 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   let armedDisaster: string | null = null;
 
-  const hud = new Hud(hudRoot, i18n, world, SPEEDS, views, layers, serviceClasses, disasterRegistry.kinds(), layoutMode(), {
+  const hud = new Hud(
+    hudRoot,
+    i18n,
+    world,
+    SPEEDS,
+    views,
+    layers,
+    serviceClasses,
+    {
+      max: MAX_FUNDING,
+      effect: (level) => fundingEffect(content.getBalance(), level),
+      cost: (level) => fundingCost(content.getBalance(), level),
+    },
+    disasterRegistry.kinds(),
+    layoutMode(),
+    {
     onSpeed: setSpeed,
     onTaxChange: changeTax,
     onQuickSave: () => void quickSaveNow(),
@@ -1818,7 +1834,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const where = alertTarget(simWorld, x, y);
       if (alert.open(kind, where.x, where.y)) setSpeed(0);
     },
-  });
+    },
+  );
 
   function selectTool(tool: ToolOption): void {
     activeTool = tool;

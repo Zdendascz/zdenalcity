@@ -306,7 +306,7 @@ export class BuildingInfo {
     if (waterRange > 0) rows.push(['ui.info.waterRange', formatNumber(waterRange)]);
 
     const tax = buildingMonthlyTax(world, definition, building, this.balance);
-    const upkeep = buildingMonthlyUpkeep(world, definition, building);
+    const upkeep = buildingMonthlyUpkeep(world, this.balance, definition, building);
     rows.push(['ui.info.monthlyIncome', `+${formatNumber(tax)}`]);
     rows.push(['ui.info.monthlyUpkeep', `−${formatNumber(upkeep)}`]);
     rows.push(['ui.info.monthlyNet', formatNumber(tax - upkeep)]);

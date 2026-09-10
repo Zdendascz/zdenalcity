@@ -248,7 +248,7 @@ describe('blackout', () => {
     // registr, ručně spuštěný blackout by v něm neznal a hned by ho ukončil
     // — a při úklidu by elektrárnu zase zapnul.
     for (let tick = 0; tick < 3; tick++) {
-      tickWorld(world, [createPowerSystem(content), createServiceSystem(content)]);
+      tickWorld(world, [createPowerSystem(content), createServiceSystem(content, content.getBalance())]);
     }
     expect([...world.buildings.values()].filter((b) => b.powered).length).toBeLessThan(litBefore);
   });
