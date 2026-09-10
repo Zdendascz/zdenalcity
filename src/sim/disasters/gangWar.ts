@@ -12,7 +12,7 @@ import {
   taxLoss
 } from './effects';
 import type { Disaster, DisasterContext } from './registry';
-import { setClock } from './state';
+import { addToll, setClock } from './state';
 import type { ActiveDisaster } from './state';
 import {
   areaCoverage,
@@ -140,6 +140,7 @@ function advance(context: DisasterContext, active: ActiveDisaster): void {
   destroyTile(world, catalogue, target, losses);
   active.state['destroyed'] = ((active.state['destroyed'] as number | undefined) ?? 0) + 1;
   reportLosses(world, balance, losses, war.happinessPerLoss);
+  addToll(active, losses.residents * balance.disasters.casualties.collapse);
 }
 
 /** Náhodná budova v oblasti. Vzestupně podle id, ať save nerozhodne za nás. */

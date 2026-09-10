@@ -7,6 +7,7 @@ import { lookup, noLosses, reportLosses, rollDamage } from './damage';
 import { igniteTile } from './fire';
 import type { Disaster, DisasterContext } from './registry';
 import { tilesOf } from './shapes';
+import { addToll } from './state';
 import type { ActiveDisaster } from './state';
 
 /**
@@ -100,6 +101,7 @@ function detonate(
   }
 
   reportLosses(world, balance, losses, settings.happinessPerLoss);
+  addToll(active, losses.residents * balance.disasters.casualties.collapse);
 }
 
 /** Úroveň budovy na dlaždici; prázdná parcela se počítá jako jednička. */

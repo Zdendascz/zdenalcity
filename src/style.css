@@ -1623,6 +1623,16 @@ body {
   line-height: 1.6;
 }
 
+/*
+ * Odhad obětí. Odsazený linkou, ne barvou: je to jediný řádek karty, který
+ * není povídání, a má se od něj oddělit, ne křičet.
+ */
+.alert__toll {
+  padding-top: 10px;
+  border-top: 1px solid rgb(232 107 107 / 30%);
+  color: var(--text);
+}
+
 .alert__head {
   display: flex;
   gap: 14px;

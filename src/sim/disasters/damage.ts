@@ -87,10 +87,20 @@ export interface Losses {
   buildings: number;
   downgraded: number;
   infrastructure: number;
+  /**
+   * Kolik lidí bydlelo v tom, co spadlo.
+   *
+   * **Nejsou to mrtví**, je to základ, ze kterého se počítají: každá pohroma
+   * si ho násobí svým podílem (`disasters.casualties`), protože ze zbořeného
+   * domu se ven dostane jiná část lidí než z vyhořelého. Kdyby se převod dělal
+   * tady, musela by `destroyTile` znát balanc i to, která pohroma ji volá —
+   * a přitom je to jedno násobení u volajícího.
+   */
+  residents: number;
 }
 
 export function noLosses(): Losses {
-  return { buildings: 0, downgraded: 0, infrastructure: 0 };
+  return { buildings: 0, downgraded: 0, infrastructure: 0, residents: 0 };
 }
 
 /**
@@ -121,7 +131,12 @@ export function destroyTile(
       }
     }
 
-    if (removeBuilding(world, buildingId)) losses.buildings++;
+    // Obyvatelé se sečtou **před** odstraněním: potom se už nikoho nezeptáš.
+    const residents = building.population;
+    if (removeBuilding(world, buildingId)) {
+      losses.buildings++;
+      losses.residents += residents;
+    }
     return;
   }
 

@@ -12,7 +12,8 @@ import type { Losses } from './damage';
 import { igniteTile } from './fire';
 import { floodTile } from './flood';
 import type { Disaster, DisasterContext } from './registry';
-import { setClock } from './state';
+import { addToll, setClock } from './state';
+import type { ActiveDisaster } from './state';
 
 /**
  * Zemětřesení (katalog 4).
@@ -53,7 +54,7 @@ export function createEarthquakeDisaster(): Disaster {
       setClock(active, count);
       active.state['next'] = world.tick + nextDelay(world, context);
 
-      shake(context, magnitude);
+      shake(context, active, magnitude);
     },
     tick: (context, active) => {
       const { world, balance } = context;
@@ -70,7 +71,7 @@ export function createEarthquakeDisaster(): Disaster {
       active.state['left'] = left - 1;
       active.state['next'] = world.tick + nextDelay(world, context);
 
-      shake(context, magnitude);
+      shake(context, active, magnitude);
     },
     isFinished: (_world, active) => ((active.state['left'] as number | undefined) ?? 0) <= 0,
   };
@@ -91,7 +92,7 @@ function nextDelay(world: WorldState, context: DisasterContext): number {
  * právě jeden hod bez ohledu na to, kolik má dlaždic, a pořadí nezávisí na tom,
  * kdy se do `Map` vložila (P2).
  */
-function shake(context: DisasterContext, magnitude: number): void {
+function shake(context: DisasterContext, active: ActiveDisaster, magnitude: number): void {
   const { world, catalogue, balance } = context;
   const quake = balance.disasters.earthquake;
   const losses = noLosses();
@@ -126,6 +127,7 @@ function shake(context: DisasterContext, magnitude: number): void {
   floodCoast(context, magnitude);
 
   reportLosses(world, balance, losses, quake.happinessPerLoss, quake.happinessPerDowngrade);
+  addToll(active, losses.residents * balance.disasters.casualties.collapse);
 }
 
 function destroyTileAndBurn(

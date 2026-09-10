@@ -254,6 +254,11 @@
     "damage": {
       "highLevel": 3
     },
+    "casualties": {
+      "collapse": 0.12,
+      "burn": 0.18,
+      "flood": 0.05
+    },
     "rubble": {
       "clearCost": 250,
       "crimeWeight": 1.5,

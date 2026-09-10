@@ -1830,9 +1830,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     },
     // Klik na ikonu u hodin vrátí **tutéž kartu, která přišla při vzniku**.
     // Hra se u ní znovu zastaví: kdo si ji otevřel, chce číst, ne dohánět.
-    onDisasterClick: (kind, x, y) => {
+    onDisasterClick: (kind, x, y, dead) => {
       const where = alertTarget(simWorld, x, y);
-      if (alert.open(kind, where.x, where.y)) setSpeed(0);
+      if (alert.open(kind, where.x, where.y, dead)) setSpeed(0);
     },
     },
   );

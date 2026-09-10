@@ -13,6 +13,7 @@ import {
   pollutionBurst,
 } from './effects';
 import type { Disaster, DisasterContext } from './registry';
+import { addToll } from './state';
 import type { ActiveDisaster } from './state';
 
 /**
@@ -71,6 +72,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
     losses,
   );
   reportLosses(world, balance, losses, spill.happinessPerLoss);
+  addToll(active, losses.residents * balance.disasters.casualties.collapse);
 
   // Cena půdy padá v širokém okolí a doznívá roky. Tohle je ta část účtu,
   // kterou hráč uvidí až dávno po tom, co uklidil trosky.
@@ -126,6 +128,9 @@ function advance(context: DisasterContext, active: ActiveDisaster): void {
     spill.populationLoss * intensity,
   );
   active.state['lost'] = ((active.state['lost'] as number | undefined) ?? 0) + lost;
+  // Tady jsou to **přesně mrtví**, ne odhad: chemikálie domy neboří, ubývají
+  // z nich lidé, a to jsou právě ti, kteří se nadýchali.
+  addToll(active, lost);
 
   happinessPenalty(
     world,

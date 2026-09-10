@@ -9,7 +9,7 @@ import {
   suppressService,
 } from './effects';
 import type { Disaster, DisasterContext } from './registry';
-import { setClock } from './state';
+import { addToll, setClock } from './state';
 import type { ActiveDisaster } from './state';
 import { cellsAround, remainingOf } from './unrest';
 
@@ -76,6 +76,7 @@ function begin(context: DisasterContext, active: ActiveDisaster): void {
   // nevystěhuje, jen ubude lidí a dům se časem zaplní zpátky.
   const lost = populationLoss(world, area, pileup.populationLoss);
   active.state['lost'] = lost;
+  addToll(active, lost);
   active.state['cells'] = cellsAround(world, context.x, context.y, pileup.reach);
 }
 

@@ -8,6 +8,7 @@ import type { WorldState } from '../world';
 import type { Disaster, DisasterContext } from './registry';
 import { spawnRubble } from './rubble';
 import { tilesOf } from './shapes';
+import { addToll, blameFor } from './state';
 import type { ActiveDisaster } from './state';
 
 /**
@@ -258,6 +259,7 @@ function burnDown(
   const fire = balance.disasters.fire;
   const doomed = new Set<number>();
   let lost = 0;
+  let residents = 0;
 
   for (const tile of tiles) {
     const buildingId = world.layers.buildingId[tile] ?? 0;
@@ -299,7 +301,24 @@ function burnDown(
       }
     }
 
-    if (removeBuilding(world, id)) lost++;
+    const inside = building.population;
+    if (removeBuilding(world, id)) {
+      lost++;
+      residents += inside;
+    }
+  }
+
+  /*
+   * Oběti se připíšou **běžícímu požáru**, ne tomuhle systému.
+   *
+   * Hoří se mimo `advance`: systém projde plamen po plameni každý tik, takže
+   * sám o sobě neví, čí požár to je. Vlastníkem je proto nejdéle běžící
+   * pohroma druhu „požár" nebo „lesní požár" — a když žádná neběží (oheň
+   * založený výbuchem, který už skončil), nepřipíšou se nikam.
+   */
+  if (residents > 0) {
+    const owner = blameFor(world.disasters.active, ['fire', 'wildfire']);
+    if (owner) addToll(owner, residents * balance.disasters.casualties.burn);
   }
 
   if (lost > 0 && fire.happinessPerLoss > 0) {

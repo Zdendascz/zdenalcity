@@ -1,7 +1,7 @@
 import type { ZoneType } from '@/sim/layers';
 import { ZONE } from '@/sim/layers';
 import { EXPLAINED_STATS } from '@/sim/statBreakdown';
-import { disasterProgress } from '@/sim/disasters/state';
+import { disasterProgress, tollOf } from '@/sim/disasters/state';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { averageHappiness } from '@/sim/systems/happiness';
 import type { DemandBreakdown } from '@/sim/diagnostics';
@@ -47,7 +47,7 @@ export interface HudCallbacks {
    * a je to jediná cesta zpátky k té zprávě: kdo ji jednou zavřel, neměl jak
    * si přečíst, co se vlastně děje, ani kde.
    */
-  onDisasterClick(kind: string, x: number, y: number): void;
+  onDisasterClick(kind: string, x: number, y: number, dead: number): void;
   onToggleDecor(): void;
   /**
    * Zapnout či vypnout čtvercovou síť po hranicích dlaždic.
@@ -721,7 +721,12 @@ export class Hud {
       for (const disaster of active) {
         const name = this.i18n.t(`ui.disaster.${disaster.kind}`);
         const node = button('hud__disaster', () =>
-          this.callbacks.onDisasterClick(disaster.kind, disaster.x, disaster.y),
+          this.callbacks.onDisasterClick(
+            disaster.kind,
+            disaster.x,
+            disaster.y,
+            tollOf(disaster),
+          ),
         );
         node.setAttribute('aria-label', name);
         node.appendChild(iconSvg(disaster.kind));
@@ -745,10 +750,15 @@ export class Hud {
       const done = disasterProgress(disaster);
       node.style.setProperty('--disaster-progress', done === null ? '0%' : `${Math.round(done * 100)}%`);
       const name = this.i18n.t(`ui.disaster.${disaster.kind}`);
-      node.title =
+      const head =
         done === null
           ? name
           : this.i18n.t('ui.disaster.progress', { name, percent: Math.round(done * 100) });
+
+      // Oběti se lepí za odpočet, ne místo něj: hráč potřebuje obojí a
+      // pohroma, která nikoho nezabila, o tom nemá co říkat.
+      const dead = tollOf(disaster);
+      node.title = dead > 0 ? `${head} · ${this.i18n.t('ui.disaster.toll', { dead })}` : head;
     }
   }
 

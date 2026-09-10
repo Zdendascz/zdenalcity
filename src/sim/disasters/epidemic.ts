@@ -4,7 +4,7 @@ import { index } from '../layers';
 import type { Building, WorldState } from '../world';
 import { CITY_WIDE, happinessPenalty, suppressService } from './effects';
 import type { Disaster, DisasterContext } from './registry';
-import { setClock } from './state';
+import { addToll, setClock } from './state';
 import type { ActiveDisaster } from './state';
 import { densityOfCell, populationPerCell } from './unrest';
 
@@ -229,6 +229,9 @@ function applyEffects(
   }
 
   active.state['lost'] = ((active.state['lost'] as number | undefined) ?? 0) + lost;
+  // U epidemie je „ubylo" totéž co „zemřelo" — nemoc nikoho nevystěhuje.
+  // Přesto se to hlásí jako odhad: epidemie ještě běží a číslo poroste.
+  addToll(active, lost);
   active.state['worst'] = worst;
   active.state['debt'] = debt;
 

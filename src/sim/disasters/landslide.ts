@@ -11,6 +11,7 @@ import { applyHeightChanges } from '../world';
 import type { WorldState } from '../world';
 import { collapseUnsupportedRoads, destroyTile, noLosses, reportLosses } from './damage';
 import type { Losses } from './damage';
+import { addToll } from './state';
 import type { Disaster, DisasterContext } from './registry';
 
 /**
@@ -89,7 +90,7 @@ export function createLandslideDisaster(): Disaster {
       return { x, y: (last - x) / world.size };
     },
 
-    start: (context) => {
+    start: (context, active) => {
       const { world, balance } = context;
       const slide = balance.disasters.landslide;
 
@@ -121,6 +122,7 @@ export function createLandslideDisaster(): Disaster {
       collapseUnsupportedRoads(world, changes, losses);
 
       reportLosses(world, balance, losses, slide.happinessPerLoss);
+      addToll(active, losses.residents * balance.disasters.casualties.collapse);
     },
 
     // Okamžitá: `start` udělá všechno a plánovač ji hned uklidí.

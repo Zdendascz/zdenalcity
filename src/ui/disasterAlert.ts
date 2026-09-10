@@ -131,7 +131,7 @@ export class DisasterAlert {
    * Druhá katastrofa nesmí to první okno přebít — hráč by přišel o zprávu,
    * kterou ještě nestihl přečíst, a přesně tomu se tady předchází.
    */
-  open(kind: string, x: number, y: number): boolean {
+  open(kind: string, x: number, y: number, dead = 0): boolean {
     if (this.isOpen) return false;
 
     this.target = { x, y };
@@ -149,6 +149,21 @@ export class DisasterAlert {
         .split(PARAGRAPH_BREAK)
         .map((paragraph) => el('p', 'alert__paragraph', paragraph)),
     );
+
+    /*
+     * Odhad obětí. Při vzniku pohromy je nula a řádek se neukáže — nikdo ještě
+     * neumřel. Smysl má, teprve když si hráč kartu otevře znovu z odznaku
+     * u hodin: tehdy chce vědět, co ho to zatím stálo.
+     *
+     * Je to **odhad a říká to i nahlas**. Hra ví přesně, kolik lidí ubylo
+     * z domů, které stojí; kolik se jich nedostalo ze zbořeného, počítá
+     * podílem. Číslo bez toho slova by tvrdilo víc, než hra ví.
+     */
+    if (dead > 0) {
+      this.story.appendChild(
+        el('p', 'alert__paragraph alert__toll', this.i18n.t('ui.alert.toll', { dead })),
+      );
+    }
 
     this.picture.classList.remove('is-hidden');
     this.image.src = `events/${kind}.jpg`;

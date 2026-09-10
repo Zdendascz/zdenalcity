@@ -848,6 +848,25 @@ export interface Balance {
      */
     damage: { highLevel: number };
     /**
+     * Kolik lidí pohroma zabije, podílem zasažených obyvatel (T113).
+     *
+     * Autor: „při katastrofách dokážeme orientačně spočítat, kolik lidí při
+     * nich umřelo? Bylo by fajn to dát do té informace o katastrofě."
+     *
+     * Jsou to **odhady, ne evidence**. Ze zbořeného domu se většina lidí
+     * dostane ven, z hořícího míň a povodeň dá čas skoro všem — proto tři
+     * čísla a ne jedno. Epidemie ani havárie tu nejsou: tam se obyvatelé
+     * ubírají přímo a mrtví jsou přesně ti.
+     */
+    casualties: {
+      /** Ze stržené či rozbořené budovy. */
+      collapse: number;
+      /** Z vyhořelé. */
+      burn: number;
+      /** Ze zaplavené. */
+      flood: number;
+    };
+    /**
      * Trosky (R15). Chovají se jako opuštěné budovy z fáze 2 — sráží cenu půdy
      * a živí kriminalitu — a stojí peníze, než je hráč uklidí.
      */
@@ -1131,6 +1150,32 @@ export function validateBalance(raw: unknown): {
           'disasters.damage.highLevel',
           1,
           5,
+        ),
+      },
+      casualties: {
+        collapse: num(
+          issues,
+          disasters ? asRecord(disasters['casualties']) : null,
+          'collapse',
+          'disasters.casualties.collapse',
+          0,
+          1,
+        ),
+        burn: num(
+          issues,
+          disasters ? asRecord(disasters['casualties']) : null,
+          'burn',
+          'disasters.casualties.burn',
+          0,
+          1,
+        ),
+        flood: num(
+          issues,
+          disasters ? asRecord(disasters['casualties']) : null,
+          'flood',
+          'disasters.casualties.flood',
+          0,
+          1,
         ),
       },
       rubble: {

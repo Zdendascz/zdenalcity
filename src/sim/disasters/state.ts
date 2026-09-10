@@ -93,6 +93,56 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+/**
+ * Kolik lidí už pohroma stála. Zaokrouhluje se **až tady**, ne u každé škody.
+ *
+ * Autor: „při katastrofách dokážeme orientačně spočítat, kolik lidí při nich
+ * umřelo? Bylo by fajn to dát do té informace o katastrofě. U déletrvajících,
+ * jako je epidemie, může být odhad."
+ *
+ * Je to schválně **odhad, a tak se to i hlásí**. Přesně vzato ví hra jen
+ * u epidemie a u havárií, kolik lidí ubylo; u zbořeného domu odhaduje podílem
+ * (`disasters.casualties`), kolik se jich nedostalo ven. Číslo, které vypadá
+ * na jednoho člověka přesně, by tvrdilo víc, než hra ví.
+ *
+ * Sčítá se **ve zlomcích** a zaokrouhluje se až při čtení: malý požár, který
+ * pokaždé zabije 0,4 člověka, by jinak nezabil nikdy nikoho.
+ */
+export function addToll(active: ActiveDisaster, dead: number): void {
+  if (!(dead > 0)) return;
+  active.state['dead'] = ((active.state['dead'] as number | undefined) ?? 0) + dead;
+}
+
+/** Kolik obětí si pohroma zatím vyžádala, na celé lidi. */
+export function tollOf(active: ActiveDisaster): number {
+  const dead = active.state['dead'];
+  return typeof dead === 'number' ? Math.round(dead) : 0;
+}
+
+/**
+ * Která běžící pohroma může za škodu daného druhu.
+ *
+ * Oheň a voda se ve hře šíří **vlastními systémy**, ne uvnitř katastrofy:
+ * hoří, dokud je co, a to je tik za tikem mimo `advance`. Aby se dalo říct
+ * „tenhle požár stál dvanáct lidí", musí se ta škoda někomu přiřadit — a je
+ * to ta pohroma daného druhu, která běží nejdéle.
+ *
+ * Když žádná neběží (například oheň založený výbuchem, který mezitím
+ * skončil), vrací `null` a oběti se nikam nepřipíšou. Lepší než je připsat
+ * tomu, kdo za ně nemůže.
+ */
+export function blameFor(
+  active: readonly ActiveDisaster[],
+  kinds: readonly string[],
+): ActiveDisaster | null {
+  let oldest: ActiveDisaster | null = null;
+  for (const disaster of active) {
+    if (disaster.finished || !kinds.includes(disaster.kind)) continue;
+    if (oldest === null || disaster.startedAtTick < oldest.startedAtTick) oldest = disaster;
+  }
+  return oldest;
+}
+
 export interface DisasterState {
   /**
    * Smí katastrofy vůbec nastat? (R18)

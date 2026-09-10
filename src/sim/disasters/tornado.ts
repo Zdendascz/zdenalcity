@@ -3,6 +3,7 @@ import type { WorldState } from '../world';
 import { lookup, noLosses, reportLosses, rollDamage } from './damage';
 import { igniteTile } from './fire';
 import type { Disaster, DisasterContext } from './registry';
+import { addToll } from './state';
 import type { ActiveDisaster } from './state';
 
 /**
@@ -116,6 +117,7 @@ function advance(context: DisasterContext, active: ActiveDisaster): void {
   }
 
   reportLosses(world, balance, losses, tornado.happinessPerLoss);
+  addToll(active, losses.residents * balance.disasters.casualties.collapse);
 }
 
 /** 1 v ose pásu, 0 na jeho okraji. Vystaveno kvůli testům, viz `strengthAt`. */

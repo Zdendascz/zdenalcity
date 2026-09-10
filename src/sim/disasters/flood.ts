@@ -8,6 +8,7 @@ import { markTileDirty, removeBuilding } from '../world';
 import type { WorldState } from '../world';
 import type { Disaster, DisasterContext } from './registry';
 import { spawnRubble } from './rubble';
+import { addToll, blameFor } from './state';
 import type { ActiveDisaster } from './state';
 
 /**
@@ -163,6 +164,7 @@ function washAway(
 ): void {
   const doomed = new Set<number>();
   let lost = 0;
+  let residents = 0;
 
   for (const tile of tiles) {
     const buildingId = world.layers.buildingId[tile] ?? 0;
@@ -198,7 +200,17 @@ function washAway(
       }
     }
 
-    if (removeBuilding(world, id)) lost++;
+    const inside = building.population;
+    if (removeBuilding(world, id)) {
+      lost++;
+      residents += inside;
+    }
+  }
+
+  // Utopení se připíše běžící povodni; stejný důvod jako u požáru.
+  if (residents > 0) {
+    const owner = blameFor(world.disasters.active, ['flood']);
+    if (owner) addToll(owner, residents * balance.disasters.casualties.flood);
   }
 
   const penalty = balance.disasters.flood.happinessPerLoss;
