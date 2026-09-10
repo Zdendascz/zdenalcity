@@ -51,7 +51,7 @@ export function createHappinessSystem(balance: Balance): System {
         workers > 0 ? Math.max(0, Math.min(1, (workers - jobs) / workers)) : 0;
 
       const cityWide =
-        world.economy.taxRates.residential * happiness.tax +
+        taxPenalty(balance, world.economy.taxRates.residential) +
         unemployment * happiness.unemployment;
 
       // Váhy i mapy pokrytí se rozbalí **jednou**, ne pro každou buňku, a to
@@ -94,6 +94,31 @@ export function createHappinessSystem(balance: Balance): System {
       world.dirty.coarseChanged = true;
     },
   };
+}
+
+/**
+ * O kolik daň sráží spokojenost.
+ *
+ * Do T113 to byla přímka: sazba krát koeficient. Autor si vyžádal, ať „vliv
+ * vysokých daní zdvojnásobí, respektive ať tam je nějaká progrese — čím vyšší
+ * daň, tím vyšší nespokojenost". Progrese je tady důležitější než ten
+ * dvojnásobek: přímka dělá z každého procenta stejně velký hřích, takže mezi
+ * osmi a devíti procenty je totéž rozhodování jako mezi osmnácti a
+ * devatenácti. To je špatně — devatenáct procent má bolet nesrovnatelně víc.
+ *
+ * ```
+ * srážka = sazba × tax + progrese × max(0, sazba − odkud)²
+ * ```
+ *
+ * S vanilla čísly (2,5 / 7 / 0,3) je do sedmi procent všechno jako dřív,
+ * u desíti je srážka o desetinu vyšší a u stropu, tedy u dvaceti procent,
+ * přesně dvojnásobná. Tam ten „zdvojnásob" sedí a mezi tím se plynule
+ * dojíždí.
+ */
+export function taxPenalty(balance: Balance, rate: number): number {
+  const { tax, taxProgressionFrom, taxProgression } = balance.happiness;
+  const over = Math.max(0, rate - taxProgressionFrom);
+  return rate * tax + taxProgression * over * over;
 }
 
 /**

@@ -14,6 +14,7 @@ import {
 import {
   averageHappiness,
   happinessDemandFactor,
+  taxPenalty,
 } from '@/sim/systems/happiness';
 import { createWorld, NEUTRAL_HAPPINESS, setRoadTile, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
@@ -273,5 +274,35 @@ describe('čitelnost', () => {
     const world = createWorld(1);
     world.happiness[coarseIndex(64, 64, world.size)] = 42;
     expect(explainParcel(world, VANILLA_BALANCE, 64, 64).happiness).toBe(42);
+  });
+});
+
+/**
+ * Progrese daní (T113).
+ *
+ * Autor: „zdvojnásob vliv vysokých daní na spokojenost, respektive měla by
+ * tam být nějaká progrese — čím vyšší daň, tím vyšší nespokojenost."
+ *
+ * Testuje se tvar křivky, ne konkrétní srážka: koeficienty jsou balanc.
+ */
+describe('daň a spokojenost', () => {
+  it('nulová daň nesráží nic', () => {
+    expect(taxPenalty(VANILLA_BALANCE, 0)).toBe(0);
+  });
+
+  it('každé další procento bolí víc než to předchozí', () => {
+    let previous = 0;
+    for (let rate = 1; rate <= 20; rate++) {
+      const step = taxPenalty(VANILLA_BALANCE, rate) - taxPenalty(VANILLA_BALANCE, rate - 1);
+      expect(step).toBeGreaterThanOrEqual(previous);
+      previous = step;
+    }
+  });
+
+  it('u stropu sazby je srážka dvojnásobná proti přímce', () => {
+    // Přesně ten „zdvojnásob" ze zadání. Dole se nemění nic, nahoře dvakrát.
+    const { tax } = VANILLA_BALANCE.happiness;
+    expect(taxPenalty(VANILLA_BALANCE, 20) / (20 * tax)).toBeCloseTo(2, 1);
+    expect(taxPenalty(VANILLA_BALANCE, 5)).toBeCloseTo(5 * tax, 10);
   });
 });

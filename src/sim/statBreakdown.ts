@@ -4,6 +4,7 @@ import { cityUtilities, coarseCongestion } from './diagnostics';
 import { strongestModifier } from './disasters/effects';
 import { populationPerCell } from './disasters/unrest';
 import { ledgerTotal } from './ledger';
+import { taxPenalty } from './systems/happiness';
 import { computeBudget } from './systems/economy';
 import type { WorldState } from './world';
 
@@ -197,7 +198,7 @@ function explainHappiness(world: WorldState, balance: Balance): StatBreakdown {
   const scale = 100 / 255;
 
   add(plus, 'ui.stat.row.happiness.base', happiness.base * scale);
-  add(minus, 'ui.stat.row.happiness.tax', world.economy.taxRates.residential * happiness.tax * scale);
+  add(minus, 'ui.stat.row.happiness.tax', taxPenalty(balance, world.economy.taxRates.residential) * scale);
   add(minus, 'ui.stat.row.happiness.unemployment', unemployment * happiness.unemployment * scale);
 
   let people = 0;

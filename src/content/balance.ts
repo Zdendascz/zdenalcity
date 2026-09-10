@@ -739,7 +739,12 @@ export interface Balance {
     pollution: number;
     crime: number;
     congestion: number;
+    /** Srážka za každé procento daně. Lineární část. */
     tax: number;
+    /** Od které sazby se přidává progrese. Pod ní daň bolí jen lineárně. */
+    taxProgressionFrom: number;
+    /** Kvadratická část srážky: čím výš nad tou sazbou, tím prudčeji. */
+    taxProgression: number;
     unemployment: number;
     /**
      * Nejnižší násobitel obytné poptávky při nulové spokojenosti. **Není to
@@ -1284,6 +1289,15 @@ export function validateBalance(raw: unknown): {
       crime: num(issues, happiness, 'crime', 'happiness.crime', 0, 100),
       congestion: num(issues, happiness, 'congestion', 'happiness.congestion', 0, 1000),
       tax: num(issues, happiness, 'tax', 'happiness.tax', 0, 100),
+      taxProgressionFrom: num(
+        issues,
+        happiness,
+        'taxProgressionFrom',
+        'happiness.taxProgressionFrom',
+        0,
+        100,
+      ),
+      taxProgression: num(issues, happiness, 'taxProgression', 'happiness.taxProgression', 0, 100),
       unemployment: num(issues, happiness, 'unemployment', 'happiness.unemployment', 0, 1000),
       minDemandFactor: num(issues, happiness, 'minDemandFactor', 'happiness.minDemandFactor', 0, 1),
       weights: happinessWeights,
