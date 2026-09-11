@@ -124,3 +124,16 @@ describe('zaslepené metody §9', () => {
     expect(await platform.listWorkshopMods()).toEqual([]);
   });
 });
+
+describe('restart do rozehraného města', () => {
+  it('další spuštění jednou přeskočí rozcestník', () => {
+    // Save s jinou velikostí mapy se načítá novým startem. Hráč si město
+    // vybral, takže ho rozcestník po obnovení nemá zdržovat — ale jen jednou.
+    sessionStorage.clear();
+    createBrowserPlatform().restartIntoAutosave();
+
+    const poObnoveni = createBrowserPlatform();
+    expect(poObnoveni.resumedAfterUpdate()).toBe(true);
+    expect(poObnoveni.resumedAfterUpdate()).toBe(false);
+  });
+});

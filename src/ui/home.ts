@@ -29,7 +29,9 @@ import type { NewGame } from './newGameDialog';
 /** Co si hráč vybral. Odpověď buď rozjede hru, nebo načte soubor. */
 export type HomeChoice =
   | { kind: 'game'; game: NewGame }
-  | { kind: 'file'; bytes: Uint8Array };
+  | { kind: 'file'; bytes: Uint8Array }
+  /** Město, které se minule nenačetlo a tahle verze hry ho už přečte. */
+  | { kind: 'damaged' };
 
 export interface HomeOptions {
   /** Je co obnovit? Bez toho se „Pokračovat" neukáže. */
@@ -49,8 +51,12 @@ export interface HomeOptions {
    * Nemaže se, odkládá — a tady je jediné místo, kde se s ním dá něco dělat:
    * stáhnout ho jako soubor a poslat autorovi, nebo ho zahodit. Kdyby se
    * poškozený autosave mazal, byla by regrese v načítání ztráta bez důkazu.
+   *
+   * `restorable` znamená, že **tahle verze hry ho už načte** — typicky po opravě
+   * chyby, kvůli které se minule nenačetlo. Pak se nabídne i otevření: hráč
+   * nemá vědět, že si může město stáhnout a nahrát zpátky jako soubor.
    */
-  damaged?: { download: () => void; discard: () => void };
+  damaged?: { download: () => void; discard: () => void; restorable: boolean };
 }
 
 /** Kam se hlásí chyby. Adresa autora, ne obecná schránka. */
@@ -217,7 +223,19 @@ export function showHome(
 
   const damaged = options.damaged;
   if (damaged) {
-    note.textContent = t('ui.home.damaged');
+    // Otevření nahradí město, které hráč mezitím rozehrál. Musí to vědět dřív,
+    // než klikne — ne až uvidí, že jeho nové město je pryč.
+    note.textContent = damaged.restorable
+      ? [t('ui.home.damagedRestorable'), options.canResume ? t('ui.home.damagedRestoreReplaces') : '']
+          .filter((part) => part !== '')
+          .join(' ')
+      : t('ui.home.damaged');
+    const row = el('p', 'home__note');
+    if (damaged.restorable) {
+      const restore = button('home__link-button', () => finish({ kind: 'damaged' }));
+      restore.textContent = t('ui.home.damagedRestore');
+      row.appendChild(restore);
+    }
     const download = button('home__link-button', () => damaged.download());
     download.textContent = t('ui.home.damagedDownload');
     const discard = button('home__link-button', () => {
@@ -226,7 +244,6 @@ export function showHome(
       row.remove();
     });
     discard.textContent = t('ui.home.damagedDiscard');
-    const row = el('p', 'home__note');
     row.append(download, discard);
     hero.appendChild(row);
   }

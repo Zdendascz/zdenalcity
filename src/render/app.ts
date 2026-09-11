@@ -12,6 +12,7 @@ import {
   readSaveMeta,
   unpackSave,
 } from '@/save/deserialize';
+import type { LoadWarnings } from '@/save/deserialize';
 import { checkFootprint } from '@/sim/buildings';
 import {
   estimateCornerHeight,
@@ -31,6 +32,7 @@ import {
   worstBlocker,
 } from '@/sim/diagnostics';
 import { migrate } from '@/save/migrations';
+import { planInGameLoad, verifySave } from '@/save/verify';
 import { serializeSave } from '@/save/serialize';
 import type { Command } from '@/sim/commands';
 import type { CommandResult } from '@/sim/result';
@@ -905,6 +907,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
                   download: () =>
                     platform.files.save(damagedSave, 'zdenalcity-poskozene-mesto.city'),
                   discard: () => void platform.storage.remove('corrupt'),
+                  // Po opravě chyby, kvůli které se minule nenačetl, ho hráč
+                  // dostane zpátky. Zkouší se stejnou cestou jako při startu.
+                  restorable: verifySave(damagedSave) === null,
                 },
               }
             : {}),
@@ -915,7 +920,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       : // Soubor nese vlastní mapu i jméno, takže na parametrech nové hry
         // nezáleží — přepíše je `applySaveToWorld` o pár řádků níž.
         { cityName: '', seed: 0, size: DEFAULT_MAP_SIZE as MapSize, disasters: true };
-  const openedFile = choice.kind === 'file' ? choice.bytes : null;
+  // Město ze slotu „poškozený" se otevírá jako soubor: nese vlastní mapu i jméno,
+  // a kdyby se přece jen nenačetlo, autosave zůstane nedotčený.
+  const openedFile =
+    choice.kind === 'file' ? choice.bytes : choice.kind === 'damaged' ? damagedSave : null;
 
   // `simWorld` je zapisovatelný stav, který drží tahle vrstva, protože ho
   // potřebuje save. `world` je read-only pohled pro renderer a UI (T2).
@@ -957,11 +965,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let restored = false;
   /** Načtení selhalo a hráč místo svého města dostal nové. Musí to vědět. */
   let loadFailed = false;
+  /** Co hráči chybí v obnoveném městě. Hlásí se, až budou notifikace. */
+  let startupWarnings: LoadWarnings | null = null;
   if (resumed) {
     try {
-      applySaveToWorld(simWorld, migrate(unpackSave(resumed)));
+      const save = migrate(unpackSave(resumed));
+      startupWarnings = collectLoadWarnings(save, content, content.getLoadedSources());
+      applySaveToWorld(simWorld, save);
       cityName = readSaveMeta(resumed).city.name;
       restored = true;
+      // Poškozené město se právě otevřelo, odkládat už není co.
+      if (choice.kind === 'damaged') await platform.storage.remove('corrupt');
     } catch {
       // **Jen když šlo o autosave.** Když se nepovede otevřít soubor, který
       // hráč vybral na rozcestníku, nemá s tím rozehrané město nic společného
@@ -1196,6 +1210,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Když se rozehrané město nepodařilo načíst, hráč vidí prázdnou mapu a neví
   // proč. Soubor přitom zůstal ležet ve slotu „poškozený" (audit N4).
   if (loadFailed) notifications.show(i18n.t('ui.save.loadFailedAtStart'));
+  // Totéž, co hlásí načtení za běhu. Save s jinou velikostí mapy se teď načítá
+  // novým startem (`planInGameLoad`) a bez tohohle by se hráč o chybějícím
+  // obsahu a městě bez vodovodu nedozvěděl.
+  if (startupWarnings) {
+    const missing = [
+      ...startupWarnings.missingSources.map((source) => source.id),
+      ...startupWarnings.missingDefinitions,
+    ];
+    if (missing.length > 0) {
+      notifications.show(i18n.t('ui.save.missingContent', { list: missing.join(', ') }));
+    }
+    if (startupWarnings.waterlessBuildings > 0) {
+      notifications.show(
+        i18n.t('ui.save.noWaterNetwork', { count: startupWarnings.waterlessBuildings }),
+      );
+    }
+  }
   const legend = new Legend(mount, i18n);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
   const advisorPanel = new AdvisorPanel(mount, i18n);
@@ -1284,14 +1315,40 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     };
   }
 
-  function loadFromBytes(bytes: Uint8Array): void {
+  async function loadFromBytes(bytes: Uint8Array): Promise<void> {
+    const plan = planInGameLoad(bytes, world.size);
+    if (plan.kind === 'invalid') {
+      message = { key: 'ui.save.failed', params: { reason: plan.error.message } };
+      return;
+    }
+
+    if (plan.kind === 'restart') {
+      // Jiná velikost mapy: renderer si ji bere při startu, takže se město
+      // načte novým startem. Uloží se jako rozehrané a hra naběhne rovnou do
+      // něj, bez rozcestníku.
+      if (!(await platform.storage.write('autosave', bytes))) {
+        message = { key: 'ui.save.storeFailed' };
+        return;
+      }
+      // Autosave při odchodu ze stránky by ho jinak přepsal městem, které se
+      // právě zavírá — a hráč by po obnovení viděl zase to staré.
+      restarting = true;
+      platform.restartIntoAutosave();
+      return;
+    }
+
     try {
-      const save = migrate(unpackSave(bytes));
+      const save = plan.save;
       const warnings = collectLoadWarnings(save, content, content.getLoadedSources());
       applySaveToWorld(simWorld, save);
       // Loňskou uzávěrku už hráč viděl, když se zavírala. Bez tohohle by mu
       // vyskočila znovu při každém načtení téhož města.
       if (simWorld.economy.lastYear) yearReport.markSeen(simWorld.economy.lastYear.year);
+
+      // Kamera **na načtené město**, stejně jako při startu. Zůstávala tam, kam
+      // se dívalo to předchozí, a hráč po načtení viděl prázdnou krajinu.
+      const centre = cityCentre(world);
+      centreOn(centre.x, centre.y);
 
       const missing = [...warnings.missingSources.map((s) => s.id), ...warnings.missingDefinitions];
       message =
@@ -1331,8 +1388,41 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     water: false,
   };
 
+  /** Aby se hláška o nečitelném savu neopakovala při každém uložení. */
+  let unreadableWarned = false;
+
+  /**
+   * Hra se restartuje do načteného savu. Autosave je v tu chvíli **ten savem**
+   * a nesmí ho přepsat město, které se zavírá (`loadFromBytes`).
+   */
+  let restarting = false;
+
+  /**
+   * Načetlo by se tohle město při příštím startu?
+   *
+   * Save, který by se nenačetl, **nesmí přepsat ten poslední dobrý** (viz
+   * `save/verify.ts`). Hráč by o město přišel až po obnovení stránky, kdy už
+   * se s tím nedá nic dělat.
+   */
+  function saveIsReadable(bytes: Uint8Array): boolean {
+    const problem = verifySave(bytes);
+    if (problem === null) return true;
+    // Celá výjimka do konzole: je to chyba hry, ne hráče, a bez zprávy se
+    // nedá dohledat, které pole se s loaderem rozešlo.
+    console.error('Uložené město by se znovu nenačetlo:', problem);
+    if (!unreadableWarned) {
+      unreadableWarned = true;
+      notifications.show(i18n.t('ui.save.unreadable'));
+    }
+    return false;
+  }
+
   function autosaveNow(): void {
+    if (restarting) return;
     try {
+      const bytes = serializeSave(simWorld, saveOptions());
+      if (!saveIsReadable(bytes)) return;
+
       // Bez `await`: na `pagehide` už není kam čekat. Zápis v prohlížeči běží
       // synchronně, takže se stihne — a kdyby jednou neběžel, je to věc
       // platform vrstvy, ne tohohle místa.
@@ -1342,7 +1432,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       // město se jednou uložit nemusí. Rychlé uložení chybu hlásilo, tohle ne
       // — a hráč se o ztrátě dozvídal až po obnovení stránky.
       void platform.storage
-        .write('autosave', serializeSave(simWorld, saveOptions()))
+        .write('autosave', bytes)
         .then((stored) => {
           if (stored || autosaveWarned) return;
           autosaveWarned = true;
@@ -1368,6 +1458,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   async function quickSaveNow(): Promise<void> {
     const bytes = serializeSave(simWorld, saveOptions());
+    // Nečitelný save nepřepíše předchozí rychlé uložení, stejně jako u autosave.
+    if (!saveIsReadable(bytes)) {
+      message = { key: 'ui.save.unreadableShort' };
+      return;
+    }
     const stored = await platform.storage.write('quick', bytes);
     // Rychlý save **přežije obnovení stránky**. Když se uložit nepovede, hráč
     // to musí vědět hned — jinak by se na něj spolehl a přišel o město.
@@ -1426,7 +1521,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       message = { key: 'ui.save.empty' };
       return;
     }
-    loadFromBytes(bytes);
+    await loadFromBytes(bytes);
   }
 
   const camera = (() => {
@@ -1789,8 +1884,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     onQuickLoad: () => void quickLoadNow(),
     onDownload: () => {
       const bytes = serializeSave(simWorld, saveOptions());
+      // Soubor se stáhne **i tak**: je to jediná kopie rozehrané hry a zároveň
+      // důkaz, podle kterého se dá chyba opravit. Hráč jen musí vědět, že ho
+      // tahle verze neotevře.
+      const readable = saveIsReadable(bytes);
       platform.files.save(bytes, 'mesto.city');
-      message = { key: 'ui.save.saved', params: { size: (bytes.byteLength / 1024).toFixed(1) } };
+      message = readable
+        ? { key: 'ui.save.saved', params: { size: (bytes.byteLength / 1024).toFixed(1) } }
+        : { key: 'ui.save.downloadedUnreadable' };
     },
     onOpenFile: (file) => {
       void platform.files.read(file).then(loadFromBytes);

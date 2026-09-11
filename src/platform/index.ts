@@ -89,9 +89,19 @@ export interface Platform {
    */
   reloadNewVersion(): Promise<void>;
   /**
+   * Spustí hru znovu a **rovnou pokračuje v rozehraném městě** (autosave).
+   *
+   * Vzniklo kvůli načtení savu s jinou velikostí mapy. Renderer si velikost
+   * bere při startu, takže načíst takový save za běhu kreslilo terén jen
+   * z části. Start hry to umí správně: volající save uloží jako autosave
+   * a nechá hru naběhnout znovu. Na rozdíl od `reloadNewVersion` nesahá na keš.
+   */
+  restartIntoAutosave(): void;
+  /**
    * Vrátí `true` právě jednou: při tom spuštění, které vzniklo z
-   * `reloadNewVersion`. Hra podle toho pozná, že má rovnou pokračovat
-   * a nenutit hráče proklikat rozcestník kvůli něčemu, co si vyžádal.
+   * `reloadNewVersion` nebo `restartIntoAutosave`. Hra podle toho pozná, že má
+   * rovnou pokračovat a nenutit hráče proklikat rozcestník kvůli něčemu, co si
+   * vyžádal.
    */
   resumedAfterUpdate(): boolean;
 
