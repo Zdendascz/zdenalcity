@@ -37,6 +37,7 @@ import {
 } from '@/sim/commands';
 import { hashLayers, index, LAYER_ORDER, ZONE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
+import { MAX_FUNDING } from '@/sim/funding';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { assumeWatered } from './support/water';
@@ -299,6 +300,20 @@ describe('round-trip', () => {
 
     expect(restored.serviceFunding.get('police')).toBe(0.3);
     expect(restored.serviceFunding.get('parks')).toBe(1);
+  });
+
+  it('financování nad sto procent přežije round-trip', async () => {
+    // Posuvník jde od T113 až na MAX_FUNDING, loader ale bral jen 0–1. Hra tak
+    // uložila město, které pak sama nenačetla, a hráč o něj přišel.
+    const { world } = await builtCity();
+    setServiceFunding(world, 'fire', 1.5);
+    setServiceFunding(world, 'police', MAX_FUNDING);
+
+    const restored = createWorld(1);
+    applySaveToWorld(restored, migrate(unpackSave(serializeSave(world, OPTIONS))));
+
+    expect(restored.serviceFunding.get('fire')).toBe(1.5);
+    expect(restored.serviceFunding.get('police')).toBe(MAX_FUNDING);
   });
 
   it('kurzor vzorkování dopravy přežije round-trip (verze 3)', async () => {

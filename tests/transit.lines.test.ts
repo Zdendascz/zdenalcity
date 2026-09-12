@@ -20,6 +20,7 @@ import {
   lineFault,
   lineProblems,
   lineRuns,
+  MAX_LINE_VEHICLES,
   modeOf,
   rebuildTramTiles,
   roadCapacityFactor,
@@ -343,6 +344,20 @@ describe('vozidla a jízdné', () => {
     expect(setLineFare(world, line.id, -5).ok).toBe(false);
     expect(setLineFare(world, line.id, 12).ok).toBe(true);
     expect(line.fare).toBe(12);
+  });
+
+  it('víc vozidel, než unese save, neprojde', async () => {
+    // Mez zná příkaz i loader. Kdyby ji znal jen loader, bohaté město by si
+    // naklikalo linku, kterou by po uložení už nenačetlo.
+    const content = await vanilla();
+    const balance = content.getBalance();
+    const world = street(content);
+    createTransitLine(world, balance, 'bus');
+    const line = lastLine(world);
+    world.economy.funds = 1e12;
+
+    expect(setLineVehicles(world, balance, line.id, MAX_LINE_VEHICLES + 1).ok).toBe(false);
+    expect(line.vehicles).toBe(0);
   });
 
   it('smazaná linka zmizí i s vozidly', async () => {

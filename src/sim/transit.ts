@@ -5,6 +5,15 @@ import { index, ROAD } from './layers';
 import type { WorldState } from './world';
 
 /**
+ * Nejvíc vozidel na jedné lince.
+ *
+ * Jedna mez pro příkaz i pro načtení savu. Dřív ji znal jen loader a příkaz
+ * pustil libovolný počet — bohaté město si tak mohlo naklikat linku, kterou by
+ * po uložení už nenačetlo.
+ */
+export const MAX_LINE_VEHICLES = 10_000;
+
+/**
  * Linky MHD (§7 fáze 4).
  *
  * Rozšiřuje třídu `transit` z fáze 3, kde zastávka nedělala nic než pokrytí.

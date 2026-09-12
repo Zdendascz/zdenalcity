@@ -171,6 +171,16 @@ async function reloadNewVersion(): Promise<void> {
   location.reload();
 }
 
+/** Viz `Platform.restartIntoAutosave`. Příznak je týž jako po aktualizaci. */
+function restartIntoAutosave(): void {
+  try {
+    sessionStorage.setItem(UPDATE_FLAG, '1');
+  } catch {
+    // Bez příznaku se ukáže rozcestník a město čeká pod „Pokračovat".
+  }
+  location.reload();
+}
+
 /** Příznak se čte **a hned maže** — platí pro jedno spuštění, ne pro kartu. */
 function resumedAfterUpdate(): boolean {
   try {
@@ -188,6 +198,7 @@ export function createBrowserPlatform(): Platform {
     storage: createLocalStorage(),
     files: createFileTransfer(),
     reloadNewVersion,
+    restartIntoAutosave,
     resumedAfterUpdate,
 
     // Zaslepené podle §9. Prohlížeč nezná hráče, DLC ani Workshop; až přijde

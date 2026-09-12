@@ -27,7 +27,7 @@ import {
   takeLoan,
 } from './finance';
 import { needsClearing } from './terrain';
-import { createLine, findLine, modeOf, removeLine, stopMode } from './transit';
+import { createLine, findLine, MAX_LINE_VEHICLES, modeOf, removeLine, stopMode } from './transit';
 import { extinguishTile } from './disasters/fire';
 import { collapseUnsupportedRoads, destroyInfrastructure, noLosses } from './disasters/damage';
 import { clearRubble } from './disasters/rubble';
@@ -1200,7 +1200,7 @@ export function setLineVehicles(
 ): CommandResult {
   const line = findLine(world, lineId);
   if (!line) return reject('error.unknownLine', { id: lineId });
-  if (!Number.isInteger(vehicles) || vehicles < 0) {
+  if (!Number.isInteger(vehicles) || vehicles < 0 || vehicles > MAX_LINE_VEHICLES) {
     return reject('error.invalidVehicles', { vehicles });
   }
 

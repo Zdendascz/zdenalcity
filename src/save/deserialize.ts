@@ -9,6 +9,8 @@ import { MAX_LEVEL } from '@/content/schema';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
 import type { Ledger } from '@/sim/ledger';
+import { MAX_FUNDING } from '@/sim/funding';
+import { MAX_LINE_VEHICLES } from '@/sim/transit';
 import {
   MAX_TAX_RATE,
   MIN_TAX_RATE,
@@ -478,7 +480,12 @@ function parseState(
     const rawFunding = asRecord(raw['serviceFunding'], 'state.serviceFunding');
     for (const key of Object.keys(rawFunding).sort()) {
       const value = num(rawFunding, key, 'state.serviceFunding');
-      if (value < 0 || value > 1) fail(`state.serviceFunding.${key} musí být v rozsahu 0–1`);
+      // Mez je **tatáž konstanta, podle které se řídí posuvník** (`sim/funding.ts`).
+      // Stála tu jednička: hra uložila služby na 150 %, pak je sama odmítla
+      // načíst a hráč přišel o město při dalším startu.
+      if (value < 0 || value > MAX_FUNDING) {
+        fail(`state.serviceFunding.${key} je ${value}, čeká se rozsah 0–${MAX_FUNDING}`);
+      }
       serviceFunding[key] = value;
     }
   }
@@ -885,7 +892,7 @@ export function checkSaveFits(save: SaveData): void {
     inRange(line.id, 1, Number.MAX_SAFE_INTEGER, `${where}.id`);
     if (lines.has(line.id)) fail(`${where}.id se v savu opakuje`);
     lines.add(line.id);
-    inRange(line.vehicles, 0, 10000, `${where}.vehicles`);
+    inRange(line.vehicles, 0, MAX_LINE_VEHICLES, `${where}.vehicles`);
     if (!Number.isFinite(line.fare) || line.fare < 0) fail(`${where}.fare nesmí být záporné`);
   }
 
