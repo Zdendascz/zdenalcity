@@ -4,6 +4,7 @@ import { iconSvg } from './icons';
 import { button, el } from './dom';
 import { formatNumber } from './format';
 import type { I18n } from './i18n';
+import { closeOtherSheets, registerSheet } from './sheets';
 
 /**
  * Ekonomická tabulka. Ukazuje, kolik co stojí postavit a provozovat, kolik
@@ -34,6 +35,7 @@ export class BudgetPanel {
 
     this.root = el('div', 'sheet is-hidden');
     parent.appendChild(this.root);
+    registerSheet(this);
   }
 
   isVisible(): boolean {
@@ -46,7 +48,15 @@ export class BudgetPanel {
     // Zavřená tabulka zahodí otisk, ať se po otevření nakreslí z čerstvých
     // čísel, a ne z těch, u kterých se zavírala.
     this.drawn = null;
+    if (this.visible) closeOtherSheets(this);
     return this.visible;
+  }
+
+  hide(): void {
+    if (!this.visible) return;
+    this.visible = false;
+    this.root.classList.add('is-hidden');
+    this.drawn = null;
   }
 
   update(budget: Budget, funds: number): void {

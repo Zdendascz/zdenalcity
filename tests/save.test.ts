@@ -30,6 +30,7 @@ import {
 import {
   buildPipe,
   buildRoad,
+  bulldoze,
   placeDefinition,
   setServiceFunding,
   setTaxRate,
@@ -314,6 +315,30 @@ describe('round-trip', () => {
 
     expect(restored.serviceFunding.get('fire')).toBe(1.5);
     expect(restored.serviceFunding.get('police')).toBe(MAX_FUNDING);
+  });
+
+  it('snímek před bouráním vrátí silnici i peníze — to je „Zpět"', async () => {
+    /*
+     * Tlačítko „Zpět" v liště nevrací opačný příkaz, ale **načte snímek**
+     * města, který si `render/app.ts` vezme před nevratným tahem. Opačný
+     * příkaz k bourání totiž neexistuje: dům by se postavil nový, mladší a bez
+     * obyvatel. Tady se hlídá ten kontrakt — snímek, bourání, obnovení.
+     */
+    const { world } = await builtCity();
+    const x = 30;
+    const y = 40;
+    expect(world.layers.road[index(x, y, world.size)]).not.toBe(0);
+
+    const snapshot = serializeSave(world, OPTIONS);
+    const fundsBefore = world.economy.funds;
+
+    expect(bulldoze(world, x, y).ok).toBe(true);
+    expect(world.layers.road[index(x, y, world.size)]).toBe(0);
+
+    applySaveToWorld(world, migrate(unpackSave(snapshot)));
+
+    expect(world.layers.road[index(x, y, world.size)]).not.toBe(0);
+    expect(world.economy.funds).toBe(fundsBefore);
   });
 
   it('kurzor vzorkování dopravy přežije round-trip (verze 3)', async () => {

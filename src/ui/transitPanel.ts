@@ -8,6 +8,7 @@ import { button, el } from './dom';
 import { formatNumber } from './format';
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
+import { closeOtherSheets, registerSheet } from './sheets';
 
 /**
  * Linky MHD (§7 fáze 4).
@@ -63,6 +64,7 @@ export class TransitPanel {
 
     this.root = el('div', 'sheet sheet--transit is-hidden');
     parent.appendChild(this.root);
+    registerSheet(this);
 
     i18n.onChange(() => {
       this.drawn = '';
@@ -90,7 +92,13 @@ export class TransitPanel {
     this.root.classList.toggle('is-hidden', !this.visible);
     // Zavřený panel nesmí dál polykat kliknutí do mapy.
     if (!this.visible && this.picking !== null) this.stopPicked();
+    if (this.visible) closeOtherSheets(this);
     return this.visible;
+  }
+
+  /** Zavření zvenčí (`ui/sheets.ts`) musí zrušit i přebírání kliknutí. */
+  hide(): void {
+    if (this.visible) this.toggle();
   }
 
   update(

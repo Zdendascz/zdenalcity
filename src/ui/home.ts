@@ -317,26 +317,33 @@ function galleryRow(t: (key: string) => string, root: HTMLElement): HTMLElement 
     strip.appendChild(card);
   });
 
-  let at = 0;
-
   /**
-   * Posun se počítá ze **skutečné šířky karty**, ne z konstanty: karta je
-   * `clamp()`, takže na jiném okně vychází jinak. Kolik karet je vidět, se
-   * spočítá taky — na širokém monitoru se posouvá po jedné, ale zastaví se
-   * dřív, aby vpravo nezůstala díra.
+   * Posune pás o jednu kartu.
+   *
+   * **Rolováním, ne transformem.** Transformem se pás posouval jen šipkami,
+   * takže na telefonu s ním nešlo hnout prstem — a šipky se objevovaly až na
+   * `:hover`, tedy nikdy. Teď posouvá prst i šipky týž posuvník a nemají jak
+   * se rozejít. Šířka karty se měří, protože je `clamp()` a na jiném okně
+   * vychází jinak.
    */
   function step(delta: number): void {
     const first = strip.firstElementChild;
     if (!(first instanceof HTMLElement)) return;
     const gap = 14;
     const width = first.getBoundingClientRect().width + gap;
-    const visible = Math.max(1, Math.round(frame.clientWidth / width));
-    const last = Math.max(0, GALLERY.length - visible);
+    const last = strip.scrollWidth - strip.clientWidth;
 
-    at += delta;
-    if (at > last) at = 0;
-    if (at < 0) at = last;
-    strip.style.transform = `translateX(${-at * width}px)`;
+    // Za koncem se vrací na začátek a před začátkem na konec, aby šlo listovat
+    // pořád dokola jako dřív.
+    let left = strip.scrollLeft + delta * width;
+    if (left > last + 1) left = 0;
+    else if (left < -1) left = last;
+
+    const target = Math.max(0, Math.min(left, last));
+    // `scrollTo` s plynulým posunem neumí každé prostředí (třeba jsdom
+    // v testech). Skok je pak ošklivý, ale karta sedí, kde má.
+    if (typeof strip.scrollTo === 'function') strip.scrollTo({ left: target, behavior: 'smooth' });
+    else strip.scrollLeft = target;
   }
 
   for (const [css, delta, label] of [
@@ -353,14 +360,33 @@ function galleryRow(t: (key: string) => string, root: HTMLElement): HTMLElement 
   frame.appendChild(strip);
   section.appendChild(frame);
 
-  // Sama se posouvá, dokud na ni hráč nemíří myší. Kdo si prohlíží obrázek,
-  // nechce, aby mu ujel pod kurzorem.
-  let timer = window.setInterval(() => step(1), SLIDE_MS);
-  frame.addEventListener('mouseenter', () => window.clearInterval(timer));
-  frame.addEventListener('mouseleave', () => {
+  /*
+   * Sama se posouvá, dokud do ní hráč nesáhne.
+   *
+   * Myš ji zastaví najetím a po odjezdu se rozjede znovu. Prst ji zastaví
+   * **natrvalo**: kdo si listuje sám, nechce, aby mu pás ujel pod rukou —
+   * a na telefonu se kurzor nikdy neodjede.
+   */
+  let timer = 0;
+  let handled = false;
+
+  function play(): void {
+    if (handled) return;
+    window.clearInterval(timer);
     timer = window.setInterval(() => step(1), SLIDE_MS);
+  }
+
+  function pause(): void {
+    window.clearInterval(timer);
+  }
+
+  play();
+  strip.addEventListener('pointerdown', () => {
+    handled = true;
+    pause();
   });
-  window.addEventListener('resize', () => step(0));
+  frame.addEventListener('mouseenter', pause);
+  frame.addEventListener('mouseleave', play);
 
   return section;
 }

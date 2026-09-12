@@ -11,6 +11,7 @@ import { button, el } from './dom';
 import { formatNumber, landValueTermKeys } from './format';
 import { dateParts } from './hud';
 import type { I18n } from './i18n';
+import { closeOtherSheets, registerSheet } from './sheets';
 
 /**
  * Jméno povrchu pro překlad a pro obrázek. Index je hodnota vrstvy `terrain`,
@@ -68,9 +69,17 @@ function meter(label: string, value: string, share: number): HTMLElement {
   track.appendChild(fill);
   row.appendChild(track);
 
-  row.appendChild(el('span', 'gauge__value', value));
+  // Hodnota, která je věta a ne číslo, patří na vlastní řádek: sloupec je
+  // `auto`, takže „mimo dosah — tady nic nevyroste" zmáčkl popisek na nulu
+  // a text přejel ukazatel.
+  const text = el('span', 'gauge__value', value);
+  if (value.length > LONG_VALUE_CHARS) text.classList.add('gauge__value--long');
+  row.appendChild(text);
   return row;
 }
+
+/** Delší hodnota se vedle ukazatele nevejde. Měřeno na nejužším telefonu. */
+const LONG_VALUE_CHARS = 12;
 
 /** Slabé, střední, nebo dobré? Jedna hranice pro všechny pruhy. */
 function gradeOf(share: number): string {
@@ -166,6 +175,7 @@ export class BuildingInfo {
     this.utilities = utilities;
     this.root = el('div', 'sheet sheet--info is-hidden');
     parent.appendChild(this.root);
+    registerSheet(this);
   }
 
   hide(): void {
@@ -198,6 +208,9 @@ export class BuildingInfo {
     risk: string | null = null,
   ): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
+    // Otevřený smí být jen jeden panel (`ui/sheets.ts`): karta parcely se
+    // jinak položila přes otevřenou kasu a texty se slily.
+    closeOtherSheets(this);
     this.root.replaceChildren();
     this.root.classList.remove('is-hidden');
 

@@ -13,6 +13,7 @@ import { button, el } from './dom';
 import { formatNumber } from './format';
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
+import { closeOtherSheets, registerSheet } from './sheets';
 
 /**
  * Půjčky a dluhopisy (§8 fáze 4).
@@ -53,6 +54,7 @@ export class FinancePanel {
 
     this.root = el('div', 'sheet sheet--finance is-hidden');
     parent.appendChild(this.root);
+    registerSheet(this);
 
     // Změna jazyka přestaví formulář: popisky jsou v něm zapsané natvrdo od
     // chvíle, kdy vznikl. Zadané částky se tím ztratí, a je to v pořádku —
@@ -70,6 +72,7 @@ export class FinancePanel {
   toggle(): boolean {
     this.visible = !this.visible;
     this.root.classList.toggle('is-hidden', !this.visible);
+    if (this.visible) closeOtherSheets(this);
     return this.visible;
   }
 

@@ -69,11 +69,19 @@ body {
   gap: 8px;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 8px;
+  /*
+   * Výřez displeje a pruh gest. `index.html` má `viewport-fit=cover`, takže
+   * hra kreslí až do nich: spodní lišta ležela na iPhonu v pruhu, kde systém
+   * čeká gesto domů, a na šířku byla pacička i kasa pod výřezem.
+   */
+  padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 8px
+    max(8px, env(safe-area-inset-left));
 }
 
 .hud__bottom {
   align-items: flex-end;
+  padding-top: 8px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
 /* Nástroje vlevo, ovládání vpravo — mezi nimi je vidět mapa. */
@@ -521,6 +529,9 @@ body {
   flex-direction: column;
   gap: 4px;
   min-width: 190px;
+  /* Širší než obrazovka se nabídka vejít nemůže; zbytek dorovná `popover.ts`,
+     který ji po otevření posune zpět do obrazovky. */
+  max-width: calc(100vw - 16px);
   max-height: min(60vh, 420px);
   overflow-y: auto;
 }
@@ -712,6 +723,80 @@ body {
 .hud--compact .popover__trigger {
   min-width: 40px;
   padding: 0 3px;
+}
+
+/*
+ * Ve vysunuté řadě má ikona pod sebou slovo.
+ *
+ * Jednadvacet ikon bez popisku a `title`, který se na dotyku nikdy neukáže:
+ * hráč hledal hasiče proklikáváním. Tady je na text místo, v liště ne.
+ */
+.hud__row--drawer .toolbar__button,
+.hud__row--drawer .popover__trigger {
+  flex-direction: column;
+  gap: 2px;
+  width: 74px;
+  min-width: 74px;
+  height: auto;
+  min-height: 62px;
+  padding: 6px 2px;
+}
+
+.hud__drawer-label {
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1.1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* Dva oddíly, ne jedna hromada: stavby zvlášť, správa města zvlášť. */
+.hud__drawer-title {
+  width: 100%;
+  margin-bottom: 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+/* Zleva, ať v řadách nezůstávají díry po `wrap-reverse`. */
+.hud__row--drawer .hud__drawer-group {
+  justify-content: flex-start;
+}
+
+/*
+ * Terče na dotyku: nejméně 44 bodů (doporučení Apple, Material chce 48 dp).
+ *
+ * Naměřeno bylo 34 × 30 u lupy, 48 × 30 u pauzy, 37 × 33 u křížku panelu,
+ * 65 × 27 u čipů v dialogu, 13 × 13 u zaškrtávátka a 16 bodů na výšku
+ * u posuvníku.
+ *
+ * Paleta nástrojů se **nezvětšuje**: 40 × 44 je záměr, aby se osm tlačítek
+ * vešlo do jedné řady i na 360bodovém displeji (viz výš).
+ */
+@media (pointer: coarse) {
+  .chip,
+  .segmented__button {
+    min-width: 44px;
+    min-height: 44px;
+    height: auto;
+  }
+
+  .dialog__field--check {
+    min-height: 44px;
+  }
+
+  .dialog__field--check input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Posuvník potřebuje výšku pro prst, ne jen pro drážku. */
+  .dialog__slider {
+    height: 44px;
+  }
 }
 
 .hud--compact .toolbar__button .icon--image,
@@ -977,6 +1062,47 @@ body {
   gap: 4px;
   width: min(320px, 40vw);
   pointer-events: none;
+}
+
+/*
+ * Na telefonu přes celou šířku, nad spodní lištou. Čtyřicet procent z 375
+ * bodů je 150 — chybová hláška se v takovém sloupci lámala do šesti řádků
+ * a ležela přes mapu.
+ */
+@media (pointer: coarse), (width <= 900px) {
+  .notifications {
+    top: auto;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(136px + env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    width: auto;
+  }
+}
+
+/*
+ * Nabídka „Zpět" po bourání a po drahé stavbě.
+ *
+ * Stojí nad spodní lištou a uprostřed: je to nabídka na pět sekund, ne
+ * hláška o chybě, takže nepatří k červeným zprávám vpravo.
+ */
+.undo {
+  position: absolute;
+  bottom: calc(136px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: rgb(20 23 28 / 94%);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.undo__text {
+  color: var(--text);
 }
 
 .notice {
@@ -1463,6 +1589,17 @@ body {
   font-size: 14px;
 }
 
+/*
+ * Na dotyku šestnáct bodů. Safari na iOS při klepnutí do pole s menším písmem
+ * přiblíží celou stránku a po zavření klávesnice ji nevrátí — hra pak běží ve
+ * zvětšeném výřezu.
+ */
+@media (pointer: coarse) {
+  .dialog__input {
+    font-size: 16px;
+  }
+}
+
 /* Zaškrtávátko v dialogu: popisek vedle, ne pod. */
 .dialog__field--check {
   flex-direction: row;
@@ -1799,16 +1936,30 @@ body {
   font-size: 15px;
 }
 
-/* Slideshow: pás se posouvá transformem, ne posuvníkem. Rám ořezává. */
+/*
+ * Slideshow: **rám je rolovací plocha**, ne jen okno s transformem.
+ *
+ * Transformem se pás posouval jen šipkami, takže na telefonu s ním nešlo hnout
+ * prstem. Rolování s přichycením umí obojí: prst táhne, šipky posílají
+ * `scrollBy` a karty mají `scroll-snap-align`, který už v kódu dávno byl.
+ */
 .home__frame {
   position: relative;
-  overflow: hidden;
 }
 
+/* Roluje **pás**, ne rám: šipky leží v rámu, takže jim obsah neujede pod
+   rukama. */
 .home__strip {
   display: flex;
   gap: 14px;
-  transition: transform 0.45s ease;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.home__strip::-webkit-scrollbar {
+  display: none;
 }
 
 /* Šipky leží na okrajích rámu a jsou vidět jen na dotyk myší — jinak by
@@ -1844,6 +1995,17 @@ body {
 
 .home__step--next {
   right: 8px;
+}
+
+/*
+ * Na dotyku šipky nejsou. Objevovaly se na `:hover`, takže na telefonu byly
+ * neviditelné, ale pořád klikatelné — prst mířil na obrázek a otevřel jinou
+ * kartu. Posouvá se prstem.
+ */
+@media (hover: none) {
+  .home__step {
+    display: none;
+  }
 }
 
 /*
@@ -2432,6 +2594,19 @@ body {
   grid-template-columns: 1fr auto;
 }
 
+/*
+ * Dlouhá hodnota na vlastní řádek.
+ *
+ * Sloupec s hodnotou je `auto`, takže „mimo dosah — tady nic nevyroste"
+ * zmáčkl popisek na nulu a text přejel ukazatel. Na úzké obrazovce to potkalo
+ * každý řádek, kde místo čísla stojí věta.
+ */
+.gauge__value--long {
+  grid-column: 1 / -1;
+  text-align: left;
+  white-space: normal;
+}
+
 .gauge__label {
   color: var(--text-dim);
   overflow: hidden;
@@ -2541,9 +2716,35 @@ body {
   margin: 0;
 }
 
+/*
+ * Na telefonu se panely vysouvají **zespodu**, ne doprostřed.
+ *
+ * Uprostřed sedí přesně to, kam hráč klepl: karta parcely 353 × 409 bodů
+ * zakryla na 375bodovém displeji víc než půl mapy včetně dlaždice, kterou si
+ * otevřel. Zespodu nad lištou nástrojů zůstane mapa vidět a lišta klikatelná —
+ * a `app.ts` k tomu srovná kameru tak, aby dlaždice byla nad panelem.
+ *
+ * Je to **pravidlo pro celou skupinu**, proto stojí až tady, za všemi
+ * `.sheet--*`: ty si nastavují šířku a přebily by ho.
+ */
+@media (pointer: coarse), (width <= 900px) {
+  .sheet {
+    top: auto;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(128px + env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    width: auto;
+    max-width: none;
+    max-height: 52dvh;
+    transform: none;
+  }
+}
+
 .lightbox__image {
   max-width: 100%;
-  max-height: calc(100vh - 120px);
+  /* `dvh`, ne `vh`: na mobilu `vh` počítá i s lištou adresy, takže spodek
+     obrázku i popisek končily pod ní. */
+  max-height: calc(100dvh - 120px);
   border-radius: 6px;
   object-fit: contain;
 }

@@ -3,6 +3,7 @@ import { button, el } from './dom';
 import { formatNumber } from './format';
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
+import { closeOtherSheets, registerSheet } from './sheets';
 
 /**
  * Z čeho je číslo v liště.
@@ -24,6 +25,7 @@ export class StatPanel {
     this.i18n = i18n;
     this.root = el('div', 'sheet sheet--stat is-hidden');
     parent.appendChild(this.root);
+    registerSheet(this);
   }
 
   /** Který údaj je otevřený, nebo `null`. */
@@ -36,12 +38,18 @@ export class StatPanel {
     this.key = this.key === key ? null : key;
     this.drawn = null;
     this.root.classList.toggle('is-hidden', this.key === null);
+    if (this.key !== null) closeOtherSheets(this);
   }
 
   close(): void {
     this.key = null;
     this.drawn = null;
     this.root.classList.add('is-hidden');
+  }
+
+  /** Jméno ze skupiny panelů (`ui/sheets.ts`). */
+  hide(): void {
+    this.close();
   }
 
   update(breakdown: StatBreakdown): void {

@@ -161,8 +161,31 @@ describe('úsporná lišta', () => {
     expect(labels).toEqual(['Kasa', 'Měsíční bilance']);
     // Ikona v tlačítku nezůstala — statistiky ji nahradily celou.
     expect(trigger?.querySelector('.popover__icon')).toBeNull();
-    // Ostatní se neztratily, jen se přestěhovaly.
-    expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(9);
+    // Uvnitř tlačítka **nesmí být další tlačítko**. `button` v `button` je
+    // neplatné HTML a klepnutí na kasu otevíralo roletku i rozpis kasy naráz.
+    expect(trigger?.querySelector('button')).toBeNull();
+    // Ostatní se neztratily, jen se přestěhovaly — a kasa s bilancí jsou
+    // v roletce taky, protože jinak by se jejich rozpis nedal otevřít.
+    expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(11);
+    const explainable = [...root.querySelectorAll('.panel--stats .stat--button .stat__label')].map(
+      (node) => node.textContent,
+    );
+    expect(explainable).toContain('Kasa');
+  });
+
+  it('kasa se plní v liště i v roletce', async () => {
+    // Na telefonu visí na dvou místech a `update()` musí naplnit obojí. Do
+    // opravy držel HUD jeden uzel na klíč, takže by v tlačítku zůstala pomlčka.
+    const { root, hud } = await hudFor('compact');
+    hud.update(STATE);
+
+    const values = [...root.querySelectorAll('.stat')]
+      .filter((stat) => stat.querySelector('.stat__label')?.textContent === 'Kasa')
+      .map((stat) => stat.querySelector('.stat__value')?.textContent);
+
+    expect(values).toHaveLength(2);
+    expect(new Set(values).size).toBe(1);
+    expect(values[0]).not.toBe('-');
   });
 
   it('schované statistiky se pořád plní', async () => {
@@ -346,7 +369,9 @@ describe('střední velikost', () => {
     expect([...(trigger?.querySelectorAll('.stat__label') ?? [])].map((n) => n.textContent)).toEqual(
       ['Kasa', 'Měsíční bilance'],
     );
-    expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(9);
+    // Jedenáct, ne devět: v roletce jsou i kasa s bilancí z tlačítka, jinak
+    // by se jejich rozpis nedal otevřít.
+    expect(root.querySelectorAll('.panel--stats .stat')).toHaveLength(11);
   });
 
   it('ale nechá si všechny rychlosti, oba pohledy a nedává lupu', async () => {

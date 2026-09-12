@@ -12,6 +12,11 @@ import { iconSvg } from './icons';
 import type { I18n } from './i18n';
 import type { LayoutMode } from './layout';
 import { Menu, Popover } from './popover';
+import { closeOtherSheets } from './sheets';
+
+/** Než se držené tlačítko lupy rozjede, a jak často pak přidává. */
+const ZOOM_REPEAT_DELAY_MS = 350;
+const ZOOM_REPEAT_MS = 120;
 
 /** 1 tik = 1 den, 30 dní = měsíc, 12 měsíců = rok (§5). */
 const DAYS_PER_MONTH = 30;
@@ -297,7 +302,12 @@ export class Hud {
   /** Část vysunuté řady pro ovládání. */
   private readonly controlDrawerGroup: HTMLElement;
 
-  private readonly values = new Map<string, HTMLElement>();
+  /**
+   * Uzly s hodnotami podle klíče. **Pole, ne jeden uzel:** na telefonu visí
+   * kasa i bilance na dvou místech — v tlačítku roletky a v jejím seznamu —
+   * a `update()` musí naplnit obojí.
+   */
+  private readonly values = new Map<string, HTMLElement[]>();
   private readonly speedButtons: HTMLButtonElement[] = [];
   /** Rychlejší stupně na telefonu. `null` v plné verzi — tam jsou v liště. */
   private speedMenu: Menu | null = null;
@@ -457,7 +467,7 @@ export class Hud {
     const population = totalPopulation(buildings);
 
     this.setValue('funds', formatNumber(economy.funds));
-    this.values.get('funds')?.classList.toggle('is-alarm', economy.funds < 0);
+    this.setAlarm('funds', economy.funds < 0);
     this.setValue('population', formatNumber(population));
     this.setValue('jobs', formatNumber(totalJobs(buildings)));
     // Spokojenost se ukazuje v procentech, ne v 0–255: hráč nemá důvod vědět,
@@ -480,9 +490,7 @@ export class Hud {
     // vedení i chybějící elektrárnu. Čísla vedle sebe to rozhodnou.
     this.setValue('powered', `${state.poweredBuildings}/${buildings.size}`);
     this.setValue('power', `${formatNumber(state.powerProduced)} / ${formatNumber(state.powerNeeded)}`);
-    this.values
-      .get('power')
-      ?.classList.toggle('is-alarm', state.powerNeeded > state.powerProduced);
+    this.setAlarm('power', state.powerNeeded > state.powerProduced);
 
     // Odpad a stoky. Pořadí je stejné jako u proudu — nejdřív co zvládneme,
     // pak co je potřeba — a červená znamená totéž: zbytek jde do vzduchu.
@@ -492,13 +500,13 @@ export class Hud {
       ['water', state.waterCapacity, state.waterNeeded],
     ] as const) {
       this.setValue(key, `${formatNumber(capacity)} / ${formatNumber(needed)}`);
-      this.values.get(key)?.classList.toggle('is-alarm', needed > capacity);
+      this.setAlarm(key, needed > capacity);
     }
 
     for (const row of DEMAND_ROWS) {
       const value = demand[row.category];
-      const bar = this.values.get(`demand-bar-${row.category}`);
-      const label = this.values.get(`demand-value-${row.category}`);
+      const bar = this.node(`demand-bar-${row.category}`);
+      const label = this.node(`demand-value-${row.category}`);
       if (label) label.textContent = String(value);
       if (bar) {
         // Poptávka je v <−100, 100>; sloupec roste nahoru pro kladnou, dolů pro zápornou.
@@ -507,7 +515,7 @@ export class Hud {
       }
 
       // Popisek se přepisuje při každé změně, protože se mění i čísla v něm.
-      const column = this.values.get(`demand-column-${row.category}`);
+      const column = this.node(`demand-column-${row.category}`);
       const breakdown = state.demandTerms.find((item) => item.category === row.category);
       if (column && breakdown) {
         const lines = breakdown.terms.map(
@@ -540,7 +548,7 @@ export class Hud {
       if (document.activeElement !== input) input.value = String(percent);
       this.setValue(`funding-${serviceClass}`, `${percent} %`);
 
-      const note = this.values.get(`funding-note-${serviceClass}`);
+      const note = this.node(`funding-note-${serviceClass}`);
       if (!note) continue;
       note.classList.toggle('is-hidden', level <= 1);
       if (level > 1) {
@@ -584,8 +592,23 @@ export class Hud {
   }
 
   private setValue(key: string, text: string): void {
-    const node = this.values.get(key);
-    if (node) node.textContent = text;
+    for (const node of this.values.get(key) ?? []) node.textContent = text;
+  }
+
+  /** Příznak se přepne na všech místech, kde ten údaj visí. */
+  private setAlarm(key: string, on: boolean): void {
+    for (const node of this.values.get(key) ?? []) node.classList.toggle('is-alarm', on);
+  }
+
+  /** Uzel, který je v liště jen jednou — poptávka, daně, financování. */
+  private node(key: string): HTMLElement | undefined {
+    return this.values.get(key)?.[0];
+  }
+
+  private register(key: string, node: HTMLElement): void {
+    const nodes = this.values.get(key);
+    if (nodes) nodes.push(node);
+    else this.values.set(key, [node]);
   }
 
   /**
@@ -665,6 +688,41 @@ export class Hud {
   }
 
   /**
+   * Doplní do vysunuté řady popisky a nadpisy.
+   *
+   * Jednadvacet ikon bez jediného slova: `title` se na dotyku nikdy neukáže,
+   * takže hráč hledal hasiče proklikáváním. V řadě, která zabírá půl
+   * obrazovky, je na text místo — v liště ne.
+   *
+   * Běží **při otevření**, ne při stavbě lišty: nabídky nástrojů do řady
+   * pověsí paleta až po ní (`overflow`).
+   */
+  private dressDrawer(): void {
+    for (const [group, titleKey] of [
+      [this.toolDrawer, 'ui.hud.drawerBuild'],
+      [this.controlDrawerGroup, 'ui.hud.drawerCity'],
+    ] as const) {
+      for (const node of group.querySelectorAll('.toolbar__button, .popover__trigger')) {
+        if (node.querySelector('.hud__drawer-label')) continue;
+        const text = node.getAttribute('aria-label');
+        if (text !== null && text !== '') {
+          node.appendChild(el('span', 'hud__drawer-label', text));
+        }
+      }
+
+      // Nadpis jen k neprázdné skupině: prázdná se schovává přes `:empty`
+      // a nadpis by ji oživil.
+      const hasButtons = group.querySelector('.toolbar__button, .popover') !== null;
+      if (hasButtons && group.querySelector('.hud__drawer-title') === null) {
+        group.insertBefore(
+          el('div', 'hud__drawer-title', this.i18n.t(titleKey)),
+          group.firstChild,
+        );
+      }
+    }
+  }
+
+  /**
    * Přepínač vysunuté řady. Staví se **až nakonec**, aby stál v liště úplně
    * vpravo — tam, kde ho na telefonu chytí palec.
    */
@@ -672,7 +730,12 @@ export class Hud {
     if (!this.dense) return;
     const label = this.i18n.t('ui.toolbar.more');
     const node = button('toolbar__button', () => {
-      this.controlDrawer.classList.toggle('is-hidden');
+      const hidden = this.controlDrawer.classList.toggle('is-hidden');
+      if (hidden) return;
+      // Popisky se doplní při otevření (viz `dressDrawer`) a panel uprostřed
+      // obrazovky by řadu překryl — má vyšší vrstvu než roletky.
+      this.dressDrawer();
+      closeOtherSheets(null);
     });
     node.appendChild(iconSvg('more'));
     node.title = label;
@@ -698,6 +761,28 @@ export class Hud {
       node.appendChild(iconSvg(icon));
       node.title = label;
       node.setAttribute('aria-label', label);
+
+      /*
+       * Držené tlačítko opakuje.
+       *
+       * Krok je 1,15, takže z výchozího měřítka na nejmenší je to osm
+       * klepnutí. Kolečko na telefonu není, tohle je jediná cesta.
+       */
+      let timer = 0;
+      const stop = (): void => {
+        window.clearTimeout(timer);
+        window.clearInterval(timer);
+      };
+      node.addEventListener('pointerdown', () => {
+        stop();
+        timer = window.setTimeout(() => {
+          timer = window.setInterval(() => this.callbacks.onZoom(factor), ZOOM_REPEAT_MS);
+        }, ZOOM_REPEAT_DELAY_MS);
+      });
+      for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
+        node.addEventListener(type, stop);
+      }
+
       group.appendChild(node);
     }
     this.controlRow.appendChild(group);
@@ -778,7 +863,10 @@ export class Hud {
     const group = el('div', 'stats');
     for (const row of STAT_ROWS) {
       if (this.dense && row.primary !== true) continue;
-      group.appendChild(this.stat(row.key, row.labelKey));
+      // V úsporném režimu je celá skupina **obsahem tlačítka roletky**, takže
+      // z údajů nesmí být tlačítka: `button` uvnitř `button` je neplatné HTML
+      // a klepnutí na kasu otevřelo roletku i rozpis kasy naráz.
+      group.appendChild(this.stat(row.key, row.labelKey, !this.dense));
     }
 
     if (!this.dense) {
@@ -792,8 +880,10 @@ export class Hud {
     const popover = new Popover({ icon: 'chart', label: this.i18n.t('ui.hud.moreStats'), className: 'popover--stats' });
     popover.trigger.replaceChildren(group);
     popover.panel.classList.add('panel--stats');
+    // V roletce jsou **všechna** čísla, i kasa a bilance z tlačítka. Rozpis
+    // kasy by byl na telefonu jinak nedostupný: v tlačítku roletky být
+    // tlačítkem nemůže.
     for (const row of STAT_ROWS) {
-      if (row.primary === true) continue;
       popover.panel.appendChild(this.stat(row.key, row.labelKey));
     }
     parent.appendChild(popover.root);
@@ -806,8 +896,8 @@ export class Hud {
    * fajn, kdyby šlo každou z hodnot rozkliknout a naskočí tabulka, z čeho se
    * čísla skládají." Datum tlačítko není — z čeho by se skládalo.
    */
-  private stat(key: string, labelKey: string): HTMLElement {
-    const explainable = (EXPLAINED_STATS as readonly string[]).includes(key);
+  private stat(key: string, labelKey: string, interactive = true): HTMLElement {
+    const explainable = interactive && (EXPLAINED_STATS as readonly string[]).includes(key);
     const stat = explainable
       ? button('stat stat--button', () => this.callbacks.onStatClick(key))
       : el('div', 'stat');
@@ -815,7 +905,7 @@ export class Hud {
     stat.appendChild(el('span', 'stat__label', this.i18n.t(labelKey)));
     const value = el('span', 'stat__value', '-');
     stat.appendChild(value);
-    this.values.set(key, value);
+    this.register(key, value);
     return stat;
   }
 
@@ -833,9 +923,9 @@ export class Hud {
       column.append(track, el('span', 'demand__label', this.i18n.t(row.labelKey)), value);
       bars.appendChild(column);
 
-      this.values.set(`demand-column-${row.category}`, column);
-      this.values.set(`demand-bar-${row.category}`, bar);
-      this.values.set(`demand-value-${row.category}`, value);
+      this.register(`demand-column-${row.category}`, column);
+      this.register(`demand-bar-${row.category}`, bar);
+      this.register(`demand-value-${row.category}`, value);
     }
 
     panel.appendChild(bars);
@@ -1109,7 +1199,7 @@ export class Hud {
       minus.title = this.i18n.t('ui.tax.decrease');
 
       const value = el('span', 'panel__value', '-');
-      this.values.set(`tax-${row.category}`, value);
+      this.register(`tax-${row.category}`, value);
 
       const plus = button('chip chip--tight', () => this.callbacks.onTaxChange(row.zone, 1));
       plus.appendChild(iconSvg('tax-increase'));
@@ -1152,7 +1242,7 @@ export class Hud {
       this.fundingInputs.set(serviceClass, slider);
 
       const value = el('span', 'panel__value', '100 %');
-      this.values.set(`funding-${serviceClass}`, value);
+      this.register(`funding-${serviceClass}`, value);
 
       row.append(slider, value);
       group.appendChild(row);
@@ -1161,7 +1251,7 @@ export class Hud {
       // bublinky. Hráč, který jde nad sto procent, má rovnou vidět obojí:
       // že účinek roste polovinou a cena násobkem.
       const note = el('span', 'panel__note is-hidden');
-      this.values.set(`funding-note-${serviceClass}`, note);
+      this.register(`funding-note-${serviceClass}`, note);
       group.appendChild(note);
 
       popover.panel.appendChild(group);

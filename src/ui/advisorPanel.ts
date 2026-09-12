@@ -2,6 +2,7 @@ import type { CityAdvice } from '@/sim/advisor';
 import { button, el } from './dom';
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
+import { closeOtherSheets, registerSheet } from './sheets';
 
 /**
  * Poradce starosty.
@@ -24,6 +25,7 @@ export class AdvisorPanel {
     this.i18n = i18n;
     this.root = el('div', 'sheet sheet--advisor is-hidden');
     parent.appendChild(this.root);
+    registerSheet(this);
   }
 
   isVisible(): boolean {
@@ -34,7 +36,15 @@ export class AdvisorPanel {
     this.visible = !this.visible;
     this.root.classList.toggle('is-hidden', !this.visible);
     this.drawn = null;
+    if (this.visible) closeOtherSheets(this);
     return this.visible;
+  }
+
+  hide(): void {
+    if (!this.visible) return;
+    this.visible = false;
+    this.root.classList.add('is-hidden');
+    this.drawn = null;
   }
 
   update(advice: CityAdvice): void {

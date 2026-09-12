@@ -190,11 +190,74 @@ Pacička je teď druhá výjimka vedle buldozeru.
 - **Poptávka** (O/K/P vpravo nahoře). Je malá a autor ji nezmínil.
 - **Ikony běžících pohrom** u hodin. Zůstávají vidět vždycky — je to jediná
   cesta zpátky ke zprávě o katastrofě (viz `docs/14-POHLEDY.md`).
-- **Gesta.** Přiblížení dvěma prsty se nepřidávalo. Autor si vyžádal tlačítka
-  a ta stačí; gesto by se navíc pralo s tažením, kterým se staví.
+- **Poptávka** zůstala, jak byla (viz výš).
 
 ## Přibylo později: čtvercová síť
 
 Autor si ji vyžádal **„na mobilu i na pc"**, takže se neschovává: na počítači
 stojí vedle průhlednosti a stromů, na telefonu v řadě s paletou. Popis je
 v `docs/14-POHLEDY.md`.
+
+## Druhé kolo: audit rozhraní na telefonu
+
+Hru si na telefonu pustil audit (snímky a měření v artefaktu z 11. 9. 2026)
+a našel osmnáct věcí. Co z nich vzniklo:
+
+### Rozbité
+
+- **Nabídky staveb utíkaly z obrazovky.** Panel roletky je zarovnaný k okraji
+  svého tlačítka, takže u levého okraje vylezl mimo displej a z „Uhelná
+  elektrárna" zbylo „elektrárna". `Popover.reposition()` ho po otevření změří
+  a posune zpět; sleduje se i otočení telefonu.
+- **Klepnutí na kasu otevíralo dvě věci.** Údaje v tlačítku roletky byly samy
+  tlačítky, tedy `button` v `button`, a klik probublal do obojího. V úsporném
+  režimu jsou z nich obyčejné popisky a **v roletce je všech jedenáct čísel**
+  včetně kasy, aby se její rozpis dal otevřít.
+- **Panely se vršily přes sebe.** `ui/sheets.ts` je skupina: otevření jednoho
+  zavře ostatní, Escape zavře všechny a sáhnutí po nástroji taky. Okno pohromy
+  a roční uzávěrka do skupiny **nepatří** — to jsou zprávy, ne panely.
+- **Dlouhá hodnota přejela ukazatel.** Věta místo čísla („mimo dosah — tady nic
+  nevyroste") zmáčkla popisek na nulu; teď má vlastní řádek.
+- **Lišty ležely pod výřezem a v pruhu gest.** `env(safe-area-inset-*)` v HUDu,
+  hláškách i panelech.
+
+### Ovládání prstem
+
+- **Dva prsty patří kameře.** Tah posouvá, štípnutí přibližuje k bodu mezi
+  prsty, a to s jakýmkoli nástrojem v ruce. Dosednutí druhého prstu zahodí
+  rozdělané tažení (`cancelTouchAction`) — právě ten střet byl důvod, proč se
+  gesto do teď nepřidávalo.
+- **Míří se nad prst.** Náhled budovy se kreslil pod bříško, které to místo
+  kryje; teď je cíl o 64 bodů výš (`AIM_LIFT`), tedy o dvě dlaždice.
+- **Podržení prstu (450 ms) otevře kartu parcely** s jakýmkoli nástrojem. Na
+  počítači to dělá pravé tlačítko, na dotyku neexistovala náhrada.
+- **Zpět.** Po bourání a po stavbě nad 2 000 stojí pět sekund nabídka „Zpět".
+  Vrací se **snímek města**, ne opačný příkaz: ten k bourání neexistuje, kdežto
+  uložená hra nese id, věk i obyvatele a načte se deterministicky (P2). Snímek
+  se bere jednou na začátek tahu, takže tažení buldozerem se vrátí celé.
+- **Začíná se dál.** Na telefonu měřítko 0,5 místo 1 — při jedničce bylo přes
+  šířku displeje vidět asi šest dlaždic. Držená lupa opakuje.
+
+### Terče a čitelnost
+
+- Na dotyku má tlačítko aspoň 44 bodů (čipy, pauza, lupa, křížek panelu,
+  zaškrtávátko, posuvník). **Paleta nástrojů zůstala 40 × 44** — to je záměr
+  kvůli osmi tlačítkům v jedné řadě na 360bodovém displeji.
+- **Panely se na telefonu vysouvají zespodu** nad lištou nástrojů a kamera
+  srovná dlaždici nad ně (`centreAboveSheet`). Uprostřed obrazovky karta
+  zakrývala přesně to, na co hráč klepl.
+- **Trojtečka má popisky a dva oddíly** („Stavět" a „Město"). Jednadvacet ikon
+  bez textu znamenalo proklikávání; `title` se na dotyku neukáže.
+- **Hlášky jsou přes celou šířku** nad spodní lištou. Čtyřicet procent z 375
+  bodů je 150 a chyba se lámala do šesti řádků.
+
+### Úvodní obrazovka a systém
+
+- **Karusel se posouvá prstem** (rolování s přichycením), šipky jsou na dotyku
+  skryté a samočinné posouvání se po doteku zastaví natrvalo.
+- **Manifest už nevynucuje šířku** (`"orientation": "any"`): nainstalovaná hra
+  se na výšku vůbec nespustila.
+- **Pole v dialogu mají na dotyku 16 bodů** — Safari na iOS u menšího písma
+  přiblíží stránku a zpátky ji nevrátí.
+- **Zvětšený obrázek počítá s `dvh`**, ne `vh`, kvůli liště adresy.
+

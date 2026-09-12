@@ -76,6 +76,7 @@ import { TransitPanel } from '@/ui/transitPanel';
 import { CostPopup } from '@/ui/costPopup';
 import { PriceTag } from '@/ui/priceTag';
 import { isRoutine, Notifications } from '@/ui/notifications';
+import { UndoBar } from '@/ui/undoBar';
 import { formatNumber } from '@/ui/format';
 import { Hud } from '@/ui/hud';
 import { setIconImages } from '@/ui/icons';
@@ -121,6 +122,36 @@ import { gridToScreen, LEVEL_H, tileQuad } from './projection';
 
 /** Jeden krok kolečka = násobitel zoomu. */
 const ZOOM_STEP = 1.15;
+
+/**
+ * O kolik bodů výš než prst se míří budovou.
+ *
+ * Bříško kryje přesně tu dlaždici, na kterou ukazuje, takže i s průhledným
+ * náhledem stavěl hráč naslepo. Čtyřiašedesát bodů jsou dvě dlaždice na výšku
+ * při základním měřítku — dost, aby byl náhled celý vidět, a pořád tak blízko,
+ * že se poloha dá tažením dotáhnout.
+ */
+const AIM_LIFT = 64;
+
+/** Jak dlouho se drží prst, než se otevře karta parcely. */
+const LONG_PRESS_MS = 450;
+
+/**
+ * Od jaké ceny se u stavby nabízí „Zpět".
+ *
+ * Bourání se nabízí vždycky — je nevratné. U stavby ne: hláška po každé
+ * silnici za stovku by v liště jen překážela. Dva tisíce jsou ve vanille pod
+ * cenou nejlevnější elektrárny, takže se nabídka objeví u všeho, co bolí.
+ */
+const UNDO_PRICE = 2000;
+
+/**
+ * Měřítko, ve kterém se na telefonu začíná.
+ *
+ * Při jedničce je přes šířku 375bodového displeje vidět asi šest dlaždic ze
+ * sto dvaceti osmi: hráč viděl trávu a kámen a nepoznal, kde ve městě je.
+ */
+const COMPACT_START_ZOOM = 0.5;
 
 /** Značka rohu při terraformingu: bílá, aby ji nešlo splést s ničím v terénu. */
 const CORNER_MARK_COLOR = 0xffffff;
@@ -1207,6 +1238,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const costPopup = new CostPopup(mount);
   const priceTag = new PriceTag(mount);
   const notifications = new Notifications(mount);
+  /**
+   * Nabídka „Zpět" po bourání a po drahé stavbě.
+   *
+   * Vrácení je **načtení snímku**, ne opačný příkaz: ten k bourání neexistuje
+   * (dům se nepostaví zpět s týmž id, věkem a obyvateli), kdežto uložená hra
+   * to všechno nese a načte se deterministicky (P2). Mapa má tutéž velikost,
+   * takže se renderer nemusí přestavovat.
+   */
+  const undoBar = new UndoBar(mount, i18n, (snapshot) => {
+    applySaveToWorld(simWorld, migrate(unpackSave(snapshot)));
+    message = { key: 'ui.undo.done' };
+  });
   // Když se rozehrané město nepodařilo načíst, hráč vidí prázdnou mapu a neví
   // proč. Soubor přitom zůstal ležet ve slotu „poškozený" (audit N4).
   if (loadFailed) notifications.show(i18n.t('ui.save.loadFailedAtStart'));
@@ -1531,7 +1574,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // zůstává střed mapy: nové město se zakládá kdekoli.
     const centre = cityCentre(world);
     const point = gridToScreen(centre.x, centre.y);
-    return createCamera(point.x, point.y, 1);
+    return createCamera(
+      point.x,
+      point.y,
+      layoutMode() === 'compact' ? COMPACT_START_ZOOM : 1,
+    );
   })();
 
   let hoveredTile: { x: number; y: number } | null = null;
@@ -1617,6 +1664,27 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const point = gridToScreen(x, y);
     camera.x = point.x;
     camera.y = point.y;
+  }
+
+  /**
+   * Srovná dlaždici **nad vysunutý panel**.
+   *
+   * Na telefonu se panely vysouvají zespodu (`style.css`) a karta parcely se
+   * otevře přes spodní část obrazovky — jenže kamera míří na střed, tedy
+   * přesně tam, kam hráč klepl. Panel tak zakryl dlaždici, o které mluví.
+   *
+   * Na počítači se nesrovnává nic: tam je panel malý a leží vedle.
+   */
+  function centreAboveSheet(x: number, y: number): void {
+    if (layoutMode() !== 'compact') return;
+
+    const sheet = document.querySelector('.sheet:not(.is-hidden)');
+    if (!(sheet instanceof HTMLElement)) return;
+
+    centreOn(x, y);
+    // Volná plocha je nad panelem a její střed leží o polovinu té plochy výš.
+    const free = window.innerHeight - sheet.getBoundingClientRect().top;
+    if (free > 0) pan(camera, 0, -free / 2);
   }
 
   function changeTax(zone: ZoneType, delta: number): void {
@@ -1746,6 +1814,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       spriteUrl,
       riskAt(tile.x, tile.y),
     );
+
+    centreAboveSheet(tile.x, tile.y);
   }
 
   /**
@@ -2005,11 +2075,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let panStartedAt: { x: number; y: number; tile: { x: number; y: number } } | null = null;
   const CLICK_SLOP = 8;
 
-  function tileAt(event: PointerEvent): { x: number; y: number } | null {
+  function tileAt(event: PointerEvent, liftY = 0): { x: number; y: number } | null {
     return pickTile(
       camera,
       event.offsetX,
-      event.offsetY,
+      event.offsetY - liftY,
       app.screen.width,
       app.screen.height,
       world.size,
@@ -2208,6 +2278,22 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const action = activeTool.action;
     const fundsBefore = world.economy.funds;
 
+    /*
+     * Snímek pro „Zpět" se bere **před** příkazem a jen u tahů, které se
+     * nedají snadno vrátit: bourání a stavba. Během jednoho tahu se bere
+     * jenom první — tažení buldozerem se tak vrátí celé, ne po dlaždici.
+     */
+    const undoKey =
+      action.kind === 'bulldoze'
+        ? 'ui.undo.demolished'
+        : action.kind === 'place'
+          ? 'ui.undo.built'
+          : null;
+    if (undoKey !== null && undoSnapshot === null) {
+      undoSnapshot = serializeSave(simWorld, saveOptions());
+    }
+    let undone = false;
+
     switch (action.kind) {
       case 'road':
         dispatch({ type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType });
@@ -2221,25 +2307,28 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       case 'plantTrees':
         dispatch({ type: 'plant_trees', x: tile.x, y: tile.y });
         break;
-      case 'bulldoze':
+      case 'bulldoze': {
         // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.
-        if (viewMode === 'underground') {
-          dispatch({ type: 'remove_pipe', x: tile.x, y: tile.y });
-        } else {
-          dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
-        }
+        const result =
+          viewMode === 'underground'
+            ? dispatch({ type: 'remove_pipe', x: tile.x, y: tile.y })
+            : dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
+        undone = result.ok;
         break;
+      }
       case 'zone':
         dispatch({ type: 'zone', x: tile.x, y: tile.y, w: 1, h: 1, zone: action.zone });
         break;
-      case 'place':
-        dispatch({
+      case 'place': {
+        const result = dispatch({
           type: 'place_building',
           definitionId: action.definitionId,
           x: tile.x,
           y: tile.y,
         });
+        undone = result.ok;
         break;
+      }
       case 'terraform': {
         if (action.delta === 0) {
           // Srovnává se **na výšku dlaždice, kde tah začal**, ne na průměr
@@ -2270,6 +2359,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const spent = fundsBefore - world.economy.funds;
     if (spent > 0) {
       costPopup.show(viewX, viewY, i18n.t('ui.cost.spent', { amount: formatNumber(spent) }));
+    }
+
+    // Nabídka „Zpět": u bourání vždycky, u stavby jen když stála dost.
+    // U silnice za stovku by hláška jen překážela.
+    if (undoKey !== null && undone && undoSnapshot !== null) {
+      if (action.kind === 'bulldoze' || spent >= UNDO_PRICE) {
+        undoBar.show(undoKey, undoSnapshot);
+      }
     }
   }
 
@@ -2315,14 +2412,140 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   let aimingPointer: number | null = null;
 
+  /**
+   * Prsty na plátně.
+   *
+   * Dva znamenají **kameru**: posouvá se jejich středem a přibližuje jejich
+   * vzdáleností, ať má hráč v ruce jakýkoli nástroj. Do teď posun umělo jen
+   * pacička, takže delší silnice na telefonu znamenala pořád přepínat mezi
+   * nástrojem a rukou.
+   */
+  const touches = new Map<number, { x: number; y: number }>();
+  let pinch: { distance: number; x: number; y: number } | null = null;
+
+  /** Podržení prstu otevře kartu parcely, ať je vybraný jakýkoli nástroj. */
+  let longPress: { x: number; y: number; timer: number } | null = null;
+
+  /**
+   * Město před rozdělaným tahem, pro „Zpět". `null` mimo tah.
+   *
+   * Bere se jednou na začátek tahu, takže tažení buldozerem se vrátí celé.
+   */
+  let undoSnapshot: Uint8Array | null = null;
+
+  /**
+   * Zahodí, co prst rozdělal: míření budovou, malování i tažení.
+   *
+   * Tohle je ten důvod, proč se gesto dvěma prsty **nepere s kreslením**
+   * (`docs/15-MOBIL.md`): druhý prst znamená „chci se rozhlédnout", ne
+   * „postav zónu odtud až sem".
+   */
+  function cancelTouchAction(): void {
+    cancelLongPress();
+    dragAnchor = null;
+    paintButton = null;
+    lastPaintedTile = -1;
+    levelHeight = null;
+    panStartedAt = null;
+
+    if (aimingPointer !== null) {
+      if (canvas.hasPointerCapture(aimingPointer)) canvas.releasePointerCapture(aimingPointer);
+      aimingPointer = null;
+    }
+    if (dragPointerId !== null) {
+      if (canvas.hasPointerCapture(dragPointerId)) canvas.releasePointerCapture(dragPointerId);
+      dragPointerId = null;
+    }
+    hoveredTile = null;
+  }
+
+  function beginGesture(): void {
+    cancelTouchAction();
+
+    const [first, second] = [...touches.values()];
+    if (!first || !second) return;
+    pinch = {
+      distance: Math.hypot(first.x - second.x, first.y - second.y),
+      x: (first.x + second.x) / 2,
+      y: (first.y + second.y) / 2,
+    };
+  }
+
+  function updateGesture(): void {
+    const [first, second] = [...touches.values()];
+    if (pinch === null || !first || !second) return;
+
+    const x = (first.x + second.x) / 2;
+    const y = (first.y + second.y) / 2;
+    const distance = Math.hypot(first.x - second.x, first.y - second.y);
+
+    pan(camera, x - pinch.x, y - pinch.y);
+    // Přibližuje se **k místu mezi prsty**, ne ke středu obrazovky: bod, který
+    // hráč drží, má pod prsty zůstat.
+    if (pinch.distance > 0 && distance > 0) {
+      const rect = canvas.getBoundingClientRect();
+      zoomAt(
+        camera,
+        distance / pinch.distance,
+        x - rect.left,
+        y - rect.top,
+        app.screen.width,
+        app.screen.height,
+      );
+    }
+
+    pinch = { distance, x, y };
+  }
+
+  function startLongPress(event: PointerEvent): void {
+    const tile = tileAt(event);
+    cancelLongPress();
+    if (!tile) return;
+
+    const at = { x: tile.x, y: tile.y };
+    longPress = {
+      x: event.clientX,
+      y: event.clientY,
+      timer: window.setTimeout(() => {
+        longPress = null;
+        // Rozdělaná akce se zahodí, takže zvednutí prstu už nic nepostaví.
+        cancelTouchAction();
+        showBuildingAt(at);
+      }, LONG_PRESS_MS),
+    };
+  }
+
+  function cancelLongPress(): void {
+    if (longPress === null) return;
+    window.clearTimeout(longPress.timer);
+    longPress = null;
+  }
+
   canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
+    // Nový tah, nový snímek pro „Zpět" (bere si ho `applyTool`).
+    undoSnapshot = null;
+
+    if (event.pointerType === 'touch') {
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touches.size >= 2) {
+        beginGesture();
+        return;
+      }
+      startLongPress(event);
+    }
 
     if (isPanButton(event)) {
       dragPointerId = event.pointerId;
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
-      canvas.setPointerCapture(event.pointerId);
+      // Zachycení smí selhat (prst, který mezitím zmizel), stejně jako
+      // u míření budovou. Posun tím nekončí, jen se hůř drží.
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch {
+        // Nic. Padat kvůli tomu do hlášky „chyba v běhu hry" je horší.
+      }
       const tile = activeTool.action.kind === 'pan' ? tileAt(event) : null;
       panStartedAt = tile ? { x: event.clientX, y: event.clientY, tile } : null;
       return;
@@ -2362,7 +2585,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       // Malování tažením se musí vypnout, jinak by prst při míření postavil
       // budovu na každé dlaždici, přes kterou přejede.
       paintButton = null;
-      hoveredTile = tile;
+      // Míří se **nad prst**, ne pod něj: bříško kryje přesně tu dlaždici, na
+      // kterou ukazuje, takže i s náhledem stavěl hráč naslepo.
+      hoveredTile = tileAt(event, AIM_LIFT) ?? tile;
       pointerX = event.offsetX;
       pointerY = event.offsetY;
       // Zachycení smí selhat (prst, který mezitím zmizel). Míření tím
@@ -2388,13 +2613,32 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   canvas.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'touch') {
+      const point = touches.get(event.pointerId);
+      if (point) {
+        point.x = event.clientX;
+        point.y = event.clientY;
+      }
+      if (pinch !== null) {
+        updateGesture();
+        return;
+      }
+      // Prst, který se rozjel, už nic nedrží.
+      if (
+        longPress !== null &&
+        Math.abs(event.clientX - longPress.x) + Math.abs(event.clientY - longPress.y) > CLICK_SLOP
+      ) {
+        cancelLongPress();
+      }
+    }
+
     if (dragPointerId === event.pointerId) {
       pan(camera, event.clientX - lastPointerX, event.clientY - lastPointerY);
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
     }
 
-    hoveredTile = tileAt(event);
+    hoveredTile = aimingPointer === event.pointerId ? tileAt(event, AIM_LIFT) : tileAt(event);
     pointerX = event.offsetX;
     pointerY = event.offsetY;
 
@@ -2463,6 +2707,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   }
 
   function endDrag(event: PointerEvent): void {
+    if (event.pointerType === 'touch') {
+      touches.delete(event.pointerId);
+      cancelLongPress();
+      if (pinch !== null) {
+        // Gesto skončí, až zůstane jediný prst — a ten už nic nestaví.
+        pinch = touches.size < 2 ? null : pinch;
+        if (pinch !== null) beginGesture();
+        return;
+      }
+    }
+
     /*
      * Zvednutí prstu **postaví** to, na co se mířilo.
      *

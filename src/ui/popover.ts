@@ -1,5 +1,6 @@
 import { button, el } from './dom';
 import { iconSvg } from './icons';
+import { closeOtherSheets } from './sheets';
 
 /**
  * Tlačítko, které rozbalí panel.
@@ -37,6 +38,11 @@ function startListening(): void {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeOthers(null);
+  });
+
+  // Otočení telefonu i přetažení okna mění, kam se panel vejde.
+  window.addEventListener('resize', () => {
+    for (const popover of open) popover.reposition();
   });
 }
 
@@ -131,10 +137,37 @@ export class Popover {
 
   show(): void {
     closeOthers(this);
+    // Panely uprostřed obrazovky taky: kdo sáhl po nástroji, chce vidět mapu,
+    // ne kartu parcely, která nabídku navíc překrývá (má vyšší vrstvu).
+    closeOtherSheets(null);
     this.isOpen = true;
     open.add(this);
     this.panel.classList.remove('is-hidden');
     this.trigger.classList.add('is-open');
+    this.reposition();
+  }
+
+  /**
+   * Posune panel zpátky do obrazovky.
+   *
+   * Panel je zarovnaný k okraji svého tlačítka a to na monitoru stačí. Na
+   * telefonu ale tlačítka stojí u levého okraje a panel je širší než ono,
+   * takže vylezl z displeje: nabídka energetiky začínala na −105 bodech
+   * a z „Uhelná elektrárna" zbylo „elektrárna". Hráč kupoval podle ceny.
+   *
+   * Měří se **až po otevření** — zavřený panel má `display: none` a žádnou
+   * šířku. Posouvá se transformem, aby se to nepralo s `left`/`right` v CSS.
+   */
+  reposition(): void {
+    if (!this.isOpen) return;
+    this.panel.style.removeProperty('transform');
+
+    const margin = 8;
+    const box = this.panel.getBoundingClientRect();
+    const overLeft = margin - box.left;
+    const overRight = box.right - (window.innerWidth - margin);
+    const shift = overLeft > 0 ? overLeft : overRight > 0 ? -overRight : 0;
+    if (shift !== 0) this.panel.style.transform = `translateX(${Math.round(shift)}px)`;
   }
 
   close(): void {
