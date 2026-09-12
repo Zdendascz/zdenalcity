@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 11;
+export const CURRENT_FORMAT_VERSION = 12;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -36,6 +36,7 @@ export const SAVE_LAYER_ORDER = [
   'terrain',
   'zone',
   'road',
+  /** Od verze 12 čtyři bajty na dlaždici (Uint32 LE), do té doby dva. */
   'buildingId',
   'power',
   /**

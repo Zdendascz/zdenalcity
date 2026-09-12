@@ -1,6 +1,15 @@
 import type { Definition } from '@/content/schema';
 import { isFlatTile } from './heights';
-import { inBounds, index, ROAD, sizeOfLayer, TERRAIN, terrainNameKey, ZONE } from './layers';
+import {
+  inBounds,
+  index,
+  MAX_BUILDING_ID,
+  ROAD,
+  sizeOfLayer,
+  TERRAIN,
+  terrainNameKey,
+  ZONE,
+} from './layers';
 import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import {
@@ -50,6 +59,15 @@ export function checkFootprint(
   options: FitOptions = {},
 ): CommandResult {
   const [width, depth] = definition.footprint;
+
+  // Došla čísla budov. Id se nevracejí (viz `placeBuilding`), takže je to strop
+  // na **všechny budovy za celou dobu** města. Kontroluje se tady, ne až při
+  // stavbě, aby platil i pro růst a hráč se dozvěděl proč. S čtyřbajtovou
+  // vrstvou jsou to přes čtyři miliardy, tedy prakticky nikdy — bez kontroly by
+  // se ale další id zapsalo do vrstvy jako nula, přesně jako dřív u Uint16.
+  if (world.nextBuildingId > MAX_BUILDING_ID) {
+    return reject('error.buildingIdsExhausted');
+  }
 
   for (let dy = 0; dy < depth; dy++) {
     for (let dx = 0; dx < width; dx++) {
@@ -308,7 +326,7 @@ function isSet(layer: Uint8Array, x: number, y: number): boolean {
  */
 export interface FootprintView {
   readonly size: number;
-  readonly layers: { readonly buildingId: Readonly<Uint16Array> };
+  readonly layers: { readonly buildingId: Readonly<Uint32Array> };
 }
 
 export function placedFootprint(
@@ -334,12 +352,35 @@ export function placedFootprint(
   return [ownedWidth, ownedDepth];
 }
 
+/**
+ * Postaví budovu a přidělí jí **nové** id.
+ *
+ * Id se po zbourání **nerecyklují** a spoléhá na to víc míst, než je vidět:
+ * `lostStops` si pamatuje dlaždici právě proto, že id zbořené zastávky se
+ * nevrátí; `disasters.offlinePlants` drží id odpojené elektrárny i po jejím
+ * zbourání, dokud blackout neskončí; a varianta obrázku i podezdívka se losují
+ * z id. Recyklované číslo by nové elektrárně zdědilo výpadek a novému domu
+ * fasádu toho zbořeného. Proto je místo recyklace vrstva `buildingId`
+ * čtyřbajtová (verze savu 12).
+ *
+ * Volá se až po `checkFootprint`, který hlídá i strop na id.
+ */
 export function placeBuilding(
   world: WorldState,
   definition: Definition,
   x: number,
   y: number,
 ): Building {
+  // Sem se bez `checkFootprint` chodit nemá. Kdyby přesto, zapsalo by se id,
+  // které se do vrstvy nevejde, a budova by stála neviditelně na „prázdné"
+  // dlaždici. To je chyba volajícího, ne situace ve hře — radši spadnout než
+  // tiše rozbít město.
+  if (world.nextBuildingId > MAX_BUILDING_ID) {
+    throw new Error(
+      `placeBuilding: id ${world.nextBuildingId} se do vrstvy buildingId nevejde (strop ${MAX_BUILDING_ID})`,
+    );
+  }
+
   const building: Building = {
     id: world.nextBuildingId++,
     definitionId: definition.id,

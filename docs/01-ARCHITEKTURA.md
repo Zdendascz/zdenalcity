@@ -55,7 +55,7 @@ Nikde v `src/sim/` se nesmí objevit `screenX`, `screenY`, `TILE_WIDTH` ani nic 
 
 ### P4 — Mřížková data jsou typed arrays
 
-Vrstvy nad mapou (terén, zóna, elektřina, znečištění, cena půdy…) jsou `Uint8Array` / `Uint16Array` o velikosti `SIZE * SIZE`, jedna vrstva na atribut.
+Vrstvy nad mapou (terén, zóna, elektřina, znečištění, cena půdy…) jsou `Uint8Array` / `Uint16Array` / `Uint32Array` o velikosti `SIZE * SIZE`, jedna vrstva na atribut.
 
 **Zakázáno:** `Tile[]` s objekty, `Map<string, Tile>`, `tiles[x][y]`.
 
@@ -152,7 +152,7 @@ interface WorldState {
 | `elevation` | Uint8Array | 0–15 | fáze 1 vždy 0 |
 | `zone` | Uint8Array | 0–3 | 0 = žádná, 1 = R, 2 = C, 3 = I |
 | `road` | Uint8Array | 0/1 | fáze 1 boolean, bitmask sousedů se počítá v rendereru |
-| `buildingId` | Uint16Array | 0 = prázdno | ID budovy okupující dlaždici |
+| `buildingId` | Uint32Array | 0 = prázdno | ID budovy okupující dlaždici. Od verze savu 12; do té doby Uint16Array, což byl strop na všechny budovy za celou dobu města, protože id se nevrací |
 | `power` | Uint8Array | 0/1 | výsledek flood fillu |
 
 ### Vrstvy — fáze 2 (rezervováno, zatím nealokovat)

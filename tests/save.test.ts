@@ -119,9 +119,10 @@ describe('formát savu', () => {
     expect(packLayers(world.layers).byteLength).toBe(
       expectedLayersByteLength(MAP_SIZE),
     );
-    // 6 vrstev, z toho jedna dvoubajtová. `elevation` zmizela ve verzi 4
-    // (výšku nese `heights.bin`), `pipe` přibyla ve verzi 5.
-    expect(expectedLayersByteLength(MAP_SIZE)).toBe(MAP_SIZE * MAP_SIZE * 7);
+    // 6 vrstev, z toho jedna čtyřbajtová (`buildingId` od verze 12, předtím
+    // dvoubajtová). `elevation` zmizela ve verzi 4 (výšku nese `heights.bin`),
+    // `pipe` přibyla ve verzi 5.
+    expect(expectedLayersByteLength(MAP_SIZE)).toBe(MAP_SIZE * MAP_SIZE * 9);
   });
 
   it('meta.json je v ZIPu nekomprimovaná, aby se dala číst samostatně', async () => {
@@ -558,6 +559,9 @@ describe('chybějící obsah při načtení', () => {
       id: 9999,
       definitionId: 'zdendas_pack:castle',
     });
+    // Hra přiděluje id vzestupně, takže `nextBuildingId` leží vždycky nad
+    // každou stojící budovou — a loader to od verze 12 hlídá.
+    save.entities.nextBuildingId = 10_000;
 
     const content = await loadedContent();
     const warnings = collectLoadWarnings(save, content, content.getLoadedSources());

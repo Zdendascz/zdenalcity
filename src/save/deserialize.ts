@@ -4,7 +4,7 @@ import { coarseCellsOf, coarseSizeOf } from '@/sim/coarse';
 import { cornerCellsOf } from '@/sim/heights';
 import type { CoarseLayers } from '@/sim/coarse';
 import type { Layers } from '@/sim/layers';
-import { MAP_SIZES } from '@/sim/layers';
+import { MAP_SIZES, MAX_BUILDING_ID } from '@/sim/layers';
 import { MAX_LEVEL } from '@/content/schema';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
@@ -602,8 +602,9 @@ export function unpackHeightsInto(
 /** Očekávaná délka `layers.bin` pro aktuální formát a mapu o hraně `size`. */
 export function expectedLayersByteLength(size: number): number {
   const cells = size * size;
-  // Jen `buildingId` je dvoubajtová; kdyby se to změnilo, je to nová verze formátu.
-  return cells * (SAVE_LAYER_ORDER.length + 1);
+  // Jen `buildingId` je vícebajtová — od verze 12 čtyři bajty, do té doby dva.
+  // Kdyby se to změnilo, je to nová verze formátu.
+  return cells * (SAVE_LAYER_ORDER.length + 3);
 }
 
 export function unpackLayersInto(
@@ -628,11 +629,13 @@ export function unpackLayersInto(
         layer[i] = view.getUint8(offset);
         offset += 1;
       }
-    } else {
+    } else if (layer.BYTES_PER_ELEMENT === 4) {
       for (let i = 0; i < cells; i++) {
-        layer[i] = view.getUint16(offset, true);
-        offset += 2;
+        layer[i] = view.getUint32(offset, true);
+        offset += 4;
       }
+    } else {
+      fail(`vrstva ${name} má ${layer.BYTES_PER_ELEMENT} B na dlaždici, save zná 1 a 4`);
     }
   }
 }
@@ -842,13 +845,16 @@ export function checkSaveFits(save: SaveData): void {
     }
   }
 
-  // Budovy. `id` se ukládá do vrstvy `buildingId`, a ta je dvoubajtová —
-  // nula znamená prázdnou dlaždici, takže id nad 65 535 by se do mapy vůbec
-  // nevešlo a budova by na ní stála neviditelně.
+  // Budovy. `id` se ukládá do vrstvy `buildingId` — nula znamená prázdnou
+  // dlaždici a id nad `MAX_BUILDING_ID` by se do mapy nevešlo, budova by na ní
+  // stála neviditelně. Vrstva je od verze 12 čtyřbajtová; starší save má id
+  // pod 65 536 z principu, takže jedna mez platí pro všechny.
   const seen = new Set<number>();
+  let highestId = 0;
   for (const building of save.entities.buildings) {
     const where = `entities.buildings[id=${building.id}]`;
-    inRange(building.id, 1, 0xffff, `${where}.id`);
+    inRange(building.id, 1, MAX_BUILDING_ID, `${where}.id`);
+    highestId = Math.max(highestId, building.id);
     if (seen.has(building.id)) fail(`${where}.id se v savu opakuje`);
     seen.add(building.id);
     inRange(building.x, 0, size - 1, `${where}.x`);
@@ -859,7 +865,16 @@ export function checkSaveFits(save: SaveData): void {
     inRange(building.builtAtTick, 0, Number.MAX_SAFE_INTEGER, `${where}.builtAtTick`);
     inRange(building.levelChangedAtTick, 0, Number.MAX_SAFE_INTEGER, `${where}.levelChangedAtTick`);
   }
-  inRange(save.entities.nextBuildingId, 1, 0xffff, 'entities.nextBuildingId');
+  // `nextBuildingId` smí být o jedna nad stropem — to je město, kterému čísla
+  // došla, a takové se načíst musí. Nesmí ale ležet na žádném stojícím id ani
+  // pod ním: další stavba by přepsala existující budovu v mapě entit, zatímco
+  // její dlaždice by na mapě zůstaly.
+  inRange(
+    save.entities.nextBuildingId,
+    highestId + 1,
+    MAX_BUILDING_ID + 1,
+    'entities.nextBuildingId',
+  );
 
   // Linky. Zastávky se **nekontrolují na existující budovu** — zbořená
   // zastávka z linky sama vypadne při načtení (viz `applyTransitToWorld`),

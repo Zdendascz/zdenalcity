@@ -39,7 +39,9 @@ describe('createLayers', () => {
     }
 
     expect(layers.terrain.BYTES_PER_ELEMENT).toBe(1);
-    expect(layers.buildingId.BYTES_PER_ELEMENT).toBe(2);
+    // Čtyři bajty od verze savu 12: id se nevrací, takže dvoubajtová vrstva
+    // byla strop na všechny budovy za celou dobu města.
+    expect(layers.buildingId.BYTES_PER_ELEMENT).toBe(4);
   });
 
   it('startuje vynulovaná', () => {
@@ -74,12 +76,27 @@ describe('hashLayers', () => {
     expect(hashLayers(a)).not.toBe(hashLayers(b));
   });
 
-  it('nezahazuje horní bajt u Uint16 vrstvy', () => {
-    const a = createLayers(MAP_SIZE);
-    const b = createLayers(MAP_SIZE);
-    a.buildingId[0] = 1;
-    b.buildingId[0] = 257; // 0x0101 — při hashování jen dolního bajtu by kolidovalo
-    expect(hashLayers(a)).not.toBe(hashLayers(b));
+  it('nezahazuje horní bajty u vícebajtové vrstvy', () => {
+    // 0x0101, 0x010001 a 0x01000001 — při hashování jen dolního bajtu nebo
+    // jen dolních dvou by každé z nich kolidovalo s jedničkou.
+    const hashes = [1, 257, 65_537, 16_777_217].map((id) => {
+      const layers = createLayers(MAP_SIZE);
+      layers.buildingId[0] = id;
+      return hashLayers(layers);
+    });
+    expect(new Set(hashes).size).toBe(hashes.length);
+  });
+
+  it('id do 65 535 hashuje stejně jako dřívější dvoubajtová vrstva', () => {
+    // Rozšíření vrstvy nezměnilo simulaci a golden hashe to dokazují jen tím,
+    // že zůstaly stejné. Kdyby se hashovaly i nulové horní bajty, změnil by se
+    // každý a nešlo by poznat, jestli se nerozjelo i něco jiného.
+    const wide = createLayers(MAP_SIZE);
+    wide.buildingId[0] = 4242;
+    wide.buildingId[MAP_SIZE * MAP_SIZE - 1] = 0xffff;
+    const narrow = { ...wide, buildingId: Uint16Array.from(wide.buildingId) };
+
+    expect(hashLayers(wide)).toBe(hashLayers(narrow as unknown as typeof wide));
   });
 
   it('vrací 8 hexadecimálních znaků', () => {

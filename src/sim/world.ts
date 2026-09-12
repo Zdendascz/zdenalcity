@@ -678,7 +678,7 @@ export interface ReshapeView {
   readonly size: number;
   readonly cornerHeight: Readonly<Uint8Array>;
   readonly layers: {
-    readonly buildingId: Readonly<Uint16Array>;
+    readonly buildingId: Readonly<Uint32Array>;
     readonly terrain: Readonly<Uint8Array>;
     /** Silnice: srovnávání se jí musí vyhnout, aby ji nezkroutilo. */
     readonly road: Readonly<Uint8Array>;

@@ -444,6 +444,7 @@
   "error.rubbleInTheWay": "Rubble is in the way — clear it with the bulldozer first.",
   "error.occupied": "The tile is occupied.",
   "error.occupiedFootprint": "It does not fit here. This building needs {width} × {depth} free tiles.",
+  "error.buildingIdsExhausted": "The city has run out of building numbers: over four billion buildings have been built here and no more will fit.",
   "error.nothingToBulldoze": "Nothing to bulldoze here.",
   "error.needsWater": "Nothing builds here without water. Bring a pipe over.",
   "error.needsShore": "This building has to stand by the water.",

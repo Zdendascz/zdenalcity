@@ -177,7 +177,9 @@ describe('fixtury savů', () => {
 
     expect(after.meta.formatVersion).toBe(5);
     expect(after.layers.byteLength - before.layers.byteLength).toBe(cells);
-    expect(after.layers.byteLength).toBe(expectedLayersByteLength(MAP_SIZE));
+    // Verze 5: šest vrstev, `buildingId` ještě dvoubajtová. S aktuální délkou
+    // se porovnávat nesmí — ve verzi 12 se `buildingId` rozšířila.
+    expect(after.layers.byteLength).toBe(cells * 7);
 
     // Stávající vrstvy zůstaly bajt po bajtu tam, kde byly…
     expect([...after.layers.subarray(0, before.layers.byteLength)]).toEqual([...before.layers]);
@@ -254,6 +256,43 @@ describe('fixtury savů', () => {
     expect(new Set(world.cornerHeight).size).toBeGreaterThan(3);
     expect(Math.max(...world.cornerHeight)).toBeGreaterThan(2);
     expect(countViolations(world.cornerHeight)).toBe(0);
+  });
+
+  it('migrace v11 → v12 rozšíří buildingId na čtyři bajty a nic jiného nepohne', () => {
+    const v11 = Object.entries(fixtures).find(([path]) => path.includes('v11.city'));
+    expect(v11).toBeDefined();
+    if (!v11) return;
+
+    const before = unpackSave(decode(v11[1] as string));
+    expect(before.meta.formatVersion).toBe(11);
+    const after = migrate(before, MIGRATIONS, 12);
+    const cells = MAP_SIZE * MAP_SIZE;
+    const head = cells * 3; // terrain, zone, road
+
+    expect(after.meta.formatVersion).toBe(12);
+    expect(after.layers.byteLength - before.layers.byteLength).toBe(cells * 2);
+    expect(after.layers.byteLength).toBe(expectedLayersByteLength(MAP_SIZE));
+
+    // Vrstvy před a za `buildingId` bajt po bajtu tam, kde byly…
+    expect([...after.layers.subarray(0, head)]).toEqual([...before.layers.subarray(0, head)]);
+    expect([...after.layers.subarray(head + cells * 4)]).toEqual([
+      ...before.layers.subarray(head + cells * 2),
+    ]);
+
+    // …a každé id pořád stejné číslo. Přečíslovat by se nesmělo nic: na id
+    // visí zastávky linek i varianta obrázku.
+    const narrow = new DataView(before.layers.buffer, before.layers.byteOffset + head, cells * 2);
+    const wide = new DataView(after.layers.buffer, after.layers.byteOffset + head, cells * 4);
+    let occupied = 0;
+    let mismatched = 0;
+    for (let i = 0; i < cells; i++) {
+      const id = narrow.getUint16(i * 2, true);
+      if (id !== 0) occupied++;
+      if (wide.getUint32(i * 4, true) !== id) mismatched++;
+    }
+    expect(occupied).toBeGreaterThan(0); // fixtura bez budov by neověřila nic
+    expect(mismatched).toBe(0);
+    expect(after.entities).toEqual(before.entities);
   });
 
   it('save verze 2 si hrubé vrstvy i financování nese sám', () => {

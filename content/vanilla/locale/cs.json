@@ -444,6 +444,7 @@
   "error.rubbleInTheWay": "Překážejí trosky — nejdřív je ukliď buldozerem.",
   "error.occupied": "Dlaždice je obsazená.",
   "error.occupiedFootprint": "Nevejde se sem. Tahle budova potřebuje volných {width} × {depth} dlaždic.",
+  "error.buildingIdsExhausted": "Městu došla čísla budov: za celou dobu tu vzniklo přes čtyři miliardy staveb a další se už nevejde.",
   "error.nothingToBulldoze": "Není tu co bourat.",
   "error.needsWater": "Bez vodovodu se tu stavět nedá. Doveď sem potrubí.",
   "error.needsShore": "Tahle stavba musí stát u vody.",

@@ -111,7 +111,16 @@ export interface Layers {
   terrain: Uint8Array;
   zone: Uint8Array;
   road: Uint8Array;
-  buildingId: Uint16Array;
+  /**
+   * Id budovy na dlaždici, 0 = prázdno. **Čtyřbajtová** od verze savu 12.
+   *
+   * Do té doby byla dvoubajtová. Id se ale po zbourání nevrací (proč, viz
+   * `placeBuilding`), takže město, ve kterém za celou dobu vzniklo přes 65 535
+   * budov, zapsalo další id do vrstvy jako nulu: budova stála neviditelně na
+   * „prázdné" dlaždici a save se už nenačetl. Na mapě 512 × 512 se tolik
+   * jednodlaždicových domů navíc vejde i naráz.
+   */
+  buildingId: Uint32Array;
   power: Uint8Array;
   /**
    * Vodovodní potrubí, 0/1 (§8 fáze 3). Na rozdíl od elektřiny **budovy vodu
@@ -122,6 +131,12 @@ export interface Layers {
 
 /** Pohled na vrstvy pro renderer a UI — čtení ano, zápis chyba při typecheku. */
 export type ReadonlyLayers = { readonly [K in keyof Layers]: Readonly<Layers[K]> };
+
+/**
+ * Nejvyšší id, které se do vrstvy `buildingId` vejde. Nula je vyhrazená pro
+ * prázdnou dlaždici, takže budovy mají id 1 až tohle číslo včetně.
+ */
+export const MAX_BUILDING_ID = 0xffffffff;
 
 /**
  * Pevné pořadí vrstev pro `hashLayers`. Explicitní seznam místo `Object.keys()`,
@@ -144,7 +159,7 @@ export function createLayers(size: number): Layers {
     terrain: new Uint8Array(cells), // 0 = tráva
     zone: new Uint8Array(cells), // 0 = bez zóny
     road: new Uint8Array(cells), // 0/1
-    buildingId: new Uint16Array(cells), // 0 = prázdná dlaždice
+    buildingId: new Uint32Array(cells), // 0 = prázdná dlaždice
     power: new Uint8Array(cells),
     pipe: new Uint8Array(cells), // 0/1
   };
@@ -176,7 +191,13 @@ export function hashLayers(layers: ReadonlyLayers): string {
     const layer = layers[name];
     const width = layer.BYTES_PER_ELEMENT;
     for (const value of layer) {
-      for (let byte = 0; byte < width; byte++) {
+      // Nad dva bajty se hashuje, **jen když tam něco je**. `buildingId` se ve
+      // verzi savu 12 rozšířila z Uint16 na Uint32 a simulace se tím nezměnila
+      // ani o bit — golden hashe to potvrzují tím, že zůstaly stejné. Kdyby se
+      // hashovaly i nulové horní bajty, změnil by se každý z nich a nešlo by
+      // poznat, jestli se s rozšířením nerozjelo i něco jiného.
+      const bytes = width > 2 && value <= 0xffff ? 2 : width;
+      for (let byte = 0; byte < bytes; byte++) {
         hash = hashByte(hash, (value >>> (byte * 8)) & 0xff);
       }
     }

@@ -332,6 +332,44 @@ const migrateV10ToV11: Migration = (save) => ({
   },
 });
 
+/**
+ * Verze 12: vrstva `buildingId` je čtyřbajtová.
+ *
+ * Id budovy se po zbourání nevrací, takže dvoubajtová vrstva byla strop na
+ * všechny budovy, které ve městě **kdy** vznikly. Po 65 535 se další id zapsalo
+ * jako nula a save se už nenačetl. Starý save pod stropem je z definice, takže
+ * migrace čísla jen přepíše do širšího pole: dolní dva bajty zůstanou, horní
+ * jsou nuly. Žádná budova se nepřečísluje.
+ */
+const migrateV11ToV12: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 12 },
+  layers: widenBuildingIdLayer(save.layers, save.meta.grid?.size ?? LEGACY_MAP_SIZE),
+});
+
+/**
+ * Přepíše `buildingId` v `layers.bin` verze 11 ze dvou bajtů na čtyři.
+ *
+ * Rozložení verze 11 je tu natvrdo — migrace popisuje minulost: `terrain`,
+ * `zone`, `road` po bajtu, `buildingId` dva bajty, `power` a `pipe` po bajtu.
+ */
+function widenBuildingIdLayer(layers: Uint8Array, size: number): Uint8Array {
+  const cells = size * size;
+  const BYTES_PER_TILE_V11 = 7;
+  if (layers.byteLength !== cells * BYTES_PER_TILE_V11) return layers; // délku ohlásí `checkSaveFits`
+
+  const head = cells * 3; // terrain, zone, road
+  const out = new Uint8Array(cells * (BYTES_PER_TILE_V11 + 2));
+  out.set(layers.subarray(0, head), 0);
+  // Little-endian: dolní bajty jdou na začátek čtveřice, horní zůstanou nulové.
+  for (let i = 0; i < cells; i++) {
+    out[head + i * 4] = layers[head + i * 2] ?? 0;
+    out[head + i * 4 + 1] = layers[head + i * 2 + 1] ?? 0;
+  }
+  out.set(layers.subarray(head + cells * 2), head + cells * 4); // power, pipe
+  return out;
+}
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
@@ -344,6 +382,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   8: migrateV8ToV9,
   9: migrateV9ToV10,
   10: migrateV10ToV11,
+  11: migrateV11ToV12,
 };
 
 /**

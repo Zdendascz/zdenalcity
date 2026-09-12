@@ -56,11 +56,15 @@ export function packLayers(layers: Layers): Uint8Array {
         view.setUint8(offset, value);
         offset += 1;
       }
-    } else {
+    } else if (layer.BYTES_PER_ELEMENT === 4) {
+      // Jediná vícebajtová vrstva je `buildingId`, od verze 12 čtyřbajtová.
       for (const value of layer) {
-        view.setUint16(offset, value, true);
-        offset += 2;
+        view.setUint32(offset, value, true);
+        offset += 4;
       }
+    } else {
+      // Jiná šířka je nová verze formátu, ne něco, co se dá zapsat potichu.
+      throw new Error(`vrstva ${name} má ${layer.BYTES_PER_ELEMENT} B na dlaždici, save zná 1 a 4`);
     }
   }
 
