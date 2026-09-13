@@ -38,14 +38,40 @@ export type LoanProblem =
   | 'invalidTerm';
 
 /**
- * Strop půjčky: násobek měsíčního příjmu, snížený o to, co město už dluží.
+ * Strop půjčky pro danou splatnost, snížený o to, co město už dluží.
  *
  * Odvozuje se od **příjmu, ne od kasy**. Půjčka má být přemostěním, ne
  * způsobem, jak si koupit město, které se neuživí — a příjem je jediné číslo,
  * které říká, jestli se to má z čeho splácet.
+ *
+ * Rozhoduje **udržitelná splátka**, ne celková částka (T-revize, nález 5).
+ * Do teď byl strop `příjem × 24` bez ohledu na splatnost, takže maximální
+ * půjčka na dvanáct měsíců měla splátku přes dvojnásobek měsíčního příjmu.
+ * Město ji nemělo z čeho platit, dluh se nezmenšoval, předčasně splatit nejde
+ * — a protože se od stropu odečítá zbytek dluhu, zůstal úvěr napořád zavřený.
+ * Jedno kliknutí a hotovo.
+ *
+ * ```
+ * strop = příjem × podíl × měsíců / (1 + úrok × roky)
+ * ```
+ *
+ * Čitatel je to, co město za tu dobu unese na splátkách; jmenovatel z toho
+ * ubere úrok, protože splácí se jistina **i** on. Delší splatnost tedy znamená
+ * větší půjčku, což hráč čeká. Původní násobek příjmu zůstává jako tvrdý
+ * strop na celkový dluh: i na deset let si má město půjčit rozumně.
  */
-export function loanCap(world: WorldState, balance: Balance): number {
-  const ceiling = world.economy.lastIncome * balance.finance.loanIncomeMultiple;
+export function loanCap(
+  world: WorldState,
+  balance: Balance,
+  termMonths: number = balance.finance.minTermMonths,
+): number {
+  const { loanIncomeMultiple, loanPaymentShare, minTermMonths, maxTermMonths } = balance.finance;
+  const months = Math.min(maxTermMonths, Math.max(minTermMonths, Math.round(termMonths)));
+  const rate = loanRate(world, balance);
+
+  const sustainable =
+    (world.economy.lastIncome * loanPaymentShare * months) / (1 + (rate / 100) * (months / 12));
+  const ceiling = Math.min(sustainable, world.economy.lastIncome * loanIncomeMultiple);
   const owed = world.loans.reduce((sum, loan) => sum + loan.remaining, 0);
   return Math.max(0, Math.floor(ceiling - owed));
 }
@@ -70,7 +96,7 @@ export function loanProblems(
 ): LoanProblem[] {
   const problems: LoanProblem[] = [];
   if (!Number.isFinite(amount) || amount <= 0) problems.push('invalidAmount');
-  else if (amount > loanCap(world, balance)) problems.push('overCap');
+  else if (amount > loanCap(world, balance, termMonths)) problems.push('overCap');
 
   if (!Number.isInteger(termMonths) || termMonths < balance.finance.minTermMonths) {
     problems.push('invalidTerm');
@@ -247,6 +273,47 @@ export function awardGrants(
   }
 
   return awarded;
+}
+
+/**
+ * Stav milníků pro rozhraní: co je přiznané, co se plní a jak daleko.
+ *
+ * Vrací **klíče a čísla, ne věty** (§10). Počítá se ze stavu, který svět už
+ * drží, takže tu nevzniká druhá pravda o tom, na co město dosáhlo.
+ */
+export interface GrantStatus {
+  id: string;
+  /** Lokalizační klíč jména a popisu z definice. */
+  name: string;
+  description: string;
+  amount: number;
+  awarded: boolean;
+  /** Platí podmínka právě teď? U milníku na výdrž to ještě nestačí. */
+  holds: boolean;
+  /** Kolik tiků už podmínka drží v kuse a kolik jich je potřeba. `0` = bez výdrže. */
+  held: number;
+  needed: number;
+}
+
+export function grantStatus(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  grants: readonly GrantDefinition[],
+): GrantStatus[] {
+  return grants.map((grant) => {
+    const awarded = world.grantsAwarded.has(grant.id);
+    const holds = !awarded && grantConditionHolds(world, catalogue, grant);
+    return {
+      id: grant.id,
+      name: grant.name,
+      description: grant.description,
+      amount: grant.amount,
+      awarded,
+      holds,
+      held: holds ? (world.grantProgress.get(grant.id) ?? 0) : 0,
+      needed: grant.condition.forTicks ?? 0,
+    };
+  });
 }
 
 function totalPopulation(world: WorldState): number {

@@ -102,12 +102,21 @@ function slider(
   max: number,
   value: number,
   onChange: (value: number) => void,
+  /**
+   * Jedna věta o tom, co ta volba udělá.
+   *
+   * Hráč dostával před první hrou čtyři volby a k žádné vysvětlení: nikde
+   * nestálo, že víc vody znamená míň místa a nutnost mostů a že kopce znamenají
+   * platit za srovnávání u každé budovy (T-revize, nález 32).
+   */
+  hint?: string,
 ): HTMLInputElement {
   const field = el('label', 'dialog__field dialog__field--slider');
   const head = el('div', 'dialog__slider-head');
   head.appendChild(el('span', undefined, label));
   head.appendChild(readout);
   field.appendChild(head);
+  if (hint !== undefined) field.appendChild(el('span', 'dialog__hint', hint));
 
   const input = el('input', 'dialog__slider');
   input.type = 'range';
@@ -161,6 +170,7 @@ export function showNewGameDialog(
   sizeLabel.appendChild(el('span', undefined, t('ui.newGame.size')));
   const sizeChips = el('div', 'dialog__sizes');
   sizeLabel.appendChild(sizeChips);
+  sizeLabel.appendChild(el('span', 'dialog__hint', t('ui.newGame.sizeHint')));
 
   // Katastrofy jdou vypnout hned při zakládání města (R18). Kdo si chce
   // stavět a ne hasit, nemá důvod se to dozvídat až po prvním požáru.
@@ -169,7 +179,10 @@ export function showNewGameDialog(
   disasterInput.type = 'checkbox';
   disasterInput.checked = true;
   disasterLabel.appendChild(disasterInput);
-  disasterLabel.appendChild(el('span', undefined, t('ui.newGame.disasters')));
+  const disasterText = el('span');
+  disasterText.appendChild(el('span', undefined, t('ui.newGame.disasters')));
+  disasterText.appendChild(el('span', 'dialog__hint', t('ui.newGame.disastersHint')));
+  disasterLabel.appendChild(disasterText);
 
   const seedLabel = el('label', 'dialog__field');
   seedLabel.appendChild(el('span', undefined, t('ui.newGame.seed')));
@@ -201,6 +214,7 @@ export function showNewGameDialog(
       choice.seaLevel = percent / 100;
       draw();
     },
+    t('ui.newGame.waterHint'),
   );
 
   const hillsValue = el('span', 'dialog__slider-value');
@@ -215,6 +229,7 @@ export function showNewGameDialog(
       choice.maxHeight = levels;
       draw();
     },
+    t('ui.newGame.hillsHint'),
   );
 
   dialog.appendChild(form);
@@ -240,6 +255,9 @@ export function showNewGameDialog(
     });
     chip.textContent = `${option}×${option}`;
     if (option >= HEAVY_SIZE) chip.title = t('ui.newGame.size.heavy');
+    // U výchozí velikosti se říká, že je doporučená — jinak je to čtveřice
+    // čísel, ze které si hráč nemá jak vybrat.
+    else if (option === DEFAULT_MAP_SIZE) chip.title = t('ui.newGame.size.recommended');
     chips.set(option, chip);
     sizeChips.appendChild(chip);
   }
@@ -256,7 +274,6 @@ export function showNewGameDialog(
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    const started = performance.now();
     const { terrain, cornerHeight } = generateTerrain(seed, balanceWithMap(balance, choice), size);
 
     // Jeden pixel na dlaždici; roztažení na 384 bodů obstará CSS
@@ -294,9 +311,10 @@ export function showNewGameDialog(
 
     let land = 0;
     for (const value of terrain) if (value !== TERRAIN.water) land++;
+    // Milisekundy generátoru hráči neříkají nic — je to údaj pro vývoj,
+    // stejně jako značka sestavení, a ve hře nemá co dělat (nález 32).
     const stats = i18n.t('ui.newGame.stats', {
       land: Math.round((land / terrain.length) * 100),
-      ms: Math.round(performance.now() - started),
     });
     // Varování se lepí za statistiku, ne místo ní: hráč potřebuje obojí.
     note.textContent = size >= HEAVY_SIZE ? `${stats} ${t('ui.newGame.size.heavy')}` : stats;

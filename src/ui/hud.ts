@@ -93,6 +93,8 @@ export interface HudCallbacks {
    * blíž ani dál a díval se na město pořád z jedné výšky.
    */
   onZoom(factor: number): void;
+  /** Vrátí kameru nad město. Bez toho z prázdné mapy nevede cesta zpátky. */
+  onFocusCity(): void;
   /**
    * Načíst novou verzi hry a **nechat rozehrané město**.
    *
@@ -113,6 +115,16 @@ export interface HudCallbacks {
 export interface ToolbarOverflow {
   readonly host: HTMLElement;
   close(): void;
+  /**
+   * Který nástroj je vybraný ve **schované** řadě. `null`, když je v liště.
+   *
+   * Paleta označí jen tu nabídku, která vybraný nástroj obsahuje — a ta je
+   * schovaná, takže po výběru elektrárny z trojtečky se v liště nerozsvítilo
+   * nic. Hráč klepl do mapy v domnění, že drží pacičku, a postavil elektrárnu
+   * za 24 000 (T-revize, nález 17). Trojtečka si proto převezme její ikonu
+   * a stav, přesně jak to umí nabídky.
+   */
+  setActive(tool: { icon: string; label: string } | null): void;
 }
 
 /** Položka nabídky pohledů nebo vrstev. Popisek je lokalizační klíč. */
@@ -170,6 +182,13 @@ export interface HudState {
   demandTerms: readonly DemandBreakdown[];
   /** Už přeložená hláška o uložení či načtení. Prázdná = nic nezobrazovat. */
   message: string;
+  /**
+   * Před kolika minutami se město naposledy uložilo samo. `null` = ještě nikdy.
+   *
+   * Hra se ukládá sama, ale v rozhraní z toho nebylo vidět nic — hráč neměl
+   * jak poznat, jestli o poslední hodinu přijde (T-revize, nález 3).
+   */
+  autosaveMinutesAgo: number | null;
 }
 
 /**
@@ -230,10 +249,21 @@ const STAT_ROWS: readonly { key: string; labelKey: string; primary?: true }[] = 
 /** O kolik se změní měřítko jedním klepnutím na lupu. */
 const ZOOM_STEP = 1.25;
 
-const DEMAND_ROWS: readonly { labelKey: string; category: 'residential' | 'commercial' | 'industrial' }[] = [
-  { labelKey: 'ui.demand.residential', category: 'residential' },
-  { labelKey: 'ui.demand.commercial', category: 'commercial' },
-  { labelKey: 'ui.demand.industrial', category: 'industrial' },
+/**
+ * Sloupečky poptávky.
+ *
+ * `labelKey` je to jedno písmeno ve sloupci, `nameKey` **plné jméno zóny** do
+ * bubliny. Do T-revize šlo do obojího totéž písmeno, takže první řádek bubliny
+ * zněl „O: 12" a co které písmeno znamená, se hráč nedozvěděl nikde (nález 31).
+ */
+const DEMAND_ROWS: readonly {
+  labelKey: string;
+  nameKey: string;
+  category: 'residential' | 'commercial' | 'industrial';
+}[] = [
+  { labelKey: 'ui.demand.residential', nameKey: 'ui.tool.zone.residential', category: 'residential' },
+  { labelKey: 'ui.demand.commercial', nameKey: 'ui.tool.zone.commercial', category: 'commercial' },
+  { labelKey: 'ui.demand.industrial', nameKey: 'ui.tool.zone.industrial', category: 'industrial' },
 ];
 
 /**
@@ -313,6 +343,24 @@ export class Hud {
   private speedMenu: Menu | null = null;
   /** Pauza a běh v jednom tlačítku. Jen na telefonu. */
   private playButton: HTMLButtonElement | null = null;
+  /** Řádek „uloženo před X minutami" v panelu uložení. */
+  private autosaveNote: HTMLElement | null = null;
+
+  /**
+   * Běžící opakovač držené lupy. Nula znamená „nic neběží".
+   *
+   * Drží se na instanci, protože řada s lupou při přestavbě lišty zmizí
+   * i s tlačítkem, na kterém visely obsluhy puštění (T-revize, nález 36).
+   */
+  private zoomRepeat = 0;
+
+  private stopZoomRepeat(): void {
+    if (this.zoomRepeat === 0) return;
+    window.clearTimeout(this.zoomRepeat);
+    window.clearInterval(this.zoomRepeat);
+    this.zoomRepeat = 0;
+  }
+
   /** Co je na tom tlačítku nakreslené. Prázdné = ještě nic. */
   private playShown = '';
   /**
@@ -352,6 +400,7 @@ export class Hud {
   private badgeKey = '';
   private readonly fundingInputs = new Map<string, HTMLInputElement>();
   private lastState: HudState = {
+    autosaveMinutesAgo: null,
     speedIndex: 1,
     layer: 'none',
     view: 'surface',
@@ -442,8 +491,36 @@ export class Hud {
   get overflow(): ToolbarOverflow {
     return {
       host: this.toolDrawer,
-      close: () => this.controlDrawer.classList.add('is-hidden'),
+      close: () => {
+        this.controlDrawer.classList.add('is-hidden');
+        this.reflectMore();
+      },
+      setActive: (tool) => {
+        this.overflowTool = tool;
+        this.reflectMore();
+      },
     };
+  }
+
+  /**
+   * Vybraný nástroj ze schované řady. `null`, když je vybraný z lišty.
+   */
+  private overflowTool: { icon: string; label: string } | null = null;
+  private moreButton: HTMLButtonElement | null = null;
+
+  /** Srovná trojtečku se skutečností: ikona vybraného nástroje a stav. */
+  private reflectMore(): void {
+    const node = this.moreButton;
+    if (!node) return;
+
+    const open = !this.controlDrawer.classList.contains('is-hidden');
+    const tool = this.overflowTool;
+    node.classList.toggle('is-active', open || tool !== null);
+
+    const label = tool ? tool.label : this.i18n.t('ui.toolbar.more');
+    node.title = label;
+    node.setAttribute('aria-label', this.i18n.t('ui.toolbar.more'));
+    node.replaceChildren(iconSvg(tool ? tool.icon : 'more'));
   }
 
   /**
@@ -485,6 +562,12 @@ export class Hud {
       `+${formatNumber(economy.lastIncome)} / −${formatNumber(economy.lastExpenses)}`,
     );
     this.setValue('date', this.i18n.t('ui.hud.date', dateParts(tick)));
+    if (this.autosaveNote) {
+      this.autosaveNote.textContent =
+        state.autosaveMinutesAgo === null
+          ? this.i18n.t('ui.save.autosaveNever')
+          : this.i18n.t('ui.save.autosaveAgo', { minutes: state.autosaveMinutesAgo });
+    }
     this.syncDisasters();
     // Zlomek sám o sobě neřekne, co s tím: „65/86" může znamenat chybějící
     // vedení i chybějící elektrárnu. Čísla vedle sebe to rozhodnou.
@@ -521,7 +604,7 @@ export class Hud {
         const lines = breakdown.terms.map(
           (term) => `${this.i18n.t(term.key)}: ${term.value > 0 ? '+' : ''}${term.value}`,
         );
-        column.title = [`${this.i18n.t(row.labelKey)}: ${value}`, ...lines].join('\n');
+        column.title = [`${this.i18n.t(row.nameKey)}: ${value}`, ...lines].join('\n');
       }
     }
 
@@ -628,6 +711,9 @@ export class Hud {
   }
 
   private build(): void {
+    // Běžící opakovač lupy nepřežije přestavbu: tlačítko, na kterém visí
+    // obsluhy puštění, se vzápětí vysype z dokumentu.
+    this.stopZoomRepeat();
     this.root.classList.toggle('hud--compact', this.compact);
     this.root.classList.toggle('hud--dense', this.dense);
     /*
@@ -649,6 +735,8 @@ export class Hud {
     this.speedButtons.length = 0;
     this.speedMenu = null;
     this.playButton = null;
+    this.moreButton = null;
+    this.autosaveNote = null;
     this.viewToggle = null;
     this.viewButtons.clear();
     this.fundingInputs.clear();
@@ -731,6 +819,7 @@ export class Hud {
     const label = this.i18n.t('ui.toolbar.more');
     const node = button('toolbar__button', () => {
       const hidden = this.controlDrawer.classList.toggle('is-hidden');
+      this.reflectMore();
       if (hidden) return;
       // Popisky se doplní při otevření (viz `dressDrawer`) a panel uprostřed
       // obrazovky by řadu překryl — má vyšší vrstvu než roletky.
@@ -741,6 +830,8 @@ export class Hud {
     node.title = label;
     node.setAttribute('aria-label', label);
     this.barSlot().appendChild(node);
+    this.moreButton = node;
+    this.reflectMore();
   }
 
   /**
@@ -748,6 +839,16 @@ export class Hud {
    * v liště jen překážela.
    */
   private buildZoom(): void {
+    // Návrat nad město patří **do každého rozložení**, ne jen na telefon:
+    // odjet za okraj mapy jde myší i šipkami a hra do teď neměla jediný prvek,
+    // kterým by se hráč vrátil — žádnou minimapu, žádné „na město"
+    // (T-revize, nález 18).
+    const home = button('chip chip--tight', () => this.callbacks.onFocusCity());
+    home.appendChild(iconSvg('focus-city'));
+    home.title = this.i18n.t('ui.zoom.city');
+    home.setAttribute('aria-label', this.i18n.t('ui.zoom.city'));
+    this.controlRow.appendChild(home);
+
     if (!this.compact) return;
     const group = el('div', 'segmented');
     for (const [icon, labelKey, factor] of [
@@ -768,15 +869,19 @@ export class Hud {
        * Krok je 1,15, takže z výchozího měřítka na nejmenší je to osm
        * klepnutí. Kolečko na telefonu není, tohle je jediná cesta.
        */
-      let timer = 0;
-      const stop = (): void => {
-        window.clearTimeout(timer);
-        window.clearInterval(timer);
-      };
+      // Časovač visí **na instanci, ne v uzávěru tlačítka** (T-revize,
+      // nález 36). Řada s lupou se při každé přestavbě lišty vysype — a ta
+      // přijde při změně stupně rozložení i jazyka, tedy i při otočení
+      // displeje. Tlačítko, na kterém visely obsluhy puštění, tím zmizelo
+      // z dokumentu a mapa se přibližovala dál, dokud nenarazila na strop.
+      const stop = (): void => this.stopZoomRepeat();
       node.addEventListener('pointerdown', () => {
         stop();
-        timer = window.setTimeout(() => {
-          timer = window.setInterval(() => this.callbacks.onZoom(factor), ZOOM_REPEAT_MS);
+        this.zoomRepeat = window.setTimeout(() => {
+          this.zoomRepeat = window.setInterval(
+            () => this.callbacks.onZoom(factor),
+            ZOOM_REPEAT_MS,
+          );
         }, ZOOM_REPEAT_DELAY_MS);
       });
       for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
@@ -914,7 +1019,12 @@ export class Hud {
 
     const bars = el('div', 'demand__bars');
     for (const row of DEMAND_ROWS) {
-      const column = el('div', `demand__column demand__column--${row.category}`);
+      // Sloupeček je **tlačítko**: rozpad poptávky se do teď dal přečíst jen
+      // bublinou po najetí myší, tedy na dotyku vůbec (T-revize, nález 31).
+      const column = button(
+        `demand__column demand__column--${row.category}`,
+        () => this.callbacks.onStatClick(`demand.${row.category}`),
+      );
       const track = el('div', 'demand__track');
       const bar = el('div', 'demand__bar');
       track.appendChild(bar);
@@ -1324,7 +1434,9 @@ export class Hud {
     shot.append(iconSvg('screenshot'), this.i18n.t('ui.save.screenshot'));
     shotRow.appendChild(shot);
 
-    popover.panel.append(row, fileRow, shotRow);
+    // Kdy se naposledy uložilo samo. Bez toho hráč netušil, že se to vůbec děje.
+    this.autosaveNote = el('p', 'sheet__note');
+    popover.panel.append(row, fileRow, shotRow, this.autosaveNote);
 
     // Načtení nové verze **jen na telefonu**: na počítači si hráč zmáčkne
     // Ctrl+F5 a hotovo. Sedí to v uložení, protože je to hlavně uložení —
@@ -1357,7 +1469,11 @@ export class Hud {
 
     for (const language of this.i18n.getLanguages()) {
       const node = button('chip', () => this.callbacks.onLanguageChange(language));
-      node.textContent = language;
+      // Jazyk se jmenuje **ve svém vlastním jazyce**, ne kódem: „cs" a „en"
+      // jsou dvě tlačítka, ze kterých hráč nepozná, co dostane (T-revize,
+      // nález 23). Jména jsou v překladu, takže mod si přidá své.
+      const key = `ui.language.${language}`;
+      node.textContent = this.i18n.has(key) ? this.i18n.t(key) : language;
       node.classList.toggle('is-active', language === this.i18n.getLanguage());
       popover.panel.appendChild(node);
     }

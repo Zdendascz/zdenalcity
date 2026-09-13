@@ -71,11 +71,13 @@ function callbacks(): HudCallbacks & { zoomed: number[]; speeds: number[]; views
     onArmDisaster: () => {},
     onToggleDisasters: () => {},
     onZoom: (factor) => void zoomed.push(factor),
+    onFocusCity: () => {},
     onReload: () => {},
   };
 }
 
 const STATE: HudState = {
+  autosaveMinutesAgo: null,
   demandTerms: [],
   speedIndex: 1,
   layer: 'none',
@@ -211,9 +213,11 @@ describe('úsporná lišta', () => {
     expect(widgets(root, EXTRAS)).toBe(0);
   });
 
-  it('na telefonu zůstane nahoře lupa, pohled, průhlednost a stromy', async () => {
+  it('na telefonu zůstane nahoře návrat nad město, lupa, pohled, průhlednost a stromy', async () => {
     const { root } = await hudFor('compact');
-    expect(widgets(root, ROW)).toBe(4);
+    expect(widgets(root, ROW)).toBe(5);
+    // Bez návratu nad město nevede z prázdné mapy cesta zpátky (nález 18).
+    expect(root.querySelector(`${ROW} [aria-label="Na město"]`)).not.toBeNull();
   });
 
   it('síť, uložení a trojtečka stojí v řadě s paletou, ne nad ní', async () => {
@@ -420,18 +424,28 @@ describe('přepínání režimu', () => {
 
 describe('úsporná paleta nástrojů', () => {
   /** Vysunutá řada tak, jak ji paletě podává HUD. */
-  function overflow(): { slot: ToolbarOverflow; host: HTMLElement; closed: () => number } {
+  function overflow(): {
+    slot: ToolbarOverflow;
+    host: HTMLElement;
+    closed: () => number;
+    active: () => { icon: string; label: string } | null;
+  } {
     const host = document.createElement('div');
     let closed = 0;
+    let active: { icon: string; label: string } | null = null;
     return {
       slot: {
         host,
         close: () => {
           closed += 1;
         },
+        setActive: (tool) => {
+          active = tool;
+        },
       },
       host,
       closed: () => closed,
+      active: () => active,
     };
   }
 

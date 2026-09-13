@@ -174,6 +174,8 @@ export const HELP_PROBLEMS: readonly string[] = [
   'unhappy',
   'blackout',
   'noWaterReach',
+  'waste',
+  'growth',
   'fire',
   'services',
 ];

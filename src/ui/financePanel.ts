@@ -1,17 +1,21 @@
 import type { Balance } from '@/content/balance';
+import type { GrantDefinition } from '@/content/schema';
+import type { BuildingCatalogue } from '@/sim/catalogue';
 import type { Command } from '@/sim/commands';
 import {
   bondCap,
+  grantStatus,
   issueFee,
   loanCap,
   loanRate,
   loanTerms,
   subscriptionRate,
 } from '@/sim/finance';
+import { computeBudget } from '@/sim/systems/economy';
 import type { WorldState } from '@/sim/world';
 import { button, el } from './dom';
 import { formatNumber } from './format';
-import { iconSvg } from './icons';
+import { iconSvg, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
 
@@ -43,14 +47,24 @@ export class FinancePanel {
   private readonly root: HTMLElement;
   private readonly i18n: I18n;
   private readonly dispatch: (command: Command) => void;
+  private readonly catalogue: BuildingCatalogue;
+  private readonly grants: readonly GrantDefinition[];
   private visible = false;
 
   /** Postaveno až při prvním otevření — panel bez formuláře nemá co obnovovat. */
   private form: FinanceForm | null = null;
 
-  constructor(parent: HTMLElement, i18n: I18n, dispatch: (command: Command) => void) {
+  constructor(
+    parent: HTMLElement,
+    i18n: I18n,
+    dispatch: (command: Command) => void,
+    catalogue: BuildingCatalogue,
+    grants: readonly GrantDefinition[],
+  ) {
     this.i18n = i18n;
     this.dispatch = dispatch;
+    this.catalogue = catalogue;
+    this.grants = grants;
 
     this.root = el('div', 'sheet sheet--finance is-hidden');
     parent.appendChild(this.root);
@@ -92,18 +106,16 @@ export class FinancePanel {
   private build(): FinanceForm {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
 
-    const header = el('div', 'sheet__header');
-    header.appendChild(el('h2', 'sheet__title', t('ui.finance.title')));
-    const close = button('chip chip--tight', () => this.toggle());
-    close.appendChild(iconSvg('close'));
-    header.appendChild(close);
-    this.root.appendChild(header);
+    this.root.appendChild(sheetHeader(t('ui.finance.title'), t('ui.common.close'), () => this.toggle()));
 
     const form: FinanceForm = {
+      rating: el('span', 'finance__value'),
       loanAmount: numberInput(),
       loanTerm: numberInput(),
       loanRate: el('span', 'finance__value'),
       loanCap: el('span', 'finance__value'),
+      monthlyNet: el('span', 'finance__value'),
+      grantTable: el('div', 'finance__list'),
       loanPreview: el('p', 'sheet__note'),
       loanButton: button('chip chip--primary', () => this.takeLoan()),
       loanTable: el('div', 'finance__list'),
@@ -123,8 +135,15 @@ export class FinancePanel {
     /* --- půjčka --- */
     const loans = el('section', 'finance__section');
     loans.appendChild(el('h3', 'finance__heading', t('ui.finance.loans')));
+    // Rating řídí úrok i úspěšnost úpisu a do teď ho hráč neviděl nikde —
+    // panel mu po pár zmeškaných splátkách nabídl 12 % místo 4 % a mlčel
+    // o tom proč (T-revize, nález 12).
+    loans.appendChild(row(t('ui.finance.rating'), form.rating));
     loans.appendChild(row(t('ui.finance.cap'), form.loanCap));
     loans.appendChild(row(t('ui.finance.rate'), form.loanRate));
+    // Měsíční bilance vedle splátky: teprve ty dvě vedle sebe říkají, jestli
+    // je půjčka splatitelná.
+    loans.appendChild(row(t('ui.finance.monthlyNet'), form.monthlyNet));
     loans.appendChild(field(t('ui.finance.amount'), form.loanAmount));
     loans.appendChild(field(t('ui.finance.term'), form.loanTerm));
     loans.appendChild(form.loanPreview);
@@ -150,6 +169,15 @@ export class FinancePanel {
     bonds.appendChild(form.bondTable);
     this.root.appendChild(bonds);
 
+    /* --- granty --- */
+    // Milníky byly celou dobu neviditelné: přiteklo 8 000 a hráč neměl jak
+    // zjistit, že za něco. Seznam je jediné místo, kde se dá přečíst, co hra
+    // odměňuje — a u podmínek na výdrž i to, jak daleko město je.
+    const milestones = el('section', 'finance__section');
+    milestones.appendChild(el('h3', 'finance__heading', t('ui.finance.grants')));
+    milestones.appendChild(form.grantTable);
+    this.root.appendChild(milestones);
+
     return form;
   }
 
@@ -160,16 +188,24 @@ export class FinancePanel {
     const finance = balance.finance;
 
     /* --- půjčka --- */
-    const cap = loanCap(world, balance);
+    const term = Math.floor(Number(form.loanTerm.value));
+    // Strop se počítá **k zadané splatnosti**: na rok město unese jinou půjčku
+    // než na deset let a jedno číslo pro obojí bylo lež, ze které šlo vyrobit
+    // nesplatitelný dluh (T-revize, nález 5).
+    const cap = loanCap(world, balance, term);
     const rate = loanRate(world, balance);
+    form.rating.textContent = t('ui.finance.percent', {
+      value: String(Math.round(world.economy.creditRating * 100)),
+    });
     form.loanCap.textContent = formatNumber(cap);
     form.loanRate.textContent = t('ui.finance.percent', { value: rate.toFixed(1) });
+    const budget = computeBudget(world, this.catalogue, balance);
+    form.monthlyNet.textContent = formatNumber(budget.income - budget.expenses);
     form.loanAmount.max = String(cap);
     form.loanTerm.min = String(finance.minTermMonths);
     form.loanTerm.max = String(finance.maxTermMonths);
 
     const amount = Math.floor(Number(form.loanAmount.value));
-    const term = Math.floor(Number(form.loanTerm.value));
     const loanOk =
       Number.isFinite(amount) &&
       amount > 0 &&
@@ -198,6 +234,7 @@ export class FinancePanel {
     form.loanButton.disabled = !loanOk;
 
     this.fillLoans(form.loanTable, world);
+    this.fillGrants(form.grantTable, world);
 
     /* --- dluhopisy --- */
     const bonds = finance.bonds;
@@ -283,6 +320,41 @@ export class FinancePanel {
     }
   }
 
+  /** Milníky: přiznané zaškrtnuté, zbylé s podmínkou a postupem. */
+  private fillGrants(target: HTMLElement, world: WorldState): void {
+    const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
+    target.replaceChildren();
+
+    const rows = grantStatus(world, this.catalogue, this.grants);
+    if (rows.length === 0) {
+      target.appendChild(el('p', 'sheet__note', t('ui.finance.noGrants')));
+      return;
+    }
+
+    for (const grant of rows) {
+      const node = el('p', grant.awarded ? 'finance__row is-done' : 'finance__row');
+      const amount = formatNumber(grant.amount);
+      if (grant.awarded) {
+        node.textContent = t('ui.finance.grantAwarded', { name: t(grant.name), amount });
+      } else if (grant.needed > 0 && grant.holds) {
+        // Podmínka na výdrž se plní — ukazatel postupu bere přímo ten čítač,
+        // kterým se grant přiznává, takže nemůže ukazovat něco jiného.
+        node.textContent = t('ui.finance.grantHolding', {
+          name: t(grant.name),
+          amount,
+          percent: Math.min(99, Math.floor((grant.held / grant.needed) * 100)),
+        });
+      } else {
+        node.textContent = t('ui.finance.grantPending', {
+          name: t(grant.name),
+          amount,
+          condition: t(grant.description),
+        });
+      }
+      target.appendChild(node);
+    }
+  }
+
   private fillBonds(target: HTMLElement, world: WorldState): void {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     target.replaceChildren();
@@ -350,6 +422,10 @@ interface FinanceForm {
   bondPreview: HTMLElement;
   bondButton: HTMLButtonElement;
   bondTable: HTMLElement;
+
+  rating: HTMLElement;
+  monthlyNet: HTMLElement;
+  grantTable: HTMLElement;
 }
 
 function numberInput(): HTMLInputElement {

@@ -107,7 +107,7 @@ async function financeFixture(funds = 200_000, income = 20_000) {
 
   const mount = document.createElement('div');
   const { sent, dispatch } = recorder();
-  const panel = new FinancePanel(mount, await i18nFor(content), dispatch);
+  const panel = new FinancePanel(mount, await i18nFor(content), dispatch, content, content.grants());
   panel.toggle();
   panel.update(world, balance);
   return { panel, mount, sent, world, balance };
@@ -119,7 +119,7 @@ describe('panel financí', () => {
     const balance = content.getBalance();
     const world = createWorld(1, balance.economy);
     const mount = document.createElement('div');
-    const panel = new FinancePanel(mount, await i18nFor(content), () => {});
+    const panel = new FinancePanel(mount, await i18nFor(content), () => {}, content, content.grants());
 
     panel.update(world, balance);
     expect(mount.textContent).toBe('');

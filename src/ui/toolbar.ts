@@ -80,6 +80,25 @@ export class Toolbar {
     for (const [toolId, node] of this.singles) {
       node.classList.toggle('is-active', toolId === this.activeId);
     }
+
+    // Vybraný nástroj ze **schované** řady si přebírá trojtečka: jinak by
+    // v liště nesvítilo nic a hráč by nevěděl, co drží (T-revize, nález 17).
+    const host = this.overflow?.host;
+    const active = this.tools.find((tool) => tool.id === this.activeId);
+    const hidden =
+      host !== undefined &&
+      active !== undefined &&
+      host.contains(this.nodeOf(active.id));
+    this.overflow?.setActive(
+      hidden && active ? { icon: active.icon, label: this.i18n.t(active.labelKey) } : null,
+    );
+  }
+
+  /** Uzel, ve kterém nástroj bydlí — vlastní tlačítko, nebo jeho nabídka. */
+  private nodeOf(toolId: string): HTMLElement | null {
+    const single = this.singles.get(toolId);
+    if (single) return single;
+    return this.menus.find((menu) => menu.has(toolId))?.root ?? null;
   }
 
   private inBar(tool: ToolOption): boolean {

@@ -6,8 +6,8 @@ import { downgradeGrace, LEVEL_INTERVAL } from '@/sim/systems/levels';
 import { TICKS_PER_YEAR } from '@/sim/disasters/risk';
 import type { Building, WorldState } from '@/sim/world';
 import { ROAD, TERRAIN } from '@/sim/layers';
-import { iconSvg } from './icons';
-import { button, el } from './dom';
+import { iconSvg, sheetHeader } from './icons';
+import { el } from './dom';
 import { formatNumber, landValueTermKeys } from './format';
 import { dateParts } from './hud';
 import type { I18n } from './i18n';
@@ -220,12 +220,7 @@ export class BuildingInfo {
         : building.definitionId
       : t('ui.info.emptyParcel');
 
-    const header = el('div', 'sheet__header');
-    header.appendChild(el('h2', 'sheet__title', title));
-    const close = button('chip chip--tight', () => this.hide());
-    close.appendChild(iconSvg('close'));
-    header.appendChild(close);
-    this.root.append(header);
+    this.root.append(sheetHeader(title, t('ui.common.close'), () => this.hide()));
 
     // **Dva sloupce, ne nudle se scrollbarem.** Monitory jsou širokoúhlé
     // a panel byl svislý pruh, ve kterém se rolovalo i u malého domu.

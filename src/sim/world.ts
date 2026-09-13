@@ -141,6 +141,27 @@ export function createDirtySet(): DirtySet {
   };
 }
 
+/**
+ * Jedna zpráva z financí ven do rozhraní.
+ *
+ * Nese **id a počty, ne věty** (§10): jak se to řekne, patří do překladu.
+ */
+export type FinanceNotice =
+  | { kind: 'grant'; grantId: string; amount: number }
+  | { kind: 'missedPayment'; count: number }
+  | { kind: 'missedCoupon'; count: number }
+  | { kind: 'bondDefault'; count: number }
+  | { kind: 'bondDue'; years: number };
+
+/** Kolik zpráv fronta udrží, než začne zahazovat ty nejstarší. */
+const MAX_FINANCE_NOTICES = 32;
+
+/** Přidá zprávu do fronty pro rozhraní a udrží ji krátkou. */
+export function pushFinanceNotice(world: WorldState, notice: FinanceNotice): void {
+  world.financeNotices.push(notice);
+  if (world.financeNotices.length > MAX_FINANCE_NOTICES) world.financeNotices.shift();
+}
+
 export interface WorldState {
   readonly size: number;
   readonly seed: number;
@@ -178,6 +199,21 @@ export interface WorldState {
    * a po načtení savu se do pár tiků spočítá znovu.
    */
   trafficLoad: Float32Array;
+
+  /**
+   * Co se ve financích stalo a hráč to má vědět: přiznaný grant, zmeškaná
+   * splátka, nezaplacený kupón, propadlý dluhopis.
+   *
+   * **Runtime-only, do savu nepatří.** Je to jednosměrný kanál ven ze
+   * simulace — sim sem přidává, rozhraní si frontu vybírá, stejně jako už to
+   * dělá s `dirty.tiles`. Bez něj se návratové hodnoty `awardGrants`,
+   * `payLoans` a `serviceBonds` zahazovaly a celá vrstva milníků i ratingu
+   * byla pro hráče neviditelná: přiteklo 25 000 a nikde ani slovo.
+   *
+   * Fronta má strop. Běh bez rozhraní (testy, headless) ji nikdy nevybírá
+   * a nesmí kvůli tomu růst donekonečna.
+   */
+  financeNotices: FinanceNotice[];
 
   /**
    * Patra v rozích mřížky, 0–15 (§7 fáze 3). Mřížka je o jedna větší než mřížka
@@ -503,6 +539,7 @@ export function createWorld(
     serviceFunding: new Map(),
     coverageDirty: false,
     trafficLoad: new Float32Array(size * size),
+    financeNotices: [],
     cornerHeight: createCornerHeights(size),
     jobAccess: new Map(),
     jobAccessCells: new Float32Array(coarseCells).fill(1),
@@ -616,6 +653,7 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.coarse = createCoarseLayers(size);
   world.cornerHeight = createCornerHeights(size);
   world.trafficLoad = new Float32Array(size * size);
+  world.financeNotices.length = 0;
   world.waterSupply = new Uint8Array(size * size);
   world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
   world.happiness = new Uint8Array(coarseCellsOf(size)).fill(NEUTRAL_HAPPINESS);

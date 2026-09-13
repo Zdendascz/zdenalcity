@@ -136,7 +136,11 @@ export type Command =
   | { type: 'issue_bond'; amount: number; rate: number; maturityTicks: number };
 
 /** Má dlaždice aspoň jednoho silničního souseda? Odsud se staví mosty dál. */
-function touchesRoad(world: WorldState, x: number, y: number): boolean {
+function touchesRoad(
+  world: { readonly size: number; readonly layers: { readonly road: Readonly<Uint8Array> } },
+  x: number,
+  y: number,
+): boolean {
   for (const [dx, dy] of [
     [0, -1],
     [1, 0],
@@ -289,8 +293,12 @@ export interface RoadCostView {
     readonly terrain: Readonly<Uint8Array>;
     /** Rovnání potřebuje vědět, kudy silnice vede — bez sousedů nezná směr. */
     readonly road: Readonly<Uint8Array>;
+    /** Odhad musí poznat obsazenou dlaždici: tam se nepostaví, takže stojí nulu. */
+    readonly buildingId: Readonly<Uint32Array>;
   };
   readonly cornerHeight: Readonly<Uint8Array>;
+  /** Trosky blokují silnici stejně jako budova. */
+  readonly rubble: Readonly<Uint8Array>;
 }
 
 /** Z čeho se skládá cena jedné dlaždice vozovky. */
@@ -330,6 +338,16 @@ export function estimateRoad(
   const tile = index(x, y, world.size);
   const overWater = world.layers.terrain[tile] === TERRAIN.water;
   const terrain = world.layers.terrain[tile] ?? TERRAIN.grass;
+
+  // Dlaždice, na kterou příkaz stavět nebude, stojí **nulu** (T-revize,
+  // nález 14). Cenovka nad tažením do teď sčítala i pole, kde už silnice je,
+  // kde stojí budova nebo leží trosky, takže nad tahem svítilo jedno číslo
+  // a stalo se jiné — a hráč u toho počítal peníze.
+  const current = world.layers.road[tile] ?? ROAD.none;
+  if ((world.layers.buildingId[tile] ?? 0) !== 0) return empty;
+  if ((world.rubble[tile] ?? 0) !== 0) return empty;
+  if (current >= type) return empty;
+  if (overWater && !touchesRoad(world, x, y)) return empty;
 
   const road = overWater
     ? (balance?.traffic.bridgeCost ?? 0)
@@ -517,6 +535,11 @@ export function zoneArea(
   // psaly průběžně, zůstala by po odmítnutí půlka čtvrti vyznačená.
   const toZone: number[] = [];
   let lastReason = 'error.zoneNoChange';
+  // „Nic nového, ale nic nebrání" se musí odlišit od „ani jedna dlaždice
+  // nešla" (T-revize, nález 16). Prodloužení už vyznačené čtvrti přes to,
+  // co obytné je, jinak skončilo hláškou „Zóna se sem vyznačit nedá" —
+  // přestože zóna tam byla a nic špatně nebylo.
+  let alreadyZoned = 0;
 
   for (let dy = 0; dy < h; dy++) {
     for (let dx = 0; dx < w; dx++) {
@@ -540,12 +563,17 @@ export function zoneArea(
         lastReason = 'error.occupied';
         continue;
       }
-      if (world.layers.zone[tile] === zone) continue;
+      if (world.layers.zone[tile] === zone) {
+        alreadyZoned++;
+        continue;
+      }
 
       toZone.push(tile);
     }
   }
 
+  // Tichý úspěch: hráč táhl přes svou vlastní čtvrť a dostal, co chtěl.
+  if (toZone.length === 0 && alreadyZoned > 0) return OK;
   if (toZone.length === 0) return reject(lastReason);
 
   // Srovnání se **účtuje** (rozhodnutí autora, T67) a hráč ho vidí na cenovce
@@ -1278,7 +1306,12 @@ export function requestLoan(
     return reject('error.tooManyLoans', { max: balance.finance.maxLoans });
   }
   if (problems.includes('overCap')) {
-    return reject('error.overLoanCap', { cap: loanCap(world, balance) });
+    // Strop závisí na splatnosti, tak ji hláška říká: jinak by hráč viděl dvě
+    // různá čísla pro tutéž půjčku a neměl by z čeho poznat, čím se liší.
+    return reject('error.overLoanCap', {
+      cap: loanCap(world, balance, termMonths),
+      months: termMonths,
+    });
   }
 
   return takeLoan(world, balance, amount, termMonths) ? OK : reject('error.invalidAmount', { amount });

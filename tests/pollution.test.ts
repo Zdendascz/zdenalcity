@@ -179,7 +179,10 @@ describe('znečištění ve světě', () => {
     expect(cell(world, 120, 120)).toBeGreaterThan(0);
   });
 
-  it('zdroj sedí na předním rohu půdorysu', () => {
+  it('zdroj se rozprostře po půdorysu, ne do jedné buňky', () => {
+    // Do T-revize se celé znečištění přičetlo do buňky pod **předním rohem**,
+    // takže elektrárna 6 × 6 zamořila přesně tolik místa co budka 1 × 1
+    // a velikost zdroje na rozsah škody neměla vliv.
     const big: Definition = { ...FACTORY, id: 'test:big', footprint: [4, 4] };
     const world = createWorld(1);
     // Půdorys (62..65, 62..65) přesahuje přes hranici buňky, takže počátek
@@ -188,11 +191,28 @@ describe('znečištění ve světě', () => {
 
     runPollution(world, catalogueOf(big), 1);
 
-    expect(coarseIndex(62, 62, MAP_SIZE)).not.toBe(
-      coarseIndex(65, 65, MAP_SIZE),
-    );
-    // Buňka počátku něco dostane difuzí, ale zdroj sedí v té s předním rohem.
-    expect(cell(world, 65, 65)).toBeGreaterThan(cell(world, 62, 62));
+    expect(coarseIndex(62, 62, MAP_SIZE)).not.toBe(coarseIndex(65, 65, MAP_SIZE));
+    // Obě buňky zdroj mají, a stejným dílem: každá nese čtvrtinu dlaždic.
+    expect(cell(world, 62, 62)).toBeGreaterThan(0);
+    expect(cell(world, 65, 65)).toBeCloseTo(cell(world, 62, 62), 5);
+  });
+
+  it('celkové množství se rozprostřením nezmění', () => {
+    const sum = (definition: Definition, x: number, y: number): number => {
+      const world = createWorld(1);
+      placeBuilding(world, definition, x, y);
+      runPollution(world, catalogueOf(definition), 1);
+      let total = 0;
+      for (const value of world.coarse.pollution) total += value;
+      return total;
+    };
+
+    const big: Definition = { ...FACTORY, id: 'test:big', footprint: [4, 4] };
+    // Rozdíl je v tom, **kde** kouř je, ne kolik ho je. Difuze i ořez do bajtu
+    // dělají svoje, takže se porovnává řádově, ne na jednotky.
+    expect(sum(big, 62, 62)).toBeGreaterThan(0);
+    expect(sum(big, 62, 62) / sum(FACTORY, 62, 62)).toBeGreaterThan(0.5);
+    expect(sum(big, 62, 62) / sum(FACTORY, 62, 62)).toBeLessThan(1.5);
   });
 
   it('ohlásí změnu hrubé mřížky do DirtySet', () => {

@@ -10,6 +10,8 @@
 /** Čím se v parametru oddělují klíče seznamu. */
 const LIST_SEPARATOR = ',';
 
+import { setNumberLocale } from './format';
+
 export const FALLBACK_LANGUAGE = 'en';
 
 export type LocaleTable = Readonly<Record<string, string>>;
@@ -34,6 +36,7 @@ export class I18n {
   constructor(tables: LocaleTables, language: string) {
     this.tables = tables;
     this.language = language;
+    this.applyLocale();
   }
 
   getLanguage(): string {
@@ -47,7 +50,20 @@ export class I18n {
   setLanguage(language: string): void {
     if (this.language === language) return;
     this.language = language;
+    this.applyLocale();
     for (const listener of this.listeners) listener();
+  }
+
+  /**
+   * Předá jazyk formátování čísel.
+   *
+   * Značka je **v překladu** (`ui.locale.tag`), ne v kódu: kdo přidá jazyk,
+   * přidá k němu i to, jak se v něm píší tisíce, a nemusí kvůli tomu sahat
+   * do hry. Bez klíče se použije kód jazyka, což pro `cs` i `en` dá rozumný
+   * výsledek.
+   */
+  private applyLocale(): void {
+    setNumberLocale(this.has('ui.locale.tag') ? this.t('ui.locale.tag') : this.language);
   }
 
   /** Zavolá se po přepnutí jazyka, aby si UI přepsalo popisky. */

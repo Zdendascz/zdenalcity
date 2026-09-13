@@ -1,6 +1,6 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from './catalogue';
-import { cityUtilities, coarseCongestion } from './diagnostics';
+import { cityUtilities, coarseCongestion, explainDemand } from './diagnostics';
 import { strongestModifier } from './disasters/effects';
 import { populationPerCell } from './disasters/unrest';
 import { ledgerTotal } from './ledger';
@@ -51,6 +51,11 @@ export const EXPLAINED_STATS = [
   'waste',
   'sewage',
   'water',
+  // Poptávka: tři sloupečky O/K/P se do teď daly přečíst **jen bublinou po
+  // najetí myší**, tedy na dotyku vůbec (T-revize, nález 31).
+  'demand.residential',
+  'demand.commercial',
+  'demand.industrial',
 ] as const;
 
 export type ExplainedStat = (typeof EXPLAINED_STATS)[number];
@@ -76,9 +81,37 @@ export function explainStat(
       return explainPowered(world);
     case 'power':
       return explainPower(world, catalogue);
+    case 'demand.residential':
+    case 'demand.commercial':
+    case 'demand.industrial':
+      return explainDemandStat(world, catalogue, balance, key.slice('demand.'.length));
     default:
       return explainUtility(world, catalogue, balance, key);
   }
+}
+
+/**
+ * Poptávka jedné zóny: z čeho vyšel sloupeček O, K nebo P.
+ *
+ * Bere **tentýž rozpad, jaký ukazuje bublina nad sloupcem** (`explainDemand`),
+ * jen ho převléká do tvaru plus/mínus, aby šel otevřít i prstem.
+ */
+function explainDemandStat(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  balance: Balance,
+  category: string,
+): StatBreakdown {
+  const breakdown = explainDemand(world, catalogue, balance).find(
+    (item) => item.category === category,
+  );
+  const plus: Record<string, number> = {};
+  const minus: Record<string, number> = {};
+  for (const term of breakdown?.terms ?? []) {
+    if (term.value >= 0) add(plus, term.key, term.value);
+    else add(minus, term.key, -term.value);
+  }
+  return { plus: rowsOf(plus), minus: rowsOf(minus), total: breakdown?.value ?? 0 };
 }
 
 /**
@@ -234,6 +267,13 @@ function explainHappiness(world: WorldState, balance: Balance): StatBreakdown {
     else add(minus, `ui.stat.row.happiness.${key}`, amount);
   }
 
+  // Ořez na strop je **vlastní řádek**, ne mlčení. Vrstva se ukládá do bajtu,
+  // takže surová hodnota nad 255 se do ní nevejde; bez tohoto řádku vycházel
+  // sloupec plus o stovky procent výš než souhrn a jediné vysvětlení pod
+  // tabulkou mluvilo o vyhlazování, které za rozdíl nemohlo.
+  const raw = total(plus) - total(minus);
+  if (raw > 100) add(minus, 'ui.stat.row.happiness.clamp', raw - 100);
+
   // Souhrn je **skutečný průměr ve vrstvě**, ne součet členů: vrstva se
   // k surové hodnotě vyhlazuje, takže po změně daně sedí až za pár měsíců.
   let sum = 0;
@@ -328,6 +368,12 @@ function explainUtility(
     minus: [{ label: `ui.stat.row.need.${key}`, value: needed }],
     total: capacity - needed,
   };
+}
+
+function total(source: Record<string, number>): number {
+  let sum = 0;
+  for (const value of Object.values(source)) sum += value;
+  return sum;
 }
 
 function add(into: Record<string, number>, key: string, value: number): void {

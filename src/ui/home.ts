@@ -37,6 +37,15 @@ export interface HomeOptions {
   /** Je co obnovit? Bez toho se „Pokračovat" neukáže. */
   canResume: boolean;
   /**
+   * Co je v rozehraném městě a jak si ho odnést.
+   *
+   * Tlačítko „Pokračovat" do teď nepsalo jméno města, které za ním leží, a
+   * „Nové město" ho mlčky přepsalo — prohlížeč drží jeden slot, takže se
+   * rozehraná hra ztratila, jakmile hráč poprvé schoval kartu. Neměl přitom
+   * čím zjistit, o co přišel (T-revize, nález 30).
+   */
+  resumeInfo?: { name: string; playtimeSeconds: number; download: () => void };
+  /**
    * Katalog staveb pro nápovědu.
    *
    * Domovská stránka sama žádnou budovu nezná a nepotřebuje — bere si ho jen
@@ -57,6 +66,8 @@ export interface HomeOptions {
    * nemá vědět, že si může město stáhnout a nahrát zpátky jako soubor.
    */
   damaged?: { download: () => void; discard: () => void; restorable: boolean };
+  /** Jazyky hry a přepnutí. Bez toho se na rozcestníku jazyk měnit nedá. */
+  languages?: { list: readonly string[]; current: () => string; set: (language: string) => void };
 }
 
 /** Kam se hlásí chyby. Adresa autora, ne obecná schránka. */
@@ -179,7 +190,13 @@ export function showHome(
     const resume = button('home__button home__button--primary', () => {
       finish({ kind: 'game', game: { cityName: '', seed: 0, size: 128, disasters: true, resume: true } });
     });
-    resume.textContent = t('ui.home.resume');
+    const info = options.resumeInfo;
+    resume.textContent = info
+      ? i18n.t('ui.home.resumeNamed', {
+          city: info.name,
+          minutes: Math.max(1, Math.round(info.playtimeSeconds / 60)),
+        })
+      : t('ui.home.resume');
     actions.appendChild(resume);
   }
 
@@ -193,6 +210,17 @@ export function showHome(
   );
   start.textContent = t('ui.home.newCity');
   actions.appendChild(start);
+
+  // Varování, že nové město to rozehrané přepíše — a jedno kliknutí, kterým
+  // si ho hráč odnese. Hra tenhle typ varování umí, poškozené město ho má.
+  if (options.resumeInfo) {
+    const warning = el('p', 'home__warning');
+    warning.textContent = i18n.t('ui.home.overwriteWarning', { city: options.resumeInfo.name });
+    const keep = button('home__link-button', () => options.resumeInfo?.download());
+    keep.textContent = t('ui.home.keepCurrent');
+    warning.append(' ', keep);
+    actions.appendChild(warning);
+  }
 
   const input = el('input', 'is-hidden');
   input.type = 'file';
@@ -277,12 +305,24 @@ export function showHome(
 
   // --- řady karet ---------------------------------------------------------
 
-  root.appendChild(galleryRow(t, root));
+  /*
+   * Všechno, co si rozcestník zapsal mimo svůj strom, visí na jednom signálu
+   * (T-revize, nález 38).
+   *
+   * Galerie si zakládala **vlastní** časovač a úklid po výběru zhasínal jen
+   * ten v hlavičce. Odpojený uzel, který drží běžící časovač, se neuvolní,
+   * takže po vstupu do hry držel prohlížeč celý rozcestník včetně velkých
+   * obrázků a časovač se dál probouzel a sahal na uzly, které v dokumentu
+   * nebyly. Totéž platilo pro posluchač klávesnice u zvětšeného obrázku.
+   */
+  const leaving = new AbortController();
+  root.appendChild(galleryRow(t, root, leaving.signal));
 
   parent.appendChild(root);
 
   function finish(choice: HomeChoice): void {
     if (timer !== undefined) window.clearInterval(timer);
+    leaving.abort();
     root.remove();
     resolveChoice(choice);
   }
@@ -301,13 +341,17 @@ export function showHome(
  *
  * Nadpis „Galerie" taky zmizel — řada obrázků se nemusí představovat.
  */
-function galleryRow(t: (key: string) => string, root: HTMLElement): HTMLElement {
+function galleryRow(
+  t: (key: string) => string,
+  root: HTMLElement,
+  leaving: AbortSignal,
+): HTMLElement {
   const section = el('section', 'home__row');
   const frame = el('div', 'home__frame');
   const strip = el('div', 'home__strip');
 
   GALLERY.forEach((item, order) => {
-    const card = button('home__card home__card--plain', () => showLightbox(root, t, order));
+    const card = button('home__card home__card--plain', () => showLightbox(root, t, order, leaving));
     const image = el('img', 'home__card-image');
     image.src = item.file;
     image.alt = t(item.titleKey);
@@ -371,7 +415,7 @@ function galleryRow(t: (key: string) => string, root: HTMLElement): HTMLElement 
   let handled = false;
 
   function play(): void {
-    if (handled) return;
+    if (handled || leaving.aborted) return;
     window.clearInterval(timer);
     timer = window.setInterval(() => step(1), SLIDE_MS);
   }
@@ -381,6 +425,8 @@ function galleryRow(t: (key: string) => string, root: HTMLElement): HTMLElement 
   }
 
   play();
+  // Odchod z rozcestníku časovač zhasne. Bez toho se probouzel po celou hru.
+  leaving.addEventListener('abort', pause);
   strip.addEventListener('pointerdown', () => {
     handled = true;
     pause();
@@ -399,7 +445,12 @@ function galleryRow(t: (key: string) => string, root: HTMLElement): HTMLElement 
  * hráč dozví, **jestli kouká na hru, nebo na kreslený pohled**. V řadě to
  * nikde napsané není.
  */
-function showLightbox(parent: HTMLElement, t: (key: string) => string, from: number): void {
+function showLightbox(
+  parent: HTMLElement,
+  t: (key: string) => string,
+  from: number,
+  leaving: AbortSignal,
+): void {
   let at = from;
 
   const overlay = el('div', 'lightbox');
@@ -426,6 +477,10 @@ function showLightbox(parent: HTMLElement, t: (key: string) => string, from: num
     overlay.remove();
     window.removeEventListener('keydown', onKey);
   }
+
+  // Odchod z rozcestníku zavře i otevřený obrázek — jinak by po sobě nechal
+  // posluchač klávesnice, který se odhlašuje jen vlastním zavřením.
+  leaving.addEventListener('abort', close);
 
   function onKey(event: KeyboardEvent): void {
     if (event.key === 'Escape') close();
@@ -455,7 +510,7 @@ function showLightbox(parent: HTMLElement, t: (key: string) => string, from: num
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay || event.target === figure) close();
   });
-  window.addEventListener('keydown', onKey);
+  window.addEventListener('keydown', onKey, { signal: leaving });
 
   draw();
   parent.appendChild(overlay);
@@ -552,6 +607,20 @@ function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOp
 
   const authors = button('home__link', () => showAuthors(root, t));
   strip.appendChild(fill(authors, 'home-author', t('ui.home.authors')));
+
+  // Jazyk patří sem, mezi věci o hře. Do teď se dal přepnout **až ve hře**,
+  // takže anglicky hrající hráč musel nejdřív rozehrát město, aby si směl
+  // přepnout jazyk rozcestníku (T-revize, nález 23).
+  if (options.languages && options.languages.list.length > 1) {
+    const languages = options.languages;
+    const next = button('home__link', () => {
+      const order = languages.list;
+      const at = order.indexOf(languages.current());
+      const pick = order[(at + 1) % order.length];
+      if (pick) languages.set(pick);
+    });
+    strip.appendChild(fill(next, 'language', t('ui.language.label')));
+  }
 
   // Discord je **odkaz ven**, ne překryv: je to jiné místo, ne další stránka hry.
   const discord = el('a', 'home__link home__link--out');

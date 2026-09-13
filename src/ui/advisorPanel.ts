@@ -1,6 +1,6 @@
 import type { CityAdvice } from '@/sim/advisor';
-import { button, el } from './dom';
-import { iconSvg } from './icons';
+import { el } from './dom';
+import { sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
 
@@ -59,6 +59,7 @@ export class AdvisorPanel {
      * neznamená: pořadí rad se z ní mění jednou za měsíce.
      */
     const signature = [
+      advice.tooSmall ? 'small' : 'city',
       ...advice.problems.map((item) => `${item.id}:${Math.round(item.weight * 10)}`),
       `+${advice.praise?.id ?? '-'}`,
     ].join('|');
@@ -68,14 +69,14 @@ export class AdvisorPanel {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
 
-    const header = el('div', 'sheet__header');
-    header.appendChild(el('h2', 'sheet__title', t('ui.advisor.title')));
-    const close = button('chip chip--tight', () => this.toggle());
-    close.appendChild(iconSvg('close'));
-    header.appendChild(close);
-    this.root.appendChild(header);
+    this.root.appendChild(sheetHeader(t('ui.advisor.title'), t('ui.common.close'), () => this.toggle()));
 
-    if (advice.problems.length === 0) {
+    if (advice.tooSmall) {
+      // **Moc malé město** není pochvala (T-revize, nález 28). Hráč se zónou,
+      // ve které nic neroste, tu do teď četl „Město běží, jak má" — a přesně
+      // v tu chvíli potřeboval vědět, co má být hotové, než vyroste první dům.
+      this.root.appendChild(el('p', 'sheet__note', t('ui.advisor.tooSmall')));
+    } else if (advice.problems.length === 0) {
       // Prázdný poradce je odpověď, ne chyba. Poradce, který vždycky něco
       // najde, se naučí hráč ignorovat.
       this.root.appendChild(el('p', 'sheet__note', t('ui.advisor.allGood')));

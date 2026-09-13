@@ -54,8 +54,33 @@ describe('strop a úrok půjčky', () => {
     const poor = city(1000, 5_000_000);
     const rich = city(50000, 0);
 
-    expect(loanCap(poor, balance)).toBe(1000 * balance.finance.loanIncomeMultiple);
+    expect(loanCap(poor, balance)).toBeGreaterThan(0);
     expect(loanCap(rich, balance)).toBeGreaterThan(loanCap(poor, balance));
+    // Strop je úměrný příjmu a nikdy nepřeroste tvrdý násobek.
+    expect(loanCap(rich, balance)).toBeLessThanOrEqual(50000 * balance.finance.loanIncomeMultiple);
+  });
+
+  it('strop zná splatnost — a maximální půjčka se dá splácet', () => {
+    // Do T-revize byl strop `příjem × 24` bez ohledu na dobu splácení, takže
+    // maximální půjčka na dvanáct měsíců měla splátku přes dvojnásobek
+    // měsíčního příjmu. Nešla zaplatit, dluh se nezmenšoval a protože se od
+    // stropu odečítá, zůstal úvěr navždy zavřený.
+    const balance = VANILLA_BALANCE;
+    const income = 10000;
+    const world = city(income);
+
+    const short = loanCap(world, balance, balance.finance.minTermMonths);
+    const long = loanCap(world, balance, balance.finance.maxTermMonths);
+    expect(long).toBeGreaterThan(short);
+
+    for (const months of [balance.finance.minTermMonths, 24, 60, balance.finance.maxTermMonths]) {
+      const cap = loanCap(world, balance, months);
+      const { payment } = loanTerms(cap, loanRate(world, balance), months);
+      // Splátka maximální půjčky zůstane v mezích toho, co město měsíčně unese.
+      expect(payment, `${months} měsíců`).toBeLessThanOrEqual(
+        income * balance.finance.loanPaymentShare + 1,
+      );
+    }
   });
 
   it('už půjčené se od stropu odečítá', () => {
@@ -93,8 +118,8 @@ describe('strop a úrok půjčky', () => {
     const spoiled = city(10000);
     spoiled.economy.creditRating = 0;
 
-    const a = takeLoan(clean, balance, 100000, 24);
-    const b = takeLoan(spoiled, balance, 100000, 24);
+    const a = takeLoan(clean, balance, 40000, 24);
+    const b = takeLoan(spoiled, balance, 40000, 24);
     expect(a?.payment).toBeGreaterThan(0);
     expect(b?.payment).toBeGreaterThan(a?.payment ?? 0);
     // Jistina je stejná, liší se jen to, kolik se vrátí navíc.
@@ -107,13 +132,13 @@ describe('sjednání a splácení', () => {
   it('peníze přijdou hned, splácí se od příštího měsíce', () => {
     const balance = VANILLA_BALANCE;
     const world = city(10000, 500);
-    const loan = takeLoan(world, balance, 60000, 24);
+    const loan = takeLoan(world, balance, 50000, 24);
 
     expect(loan).not.toBeNull();
-    expect(world.economy.funds).toBe(500 + 60000);
+    expect(world.economy.funds).toBe(500 + 50000);
     expect(loan?.paidMonths).toBe(0);
     // Vrací se víc, než přišlo: to je ten úrok.
-    expect(loan?.remaining).toBeGreaterThan(60000);
+    expect(loan?.remaining).toBeGreaterThan(50000);
   });
 
   it('splátky ubírají dluh a po doplacení půjčka zmizí', () => {
@@ -150,7 +175,7 @@ describe('sjednání a splácení', () => {
   it('na co město nemá, to nesplatí — a rating klesne', () => {
     const balance = VANILLA_BALANCE;
     const world = city(10000, 1_000_000);
-    const loan = takeLoan(world, balance, 100000, 24);
+    const loan = takeLoan(world, balance, 40000, 24);
     if (!loan) throw new Error('půjčka nevznikla');
 
     world.economy.funds = 0;
@@ -170,7 +195,7 @@ describe('sjednání a splácení', () => {
     expect(balance.finance.ratingRecovery).toBeLessThan(balance.finance.missedPenalty);
 
     const world = city(10000, 1_000_000);
-    takeLoan(world, balance, 100000, 24);
+    takeLoan(world, balance, 40000, 24);
     world.economy.funds = 0;
     payLoans(world, balance);
     const wounded = world.economy.creditRating;
@@ -233,7 +258,7 @@ describe('sjednání a splácení', () => {
     expect(requestLoan(world, balance, 999999999, 24)).toEqual({
       ok: false,
       reason: 'error.overLoanCap',
-      params: { cap: loanCap(world, balance) },
+      params: { cap: loanCap(world, balance, 24), months: 24 },
     });
     expect(requestLoan(world, balance, 1000, 1)).toEqual({
       ok: false,

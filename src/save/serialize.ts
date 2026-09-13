@@ -21,6 +21,16 @@ import type {
   SaveTransitState,
 } from './format';
 
+/**
+ * Stupeň komprese ZIPu.
+ *
+ * Jde ven jen kvůli **snímku pro „Zpět"**, který nikdy neputuje na disk
+ * (T-revize, nález 33): mačkat kvůli pěti sekundám v paměti pět megabajtů
+ * deflatem na devítce znamenalo zaseknutí při každém kliknutí buldozerem.
+ * Nula zůstane u kopie bufferů, formát se nemění a načte se úplně stejně.
+ */
+export type ZipLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+
 export interface SaveOptions {
   cityName: string;
   /** Čas se předává zvenčí — `save/` tak zůstává čistá funkce a fixtury jdou přibít. */
@@ -276,20 +286,24 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
  * pokaždé jinak — a fixtura by se nedala vygenerovat znovu a porovnat s tou
  * v repozitáři. Vyplavalo to při psaní fixtury v5 (T40).
  */
-export function packSave(save: SaveData): Uint8Array {
+export function packSave(save: SaveData, level: ZipLevel = 9): Uint8Array {
   const mtime = save.meta.modifiedAt;
   return zipSync({
     [SAVE_FILES.meta]: [strToU8(JSON.stringify(save.meta, null, 2)), { level: 0, mtime }],
-    [SAVE_FILES.layers]: [save.layers, { level: 9, mtime }],
-    [SAVE_FILES.coarse]: [save.coarse, { level: 9, mtime }],
-    [SAVE_FILES.heights]: [save.heights, { level: 9, mtime }],
-    [SAVE_FILES.disasters]: [save.disasters, { level: 9, mtime }],
-    [SAVE_FILES.terraform]: [save.terraform, { level: 9, mtime }],
-    [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level: 9, mtime }],
-    [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level: 9, mtime }],
+    [SAVE_FILES.layers]: [save.layers, { level, mtime }],
+    [SAVE_FILES.coarse]: [save.coarse, { level, mtime }],
+    [SAVE_FILES.heights]: [save.heights, { level, mtime }],
+    [SAVE_FILES.disasters]: [save.disasters, { level, mtime }],
+    [SAVE_FILES.terraform]: [save.terraform, { level, mtime }],
+    [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level, mtime }],
+    [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level, mtime }],
   });
 }
 
-export function serializeSave(world: WorldState, options: SaveOptions): Uint8Array {
-  return packSave(toSaveData(world, options));
+export function serializeSave(
+  world: WorldState,
+  options: SaveOptions,
+  level: ZipLevel = 9,
+): Uint8Array {
+  return packSave(toSaveData(world, options), level);
 }

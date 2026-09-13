@@ -896,6 +896,8 @@ export interface Balance {
   finance: {
     /** Kolikanásobek měsíčního příjmu si smí město půjčit dohromady. */
     loanIncomeMultiple: number;
+    /** Jakou část měsíčního příjmu smí spolknout splátka. Odvozuje se z ní strop. */
+    loanPaymentShare: number;
     maxLoans: number;
     minTermMonths: number;
     maxTermMonths: number;
@@ -2286,6 +2288,7 @@ function validateFinance(
       0,
       1000,
     ),
+    loanPaymentShare: num(issues, raw, 'loanPaymentShare', 'finance.loanPaymentShare', 0, 1),
     maxLoans: num(issues, raw, 'maxLoans', 'finance.maxLoans', 1, 100),
     minTermMonths: num(issues, raw, 'minTermMonths', 'finance.minTermMonths', 1, 1000),
     maxTermMonths: num(issues, raw, 'maxTermMonths', 'finance.maxTermMonths', 1, 1000),

@@ -55,6 +55,31 @@ export function pan(camera: Camera, deltaViewX: number, deltaViewY: number): voi
   camera.y -= deltaViewY / camera.zoom;
 }
 
+/** Kam až smí střed kamery, v projekčních souřadnicích. */
+export interface CameraBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+/**
+ * Srovná kameru zpátky nad mapu.
+ *
+ * Posun neměl **žádné omezení** — strop existoval jen u měřítka, takže dvěma
+ * prsty, prostředním tlačítkem i šipkami šlo odjet libovolně daleko za okraj.
+ * Na obrazovce pak zbylo prázdno a hra neměla jediný prvek, kterým se vrátit
+ * (T-revize, nález 18). Samotné tlačítko „na město" nestačí, když se dá odjet
+ * do nekonečna; tohle je ta druhá polovina.
+ *
+ * Volá se **po** posunu i po přiblížení, ne místo nich: zoom k bodu kamerou
+ * taky hýbe.
+ */
+export function clampCamera(camera: Camera, bounds: CameraBounds): void {
+  camera.x = Math.max(bounds.minX, Math.min(bounds.maxX, camera.x));
+  camera.y = Math.max(bounds.minY, Math.min(bounds.maxY, camera.y));
+}
+
 /**
  * Zoom **k pozici kurzoru**, ne ke středu obrazovky: bod pod kurzorem zůstane
  * po změně měřítka na stejném místě. Při zastropovaném zoomu se kamera neposune.

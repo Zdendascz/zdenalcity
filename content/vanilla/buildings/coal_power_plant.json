@@ -28,7 +28,7 @@
     "production": 24000
   },
   "environment": {
-    "pollution": 10
+    "pollution": 14
   },
   "graphics": {
     "color": "#5a5a62",

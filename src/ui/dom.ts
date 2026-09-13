@@ -14,10 +14,17 @@ export function el<K extends keyof HTMLElementTagNameMap>(
 export function button(className: string, onClick: () => void): HTMLButtonElement {
   const node = el('button', className);
   node.type = 'button';
-  node.addEventListener('click', () => {
+  node.addEventListener('click', (event) => {
     // Bez odebrání fokusu by mezerník mačkal naposledy kliknuté tlačítko
     // místo toho, aby panoval mapou.
-    node.blur();
+    //
+    // Týká se to ale **jen myši** (T-revize, nález 25). Prohlížeč posílá
+    // `click` i při aktivaci z klávesnice a ty dvě se rozliší snadno:
+    // `detail` je počet kliknutí, u klávesnice tedy nula. Do teď fokus skákal
+    // na začátek dokumentu i po Enteru, takže kdo procházel rozhraní Tabem,
+    // otevřel panel a další Tab ho poslal zase na začátek — k obsahu toho
+    // panelu se proklikával celým rozhraním dokola.
+    if (event.detail > 0) node.blur();
     onClick();
   });
   return node;

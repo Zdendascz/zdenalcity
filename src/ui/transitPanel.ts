@@ -6,7 +6,7 @@ import { lineFault, lineProblems, lineRuns, modeOf, noStats } from '@/sim/transi
 import type { WorldState } from '@/sim/world';
 import { button, el } from './dom';
 import { formatNumber } from './format';
-import { iconSvg } from './icons';
+import { iconSvg, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
 
@@ -151,12 +151,7 @@ export class TransitPanel {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
 
-    const header = el('div', 'sheet__header');
-    header.appendChild(el('h2', 'sheet__title', t('ui.transit.title')));
-    const close = button('chip chip--tight', () => this.toggle());
-    close.appendChild(iconSvg('close'));
-    header.appendChild(close);
-    this.root.appendChild(header);
+    this.root.appendChild(sheetHeader(t('ui.transit.title'), t('ui.common.close'), () => this.toggle()));
 
     // Módy jsou z katalogu, ne z výčtu v kódu (P5) — mod si přidá svůj a
     // tlačítko na něj se objeví samo.

@@ -48,11 +48,25 @@ export function createPollutionSystem(catalogue: BuildingCatalogue, balance: Bal
         const emitted = definition.environment?.pollution ?? 0;
         if (emitted <= 0) continue;
 
+        // Kouř se **rozprostře po půdorysu**, ne do jedné buňky pod předním
+        // rohem (T-revize, nález 13). Do teď zamořila elektrárna 6 × 6 přesně
+        // tolik buněk co budka 1 × 1 — velikost stavby na rozsah škody neměla
+        // vliv a hráč neměl proč velké zdroje odsouvat dál od lidí. Celkové
+        // množství zůstává stejné, dělí se **podle počtu dlaždic** v buňce,
+        // takže se s ním nehýbe, jen se rozloží tam, kde stavba doopravdy je.
         const [width, depth] = definition.footprint;
-        const cornerX = Math.min(building.x + width - 1, world.size - 1);
-        const cornerY = Math.min(building.y + depth - 1, world.size - 1);
-        const at = coarseIndex(cornerX, cornerY, world.size);
-        sources[at] = (sources[at] ?? 0) + emitted;
+        const tiles = Math.max(1, width * depth);
+        const share = emitted / tiles;
+        for (let dx = 0; dx < width; dx++) {
+          const x = building.x + dx;
+          if (x >= world.size) break;
+          for (let dy = 0; dy < depth; dy++) {
+            const y = building.y + dy;
+            if (y >= world.size) break;
+            const at = coarseIndex(x, y, world.size);
+            sources[at] = (sources[at] ?? 0) + share;
+          }
+        }
       }
 
       const generatedWaste = population * balance.waste.perCitizen;

@@ -138,14 +138,14 @@
     "unemployment": 60,
     "minDemandFactor": 0.3,
     "weights": {
-      "parks": 0.4,
-      "culture": 0.5,
-      "social": 0.5,
-      "health": 0.3,
-      "education": 0.3,
-      "police": 0.2,
-      "fire": 0.15,
-      "transit": 0.25
+      "parks": 0.085,
+      "culture": 0.105,
+      "social": 0.105,
+      "health": 0.065,
+      "education": 0.065,
+      "police": 0.04,
+      "fire": 0.035,
+      "transit": 0.05
     }
   },
   "health": {
@@ -192,6 +192,7 @@
   },
   "finance": {
     "loanIncomeMultiple": 24,
+    "loanPaymentShare": 0.25,
     "maxLoans": 3,
     "minTermMonths": 12,
     "maxTermMonths": 120,

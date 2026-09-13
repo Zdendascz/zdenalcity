@@ -46,13 +46,33 @@ export function createTrafficSystem(catalogue: BuildingCatalogue, balance: Balan
     interval: INTERVAL,
     offset: OFFSET,
     run(world: WorldState) {
-      world.trafficLoad.fill(0);
-
       const homes = residentialBuildings(world, catalogue);
-      if (homes.length === 0) return;
+      if (homes.length === 0) {
+        world.trafficLoad.fill(0);
+        return;
+      }
 
       const destinations = jobTiles(world, catalogue);
       const sample = takeSample(world, homes, balance.traffic.maxBuildingsPerRun);
+
+      // Zátěž se **nevynuluje, jen zeslábne** (T-revize, nález 9).
+      //
+      // Jeden běh projde nejvýš `maxBuildingsPerRun` domů. Když se před ním
+      // vrstva vynulovala, vyrobilo město s tisícem domů stejnou zátěž jako
+      // město se stovkou — kolony se s městem přestaly zvětšovat a široká
+      // třída neměla proti ulici důvod. Navíc to blikalo: vzorek jde po id,
+      // takže se rozsvítila vždy jiná čtvrť.
+      //
+      // Útlum je nastavený tak, aby **jeden oběh kurzoru estimát právě jednou
+      // vyměnil**: při vzorku `s` z `n` domů zůstává `1 − s/n`, takže ustálená
+      // hodnota vyjde na součet přes všechny domy, ne přes vzorek. Město,
+      // které se do jednoho vzorku vejde, má útlum nulový — tedy přesně to,
+      // co se dělo do teď.
+      const keep = 1 - sample.length / homes.length;
+      if (keep <= 0) world.trafficLoad.fill(0);
+      else for (let tile = 0; tile < world.trafficLoad.length; tile++) {
+        world.trafficLoad[tile] = (world.trafficLoad[tile] ?? 0) * keep;
+      }
 
       for (const building of sample) {
         const footprint = catalogue.get(building.definitionId)?.footprint ?? [1, 1];

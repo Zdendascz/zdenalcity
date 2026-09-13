@@ -138,6 +138,15 @@ export function createLevelSystem(catalogue: BuildingCatalogue, balance: Balance
  * zbrojnice tak celou čtvrť nezachrání, ale ani město bez jediné školy nezačne
  * plošně chátrat kvůli té jedné chybějící třídě.
  *
+ * Průměruje se jen přes třídy, které se počítají **k dobru**, tedy ty s kladnou
+ * váhou ve spokojenosti nebo v ceně půdy. `world.coverage` nese vedle služeb
+ * i obtěžování: věznice do něj zapisuje třídu `prison` úplně stejnou cestou
+ * jako hasičárna třídu `fire` (`systems/services.ts`), a její pokrytí je
+ * všude nula — nikdo nechce být pokrytý věznicí. Postavená věznice tak přidala
+ * devátou vrstvu samých nul, průměr spadl pod práh a začaly chátrat staré domy
+ * ve čtvrtích, se kterými hráč nic nedělal, kdežto domy hned u věznice chátrat
+ * přestaly. Tatáž past, jaká se řešila u poradce (`sim/advisor.ts`).
+ *
  * Kolik penalizace dělá, je věc balancu (`levels.decayPenalty`) — doplněk
  * zadání, které výši neurčuje.
  */
@@ -145,7 +154,13 @@ function neglectPenalty(
   world: WorldState,
   balance: Balance,
 ): (building: { builtAtTick: number }, cell: number) => number {
-  const coverages = [...world.coverage.values()];
+  const coverages: Readonly<Uint8Array>[] = [];
+  for (const [serviceClass, coverage] of world.coverage) {
+    const wanted =
+      (balance.happiness.weights[serviceClass] ?? 0) > 0 ||
+      (balance.landValue.weights[serviceClass] ?? 0) > 0;
+    if (wanted) coverages.push(coverage);
+  }
 
   return (building, cell) => {
     if (world.tick - building.builtAtTick < balance.levels.decayAge) return 0;

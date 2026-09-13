@@ -1,7 +1,7 @@
 import type { StatBreakdown } from '@/sim/statBreakdown';
-import { button, el } from './dom';
+import { el } from './dom';
 import { formatNumber } from './format';
-import { iconSvg } from './icons';
+import { sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
 
@@ -69,12 +69,7 @@ export class StatPanel {
     const t = (name: string, params?: Record<string, string | number>) => this.i18n.t(name, params);
     this.root.replaceChildren();
 
-    const header = el('div', 'sheet__header');
-    header.appendChild(el('h2', 'sheet__title', t(`ui.hud.${key}`)));
-    const close = button('chip chip--tight', () => this.close());
-    close.appendChild(iconSvg('close'));
-    header.appendChild(close);
-    this.root.appendChild(header);
+    this.root.appendChild(sheetHeader(t(`ui.hud.${key}`), t('ui.common.close'), () => this.close()));
 
     const columns = el('div', 'stat__columns');
     columns.appendChild(this.column(t('ui.stat.plus'), breakdown.plus, 'is-income'));

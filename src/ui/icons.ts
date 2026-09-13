@@ -1,5 +1,6 @@
 import { ICON_SHAPES } from '@/render/icons';
 import type { IconShape } from '@/render/icons';
+import { button, el } from './dom';
 
 /**
  * Ikony v uživatelském rozhraní.
@@ -476,6 +477,14 @@ const UI_SHAPES: Readonly<Record<string, Shape>> = {
   'view-grid': GRID,
   'zoom-in': magnifier(1),
   'zoom-out': magnifier(-1),
+  // Terč: „vrať kameru nad město". Kruh a čtyři rysky se čtou i na 24 bodech.
+  'focus-city': [
+    ring(0.5, 0.5, 0.2, 0.3),
+    bar(0.46, 0.06, 0.54, 0.2),
+    bar(0.46, 0.8, 0.54, 0.94),
+    bar(0.06, 0.46, 0.2, 0.54),
+    bar(0.8, 0.46, 0.94, 0.54),
+  ],
   more: MORE,
   reload: RELOAD,
   'speed-pause': [bar(0.24, 0.12, 0.44, 0.88), bar(0.56, 0.12, 0.76, 0.88)],
@@ -548,4 +557,32 @@ export function polygonIcon(name: string): SVGSVGElement {
   }
 
   return svg;
+}
+
+/**
+ * Záhlaví panelu: nadpis vlevo, křížek vpravo.
+ *
+ * Bylo to sedmkrát opsané a **pokaždé bez popisku** (T-revize, nález 22).
+ * Ikona je pro odečítačku schválně skrytá, takže tlačítko nemělo přístupné
+ * jméno vůbec: odečítačka ohlásila „tlačítko" a nic víc — a je to jediné
+ * tlačítko v záhlaví, takže hráč neměl jak zjistit, že tudy vede cesta ven.
+ * Jedna funkce navíc znamená, že se sedm míst už nemůže rozejít.
+ *
+ * `heading` je `h2` všude kromě modálních oken, kde je nadpis dokumentu.
+ */
+export function sheetHeader(
+  title: string,
+  closeLabel: string,
+  onClose: () => void,
+  options: { heading?: 'h1' | 'h2'; titleClass?: string } = {},
+): HTMLElement {
+  const header = el('div', 'sheet__header');
+  header.appendChild(el(options.heading ?? 'h2', options.titleClass ?? 'sheet__title', title));
+
+  const close = button('chip chip--tight', onClose);
+  close.appendChild(iconSvg('close'));
+  close.title = closeLabel;
+  close.setAttribute('aria-label', closeLabel);
+  header.appendChild(close);
+  return header;
 }

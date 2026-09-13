@@ -13,6 +13,7 @@ import {
   unpackSave,
 } from '@/save/deserialize';
 import type { LoadWarnings } from '@/save/deserialize';
+import type { SaveMeta } from '@/save/format';
 import { checkFootprint } from '@/sim/buildings';
 import {
   estimateCornerHeight,
@@ -95,7 +96,7 @@ import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
 import { BuildingRenderer } from './buildingRenderer';
 import type { AppearanceLookup } from './buildingRenderer';
-import { createCamera, pan, viewportToWorld, zoomAt } from './camera';
+import { clampCamera, createCamera, pan, viewportToWorld, zoomAt } from './camera';
 import { ChunkRenderer, viewportFor } from './chunkRenderer';
 import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
 import type { OverlayMode } from './chunkRenderer';
@@ -118,7 +119,7 @@ import {
   TRAFFIC_COLORS,
 } from './palette';
 import { pickTile } from './picking';
-import { gridToScreen, LEVEL_H, tileQuad } from './projection';
+import { gridToScreen, LEVEL_H, TILE_H, TILE_W, tileQuad } from './projection';
 
 /** Jeden krok kolečka = násobitel zoomu. */
 const ZOOM_STEP = 1.15;
@@ -144,6 +145,11 @@ const LONG_PRESS_MS = 450;
  * cenou nejlevnější elektrárny, takže se nabídka objeví u všeho, co bolí.
  */
 const UNDO_PRICE = 2000;
+
+/** Jak často se město uloží samo, když hra běží. */
+const AUTOSAVE_EVERY_MS = 120_000;
+/** Každé N-té periodické uložení se ověří celé, ostatní se ověřením nezdržují. */
+const AUTOSAVE_VERIFY_EVERY = 5;
 
 /**
  * Měřítko, ve kterém se na telefonu začíná.
@@ -919,6 +925,24 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Rozcestník: značka, snímky ze hry a tři cesty dál — pokračovat, nové
   // město, nebo načíst soubor. Dialog nové hry z něj vychází, nezanikl.
   const canResume = await platform.storage.has('autosave');
+  /*
+   * Co je v rozehraném městě.
+   *
+   * Rozcestník to potřebuje na dvě věci: napsat do tlačítka „Pokračovat",
+   * o které město jde, a varovat u „Nové město", že ho nová hra přepíše
+   * (T-revize, nález 30). Metadata se čtou bez rozbalení zbytku — save je má
+   * nekomprimovaná právě proto. Nečitelný autosave tu **nic nerozbije**:
+   * rozcestník se prostě zeptá jako dřív.
+   */
+  const resumeBytes = canResume ? await platform.storage.read('autosave') : null;
+  let resumeMeta: SaveMeta | null = null;
+  if (resumeBytes) {
+    try {
+      resumeMeta = readSaveMeta(resumeBytes);
+    } catch {
+      resumeMeta = null;
+    }
+  }
   // Autosave, který se minule nepodařilo načíst. Neleží tam nic než důkaz —
   // hráč si ho může stáhnout a poslat, nebo ho zahodit (audit N4).
   const damagedSave = await platform.storage.read('corrupt');
@@ -932,6 +956,24 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           canResume,
           readFile: (file) => platform.files.read(file),
           catalogue: content,
+          languages: {
+            list: content.getLanguages(),
+            current: () => i18n.getLanguage(),
+            set: (language) => i18n.setLanguage(language),
+          },
+          ...(resumeMeta
+            ? {
+                resumeInfo: {
+                  name: resumeMeta.city.name,
+                  playtimeSeconds: resumeMeta.playtimeSeconds,
+                  download: () => {
+                    if (resumeBytes) {
+                      platform.files.save(resumeBytes, `${resumeMeta.city.name || 'zdenalcity'}.city`);
+                    }
+                  },
+                },
+              }
+            : {}),
           ...(damagedSave
             ? {
                 damaged: {
@@ -1282,7 +1324,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const [variant] = content.getTileVariants(name);
     return variant === undefined ? undefined : content.getTile(name, variant);
   }, () => cityUtilities(simWorld, content, content.getBalance()));
-  const financePanel = new FinancePanel(mount, i18n, dispatch);
+  const financePanel = new FinancePanel(mount, i18n, dispatch, content, content.grants());
   const transitPanel = new TransitPanel(mount, i18n, dispatch, {
     onPickStop: (lineId) => {
       message = { key: 'ui.transit.pickHint', params: { id: lineId } };
@@ -1343,10 +1385,28 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   window.addEventListener('error', (event) => reportCrash(event.message));
   window.addEventListener('unhandledrejection', (event) => reportCrash(String(event.reason)));
 
-  const startedAt = Date.now();
-  const createdAt = new Date(startedAt).toISOString();
+  /**
+   * Odkdy se počítá doba hraní a kdy město vzniklo.
+   *
+   * Obojí se přepisuje při načtení na místě: hraná hra je od té chvíle **to
+   * načtené město**, ne to předchozí (T-revize, nález 37).
+   */
+  let startedAt = Date.now();
+  let createdAt = new Date(startedAt).toISOString();
   /** Rychlý save drží jen v paměti; do souboru se ukládá tlačítkem. */
   let message: Message | null = null;
+
+  /**
+   * Snímek města pro nabídku „Zpět".
+   *
+   * Ukládá se **bez komprese**: na disk nikdy nepůjde a žije nejvýš pět
+   * sekund, kdežto deflate na devítce dělal z mapy 512 × 512 pět megabajtů
+   * mačkaných synchronně v obsluze stisku — tedy zaseknutí při každém kliknutí
+   * buldozerem, i při tom, které příkaz odmítl (T-revize, nález 33).
+   */
+  function undoSnapshotNow(): Uint8Array {
+    return serializeSave(simWorld, saveOptions(), 0);
+  }
 
   function saveOptions() {
     return {
@@ -1384,6 +1444,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const save = plan.save;
       const warnings = collectLoadWarnings(save, content, content.getLoadedSources());
       applySaveToWorld(simWorld, save);
+
+      // **Město si nese svoje jméno.** Do teď se jméno nastavovalo jen při
+      // startu, takže se načtený Zlín od téhle chvíle ukládal jako „Brno" —
+      // do autosave i do staženého souboru — a původní jméno bylo nevratně
+      // pryč. Totéž platilo pro datum vzniku a odehraný čas (nález 37).
+      cityName = save.meta.city.name;
+      createdAt = save.meta.createdAt;
+      startedAt = Date.now() - save.meta.playtimeSeconds * 1000;
+
+      // Běhový stav hlášení patří k **předchozímu** městu (nález 4).
+      resetRuntimeNotices();
       // Loňskou uzávěrku už hráč viděl, když se zavírala. Bez tohohle by mu
       // vyskočila znovu při každém načtení téhož města.
       if (simWorld.economy.lastYear) yearReport.markSeen(simWorld.economy.lastYear.year);
@@ -1460,11 +1531,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     return false;
   }
 
-  function autosaveNow(): void {
+  /**
+   * Kdy se naposledy povedlo uložit samo. `0` = ještě nikdy.
+   *
+   * Čte to panel uložení: hráč do teď neměl z čeho poznat, jestli se vůbec
+   * někdy uložilo.
+   */
+  let lastAutosaveAt = 0;
+  /** Kolik milisekund zbývá do dalšího automatického uložení. */
+  let autosaveDue = AUTOSAVE_EVERY_MS;
+  /** Kolikáté periodické uložení běží. Každé páté se pro jistotu ověří. */
+  let autosaveRuns = 0;
+
+  function autosaveNow(verify = true): void {
     if (restarting) return;
     try {
       const bytes = serializeSave(simWorld, saveOptions());
-      if (!saveIsReadable(bytes)) return;
+      if (verify && !saveIsReadable(bytes)) return;
 
       // Bez `await`: na `pagehide` už není kam čekat. Zápis v prohlížeči běží
       // synchronně, takže se stihne — a kdyby jednou neběžel, je to věc
@@ -1477,7 +1560,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       void platform.storage
         .write('autosave', bytes)
         .then((stored) => {
-          if (stored || autosaveWarned) return;
+          if (stored) {
+            lastAutosaveAt = Date.now();
+            return;
+          }
+          if (autosaveWarned) return;
           autosaveWarned = true;
           notifications.show(i18n.t('ui.save.autosaveFailed'));
         });
@@ -1633,6 +1720,79 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const armedManually = new Set<number>();
 
   /**
+   * Vybere frontu zpráv z financí a řekne je hráči.
+   *
+   * Přiznaný grant, zmeškaná splátka, nezaplacený kupón i propadlý dluhopis
+   * se do teď **zahazovaly** rovnou v simulaci: za tisíc obyvatel přiteklo
+   * 8 000 a hráč nedostal ani slovo, po pár zmeškaných splátkách mu panel
+   * nabídl 12 % místo 4 % a neřekl proč (T-revize, nálezy 11 a 12).
+   *
+   * Fronta se **vyprázdní** — je to jednosměrný kanál a druhé čtení téže
+   * zprávy by znamenalo druhou bublinu o témže grantu.
+   */
+  function announceFinance(): void {
+    const notices = simWorld.financeNotices;
+    if (notices.length === 0) return;
+
+    for (const notice of notices.splice(0, notices.length)) {
+      switch (notice.kind) {
+        case 'grant': {
+          const grant = content.grants().find((candidate) => candidate.id === notice.grantId);
+          notifications.show(
+            i18n.t('ui.notice.grantAwarded', {
+              name: grant ? i18n.t(grant.name) : notice.grantId,
+              amount: formatNumber(notice.amount),
+            }),
+          );
+          break;
+        }
+        case 'missedPayment':
+          notifications.show(i18n.t('ui.notice.missedPayment', { count: notice.count }));
+          break;
+        case 'missedCoupon':
+          notifications.show(i18n.t('ui.notice.missedCoupon', { count: notice.count }));
+          break;
+        case 'bondDefault':
+          notifications.show(i18n.t('ui.notice.bondDefault'));
+          break;
+        case 'bondDue':
+          notifications.show(i18n.t('ui.notice.bondDue', { years: notice.years }));
+          break;
+      }
+    }
+  }
+
+  /**
+   * Vynuluje **běhový stav hlášení**. Volá načtení města i start.
+   *
+   * Množina ohlášených pohrom žila po celou dobu běhu, kdežto čítač
+   * `disasters.nextId` se bere ze savu. Po načtení se tedy id vrátila do
+   * minulosti, množina ne — a každá nová pohroma vypadala jako už ohlášená.
+   * Město od té chvíle hořelo potichu: žádné okno, žádná pauza, tedy přesně
+   * to, kvůli čemu okno vzniklo (T-revize, nález 4).
+   *
+   * Řeší se to **jedním místem pro všechno běhové**, ne záplatou na `announced`:
+   * stejnou past má každý příznak, který si pamatuje „tohle jsem už hlásil",
+   * a u příštího počítadla by se to stalo znovu.
+   */
+  function resetRuntimeNotices(): void {
+    announced.clear();
+    armedManually.clear();
+    reportedBlockers.clear();
+    wasBroke = world.economy.funds < 0;
+    hadPowerShortage = false;
+    lastPowerOffline = 0;
+    utilityShortage.waste = false;
+    utilityShortage.sewage = false;
+    utilityShortage.water = false;
+    // Fronta zpráv z financí patří k předchozímu městu.
+    simWorld.financeNotices.length = 0;
+    // Karta parcely a nabídka „Zpět" mluví o městě, které už není.
+    buildingInfo.hide();
+    undoBar.hide();
+  }
+
+  /**
    * Ohlásí nově vzniklé pohromy a hru zastaví.
    *
    * Pauza je součást zprávy, ne zdvořilost. Hráč, který si zrovna odskočil, se
@@ -1664,6 +1824,48 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const point = gridToScreen(x, y);
     camera.x = point.x;
     camera.y = point.y;
+  }
+
+  /**
+   * Meze pro střed kamery: mapa plus rezerva pár dlaždic.
+   *
+   * Mapa je v projekci kosočtverec od `(0,0)` po `(size,size)`, takže vodorovně
+   * sahá na obě strany o půl šířky dlaždice krát velikost mapy a svisle od
+   * severního rohu k jižnímu. Rezerva je proto, aby šlo dojet na okraj a vidět
+   * i to, co za ním je — ne aby šlo odjet do prázdna (nález 18).
+   */
+  const CAMERA_MARGIN_TILES = 6;
+  function cameraBounds(): { minX: number; maxX: number; minY: number; maxY: number } {
+    const size = world.size;
+    const marginX = (CAMERA_MARGIN_TILES * TILE_W) / 2;
+    const marginY = (CAMERA_MARGIN_TILES * TILE_H) / 2;
+    return {
+      minX: -(size * TILE_W) / 2 - marginX,
+      maxX: (size * TILE_W) / 2 + marginX,
+      minY: -marginY,
+      maxY: size * TILE_H + marginY,
+    };
+  }
+
+  /**
+   * Kamera nad střed města, nebo nad střed mapy, když ještě žádné není.
+   *
+   * Střed se počítá z **obydlených** budov: hráč, který si odjel za okraj,
+   * se chce vrátit tam, kde bydlí lidi, ne k první postavené trafostanici.
+   */
+  function focusCity(): void {
+    let sumX = 0;
+    let sumY = 0;
+    let people = 0;
+    for (const building of world.buildings.values()) {
+      if (building.abandoned || building.population === 0) continue;
+      sumX += building.x * building.population;
+      sumY += building.y * building.population;
+      people += building.population;
+    }
+    if (people > 0) centreOn(sumX / people, sumY / people);
+    else centreOn(world.size / 2, world.size / 2);
+    clampCamera(camera, cameraBounds());
   }
 
   /**
@@ -1746,9 +1948,22 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       return tiles;
     }
 
-    for (let x = x0; x <= x1; x++) tiles.push({ x, y: dragAnchor.y });
-    for (let y = y0; y <= y1; y++) {
+    // Pořadí je **od kotvy k ukazateli**, ne od menší souřadnice k větší
+    // (T-revize, nález 6). Vozovka na vodě potřebuje sousední silnici, takže
+    // most se staví od břehu. Když hráč táhl doleva nebo nahoru, začínalo se
+    // uprostřed vody: první dlaždice spadla a s ní zbytek, a hra k tomu
+    // oznámila „Most musí začínat na břehu, ne uprostřed vody" — tedy přesně
+    // to, co hráč udělal. Opačným směrem to fungovalo. Kotva je jediné místo,
+    // o kterém hráč ví, že je napojené.
+    const stepX = Math.sign(hoveredTile.x - dragAnchor.x) || 1;
+    for (let x = dragAnchor.x; ; x += stepX) {
+      tiles.push({ x, y: dragAnchor.y });
+      if (x === hoveredTile.x) break;
+    }
+    const stepY = Math.sign(hoveredTile.y - dragAnchor.y) || 1;
+    for (let y = dragAnchor.y; ; y += stepY) {
       if (y !== dragAnchor.y) tiles.push({ x: hoveredTile.x, y });
+      if (y === hoveredTile.y) break;
     }
     return tiles;
   }
@@ -1970,6 +2185,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Lupa přibližuje **doprostřed obrazovky**. Kolečko se drží kurzoru,
     // jenže tlačítko žádný kurzor nemá a držet se jeho vlastní polohy by
     // znamenalo přibližovat k pravému dolnímu rohu.
+    onFocusCity: () => focusCity(),
     onZoom: (factor) =>
       zoomAt(camera, factor, app.screen.width / 2, app.screen.height / 2, app.screen.width, app.screen.height),
     onReload: () => void reloadNewVersion(),
@@ -2190,7 +2406,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (worst === 'ui.parcel.blocked.noDemand') return;
 
     reportedBlockers.add(worst);
-    notifications.show(i18n.t('ui.notice.nothingGrows', { reason: i18n.t(worst) }));
+    // Chybějící voda má **vlastní, konkrétní hlášku** (T-revize, nález 1):
+    // leží v překladu hotová a vysvětluje přesně tuhle situaci, kdežto obecné
+    // „nic neroste, protože chybí voda" hráči neřekne, co s tím.
+    notifications.show(
+      worst === 'error.needsWater'
+        ? i18n.t('ui.notice.zonesWithoutWater')
+        : i18n.t('ui.notice.nothingGrows', { reason: i18n.t(worst) }),
+    );
   }
 
   /** Poslední pozice kurzoru — cenovka se překresluje každý snímek. */
@@ -2290,7 +2513,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           ? 'ui.undo.built'
           : null;
     if (undoKey !== null && undoSnapshot === null) {
-      undoSnapshot = serializeSave(simWorld, saveOptions());
+      undoSnapshot = undoSnapshotNow();
     }
     let undone = false;
 
@@ -2532,20 +2755,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         beginGesture();
         return;
       }
-      startLongPress(event);
+      // Dlouhý stisk se **nezakládá u nástroje, který už zabral**: jinak se
+      // akce provedla a nad zbouranou parcelou se pak ještě otevřela její
+      // karta (T-revize, nález 19). Míření prstem akci odkládá až na zvednutí,
+      // takže tam dlouhý stisk smysl dává — ten ji zruší.
+      if (!actsOnTouchDown(event)) startLongPress(event);
     }
 
     if (isPanButton(event)) {
       dragPointerId = event.pointerId;
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
-      // Zachycení smí selhat (prst, který mezitím zmizel), stejně jako
-      // u míření budovou. Posun tím nekončí, jen se hůř drží.
-      try {
-        canvas.setPointerCapture(event.pointerId);
-      } catch {
-        // Nic. Padat kvůli tomu do hlášky „chyba v běhu hry" je horší.
-      }
+      capturePointer(event.pointerId);
       const tile = activeTool.action.kind === 'pan' ? tileAt(event) : null;
       panStartedAt = tile ? { x: event.clientX, y: event.clientY, tile } : null;
       return;
@@ -2574,6 +2795,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Nástroje s náhledem se použijí až při puštění; ostatní hned.
     if (dragKind() !== null) {
       dragAnchor = { x: tile.x, y: tile.y };
+      // Dlaždice pod ukazatelem se nastaví **hned při stisku** (T-revize,
+      // nález 15). Do teď se plnila až pohybem, takže jedno klepnutí prstem
+      // dalo tah nulové délky, prázdný seznam dlaždic a vůbec žádný příkaz:
+      // hráč klepl na místo pro jeden kus ulice a nestalo se nic, ani hláška.
+      // Myší to fungovalo jen proto, že kurzor po mapě jezdí i bez stisku.
+      hoveredTile = { x: tile.x, y: tile.y };
+      // Tažení si zachytí ukazatel, aby přežilo přejezd přes lištu nástrojů
+      // (T-revize, nález 20). Panely mají zapnutý příjem kliknutí, takže
+      // plátno jinak dostane „ukazatel odešel" a rozdělaný tah se zahodil
+      // bez hlášky i bez výsledku.
+      capturePointer(event.pointerId);
       return;
     }
 
@@ -2590,26 +2822,69 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       hoveredTile = tileAt(event, AIM_LIFT) ?? tile;
       pointerX = event.offsetX;
       pointerY = event.offsetY;
-      // Zachycení smí selhat (prst, který mezitím zmizel). Míření tím
-      // nekončí — jen se hůř drží, když prst sjede z plátna.
-      try {
-        canvas.setPointerCapture(event.pointerId);
-      } catch {
-        // Nic. Sáhnout po výjimce je tu jediná rozumná reakce.
-      }
+      capturePointer(event.pointerId);
       return;
     }
 
+    // Malování tažením si ukazatel zachytí ze stejného důvodu jako tažení:
+    // přejezd přes lištu nástrojů nemá tah zabít (nález 20).
+    capturePointer(event.pointerId);
     applyTool(tile, event.offsetX, event.offsetY);
   });
 
-  /** Míří se tímhle stiskem budovou po dotykovém displeji? */
-  function aimsWithFinger(event: PointerEvent): boolean {
+  /**
+   * Mění tenhle nástroj svět **jedním klepnutím**?
+   *
+   * Silnice, potrubí a zóny sem nepatří: ty se kreslí tažením a mají vlastní
+   * cestu. Zbytek — stavba, buldozer, zvedání a snižování rohu, srovnání,
+   * sázení lesa — zabere okamžitě, a proto se na dotyku míří nad prst.
+   */
+  function instantTool(): boolean {
+    const kind = activeTool.action.kind;
     return (
-      event.pointerType === 'touch' &&
-      event.button === 0 &&
-      activeTool.action.kind === 'place'
+      kind === 'place' ||
+      kind === 'bulldoze' ||
+      kind === 'terraform' ||
+      kind === 'fill' ||
+      kind === 'plantTrees'
     );
+  }
+
+  /**
+   * Míří se tímhle stiskem prstem?
+   *
+   * Do T-revize to platilo **jen pro budovy**. Buldozer, zvedání rohu,
+   * srovnání i les zabraly v okamžiku doteku a na dlaždici, kterou prst kryje
+   * — u rohu navíc na cíl velký pár pixelů. Hráč neviděl ani náhled, ani cenu,
+   * a bořil naslepo. Rozdíl mezi „ukazuje se" a „koná se" přitom nemá být
+   * v tom, který nástroj to je (nález 19).
+   */
+  function aimsWithFinger(event: PointerEvent): boolean {
+    return event.pointerType === 'touch' && event.button === 0 && instantTool();
+  }
+
+  /** Zabere nástroj pod tímhle prstem hned při doteku? */
+  function actsOnTouchDown(event: PointerEvent): boolean {
+    return event.pointerType === 'touch' && instantTool();
+  }
+
+  /**
+   * Zachytí ukazatel, pokud to jde.
+   *
+   * Zachycení smí selhat (prst, který mezitím zmizel), a padat kvůli tomu do
+   * hlášky „chyba v běhu hry" je horší než tah, který se hůř drží.
+   */
+  function capturePointer(pointerId: number): void {
+    try {
+      canvas.setPointerCapture(pointerId);
+    } catch {
+      // Nic. Sáhnout po výjimce je tu jediná rozumná reakce.
+    }
+  }
+
+  /** Uvolní zachycení, jen když opravdu platí. Druhé uvolnění je výjimka. */
+  function releasePointer(pointerId: number): void {
+    if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
   }
 
   canvas.addEventListener('pointermove', (event) => {
@@ -2692,18 +2967,51 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // první odmítnutí — jinak by most přes řeku vyplivl deset stejných hlášek.
     if (action.kind !== 'road' && action.kind !== 'pipe') return;
 
+    /*
+     * Nejdřív se **sečte**, teprve pak staví (T-revize, nález 14).
+     *
+     * Kontrola peněz je uvnitř jedné dlaždice, takže se tažení dálnice přes
+     * dvacet polí stavělo do vyčerpání kasy: hráči zbyla půl silnice a nula.
+     * Půl silnice není levnější silnice, jsou to zmařené peníze — zóna se
+     * proto pokládá atomicky a tažení to má mít stejné.
+     */
+    const balance = content.getBalance();
+    const price =
+      action.kind === 'road'
+        ? tiles.reduce(
+            (sum, tile) => sum + estimateRoad(world, tile.x, tile.y, action.roadType, balance).total,
+            0,
+          )
+        : (activeTool.cost ?? 0) * tiles.length;
+
+    if (price > world.economy.funds) {
+      notifications.show(
+        i18n.t('error.notEnoughFunds', { cost: price, funds: world.economy.funds }),
+      );
+      return;
+    }
+
+    // Snímek pro „Zpět": nejdražší gesto ve hře ho do teď nemělo, přestože
+    // jediná budova za 2 000 ho dostane. Bere se jen u tahu, který stojí dost
+    // — u tří dlaždic ulice by nabídka jen překážela.
+    const snapshot = price >= UNDO_PRICE ? undoSnapshotNow() : null;
+
     let complained = false;
+    let built = 0;
     for (const tile of tiles) {
       const command: Command =
         action.kind === 'pipe'
           ? { type: 'build_pipe', x: tile.x, y: tile.y }
           : { type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType };
       const result = host.dispatch(command);
-      if (!result.ok && !complained && !isRoutine(result.reason)) {
+      if (result.ok) built++;
+      else if (!complained && !isRoutine(result.reason)) {
         complained = true;
         report(result);
       }
     }
+
+    if (snapshot !== null && built > 0) undoBar.show('ui.undo.drawn', snapshot);
   }
 
   function endDrag(event: PointerEvent): void {
@@ -2727,14 +3035,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
      */
     if (aimingPointer === event.pointerId) {
       aimingPointer = null;
-      // Zrušený ukazatel už zachycený není a uvolnit ho podruhé je výjimka.
-      if (canvas.hasPointerCapture(event.pointerId)) {
-        canvas.releasePointerCapture(event.pointerId);
-      }
+      releasePointer(event.pointerId);
       const tile = hoveredTile;
       hoveredTile = null;
       paintButton = null;
-      if (event.type === 'pointerup' && tile) applyTool(tile, pointerX, pointerY);
+      // Bod na obrazovce se posouvá **o tentýž zdvih jako dlaždice**. Bez toho
+      // by zvedání rohu sáhlo po rohu pod prstem, ne po tom v zaměřené
+      // dlaždici, a bublina s cenou by vyskočila jinde než náhled.
+      if (event.type === 'pointerup' && tile) applyTool(tile, pointerX, pointerY - AIM_LIFT);
       return;
     }
 
@@ -2745,8 +3053,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     paintButton = null;
     lastPaintedTile = -1;
     levelHeight = null;
+    releasePointer(event.pointerId);
     if (dragPointerId !== event.pointerId) return;
-    canvas.releasePointerCapture(event.pointerId);
     dragPointerId = null;
 
     // Pacička: klik bez tažení otevře detail, stejně jako pravé tlačítko.
@@ -2772,11 +3080,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
-  canvas.addEventListener('pointerleave', () => {
+  canvas.addEventListener('pointerleave', (event) => {
     // Míření prstem má zachycený ukazatel a `pointerleave` mu chodí i tehdy,
     // když prst z plátna neodešel. Zhasnout ho tady by náhled zabilo hned
     // v první milisekundě tahu.
     if (aimingPointer !== null) return;
+    // Totéž platí pro rozdělané tažení a malování: dokud ukazatel drží
+    // zachycení, „odešel" znamená jen to, že přejel přes lištu položenou na
+    // mapě — a zahozený tah bez hlášky i bez výsledku byla ta horší varianta
+    // (T-revize, nález 20). Zrušit se má, teprve když zachycení neplatí.
+    if (canvas.hasPointerCapture(event.pointerId)) return;
     hoveredTile = null;
     paintButton = null;
     panStartedAt = null;
@@ -2800,17 +3113,36 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // nad HUDem překrývá hru úplně stejně jako nad mapou.
   document.addEventListener('contextmenu', (event) => event.preventDefault());
 
+  /**
+   * Píše hráč právě do pole, nebo drží posuvník?
+   *
+   * Šipky a mezerník se zpracovávaly a zakazovaly dřív, než se vůbec zjistilo,
+   * kde je fokus — takže ťuknutí do výše půjčky klávesou nahoru posunulo mapu
+   * a posuvníkem financování nešlo hnout (T-revize, nález 39). Panování mapou
+   * má ustoupit tomu, kdo něco píše.
+   */
+  function typingSomewhere(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    const tag = target.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
   window.addEventListener('keydown', (event) => {
+    const typing = typingSomewhere(event.target);
+
     if (event.code === 'Space') {
       // Řeší se před kontrolou HUDu: mezerník musí panovat i tehdy, když má
       // fokus tlačítko v panelu. `preventDefault` zabrání tomu, aby tlačítko
       // mezerník zmáčkl a aby stránka odrolovala.
+      if (typing) return;
       event.preventDefault();
       spaceDown = true;
       return;
     }
 
     if (PAN_KEYS[event.code]) {
+      if (typing) return;
       // Šipky by jinak odrolovaly stránku.
       event.preventDefault();
       panKeys.add(event.code);
@@ -2861,6 +3193,14 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     }
 
     if (event.code === 'Escape') {
+      // **Nejdřív modální okno, teprve pak karta parcely** (T-revize,
+      // nález 26). Roční uzávěrka se přes obrazovku otevřela, hru zastavila
+      // a zavřít ji šlo jedině myší: Escape ji neznal a v okně nebylo nic
+      // zaostřeného, takže nefungoval ani Enter.
+      if (yearReport.isVisible()) {
+        yearReport.close();
+        return;
+      }
       buildingInfo.hide();
       return;
     }
@@ -2888,11 +3228,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   // `pagehide` pokrývá obnovení stránky, zavření karty i odchod jinam.
   // `visibilitychange` navíc přepnutí na jiný panel, po kterém se karta často
-  // už neprobudí.
-  window.addEventListener('pagehide', autosaveNow);
+  // už neprobudí. Samo o sobě to ale **nestačí**: kdo hraje tři hodiny v jedné
+  // kartě a spadne mu prohlížeč, měl v úložišti stav z chvíle, kdy naposledy
+  // přepnul panel (T-revize, nález 3). Od toho je odpočet v `renderFrame`.
+  window.addEventListener('pagehide', () => autosaveNow());
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') autosaveNow();
   });
+
+  // Běhový stav hlášení se srovná i na startu, ať je ta invariance na jednom
+  // místě a nespoléhá na to, že se pole náhodou zakládají prázdná.
+  resetRuntimeNotices();
 
   app.ticker.add((ticker) => {
     try {
@@ -2907,9 +3253,26 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   function renderFrame(deltaMS: number): void {
     host.step(deltaMS);
 
+    /*
+     * Automatické ukládání **i během hry** (nález 3).
+     *
+     * Ověření savu se u periodického ukládání většinou přeskakuje: je to
+     * druhý round-trip přes celé město a to, co hlídá — rozpor mezí mezi
+     * posuvníkem a loaderem — se mezi dvěma minutami skoro nikdy nezmění.
+     * „Skoro" je tu ale důležité: přesně takový rozpor uměl hráč vyrobit
+     * posuvníkem financování, takže se každé páté uložení ověří celé.
+     */
+    autosaveDue -= deltaMS;
+    if (autosaveDue <= 0) {
+      autosaveDue = AUTOSAVE_EVERY_MS;
+      autosaveRuns++;
+      autosaveNow(autosaveRuns % AUTOSAVE_VERIFY_EVERY === 1);
+    }
+
     // Hlásí se **po kroku**: pohroma, která právě vznikla, se má ohlásit
     // v témž snímku, ve kterém začala hořet, ne až v tom dalším.
     announceDisasters();
+    announceFinance();
 
     // Uzávěrka roku. Okno se otevře jednou za rok a hru zastaví; katastrofa
     // má přednost, protože ta hoří teď.
@@ -2956,6 +3319,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       }
       if (dx !== 0 || dy !== 0) pan(camera, -dx * step, -dy * step);
     }
+
+    // Kamera se srovnává **jednou za snímek**, ne v každé obsluze: posouvá ji
+    // tažení, gesto dvěma prsty, šipky i zoom k bodu, a jedno místo se nedá
+    // obejít zapomenutím.
+    clampCamera(camera, cameraBounds());
 
     worldContainer.scale.set(camera.zoom);
     worldContainer.position.set(
@@ -3240,6 +3608,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       poweredBuildings,
       funding: simWorld.serviceFunding,
       message: message ? i18n.t(message.key, message.params) : '',
+      autosaveMinutesAgo:
+        lastAutosaveAt === 0 ? null : Math.floor((Date.now() - lastAutosaveAt) / 60000),
     });
 
     // Rozpis údaje z lišty. Taky jen když je otevřený — rozpad spokojenosti

@@ -1,10 +1,13 @@
 import type { Definition } from '@/content/schema';
 import type { Budget, BudgetLine } from '@/sim/systems/economy';
-import { iconSvg } from './icons';
-import { button, el } from './dom';
+import { sheetHeader } from './icons';
+import { el } from './dom';
 import { formatNumber } from './format';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
+
+/** Kategorie, které vyrostou ze zóny samy. Hráč je nestaví ani nevybírá. */
+const ZONE_CATEGORIES: readonly string[] = ['residential', 'commercial', 'industrial'];
 
 /**
  * Ekonomická tabulka. Ukazuje, kolik co stojí postavit a provozovat, kolik
@@ -71,12 +74,7 @@ export class BudgetPanel {
 
     this.root.replaceChildren();
 
-    const header = el('div', 'sheet__header');
-    header.appendChild(el('h2', 'sheet__title', t('ui.budget.title')));
-    const close = button('chip chip--tight', () => this.toggle());
-    close.appendChild(iconSvg('close'));
-    header.appendChild(close);
-    this.root.appendChild(header);
+    this.root.appendChild(sheetHeader(t('ui.budget.title'), t('ui.common.close'), () => this.toggle()));
 
     const table = el('table', 'sheet__table');
     const head = el('tr');
@@ -93,18 +91,47 @@ export class BudgetPanel {
     }
     table.appendChild(head);
 
+    /*
+     * Vypisují se **jen postavené druhy** (T-revize, nález 21).
+     *
+     * Panel dostával celý katalog, takže „Ekonomika" v začínajícím městě byla
+     * tabulka o dvaasedmdesáti řádcích, z nichž devětašedesát mělo samé nuly —
+     * a devětatřicet z nich byly zónové varianty, které hráč sám nikdy nestaví.
+     * Co město nemá, se sečte do jedné věty pod tabulkou.
+     */
+    /*
+     * A **zónové varianty se slévají do tří řádků** (nález 21).
+     *
+     * Devětatřicet ze dvaasedmdesáti definic jsou stupně obytné, obchodní a
+     * průmyslové zástavby. Hráč je nestaví ani nevybírá — vyrostou samy podle
+     * ceny půdy — takže mu jednotlivé řádky neříkají nic, co by mohl použít.
+     * Co ho zajímá, je součet za zónu, a ten je tady.
+     */
+    const zoned = new Map<string, { count: number; income: number; upkeep: number }>();
+
+    let shown = 0;
     for (const definition of this.definitions) {
       const line = counts.get(definition.id);
-      const income = line?.income ?? 0;
-      const upkeep = line?.upkeep ?? 0;
+      if (!line || line.count === 0) continue;
+      shown++;
+
+      if (ZONE_CATEGORIES.includes(definition.category)) {
+        const sum = zoned.get(definition.category) ?? { count: 0, income: 0, upkeep: 0 };
+        sum.count += line.count;
+        sum.income += line.income;
+        sum.upkeep += line.upkeep;
+        zoned.set(definition.category, sum);
+        continue;
+      }
+
+      const income = line.income;
+      const upkeep = line.upkeep;
 
       const row = el('tr');
       row.appendChild(el('td', 'sheet__name', t(definition.name)));
       row.appendChild(el('td', undefined, formatNumber(definition.construction.cost)));
-      row.appendChild(el('td', undefined, formatNumber(line?.count ?? 0)));
-      row.appendChild(
-        el('td', undefined, line ? `${line.poweredCount}/${line.count}` : '-'),
-      );
+      row.appendChild(el('td', undefined, formatNumber(line.count)));
+      row.appendChild(el('td', undefined, `${line.poweredCount}/${line.count}`));
       row.appendChild(el('td', undefined, income === 0 ? '-' : `+${formatNumber(income)}`));
       row.appendChild(el('td', undefined, upkeep === 0 ? '-' : `−${formatNumber(upkeep)}`));
 
@@ -114,7 +141,7 @@ export class BudgetPanel {
       table.appendChild(row);
 
       // Pod řádkem rozpis, ze kterého je vidět, odkud se čísla vzala.
-      const breakdown = line ? this.describe(line, budget.valuePerUnit) : '';
+      const breakdown = this.describe(line, budget.valuePerUnit);
       if (breakdown) {
         const note = el('tr', 'sheet__breakdown');
         const cell = el('td', undefined, breakdown);
@@ -122,6 +149,22 @@ export class BudgetPanel {
         note.appendChild(cell);
         table.appendChild(note);
       }
+    }
+
+    for (const category of ZONE_CATEGORIES) {
+      const sum = zoned.get(category);
+      if (!sum) continue;
+      const row = el('tr');
+      row.appendChild(el('td', 'sheet__name', t(`ui.budget.zone.${category}`)));
+      // Cena za kus u slitého řádku neexistuje: každý stupeň stojí jinak.
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, formatNumber(sum.count)));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, sum.income === 0 ? '-' : `+${formatNumber(sum.income)}`));
+      row.appendChild(el('td', undefined, sum.upkeep === 0 ? '-' : `−${formatNumber(sum.upkeep)}`));
+      const net = sum.income - sum.upkeep;
+      row.appendChild(el('td', net < 0 ? 'is-negative' : undefined, formatNumber(net)));
+      table.appendChild(row);
     }
 
     // Silnice nejsou budova, ale platí se každý měsíc — vlastní řádek.
@@ -157,7 +200,11 @@ export class BudgetPanel {
       row.appendChild(el('td', 'sheet__name', t('ui.budget.debt')));
       row.appendChild(el('td'));
       row.appendChild(el('td', undefined, formatNumber(budget.debt.loans)));
-      row.appendChild(el('td', undefined, formatNumber(budget.debt.owed)));
+      // Čtvrtá buňka je „Pod proudem" a dluh do ní nepatří (T-revize, nález 7).
+      // Zbytek dluhu se vypisuje samostatným řádkem pod tabulkou: je to jedno
+      // z nejdůležitějších čísel a sedmisloupcová tabulka postavená na
+      // budovách není tvar, do kterého se vejde.
+      row.appendChild(el('td'));
       row.appendChild(el('td', undefined, '-'));
       row.appendChild(el('td', undefined, `−${formatNumber(budget.debt.payment)}`));
       row.appendChild(el('td', 'is-negative', formatNumber(-budget.debt.payment)));
@@ -171,7 +218,7 @@ export class BudgetPanel {
       row.appendChild(el('td', 'sheet__name', t('ui.budget.bonds')));
       row.appendChild(el('td'));
       row.appendChild(el('td', undefined, formatNumber(budget.debt.bonds)));
-      row.appendChild(el('td', undefined, formatNumber(budget.debt.bondOwed)));
+      row.appendChild(el('td'));
       row.appendChild(el('td', undefined, '-'));
       row.appendChild(el('td', undefined, `−${formatNumber(budget.debt.bondPayment)}`));
       row.appendChild(el('td', 'is-negative', formatNumber(-budget.debt.bondPayment)));
@@ -190,6 +237,26 @@ export class BudgetPanel {
     table.appendChild(total);
 
     this.root.appendChild(table);
+
+    const owed = budget.debt.owed + budget.debt.bondOwed;
+    if (owed > 0) {
+      this.root.appendChild(
+        el('p', 'sheet__note', t('ui.budget.owed', { owed: formatNumber(owed) })),
+      );
+    }
+
+    // Kolik druhů staveb město nemá. Tabulka vypisuje **jen postavené**
+    // (nález 21) a tenhle řádek říká, že katalog je delší.
+    if (this.definitions.length > shown) {
+      this.root.appendChild(
+        el(
+          'p',
+          'sheet__note',
+          t('ui.budget.notBuilt', { count: this.definitions.length - shown }),
+        ),
+      );
+    }
+
     this.root.appendChild(
       el('p', 'sheet__note', t('ui.budget.funds', { funds: formatNumber(funds) })),
     );

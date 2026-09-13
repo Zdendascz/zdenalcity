@@ -2,7 +2,7 @@ import type { Ledger } from '@/sim/ledger';
 import { ledgerTotal } from '@/sim/ledger';
 import { button, el } from './dom';
 import { formatNumber } from './format';
-import { iconSvg } from './icons';
+import { sheetHeader } from './icons';
 import type { I18n } from './i18n';
 
 /**
@@ -47,6 +47,9 @@ export class YearReport {
     return !this.root.classList.contains('is-hidden');
   }
 
+  /** Tlačítko „Zavřít". Dostane fokus, jakmile se okno otevře. */
+  private dismiss: HTMLButtonElement | null = null;
+
   /** Který rok už hráč viděl. Po loadu se tím výkaz nezopakuje. */
   markSeen(year: number): void {
     this.shown = year;
@@ -63,6 +66,7 @@ export class YearReport {
     this.shown = ledger.year;
     this.draw(ledger, funds);
     this.root.classList.remove('is-hidden');
+    this.dismiss?.focus();
     return true;
   }
 
@@ -74,12 +78,14 @@ export class YearReport {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.panel.replaceChildren();
 
-    const header = el('div', 'sheet__header');
-    header.appendChild(el('h1', 'dialog__title', t('ui.year.title', { year: ledger.year })));
-    const close = button('chip chip--tight', () => this.close());
-    close.appendChild(iconSvg('close'));
-    header.appendChild(close);
-    this.panel.appendChild(header);
+    this.panel.appendChild(
+      sheetHeader(
+        t('ui.year.title', { year: ledger.year }),
+        t('ui.common.close'),
+        () => this.close(),
+        { heading: 'h1', titleClass: 'dialog__title' },
+      ),
+    );
 
     const income = ledgerTotal(ledger.income);
     const expenses = ledgerTotal(ledger.expenses);
@@ -110,6 +116,10 @@ export class YearReport {
     ok.textContent = t('ui.year.close');
     actions.appendChild(ok);
     this.panel.appendChild(actions);
+    // Ať jde okno zavřít enterem bez sahání po myši — stejně jako u hlášení
+    // katastrofy. Do teď nebylo zaostřené nic, takže kdo měl ruce na
+    // klávesnici, musel sáhnout po myši (T-revize, nález 26).
+    this.dismiss = ok;
   }
 
   /** Jeden sloupec: položky shora dolů, součet na patě. */
@@ -141,7 +151,8 @@ export class YearReport {
     return column;
   }
 
-  private close(): void {
+  /** Zavře okno i s tím, co po něm následuje. Volá tlačítko i Escape. */
+  close(): void {
     this.hide();
     this.callbacks.onClose();
   }

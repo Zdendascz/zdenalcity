@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from './catalogue';
-import { coarseCongestion, cityUtilities } from './diagnostics';
+import { coarseCongestion, cityUtilities, growthBlocker, worstBlocker } from './diagnostics';
+import { ZONE } from './layers';
 import { populationPerCell } from './disasters/unrest';
 import type { WorldState } from './world';
 import { averageHappiness } from './systems/happiness';
@@ -32,6 +33,9 @@ export const ADVISOR_PROBLEMS = [
   'blackout',
   'needsPower',
   'needsWater',
+  'noWaterReach',
+  'waste',
+  'growth',
   'pollution',
   'crime',
   'traffic',
@@ -75,6 +79,15 @@ export interface CityAdvice {
   problems: Advice[];
   /** Za co pochválit. `null`, dokud město nestojí za pochvalu. */
   praise: Advice | null;
+  /**
+   * Město je zatím moc malé na to, aby se dalo radit.
+   *
+   * Prázdná odpověď se do teď vykládala jako pochvala, takže hráč se zónou,
+   * ve které nic neroste, otevřel poradce a přečetl si „Město běží, jak má"
+   * (T-revize, nález 28). To jsou dvě různé věci a rozhraní je musí umět
+   * rozlišit.
+   */
+  tooSmall: boolean;
 }
 
 /**
@@ -139,7 +152,7 @@ export function cityAdvice(
   }
 
   // Prázdná placka nemá co řešit a rady o kriminalitě by na ní byly komické.
-  if (population < MIN_POPULATION) return { problems: [], praise: null };
+  if (population < MIN_POPULATION) return { problems: [], praise: null, tooSmall: true };
 
   /* --- peníze ------------------------------------------------------------ */
   const { funds, lastIncome, lastExpenses } = world.economy;
@@ -174,18 +187,51 @@ export function cityAdvice(
 
   /* --- sítě -------------------------------------------------------------- */
   const utilities = cityUtilities(world, catalogue, balance);
+
+  /*
+   * **Kapacita a rozvod jsou dvě různé rady** (T-revize, nález 29).
+   *
+   * Do teď existovala jen jedna, počítaná z rozdílu potřeby a výroby, a panel
+   * k ní vypsal odstavec z nápovědy: polož potrubí, případně přidej čerpací
+   * stanici. Obojí byla špatná rada — potrubí bylo položené a čerpací stanice
+   * vodu nevyrábí. Správná odpověď, druhá vodárna, v panelu nezazněla vůbec.
+   * A obrácený případ, kdy voda je, ale nedoteče, poradce nenašel nikdy,
+   * protože se počítaly jen celkové součty.
+   */
   add(
     problems,
     'needsWater',
     shortfall(utilities.waterNeeded, utilities.waterCapacity),
     { needed: utilities.waterNeeded, capacity: utilities.waterCapacity },
   );
+
+  let thirsty = 0;
+  for (const [id, building] of world.buildings) {
+    if (building.abandoned) continue;
+    if (catalogue.get(building.definitionId)?.water?.consumption) {
+      if (!world.watered.has(id)) thirsty++;
+    }
+  }
+  // Hlásí se, jen když kapacita **stačí**: jinak je to tatáž bolest dvakrát
+  // a hráč by dostal dvě položky o jedné věci.
+  if (utilities.waterCapacity >= utilities.waterNeeded && buildings > 0) {
+    add(problems, 'noWaterReach', clamp((thirsty / buildings) * 3), { buildings: thirsty });
+  }
+
   // Odpad i kanalizace končí ve stejném následku — co se nezpracuje, rozlije
-  // se do znečištění po celé mapě — takže o nich mluví jeden odstavec.
+  // se do znečištění po celé mapě. Mají ale **vlastní radu s kapacitou**:
+  // rozpustit je do znečištění znamenalo, že se poradce ptal na naměřený
+  // smog a nabízel filtry, kdežto chybějící čistička je jiná oprava.
   const dirt = Math.max(
     shortfall(utilities.wasteNeeded, utilities.wasteCapacity),
     shortfall(utilities.sewageNeeded, utilities.sewageCapacity),
   );
+  add(problems, 'waste', dirt, {
+    wasteNeeded: utilities.wasteNeeded,
+    wasteCapacity: utilities.wasteCapacity,
+    sewageNeeded: utilities.sewageNeeded,
+    sewageCapacity: utilities.sewageCapacity,
+  });
 
   /* --- čtvrti: vážené počtem lidí, ne plochou ---------------------------- */
   const perCell = populationPerCell(world);
@@ -207,7 +253,10 @@ export function cityAdvice(
     traffic /= weightSum;
   }
 
-  add(problems, 'pollution', Math.max(dirt, clamp((pollution - 0.15) * 2)), {
+  // Znečištění je **naměřená hodnota ve čtvrtích**, ne nepokrytý odpad:
+  // ten má od T-revize vlastní radu a míchat je znamenalo, že rada s váhou
+  // z odpadu vypsala číslo ze smogu.
+  add(problems, 'pollution', clamp((pollution - 0.15) * 2), {
     percent: Math.round(pollution * 100),
   });
   add(problems, 'crime', clamp((crime - 0.1) * 2), { percent: Math.round(crime * 100) });
@@ -268,6 +317,10 @@ export function cityAdvice(
   const burning = world.disasters.burning.normal + world.disasters.burning.wildfire;
   if (burning > 0) add(problems, 'fire', 0.9, { tiles: burning });
 
+  /* --- proč zóny nerostou ------------------------------------------------ */
+  const blocked = growthProblem(world, catalogue, balance);
+  if (blocked !== null) add(problems, 'growth', 0.7, { reason: blocked });
+
   problems.sort((a, b) => b.weight - a.weight);
   praises.sort((a, b) => b.weight - a.weight);
 
@@ -275,7 +328,47 @@ export function cityAdvice(
   return {
     problems: problems.filter((advice) => advice.weight >= NOISE).slice(0, 2),
     praise: best && best.weight >= PRAISE_FLOOR ? best : null,
+    tooSmall: false,
   };
+}
+
+/** Kolik zóněných, ale prázdných dlaždic se prohlédne, než se rada vysloví. */
+const SAMPLED_ZONE_TILES = 200;
+
+/**
+ * Proč zóny nerostou. `null`, když aspoň jedna parcela stavět může.
+ *
+ * Poradce o překážkách růstu **nevěděl** (T-revize, nález 28), přestože je hra
+ * počítá a v kartě parcely vypisuje: hráč se zónou, ve které nic neroste,
+ * otevřel poradce a nedozvěděl se ani slovo o tom, co chybí. Ptá se to týmiž
+ * funkcemi jako růst, takže nemůže tvrdit něco jiného než parcela sama.
+ *
+ * „Není poptávka" se nehlásí: to není závada, jen chvilkový stav.
+ */
+function growthProblem(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  balance: Balance,
+): string | null {
+  const zones = world.layers.zone;
+  const reasons: string[] = [];
+  let free = 0;
+
+  for (let tile = 0; tile < zones.length && free < SAMPLED_ZONE_TILES; tile++) {
+    if ((zones[tile] ?? ZONE.none) === ZONE.none) continue;
+    if (world.layers.buildingId[tile] !== 0) continue;
+    free++;
+
+    const x = tile % world.size;
+    const reason = growthBlocker(world, catalogue, balance, x, (tile - x) / world.size);
+    // Jediná parcela, na které se stavět dá, znamená, že město běží.
+    if (reason === null) return null;
+    reasons.push(reason);
+  }
+
+  if (free === 0) return null;
+  const worst = worstBlocker(reasons);
+  return worst === 'ui.parcel.blocked.noDemand' ? null : worst;
 }
 
 /** O kolik chybí kapacita, 0–1. Nula znamená „stačí". */

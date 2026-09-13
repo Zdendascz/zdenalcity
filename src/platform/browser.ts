@@ -114,10 +114,19 @@ function createFileTransfer(): FileTransfer {
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = fileName;
+      // Odkaz musí být **v dokumentu** a adresa se smí uvolnit až **potom**
+      // (T-revize, nález 34). Stahování je asynchronní: prohlížeč, který si
+      // blob nevyzvedne v tomtéž kroku, našel adresu už zneplatněnou a
+      // stahování zrušil bez jediné chyby — hráč klikl na „Stáhnout město",
+      // v liště se objevilo „Uloženo, 214,3 kB" a soubor nikde.
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
       anchor.click();
+      anchor.remove();
 
-      // Bez uvolnění by objekt držel v paměti až do zavření karty.
-      URL.revokeObjectURL(url);
+      // Minuta je s rezervou dost i na velké město a pomalý disk; bez uvolnění
+      // by objekt držel v paměti až do zavření karty.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     },
 
     read: async (file) => new Uint8Array(await file.arrayBuffer()),
