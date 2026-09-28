@@ -104,6 +104,7 @@ import { CoarseOverlay } from './coarseOverlay';
 import { GridOverlay } from './gridOverlay';
 import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
 import { DisasterScenes } from './disasterScenes';
+import { Effects } from './effects';
 import { ServiceMarkers } from './serviceMarkers';
 import { TrafficOverlay } from './trafficOverlay';
 import { DebugOverlay } from './debugOverlay';
@@ -337,6 +338,12 @@ export function createLayerOptions(content: ContentRegistry): OverlayOption[] {
  * buňka; uvnitř ní pak průměr, ať pohled neskáče po hranách buněk. Prázdný
  * svět nemá zástavbu, tam zůstává střed mapy.
  */
+/** Požádal hráč v systému o méně pohybu? Bez `matchMedia` (testy) ne. */
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 function cityCentre(world: ReadonlyWorldView): { x: number; y: number } {
   const cell = 16;
   const buckets = new Map<number, { x: number; y: number; count: number }>();
@@ -1245,6 +1252,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   const disasterScenes = new DisasterScenes(world, worldContainer);
 
+  // Odezva na akce (T114): prach při bourání. Nad budovami, protože prach
+  // stoupá před fasádou.
+  const effects = new Effects(worldContainer, app.renderer);
+  buildingRenderer.onVanished = (area) => effects.dust(area);
+
   const serviceMarkers = new ServiceMarkers(world, worldContainer);
   serviceMarkers.setLookup(
     (definitionId) => {
@@ -2054,6 +2066,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let ghostBuildings = false;
   let decorVisible = true;
   let gridVisible = false;
+  /**
+   * Hýbe se něco jen pro parádu? Výchozí hodnota ctí `prefers-reduced-motion`:
+   * komu se z pohybu na obrazovce dělá zle, ten si to v systému už řekl
+   * a nemá to hledat v liště znovu.
+   */
+  let motionOn = !prefersReducedMotion();
 
   function applyViewAndLayer(): void {
     // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu
@@ -2076,6 +2094,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     disasterScenes.setVisible(viewMode !== 'underground');
     buildingRenderer.setGhost(ghostBuildings);
     buildingRenderer.setDecorVisible(decorVisible);
+    buildingRenderer.setMotion(motionOn);
+    placementGhost.setMotion(motionOn);
+    effects.setEnabled(motionOn);
+    effects.setVisible(viewMode !== 'underground');
     // Barva sítě se řídí pohledem, ne přepínačem: pod zemí bílá, nad zemí
     // černá. Přepnutí sítě naopak pohledem nehne — viz `gridOverlay.ts`.
     gridOverlay.setUnderground(viewMode === 'underground');
@@ -2208,6 +2230,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     },
     onToggleDecor: () => {
       decorVisible = !decorVisible;
+      applyViewAndLayer();
+    },
+    onToggleMotion: () => {
+      motionOn = !motionOn;
       applyViewAndLayer();
     },
     onToggleGrid: () => {
@@ -2531,12 +2557,25 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         dispatch({ type: 'plant_trees', x: tile.x, y: tile.y });
         break;
       case 'bulldoze': {
+        const buildingIdBefore =
+          world.layers.buildingId[tile.y * world.size + tile.x] ?? 0;
         // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.
         const result =
           viewMode === 'underground'
             ? dispatch({ type: 'remove_pipe', x: tile.x, y: tile.y })
             : dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
         undone = result.ok;
+        // Silnice a stromy taky zvednou prach. Budova si svůj obláček zvedne
+        // sama, až zmizí z mapy, a větší — dvakrát ji prášit nemá smysl.
+        if (result.ok && viewMode !== 'underground' && buildingIdBefore === 0) {
+          effects.dust({
+            x: tile.x,
+            y: tile.y,
+            width: 1,
+            depth: 1,
+            base: tileBaseHeight(world.cornerHeight, tile.x, tile.y),
+          });
+        }
         break;
       }
       case 'zone':
@@ -3303,6 +3342,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     serviceMarkers.update(dirty.fullRedraw || dirty.buildings.size > 0);
     disasterScenes.update();
     trafficOverlay.update();
+    buildingRenderer.animate(deltaMS);
+    placementGhost.animate(deltaMS);
+    effects.update(deltaMS);
 
     // Šipky posouvají **konstantní rychlostí na obrazovce**, ne v souřadnicích
     // světa: při oddálení by jinak mapa létala a při přiblížení se sotva hnula.
@@ -3604,6 +3646,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       disastersEnabled: simWorld.disasters.enabled,
       ghost: ghostBuildings,
       decor: decorVisible,
+      motion: motionOn,
       grid: gridVisible,
       poweredBuildings,
       funding: simWorld.serviceFunding,

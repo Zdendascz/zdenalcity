@@ -54,6 +54,7 @@ export interface HudCallbacks {
    */
   onDisasterClick(kind: string, x: number, y: number, dead: number): void;
   onToggleDecor(): void;
+  onToggleMotion(): void;
   /**
    * Zapnout či vypnout čtvercovou síť po hranicích dlaždic.
    *
@@ -150,6 +151,8 @@ export interface HudState {
   ghost: boolean;
   /** Kreslí se stromy a balvany? */
   decor: boolean;
+  /** Hýbou se animace? */
+  motion: boolean;
   /** Je zapnutá čtvercová síť? */
   grid: boolean;
   poweredBuildings: number;
@@ -383,6 +386,7 @@ export class Hud {
   private disastersShown: boolean | null = null;
   private ghostButton: HTMLButtonElement | null = null;
   private decorButton: HTMLButtonElement | null = null;
+  private motionButton: HTMLButtonElement | null = null;
   private gridButton: HTMLButtonElement | null = null;
   private messageNode: HTMLElement | null = null;
   private fileInput: HTMLInputElement | null = null;
@@ -412,6 +416,7 @@ export class Hud {
     demandTerms: [],
     ghost: false,
     decor: true,
+    motion: true,
     grid: false,
     poweredBuildings: 0,
     powerProduced: 0,
@@ -661,6 +666,8 @@ export class Hud {
     // zapnul, ne výchozí stav.
     this.decorButton?.classList.toggle('is-active', !state.decor);
     this.gridButton?.classList.toggle('is-active', state.grid);
+    // Stejně jako u stromů svítí, když je animace **vypnutá**.
+    this.motionButton?.classList.toggle('is-active', !state.motion);
 
     // Text přepínače závisí na stavu, který HUD sám nedrží — přijde ve `state`.
     if (state.disastersEnabled !== this.disastersShown) {
@@ -762,6 +769,7 @@ export class Hud {
     this.buildViews();
     this.buildGhost();
     this.buildDecor();
+    this.buildMotion();
     this.buildGrid();
     this.buildLayers();
     this.buildDisasters();
@@ -1208,6 +1216,23 @@ export class Hud {
     node.setAttribute('aria-label', label);
     this.decorButton = node;
     this.slot(true).appendChild(node);
+  }
+
+  /**
+   * Zastavení animací (T114). Vedle stromů, protože je to totéž zrnem: mění
+   * se jím, jak město vypadá, ne co se v něm děje.
+   *
+   * Na telefonu jde **do vysunuté řady**, ne nahoru: horní řadu určil autor
+   * doslovně a sahá se na ni jednou za hru, ne jednou za minutu.
+   */
+  private buildMotion(): void {
+    const label = this.i18n.t('ui.view.motion');
+    const node = button('toolbar__button', () => this.callbacks.onToggleMotion());
+    node.appendChild(iconSvg('view-motion'));
+    node.title = label;
+    node.setAttribute('aria-label', label);
+    this.motionButton = node;
+    this.slot(false).appendChild(node);
   }
 
   /**

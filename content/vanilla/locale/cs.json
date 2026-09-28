@@ -661,6 +661,7 @@
   "ui.tool.pan": "Pacička",
   "ui.menu.pan": "Pohyb",
   "ui.view.decor": "Skrýt stromy a kameny",
+  "ui.view.motion": "Zastavit animace",
   "ui.home.tagline": "Izometrický budovatel měst.",
   "ui.home.beta": "BETA",
   "ui.home.resumeNamed": "Pokračovat ve městě {city} ({minutes} min)",

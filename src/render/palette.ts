@@ -350,6 +350,12 @@ export const HOVER_BLOCKED_COLOR = 0xff6b52;
 export const ABANDONED_COLOR = 0x6a6a6a;
 
 /**
+ * Prach při bourání (T114). Teplá šedá omítky a cihel, ne bílá — bílý obláček
+ * se na zelené trávě čte jako kouř z požáru.
+ */
+export const DUST_COLOR = 0xb9ab96;
+
+/**
  * Ztmavení budovy, která bere proud a nedostává ho. Ke střeše k tomu přibude
  * blesk v `POWER_OFF_COLOR` — jinak hráč pozná temnou budovu jen z detailu.
  */

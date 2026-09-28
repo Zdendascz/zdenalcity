@@ -23,6 +23,8 @@ import { decorDensity, decorHere, decorPick, decorShift, decorTiles, rubbleSlope
 import type { RubbleSlope, TerrainDecor } from './decor';
 import { index, TERRAIN } from '@/sim/layers';
 import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
+import { POP_MS, popScale } from './effects';
+import type { DustArea } from './effects';
 
 /** Na kolik dlaždic je nakreslená zpustlá budova. Viz `DECOR` ve `fit-sprites.py`. */
 const DERELICT_TILES = 2;
@@ -142,6 +144,20 @@ export class BuildingRenderer {
    * poloprůhledná koruna mu ji zakrývá stejně jako plná.
    */
   private decorVisible = true;
+  /**
+   * Čím budova byla při minulém kreslení: `definice#úroveň`. Podle toho se
+   * pozná, že **vyrostla** — nová, nebo povýšená — a ne jen že se překreslila
+   * kvůli proudu nebo podezdívce (T114).
+   */
+  private readonly known = new Map<number, string>();
+  /** Budovy, které právě vyrůstají, a kolik ms už rostou. */
+  private readonly growing = new Map<number, number>();
+  /** Měřítko spritu bez animace. `drawSprite` ho přepisuje, animace z něj násobí. */
+  private readonly baseScale = new Map<number, number>();
+  /** Hýbou se budovy? Vypíná přepínač animací i `prefers-reduced-motion`. */
+  private motion = true;
+  /** Budova zmizela z mapy. Dostane půdorys, nad kterým se má zaprášit. */
+  onVanished: ((area: DustArea) => void) | null = null;
 
   constructor(world: ReadonlyWorldView, parent: Container, appearance: AppearanceLookup) {
     this.world = world;
@@ -171,6 +187,56 @@ export class BuildingRenderer {
    */
   setGhost(ghost: boolean): void {
     this.container.alpha = ghost ? GHOST_ALPHA : 1;
+  }
+
+  /** Zapne nebo vypne vyrůstání budov. Rozběhnuté se hned dorovnají. */
+  setMotion(motion: boolean): void {
+    this.motion = motion;
+    if (!motion) {
+      for (const id of [...this.growing.keys()]) this.applyGrowth(id, 1);
+      this.growing.clear();
+    }
+  }
+
+  /** Posune vyrůstající budovy o snímek. Volá se každý snímek, ne jen při změně. */
+  animate(deltaMS: number): void {
+    if (this.growing.size === 0) return;
+    for (const [id, elapsed] of this.growing) {
+      const next = elapsed + deltaMS;
+      const t = next / POP_MS;
+      this.applyGrowth(id, t);
+      if (t >= 1) this.growing.delete(id);
+      else this.growing.set(id, next);
+    }
+  }
+
+  /**
+   * Nastaví budově měřítko vyrůstání.
+   *
+   * Roste **od paty**, ne od středu: sprite má kotvu na předním rohu půdorysu,
+   * takže stačí měřítko. Kvádr se kreslí ve světových souřadnicích, a tak mu
+   * pivot musí na ten roh přestěhovat až animace — a po ní ho vrátit.
+   */
+  private applyGrowth(id: number, t: number): void {
+    const view = this.views.get(id);
+    const box = this.boxes.get(id);
+    if (!view || !box) return;
+    const [sx, sy] = popScale(t);
+    if (view instanceof Sprite) {
+      const base = this.baseScale.get(id) ?? view.scale.y;
+      view.scale.set(base * sx, base * sy);
+      return;
+    }
+    if (t >= 1) {
+      view.pivot.set(0, 0);
+      view.position.set(0, 0);
+      view.scale.set(1, 1);
+      return;
+    }
+    const foot = gridToScreen(box.x + box.width, box.y + box.depth, box.base);
+    view.pivot.set(foot.x, foot.y);
+    view.position.set(foot.x, foot.y);
+    view.scale.set(sx, sy);
   }
 
   update(dirty: DirtySet): void {
@@ -396,22 +462,41 @@ export class BuildingRenderer {
       for (const id of [...this.views.keys()]) {
         this.remove(id);
       }
+      // Načtení savu ani přepnutí materiálů není stavba: nic nevyrůstá,
+      // jen se zapamatuje, co na mapě stojí.
+      this.known.clear();
+      this.growing.clear();
       for (const id of this.world.buildings.keys()) {
-        this.refresh(id);
+        this.refresh(id, false);
       }
       return;
     }
 
     for (const id of dirty.buildings) {
-      this.refresh(id);
+      this.refresh(id, true);
     }
   }
 
-  private refresh(id: number): void {
+  private refresh(id: number, animate: boolean): void {
     const building = this.world.buildings.get(id);
     if (!building) {
+      // Zmizela budova, kterou jsme kreslili — zbourala se, vyhořela, nebo
+      // ustoupila větší. Prach dostane půdorys, dokud ho ještě známe.
+      const box = this.boxes.get(id);
+      if (animate && this.known.has(id) && box) this.onVanished?.(box);
+      this.known.delete(id);
+      this.growing.delete(id);
+      this.baseScale.delete(id);
       this.remove(id);
       return;
+    }
+
+    // Nová, nebo povýšená? Zchátrání se nepočítá: ruina nevyrůstá, padá.
+    const identity = `${building.definitionId}#${building.level}`;
+    const previous = this.known.get(id);
+    this.known.set(id, identity);
+    if (animate && this.motion && previous !== identity && !building.abandoned) {
+      this.growing.set(id, 0);
     }
 
     const found = this.appearance(building.definitionId, id);
@@ -475,6 +560,7 @@ export class BuildingRenderer {
         ? Math.min(1, Math.min(width, depth) / DERELICT_TILES)
         : shrunk;
       this.drawSprite(id, building.x, building.y, width, depth, appearance.sprite, fit);
+      this.resumeGrowth(id);
       return;
     }
 
@@ -560,6 +646,17 @@ export class BuildingRenderer {
     // číslem na budovu, jakmile mají různé půdorysy — viz `depth.ts`. Přiřadí
     // ji `reorder()` porovnáním po dvojicích.
     this.boxes.set(id, { x: building.x, y: building.y, width, depth, base: min });
+    this.resumeGrowth(id);
+  }
+
+  /**
+   * Překreslení uprostřed vyrůstání nastaví plné měřítko — třeba když nová
+   * budova hned v dalším tiku dostane proud. Tohle ho vrátí tam, kde animace
+   * právě je, jinak by dům v půlce skočil do plné velikosti.
+   */
+  private resumeGrowth(id: number): void {
+    const elapsed = this.growing.get(id);
+    if (elapsed !== undefined) this.applyGrowth(id, elapsed / POP_MS);
   }
 
   /**
@@ -601,6 +698,7 @@ export class BuildingRenderer {
     // spočítaná z nuly by budovu posadila do rohu obrazovky.
     sprite.anchor.set(image.anchor[0] / image.width, image.anchor[1] / image.height);
     sprite.scale.set(fit / image.scale);
+    this.baseScale.set(id, fit / image.scale);
 
     /*
      * Podlaha obrázku leží na **nejvyšším rohu parcely**, ne na průměru.

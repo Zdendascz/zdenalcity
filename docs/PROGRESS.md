@@ -3900,6 +3900,28 @@ doprostřed, dostaly objekty jako hlavičku větu o navazování vozovky. Teď s
 každý blok bere ze svého oddílu podle nadpisu.
 
 
+## Animace (T114, rozhodnutí autora)
+
+Zadání má sedm bodů a je v `docs/17-ANIMACE.md`: odezva na akce, auta na
+silnicích, emitory na budovách, voda, život u služeb, les ve větru
+a vizuálnější pohromy. **Hotová je první vrstva (T114):**
+
+- nová a povýšená budova vyroste od paty (`popScale`, 420 ms), po načtení
+  savu nevyrůstá nic;
+- zbouraná budova, silnice i les zvednou prach (`Effects`, strop 240
+  obláčků);
+- duch umísťování dýchá;
+- přepínač „Zastavit animace“ v liště, na telefonu ve vysunuté řadě,
+  výchozí stav podle `prefers-reduced-motion`.
+
+Animace mají vlastní generátor (`motionRandom`) a na `world.rng` nesahají.
+To je tvrdé pravidlo celé řady: jedno vytažené číslo by rozbilo determinismus.
+
+Ověřeno: `npm run check`, testy čistých funkcí v `tests/effects.test.ts`.
+V prohlížeči je vidět prach po bourání lesa a postavená stanice sedí po
+vyrůstání ve správné velikosti i poloze. Samotný průběh vyrůstání se
+nasnímat nepodařilo, protože náhled byl skrytý a prohlížeč nekreslil snímky.
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

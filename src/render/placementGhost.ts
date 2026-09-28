@@ -4,6 +4,7 @@ import { areaHeightRange } from '@/sim/heights';
 import type { AppearanceLookup } from './buildingRenderer';
 import { gridToScreen } from './projection';
 import { sampleSmooth } from './textures';
+import { ghostPulse } from './effects';
 
 /**
  * Průhledná budova, která se teprve pokládá (T113).
@@ -23,6 +24,12 @@ import { sampleSmooth } from './textures';
  * náhrada by lhal o tvaru a hráč by pak byl překvapený dvakrát.
  */
 const GHOST_ALPHA = 0.6;
+/**
+ * Meze dýchání (T114). Náhled pomalu pulzuje, ať se na hemžícím se městě
+ * pozná, co je stavba a co návrh. Průměr zůstává u `GHOST_ALPHA`.
+ */
+const PULSE_LOW = 0.45;
+const PULSE_HIGH = 0.75;
 
 /** Nádech pro místo, kam se stavět nedá. Rámeček zčervená stejně. */
 const BLOCKED_TINT = 0xff9a9a;
@@ -33,6 +40,8 @@ export class PlacementGhost {
   private readonly sprite: Sprite;
   /** Obrázek, který v spritu právě je. Ať se textura nenačítá každý snímek. */
   private loaded: string | null = null;
+  private elapsed = 0;
+  private motion = true;
 
   constructor(world: ReadonlyWorldView, parent: Container, appearance: AppearanceLookup) {
     this.world = world;
@@ -44,6 +53,18 @@ export class PlacementGhost {
     // a náhled, který se schová za dům, je k ničemu právě tam, kde je potřeba.
     this.sprite.zIndex = 1_000_000;
     parent.addChild(this.sprite);
+  }
+
+  /** Vypne dýchání; náhled zůstane na pevné průhlednosti. */
+  setMotion(motion: boolean): void {
+    this.motion = motion;
+    if (!motion) this.sprite.alpha = GHOST_ALPHA;
+  }
+
+  animate(deltaMS: number): void {
+    if (!this.motion || !this.sprite.visible) return;
+    this.elapsed += deltaMS;
+    this.sprite.alpha = ghostPulse(this.elapsed, PULSE_LOW, PULSE_HIGH);
   }
 
   hide(): void {
