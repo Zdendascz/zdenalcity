@@ -95,9 +95,11 @@ import { Legend } from '@/ui/legend';
 import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
 import { BuildingRenderer } from './buildingRenderer';
-import type { AppearanceLookup } from './buildingRenderer';
+import type { AppearanceLookup, LoadedPart } from './buildingRenderer';
 import { clampCamera, createCamera, pan, viewportToWorld, zoomAt } from './camera';
 import { ChunkRenderer, viewportFor } from './chunkRenderer';
+import { tilesIn } from './vehicles';
+import type { MotionView } from './effects';
 import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
@@ -105,6 +107,8 @@ import { GridOverlay } from './gridOverlay';
 import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
 import { DisasterScenes } from './disasterScenes';
 import { Effects } from './effects';
+import { Vehicles } from './vehicles';
+import type { VehicleLook } from './vehicles';
 import { ServiceMarkers } from './serviceMarkers';
 import { TrafficOverlay } from './trafficOverlay';
 import { DebugOverlay } from './debugOverlay';
@@ -751,6 +755,41 @@ async function loadSkirts(content: ContentRegistry): Promise<Map<string, Texture
   return out;
 }
 
+/** Měřítko dílů: obrázky jsou kreslené ve čtyřnásobku jako budovy. */
+const PART_SCALE = 4;
+
+/** Odkud jezdí popeláři. Odpady nemají třídu služby, poznají se podle id. */
+const WASTE_SITES = new Set(['vanilla:incinerator', 'vanilla:landfill']);
+
+/**
+ * Díly pro animace (T116): rotor, auta, chodci, plameny, lampa.
+ *
+ * Načtou se všechny naráz a hra je dostane najednou. Chybějící díl se
+ * nekreslí — efekt, který ho potřebuje, se prostě přeskočí.
+ */
+export async function loadParts(content: ContentRegistry): Promise<Map<string, LoadedPart>> {
+  const out = new Map<string, LoadedPart>();
+  const jobs: Promise<void>[] = [];
+  for (const name of content.getPartNames()) {
+    const part = content.getPart(name);
+    if (part === undefined) continue;
+    jobs.push(
+      Assets.load(part.url)
+        .then((texture: Texture) => {
+          sampleSmooth(texture);
+          out.set(name, {
+            texture,
+            anchor: part.anchor,
+            ...(part.radius === undefined ? {} : { radius: part.radius }),
+          });
+        })
+        .catch(() => undefined),
+    );
+  }
+  await Promise.all(jobs);
+  return out;
+}
+
 /**
  * Předměty, které stojí na terénu: strom na lese, balvan na skále.
  *
@@ -1173,9 +1212,46 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   void loadSkirts(content).then((skirts) => {
     if (skirts.size > 0) buildingRenderer.setSkirtTextures(skirts);
   });
+  void loadParts(content).then((parts) => {
+    if (parts.size === 0) return;
+    buildingRenderer.setParts(parts);
+    const look = (sheet: string, i: number, weight: number): VehicleLook | undefined => {
+      const front = parts.get(`${sheet}_front_${i}`);
+      const rear = parts.get(`${sheet}_rear_${i}`);
+      if (front === undefined || rear === undefined) return undefined;
+      return {
+        front: { texture: front.texture, anchor: front.anchor, scale: PART_SCALE },
+        rear: { texture: rear.texture, anchor: rear.anchor, scale: PART_SCALE },
+        weight,
+      };
+    };
+    // Škoda 105, 120, Trabant, Lada, Avia, Karosa. Nákladních a autobusů je
+    // ve městě míň — a váha pod jedna je zároveň o kus pomalejší.
+    const weights = [1, 1, 1, 1, 0.35, 0.2];
+    vehicles.setLooks(
+      weights
+        .map((weight, i) => look('cars', i, weight))
+        .filter((found): found is VehicleLook => found !== undefined),
+    );
+    serviceLooks = new Map(
+      (['police', 'fire', 'health', 'waste'] as const)
+        .map((service, i) => [service, look('service', i, 0.5)] as const)
+        .filter((entry): entry is readonly [typeof entry[0], VehicleLook] => entry[1] !== undefined),
+    );
+  });
   // Silnice leží **mezi terénem a budovami**: kreslí se po chunku, ale pod
   // domy. Vlastní kontejner, ne řazení podle hloubky — vozovka je země.
   const roadRenderer = new RoadRenderer(world, worldContainer);
+
+  // Auta (T115) jezdí nad vozovkou a pod domy — dům vepředu je zakryje,
+  // dům vzadu do silnice nezasahuje. Stejná úvaha jako u scén katastrof.
+  const vehicles = new Vehicles(
+    world,
+    worldContainer,
+    (roadType) => content.getBalance().traffic.roadTypes[roadType - 1]?.capacity ?? 0,
+  );
+  /** Vozidla služeb podle třídy (T118). Plní se, až se načtou díly. */
+  let serviceLooks = new Map<string, VehicleLook>();
 
   // Čtvercová síť leží **nad zemí a pod domy**, ze stejného důvodu jako
   // vozovka: je to hranice pozemku, ne kresba přes město. V podzemním pohledu
@@ -2098,6 +2174,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     placementGhost.setMotion(motionOn);
     effects.setEnabled(motionOn);
     effects.setVisible(viewMode !== 'underground');
+    vehicles.setEnabled(motionOn);
+    vehicles.setVisible(viewMode !== 'underground');
     // Barva sítě se řídí pohledem, ne přepínačem: pod zemí bílá, nad zemí
     // černá. Přepnutí sítě naopak pohledem nehne — viz `gridOverlay.ts`.
     gridOverlay.setUnderground(viewMode === 'underground');
@@ -3279,6 +3357,19 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // místě a nespoléhá na to, že se pole náhodou zakládají prázdná.
   resetRuntimeNotices();
 
+  // Ladicí přístup **jen ve vývoji** (T115): testovací skript v headless
+  // prohlížeči staví přes něj město a posouvá kameru, aby šlo animace
+  // nasnímat bez klikání do lišty. Do produkčního buildu se nedostane —
+  // Vite `import.meta.env.DEV` ve buildu nahradí `false` a větev vypadne.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __citybuilder?: unknown }).__citybuilder = {
+      dispatch: (command: Command) => host.dispatch(command),
+      world,
+      camera,
+      setSpeed,
+    };
+  }
+
   app.ticker.add((ticker) => {
     try {
       renderFrame(ticker.deltaMS);
@@ -3288,6 +3379,40 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       reportCrash(error instanceof Error ? error.message : String(error));
     }
   });
+
+  /**
+   * Život u budov služeb (T118): policejní auto vyjede na obchůzku, sanitka
+   * a hasiči občas taky, od spalovny a skládky jezdí popeláři.
+   *
+   * Každá budova má vlastní odpočet, odvozený z id, takže se stanice
+   * nerozjedou všechny naráz. Jezdí jen budovy ve výřezu — auto, které
+   * nikdo neuvidí, se nepočítá.
+   */
+  const serviceClocks = new Map<number, number>();
+  function dispatchServiceVehicles(elapsed: number, view: MotionView): void {
+    if (elapsed <= 0 || serviceLooks.size === 0) return;
+    const range = tilesIn(view, world.size);
+    for (const [id, building] of world.buildings) {
+      if (building.abandoned) continue;
+      if (building.x < range.x0 || building.x > range.x1 || building.y < range.y0 || building.y > range.y1) {
+        continue;
+      }
+      const definition = content.get(building.definitionId);
+      if (definition === undefined) continue;
+      const service = WASTE_SITES.has(building.definitionId) ? 'waste' : definition.service?.class;
+      const look = service === undefined ? undefined : serviceLooks.get(service);
+      if (look === undefined) continue;
+      const spread = ((id * 0.618034) % 1 + 1) % 1;
+      const left = (serviceClocks.get(id) ?? 4000 + spread * 20000) - elapsed;
+      if (left > 0) {
+        serviceClocks.set(id, left);
+        continue;
+      }
+      const [width, depth] = definition.footprint;
+      vehicles.dispatch(look, building.x, building.y, width, depth, 6 + Math.floor(spread * 10));
+      serviceClocks.set(id, 18000 + spread * 30000);
+    }
+  }
 
   function renderFrame(deltaMS: number): void {
     host.step(deltaMS);
@@ -3343,8 +3468,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     disasterScenes.update();
     trafficOverlay.update();
     buildingRenderer.animate(deltaMS);
+    buildingRenderer.sway(deltaMS, viewport, camera.zoom);
     placementGhost.animate(deltaMS);
+    // Kouř jen z komínů ve výřezu; `viewport` je spočítaný výš pro chunky.
+    if (viewMode !== 'underground') {
+      effects.smoke(buildingRenderer.smokeSources(), deltaMS, viewport);
+    }
     effects.update(deltaMS);
+    if (viewMode !== 'underground') {
+      const speedFactor = [0, 1, 1.5, 2, 2.5][speedIndex] ?? 1;
+      vehicles.update(deltaMS, speedFactor, viewport, camera.zoom);
+      dispatchServiceVehicles(deltaMS * speedFactor, viewport);
+    }
 
     // Šipky posouvají **konstantní rychlostí na obrazovce**, ne v souřadnicích
     // světa: při oddálení by jinak mapa létala a při přiblížení se sotva hnula.

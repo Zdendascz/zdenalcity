@@ -1,4 +1,4 @@
-import type { ContentSource, RawFile, SpriteImage } from './registry';
+import type { ContentSource, PartImage, RawFile, SpriteEffect, SpriteImage } from './registry';
 
 /**
  * Složí `ContentSource` z vanilla obsahu v repozitáři.
@@ -98,6 +98,19 @@ export function createVanillaSource(): ContentSource {
     roads[name] = roadFiles[absolute] as string;
   }
 
+  // Díly pro animace (T116). Rozměry a kotvy nese `parts/index.json`, který
+  // vyrábí `tools/fit-parts.py`.
+  const partFiles = import.meta.glob('../../content/vanilla/parts/*.png', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  });
+  const partUrls: Record<string, string> = {};
+  for (const absolute of Object.keys(partFiles).sort()) {
+    const name = relativePath(absolute).slice('parts/'.length).replace(/\.png$/, '');
+    partUrls[name] = partFiles[absolute] as string;
+  }
+
   // Materiály podezdívek. Klíč je `kategorie__varianta`.
   const skirtFiles = import.meta.glob('../../content/vanilla/skirts/*.png', {
     eager: true,
@@ -112,6 +125,8 @@ export function createVanillaSource(): ContentSource {
 
   let manifest: unknown = undefined;
   let spriteIndex: unknown = undefined;
+  let spriteEffects: unknown = undefined;
+  let partIndex: unknown = undefined;
   let balance: unknown = undefined;
   const definitions: RawFile[] = [];
   const locales: Record<string, unknown> = {};
@@ -125,6 +140,10 @@ export function createVanillaSource(): ContentSource {
       manifest = data;
     } else if (path === 'sprites/index.json') {
       spriteIndex = data;
+    } else if (path === 'sprites/effects.json') {
+      spriteEffects = data;
+    } else if (path === 'parts/index.json') {
+      partIndex = data;
     } else if (path === 'balance.json') {
       balance = data;
     } else if (path.startsWith('buildings/') || path.startsWith('grants/')) {
@@ -141,7 +160,8 @@ export function createVanillaSource(): ContentSource {
     definitions,
     locales,
     icons,
-    sprites: buildSprites(spriteIndex, spriteUrls),
+    sprites: buildSprites(spriteIndex, spriteUrls, spriteEffects),
+    parts: buildParts(partIndex, partUrls),
     tiles,
     roads,
     skirts,
@@ -158,7 +178,9 @@ export function createVanillaSource(): ContentSource {
 export function buildSprites(
   index: unknown,
   urls: Record<string, string>,
+  effects?: unknown,
 ): Record<string, SpriteImage> {
+  const effectsByKey = readEffects(effects);
   const out: Record<string, SpriteImage> = {};
   if (typeof index !== 'object' || index === null) return out;
 
@@ -179,12 +201,91 @@ export function buildSprites(
     if (!Array.isArray(anchor) || anchor.length !== 2) continue;
     if (typeof entry['width'] !== 'number' || typeof entry['height'] !== 'number') continue;
 
-    out[`${building}|${variant}`] = {
+    const key = `${building}|${variant}`;
+    const extra = effectsByKey.get(key);
+    out[key] = {
       url,
       width: entry['width'],
       height: entry['height'],
       anchor: [Number(anchor[0]), Number(anchor[1])],
       scale,
+      ...(extra === undefined ? {} : { effects: extra }),
+    };
+  }
+  return out;
+}
+
+function pair(raw: unknown): [number, number] | undefined {
+  if (!Array.isArray(raw) || raw.length !== 2) return undefined;
+  const a = Number(raw[0]);
+  const b = Number(raw[1]);
+  return Number.isFinite(a) && Number.isFinite(b) ? [a, b] : undefined;
+}
+
+/**
+ * Efekty z `sprites/effects.json`, klíčované `budova|varianta`.
+ *
+ * Soubor je vedle `index.json` a ne v něm, protože `index.json` celý přepisuje
+ * `fit-sprites.py` — ruční body na komínech by při každém přeladění zmizely.
+ * Vadný záznam se přeskočí potichu, stejně jako sprite bez obrázku: je to
+ * vzhled, ne podmínka běhu.
+ */
+export function readEffects(raw: unknown): Map<string, SpriteEffect[]> {
+  const out = new Map<string, SpriteEffect[]>();
+  if (typeof raw !== 'object' || raw === null) return out;
+  const table = (raw as { effects?: unknown }).effects;
+  if (typeof table !== 'object' || table === null) return out;
+
+  for (const [key, list] of Object.entries(table as Record<string, unknown>)) {
+    if (!Array.isArray(list)) continue;
+    const effects: SpriteEffect[] = [];
+    for (const item of list) {
+      if (typeof item !== 'object' || item === null) continue;
+      const entry = item as Record<string, unknown>;
+      const at = pair(entry['at']);
+      if (typeof entry['type'] !== 'string' || at === undefined) continue;
+      const axes = Array.isArray(entry['axes']) ? entry['axes'].map(pair) : undefined;
+      const first = axes?.[0];
+      const second = axes?.[1];
+      const when = entry['when'];
+      effects.push({
+        type: entry['type'],
+        at,
+        ...(when === 'always' || when === 'powered' ? { when } : {}),
+        ...(typeof entry['part'] === 'string' ? { part: entry['part'] } : {}),
+        ...(axes?.length === 2 && first && second ? { axes: [first, second] as const } : {}),
+        ...(typeof entry['rate'] === 'number' ? { rate: entry['rate'] } : {}),
+        ...(typeof entry['color'] === 'string' ? { color: entry['color'] } : {}),
+      });
+    }
+    if (effects.length > 0) out.set(key, effects);
+  }
+  return out;
+}
+
+/** Díly z `parts/index.json` spárované s URL obrázků. */
+export function buildParts(
+  index: unknown,
+  urls: Record<string, string>,
+): Record<string, PartImage> {
+  const out: Record<string, PartImage> = {};
+  if (typeof index !== 'object' || index === null) return out;
+  const { scale, parts } = index as { scale?: unknown; parts?: unknown };
+  if (typeof parts !== 'object' || parts === null || typeof scale !== 'number') return out;
+
+  for (const [name, raw] of Object.entries(parts as Record<string, unknown>)) {
+    const entry = raw as Record<string, unknown>;
+    const url = urls[name];
+    const anchor = pair(entry['anchor']);
+    if (url === undefined || anchor === undefined) continue;
+    if (typeof entry['width'] !== 'number' || typeof entry['height'] !== 'number') continue;
+    out[name] = {
+      url,
+      width: entry['width'],
+      height: entry['height'],
+      anchor,
+      scale,
+      ...(typeof entry['radius'] === 'number' ? { radius: entry['radius'] } : {}),
     };
   }
   return out;

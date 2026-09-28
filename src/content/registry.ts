@@ -43,6 +43,11 @@ export interface ContentSource {
    * spoje, takže by vozovka na každém styku uskakovala (viz `docs/08-DLAZDICE.md`).
    */
   readonly tiles?: Readonly<Record<string, string>>;
+  /**
+   * Díly pro animace a silnice (T116): rotor větrníku, auta, chodci, lampa.
+   * Klíč = jméno dílu. Zdroj je mít nemusí — co chybí, to se nekreslí.
+   */
+  readonly parts?: Readonly<Record<string, PartImage>>;
   /** Dlaždice vozovky pod klíčem `rodina__tvar`. */
   readonly roads?: Readonly<Record<string, string>>;
   /** Materiály podezdívek pod klíčem `kategorie__varianta`. */
@@ -69,6 +74,51 @@ export interface SpriteImage {
   readonly height: number;
   readonly anchor: readonly [number, number];
   readonly scale: number;
+  /**
+   * Co z obrázku vychází: kouř z komína, točící se rotor, blikající světlo
+   * (T116). Body jsou **v pixelech obrázku**, stejně jako `anchor`, takže
+   * sedí na tuhle variantu a na žádnou jinou.
+   */
+  readonly effects?: readonly SpriteEffect[];
+}
+
+/**
+ * Jeden efekt na obrázku budovy. Druh je string s namespace (P6), aby mod
+ * mohl přidat vlastní; neznámý druh renderer přeskočí.
+ */
+export interface SpriteEffect {
+  /** `vanilla:spin`, `vanilla:smoke`, `vanilla:blink`. */
+  readonly type: string;
+  /** Bod v pixelech obrázku. U rotoru náboj, u kouře ústí komína. */
+  readonly at: readonly [number, number];
+  /** Kdy běží. Výchozí `always`; `powered` jen s proudem. */
+  readonly when?: 'always' | 'powered';
+  /** Díl, který se kreslí (u `spin` rotor). */
+  readonly part?: string;
+  /**
+   * Rovina rotoru: dva vektory v pixelech obrázku, kam se promítne jednotková
+   * délka lopatky ve směru „vpravo“ a „nahoru“. Rotor kreslený šikmo je
+   * elipsa, a tahle matice ji popisuje přesně (změřeno ze špiček lopatek).
+   */
+  readonly axes?: readonly [readonly [number, number], readonly [number, number]];
+  /** Otáčky za sekundu u `spin`, hustota u `smoke`. */
+  readonly rate?: number;
+  /** Barva jako `#rrggbb` (světlo, kouř). */
+  readonly color?: string;
+}
+
+/**
+ * Díl pro animaci: obrázek s kotvou. `anchor` je bod, který sedne na místo
+ * (u rotoru náboj, u auta střed podvozku), `radius` u rotoru délka lopatky
+ * v pixelech obrázku.
+ */
+export interface PartImage {
+  readonly url: string;
+  readonly width: number;
+  readonly height: number;
+  readonly anchor: readonly [number, number];
+  readonly scale: number;
+  readonly radius?: number;
 }
 
 export interface SourceInfo {
@@ -101,6 +151,7 @@ export class ContentRegistry {
   /** jméno ikony → URL obrázku, slito přes všechny zdroje. */
   private readonly icons = new Map<string, string>();
   private readonly sprites = new Map<string, SpriteImage>();
+  private readonly parts = new Map<string, PartImage>();
   private readonly tiles = new Map<string, string>();
   private readonly roads = new Map<string, string>();
   private readonly skirts = new Map<string, string>();
@@ -189,6 +240,9 @@ export class ContentRegistry {
     for (const [key, sprite] of Object.entries(source.sprites ?? {})) {
       this.sprites.set(key, sprite);
     }
+    for (const [key, part] of Object.entries(source.parts ?? {})) {
+      this.parts.set(key, part);
+    }
 
     // A povrchy. Mod smí přidat vlastní variantu trávy nebo přepsat vanilla.
     for (const [key, url] of Object.entries(source.roads ?? {})) {
@@ -252,6 +306,16 @@ export class ContentRegistry {
    */
   getSprite(definitionId: string, variant: string): SpriteImage | undefined {
     return this.sprites.get(`${definitionId}|${variant}`);
+  }
+
+  /** Díl pro animaci, nebo `undefined`. Chybějící díl se nekreslí. */
+  getPart(name: string): PartImage | undefined {
+    return this.parts.get(name);
+  }
+
+  /** Jména všech dílů, seřazená. Přednačítání je stáhne předem. */
+  getPartNames(): string[] {
+    return [...this.parts.keys()].sort();
   }
 
   /** URL obrázku povrchu, nebo `undefined`, když ho obsah nedodal. */

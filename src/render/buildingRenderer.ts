@@ -1,4 +1,4 @@
-import { Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { Assets, Container, Graphics, Matrix, Sprite, Texture } from 'pixi.js';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import { iconShape } from './icons';
@@ -36,7 +36,65 @@ export interface SpriteImage {
   readonly height: number;
   readonly anchor: readonly [number, number];
   readonly scale: number;
+  /** Efekty z `sprites/effects.json` (T116). */
+  readonly effects?: readonly SpriteEffectView[];
 }
+
+/** Efekt na obrázku budovy — úzká kopie `SpriteEffect` z registru. */
+export interface SpriteEffectView {
+  readonly type: string;
+  readonly at: readonly [number, number];
+  readonly when?: 'always' | 'powered';
+  readonly part?: string;
+  readonly axes?: readonly [readonly [number, number], readonly [number, number]];
+  readonly rate?: number;
+  readonly color?: string;
+}
+
+/** Načtený díl: textura, kotva a u rotoru délka lopatky, vše v px dílu. */
+export interface LoadedPart {
+  readonly texture: Texture;
+  readonly anchor: readonly [number, number];
+  readonly radius?: number;
+}
+
+/** Kouř, který má zrovna stoupat: bod ve světě a hustota. */
+export interface SmokeSource {
+  readonly x: number;
+  readonly y: number;
+  readonly rate: number;
+  readonly color: number;
+  /** Stálé číslo zdroje, ať si emitor drží vlastní rytmus. */
+  readonly key: number;
+}
+
+/** Točící se díl (rotor) jedné budovy. */
+interface Spinner {
+  readonly node: Container;
+  readonly blade: Sprite;
+  readonly rate: number;
+}
+
+/** Pod tímhle zoomem je strom pár pixelů a houpání by jen zrnilo. */
+const SWAY_MIN_ZOOM = 0.6;
+
+/**
+ * Zkosení stromu v čase `t` (s) v bodě `x, y` obrazovky světa.
+ *
+ * Vlna jde šikmo přes mapu rychlostí zhruba dvou dlaždic za sekundu. Jen její
+ * hřeben (`gust` nad nulou) stromy ohne; v něm se ještě každý strom kýve
+ * vlastní fází. Záporné zkosení nakloní korunu doprava — po větru, kterým
+ * se ženou i obláčky kouře.
+ */
+export function swayAt(x: number, y: number, t: number, phase: number): number {
+  const wave = Math.sin(x * 0.006 + y * 0.004 - t * 0.9) + 0.5 * Math.sin(x * 0.0023 - y * 0.0031 - t * 0.37);
+  const gust = Math.max(0, (wave - 0.6) / 0.9);
+  if (gust === 0) return 0;
+  return -0.07 * gust * (0.55 + 0.45 * Math.sin(t * 2.4 + phase));
+}
+
+/** Výchozí otáčky rotoru za sekundu. Skutečné větrníky dělají 0,2–0,5. */
+const SPIN_RATE = 0.35;
 
 /**
  * Co renderer potřebuje vědět o definici budovy. Úzké rozhraní, aby `render/`
@@ -156,6 +214,18 @@ export class BuildingRenderer {
   private readonly baseScale = new Map<number, number>();
   /** Hýbou se budovy? Vypíná přepínač animací i `prefers-reduced-motion`. */
   private motion = true;
+  /** Stromy, které se houpou ve větru (T119), s vlastní fází kmitu. */
+  private trees: { sprite: Sprite; phase: number }[] = [];
+  /** Hodiny větru v ms. Běží i na pauze — pauza zastavuje město, ne vítr. */
+  private wind = 0;
+  /** Houpaly se stromy minulý snímek? Po vypnutí se jednou srovnají. */
+  private swayed = false;
+  /** Rotory podle id budovy (T116). */
+  private readonly spinners = new Map<number, Spinner[]>();
+  /** Komíny podle id budovy — body ve světě, odkud stoupá kouř. */
+  private readonly chimneys = new Map<number, SmokeSource[]>();
+  /** Díly pro efekty. Bez nich se efekt nekreslí, budova stojí dál. */
+  private parts: ReadonlyMap<string, LoadedPart> = new Map();
   /** Budova zmizela z mapy. Dostane půdorys, nad kterým se má zaprášit. */
   onVanished: ((area: DustArea) => void) | null = null;
 
@@ -198,8 +268,57 @@ export class BuildingRenderer {
     }
   }
 
-  /** Posune vyrůstající budovy o snímek. Volá se každý snímek, ne jen při změně. */
+  /** Nastaví díly pro efekty a překreslí budovy, které je používají. */
+  setParts(parts: ReadonlyMap<string, LoadedPart>): void {
+    this.parts = parts;
+    for (const id of this.world.buildings.keys()) this.refresh(id, false);
+    this.reorder();
+  }
+
+  /**
+   * Rozhoupe stromy ve výřezu (T119).
+   *
+   * Přes mapu jde **pomalá vlna větru** a hýbe se jen to, co je zrovna na
+   * jejím hřebeni. Celý les vlnící se v jednom rytmu by vypadal jako porucha;
+   * autor chtěl, aby se stromy hýbaly „tu a tam". Fáze kmitu jde ze
+   * souřadnic, takže po posunu kamery strom nezačne odjinud.
+   */
+  sway(deltaMS: number, view: { minX: number; maxX: number; minY: number; maxY: number }, zoom: number): void {
+    const active = this.motion && this.decorVisible && zoom >= SWAY_MIN_ZOOM;
+    if (!active) {
+      if (this.swayed) for (const tree of this.trees) tree.sprite.skew.x = 0;
+      this.swayed = false;
+      return;
+    }
+    this.swayed = true;
+    this.wind += deltaMS;
+    const t = this.wind / 1000;
+    const margin = 80;
+    for (const tree of this.trees) {
+      if (tree.sprite.destroyed) continue;
+      const { x, y } = tree.sprite.position;
+      if (x < view.minX - margin || x > view.maxX + margin || y < view.minY || y > view.maxY + margin * 3) {
+        continue;
+      }
+      tree.sprite.skew.x = swayAt(x, y, t, tree.phase);
+    }
+  }
+
+  /** Odkud právě stoupá kouř. `Effects` z toho dělá obláčky. */
+  smokeSources(): Iterable<SmokeSource> {
+    const all: SmokeSource[] = [];
+    for (const list of this.chimneys.values()) all.push(...list);
+    return all;
+  }
+
+  /** Posune vyrůstající budovy a rotory o snímek. Volá se každý snímek. */
   animate(deltaMS: number): void {
+    if (this.motion && this.spinners.size > 0) {
+      const turn = (deltaMS / 1000) * Math.PI * 2;
+      for (const list of this.spinners.values()) {
+        for (const spinner of list) spinner.blade.rotation += turn * spinner.rate;
+      }
+    }
     if (this.growing.size === 0) return;
     for (const [id, elapsed] of this.growing) {
       const next = elapsed + deltaMS;
@@ -222,6 +341,9 @@ export class BuildingRenderer {
     const box = this.boxes.get(id);
     if (!view || !box) return;
     const [sx, sy] = popScale(t);
+    // Rotor a spol. se během vyrůstání schovají: rostou z jiného bodu než
+    // budova a vypadalo by to, že lopatky visí ve vzduchu.
+    for (const spinner of this.spinners.get(id) ?? []) spinner.node.visible = t >= 1;
     if (view instanceof Sprite) {
       const base = this.baseScale.get(id) ?? view.scale.y;
       view.scale.set(base * sx, base * sy);
@@ -304,6 +426,7 @@ export class BuildingRenderer {
     for (const id of [...this.views.keys()]) {
       if (id < 0) this.remove(id);
     }
+    this.trees = [];
     // Vypnuté se nejen skryjí, ale ani nevzniknou: uzel, který nikdo nevidí,
     // nemá co dělat ani v řazení hloubky.
     if (!this.decorVisible || this.decorByTerrain.size === 0) return;
@@ -323,6 +446,11 @@ export class BuildingRenderer {
         if (this.nearWater(x, y, decorTiles(decor))) continue;
 
         this.placeDecor(-(tile + 1), x, y, decor);
+        // Houpe se les, ne skála (T119).
+        const placed = this.views.get(-(tile + 1));
+        if ((terrainLayer[tile] ?? 0) === TERRAIN.forest && placed instanceof Sprite) {
+          this.trees.push({ sprite: placed, phase: (decorPick(x, y) % 628) / 100 });
+        }
       }
     }
   }
@@ -452,6 +580,9 @@ export class BuildingRenderer {
       const id = order[i]!;
       const view = this.views.get(id);
       if (view) view.zIndex = i * 2 + 1;
+      // Rotor hned za svou budovou: před její věží, za domem, který stojí
+      // blíž k divákovi.
+      for (const spinner of this.spinners.get(id) ?? []) spinner.node.zIndex = i * 2 + 1.5;
       const skirt = this.skirts.get(id);
       if (skirt) skirt.zIndex = i * 2;
     }
@@ -459,8 +590,12 @@ export class BuildingRenderer {
 
   private refreshAll(dirty: DirtySet): void {
     if (dirty.fullRedraw) {
+      // Jen budovy (kladná id). Stromy a suť si přestaví `rebuildDecor`
+      // a `rebuildRubble` — při načtení savu je `update()` volá hned potom.
+      // Mazat je tady znamenalo, že je přepnutí materiálu podezdívek
+      // (`setSkirtTextures`) smazalo a už nikdo nepostavil.
       for (const id of [...this.views.keys()]) {
-        this.remove(id);
+        if (id > 0) this.remove(id);
       }
       // Načtení savu ani přepnutí materiálů není stavba: nic nevyrůstá,
       // jen se zapamatuje, co na mapě stojí.
@@ -560,9 +695,12 @@ export class BuildingRenderer {
         ? Math.min(1, Math.min(width, depth) / DERELICT_TILES)
         : shrunk;
       this.drawSprite(id, building.x, building.y, width, depth, appearance.sprite, fit);
+      const running = !building.abandoned && (appearance.consumesPower !== true || building.powered);
+      this.placeEffects(id, appearance.sprite, fit, running);
       this.resumeGrowth(id);
       return;
     }
+    this.clearEffects(id);
 
     let view = this.views.get(id);
     if (view instanceof Sprite) {
@@ -842,7 +980,82 @@ export class BuildingRenderer {
     }
   }
 
+  /**
+   * Postaví efekty budovy podle jejího obrázku (T116).
+   *
+   * Staví se znovu při každém překreslení. Děje se to jen při změně budovy,
+   * ne každý snímek, a přestavět pár uzlů je jednodušší než hlídat, co se
+   * na nich změnilo. Natočení rotoru se přenese, ať se při dodání proudu
+   * lopatky necuknou.
+   */
+  private placeEffects(
+    id: number,
+    image: NonNullable<BuildingAppearance['sprite']>,
+    fit: number,
+    running: boolean,
+  ): void {
+    const previous = this.spinners.get(id)?.map((spinner) => spinner.blade.rotation) ?? [];
+    this.clearEffects(id);
+    const sprite = this.views.get(id);
+    if (!(sprite instanceof Sprite) || image.effects === undefined) return;
+
+    const scale = fit / image.scale;
+    const spinners: Spinner[] = [];
+    const chimneys: SmokeSource[] = [];
+    for (const effect of image.effects) {
+      if (effect.when === 'powered' && !running) continue;
+      const x = sprite.position.x + (effect.at[0] - image.anchor[0]) * scale;
+      const y = sprite.position.y + (effect.at[1] - image.anchor[1]) * scale;
+
+      if (effect.type === 'vanilla:spin') {
+        const part = effect.part === undefined ? undefined : this.parts.get(effect.part);
+        if (part === undefined || effect.axes === undefined || part.radius === undefined) continue;
+        const [ax, ay] = effect.axes;
+        const node = new Container();
+        node.setFromMatrix(
+          new Matrix(ax[0] * scale, ax[1] * scale, ay[0] * scale, ay[1] * scale, x, y),
+        );
+        const blade = new Sprite(part.texture);
+        blade.anchor.set(
+          part.anchor[0] / part.texture.width,
+          part.anchor[1] / part.texture.height,
+        );
+        blade.scale.set(1 / part.radius);
+        // Každý větrník jinak natočený a trochu jinak rychlý, jinak by se
+        // celá farma točila v jednom rytmu jako hodinky.
+        const spread = ((id * 0.618034) % 1 + 1) % 1;
+        blade.rotation = previous[spinners.length] ?? spread * Math.PI * 2;
+        node.addChild(blade);
+        node.visible = !this.growing.has(id);
+        this.container.addChild(node);
+        spinners.push({
+          node,
+          blade,
+          rate: (effect.rate ?? SPIN_RATE) * (0.85 + spread * 0.3),
+        });
+      } else if (effect.type === 'vanilla:smoke') {
+        if (!running) continue;
+        chimneys.push({
+          x,
+          y,
+          rate: effect.rate ?? 1,
+          color: effect.color === undefined ? 0x8a8a8a : Number.parseInt(effect.color.slice(1), 16),
+          key: id * 16 + chimneys.length,
+        });
+      }
+    }
+    if (spinners.length > 0) this.spinners.set(id, spinners);
+    if (chimneys.length > 0) this.chimneys.set(id, chimneys);
+  }
+
+  private clearEffects(id: number): void {
+    for (const spinner of this.spinners.get(id) ?? []) spinner.node.destroy({ children: true });
+    this.spinners.delete(id);
+    this.chimneys.delete(id);
+  }
+
   private remove(id: number): void {
+    this.clearEffects(id);
     this.skirts.get(id)?.destroy();
     this.skirts.delete(id);
     this.boxes.delete(id);

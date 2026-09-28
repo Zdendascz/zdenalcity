@@ -1,0 +1,430 @@
+{
+  "formatVersion": 1,
+  "effects": {
+    "vanilla:coal_power_plant|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          349,
+          49
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          516,
+          2
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:coal_power_plant|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          935,
+          3
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:coal_power_plant|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          271,
+          130
+        ],
+        "rate": 1.8,
+        "color": "#eef0f2"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          586,
+          22
+        ],
+        "rate": 1.8,
+        "color": "#eef0f2"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          961,
+          2
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:gas_power_plant|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          598,
+          2
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:gas_power_plant|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          370,
+          2
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:gas_power_plant|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          266,
+          2
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:incinerator|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          221,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:incinerator|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          191,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:incinerator|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          557,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_chemical|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          338,
+          3
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_chemical|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          302,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_chemical|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          201,
+          5
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_complex|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          409,
+          3
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_complex|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          667,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_foundry|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          426,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_foundry|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          449,
+          7
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_foundry|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          309,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_hall|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          309,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_large|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          147,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_medium|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          126,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_refinery|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          572,
+          31
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_refinery|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          281,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_smelter|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          381,
+          20
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_smelter|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          400,
+          70
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_smelter|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          108,
+          47
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          143,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          437,
+          93
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_works|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          284,
+          3
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_works|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          133,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:wind_turbine|a": [
+      {
+        "type": "vanilla:spin",
+        "part": "rotor",
+        "at": [
+          119.3,
+          29.2
+        ],
+        "axes": [
+          [
+            1.615,
+            80.44
+          ],
+          [
+            -87.946,
+            -18.458
+          ]
+        ]
+      }
+    ],
+    "vanilla:wind_turbine|b": [
+      {
+        "type": "vanilla:spin",
+        "part": "rotor",
+        "at": [
+          116.2,
+          32.1
+        ],
+        "axes": [
+          [
+            3.042,
+            65.258
+          ],
+          [
+            -76.501,
+            -24.32
+          ]
+        ]
+      }
+    ],
+    "vanilla:wind_turbine|c": [
+      {
+        "type": "vanilla:spin",
+        "part": "rotor",
+        "at": [
+          128.1,
+          38.4
+        ],
+        "axes": [
+          [
+            10.913,
+            89.549
+          ],
+          [
+            -109.073,
+            -13.862
+          ]
+        ]
+      }
+    ]
+  }
+}

@@ -3109,10 +3109,10 @@
       "variant": "a",
       "file": "wind_turbine__a.png",
       "width": 256,
-      "height": 290,
+      "height": 233,
       "anchor": [
-        127,
-        290
+        128,
+        233
       ]
     },
     {
@@ -3120,10 +3120,10 @@
       "variant": "b",
       "file": "wind_turbine__b.png",
       "width": 256,
-      "height": 293,
+      "height": 250,
       "anchor": [
-        128,
-        293
+        127,
+        250
       ]
     },
     {
@@ -3131,10 +3131,10 @@
       "variant": "c",
       "file": "wind_turbine__c.png",
       "width": 256,
-      "height": 308,
+      "height": 254,
       "anchor": [
         127,
-        308
+        254
       ]
     }
   ]

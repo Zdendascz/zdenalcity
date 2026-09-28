@@ -46,7 +46,25 @@ budovy, a když se změní, spustí vyrůstání. Překreslení uprostřed anima
 třeba když nová budova v dalším tiku dostane proud, ji do plné velikosti
 nevrátí (`resumeGrowth`).
 
-## Vrstva 2 — emitory na budovách (T116)
+## Vrstva 2 — emitory na budovách (T116, hotovo)
+
+**Jak to dopadlo:** efekty jsou v `content/vanilla/sprites/effects.json`,
+klíčované `budova|varianta`, body **v pixelech obrázku** (stejný prostor jako
+kotva, ne 0–1). Samostatný soubor proto, že `index.json` celý přepisuje
+`fit-sprites.py`. Hotové druhy:
+
+- `vanilla:spin` — **rotor větrníku**. Věže se přegenerovaly bez lopatek
+  (úprava původního obrázku, `docs/18-DILY.md`), lopatky jsou díl `rotor`.
+  Náboj i rovina rotoru se **změřily z červených špiček** na původních
+  obrázcích (`tools/measure-rotors.py`): těžiště tří špiček je náboj a tři
+  vektory k nim dají matici, kterou se rotor promítne jako elipsa přesně
+  tak, jak ho generátor nakreslil. Každý větrník se točí jinou fází.
+- `vanilla:smoke` — **kouř z komína**. Ústí našel `tools/find-chimneys.py`
+  (špičky horního obrysu), každý kandidát se prohlédl očima; schváleno 32
+  komínů na 27 obrázcích elektráren, spalovny a těžkého průmyslu. Chladicí
+  věže uhelné elektrárny c pouštějí bílou páru. Továrna bez proudu nekouří.
+
+Původní návrh:
 
 Budova zůstává statický obrázek. Obsah k ní přidá **body, ze kterých něco
 vychází**:
@@ -71,7 +89,15 @@ vychází**:
 Body na komíny se musí **naklikat**, z obrázku se odhadnout nedají. Nástroj:
 v ladicím režimu klik na budovu vypíše `at` pod kurzorem.
 
-## Vrstva 3 — auta na silnicích (T115)
+## Vrstva 3 — auta na silnicích (T115, hotovo)
+
+`src/render/vehicles.ts`. Šest aut (Škoda 105 a 120, Trabant, Lada, Avia,
+Karosa) z archu `cars_front` / `cars_rear`. K T118 patří vozidla služeb:
+policie, hasiči, sanitka a popeláři občas vyjedou ze své budovy a po pár
+dlaždicích zmizí. Změřeno zatím jen okem v headless Edge (skript s ladicím
+přístupem `window.__citybuilder`, jen ve vývoji).
+
+Původní návrh:
 
 Simulace auta nezná, zná **zátěž dlaždice** (`traffic`). Render si z ní
 vyrobí falešná auta:
@@ -132,7 +158,12 @@ Herci potřebují obrázky: policejní auto, hasičský vůz, sanitka, 2–3 cho
 a sedící člověk. Zadání přibude do `docs/06-SPRITY-SLUZEB.md`. Bez obrázků
 se nekreslí nic, kvádr by tady lhal víc, než pomohl.
 
-## 6 — les ve větru (T119)
+## 6 — les ve větru (T119, hotovo)
+
+`BuildingRenderer.sway` a `swayAt`. Jen les, ne balvany; jen výřez; pod
+zoomem 0,6 nic.
+
+Původní návrh:
 
 Stromy jsou samostatné sprity (`BuildingRenderer`, záporná id), takže se
 dají houpat **bez nových obrázků**:
