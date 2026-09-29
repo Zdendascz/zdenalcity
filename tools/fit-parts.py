@@ -327,6 +327,48 @@ def fit_material(name: str, write: bool, index: dict) -> None:
         image.save(OUT / f'{name}.png', optimize=True)
 
 
+# Vozidla po jednom (T128): obrázek `veh_<jméno>` nese obě strany téhož
+# vozidla — vlevo zepředu, vpravo zezadu — ve stejném měřítku.
+VEHICLES = [
+    ('veh_skoda105', 'cars', 0, 4.2), ('veh_skoda120', 'cars', 1, 4.2),
+    ('veh_trabant', 'cars', 2, 3.6), ('veh_lada', 'cars', 3, 4.1),
+    ('veh_avia', 'cars', 4, 5.2), ('veh_karosa', 'cars', 5, 8.5),
+    ('veh_police', 'service', 0, 4.3), ('veh_fire', 'service', 1, 6.2),
+    ('veh_ambulance', 'service', 2, 4.6), ('veh_refuse', 'service', 3, 6.2),
+]
+# Šířka Škody 105 zepředu na mapě (4× měřítko), jakou měla dosud — ať se
+# velikost aut proti silnici nemění. Ostatní podle skutečné délky.
+REFERENCE_WIDTH = 65
+REFERENCE_LENGTH = 4.2
+
+
+def fit_vehicles(out_dir: Path, index: dict) -> None:
+    for raw_name, sheet, i, length in VEHICLES:
+        path = RAW / f'{raw_name}.png'
+        if not path.exists():
+            continue
+        image = Image.open(path).convert('RGBA')
+        boxes = sorted(pieces(image), key=lambda b: (b[2] - b[0]) * (b[3] - b[1]), reverse=True)[:2]
+        if len(boxes) != 2:
+            print(f'  {raw_name}: čekám dvě strany, našel jsem {len(boxes)}')
+            continue
+        boxes.sort(key=lambda b: b[0])
+        front = align_vehicle(tight(image.crop(boxes[0])), True, f'{raw_name} zepředu')
+        rear = align_vehicle(tight(image.crop(boxes[1])), False, f'{raw_name} zezadu')
+        # Jedno měřítko pro obě strany: podle průměru jejich šířek.
+        size_px = (front.width + rear.width) / 2
+        target = REFERENCE_WIDTH * (length + 1.6) / (REFERENCE_LENGTH + 1.6)
+        factor = target / size_px
+        for view, crop in (('front', front), ('rear', rear)):
+            size = (max(1, round(crop.width * factor)), max(1, round(crop.height * factor)))
+            small = crop.resize(size, Image.LANCZOS)
+            anchor = anchor_for(small, 'car')
+            part = f'{sheet}_{view}_{i}'
+            index[part] = {'file': f'{part}.png', 'width': size[0], 'height': size[1], 'anchor': list(anchor)}
+            small.save(out_dir / f'{part}.png', optimize=True)
+        print(f'  {raw_name} → {sheet}_*_{i}: zepředu {front.width}, zezadu {rear.width} px před zmenšením')
+
+
 def main() -> int:
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -338,12 +380,24 @@ def main() -> int:
         index = json.loads(index_path.read_text(encoding='utf-8')).get('parts', {})
 
     have = {p.stem for p in RAW.glob('*.png')}
+    # `--preview`: vozidla po jednom jen do art/parts/preview, obsah hry beze
+    # změny. Autor je chce vidět dřív, než nahradí ta současná (T128).
+    if '--preview' in sys.argv:
+        preview = ROOT / 'art' / 'parts' / 'preview'
+        preview.mkdir(parents=True, exist_ok=True)
+        fit_vehicles(preview, {})
+        return 0
+    have_vehicles = any((RAW / f'{v[0]}.png').exists() for v in VEHICLES)
     for name, spec in SHEETS.items():
+        if have_vehicles and name.split('_')[0] in ('cars', 'service'):
+            continue
         if name in have:
             # Arch se přeřezává celý: počet kusů se mohl změnit.
             for key in [k for k in index if k.startswith(f'{name}_')]:
                 del index[key]
             fit_sheet(name, spec, write, index)
+    if have_vehicles and write:
+        fit_vehicles(OUT, index)
     if 'rotor' in have:
         fit_rotor(write, index)
     if 'street_lamp' in have:

@@ -206,6 +206,219 @@ light; a grey-green LIAZ refuse lorry with a rear compactor.
 The blue lights are plain blue domes, no text on any vehicle.
 ```
 
+## Vozidla po jednom, obě strany na jednom obrázku (T128)
+
+Pohled zepředu a zezadu se dřív kreslily na dvou různých arších a generátor
+tak každé vozidlo nakreslil pokaždé v jiných proporcích — autobus byl
+z jedné strany dlouhý a z druhé krátký. Deformace obrázku to neopravila
+(autor: „pěkně dojebaný"). Teď je **každé vozidlo na vlastním obrázku a obě
+strany vedle sebe**, takže je generátor kreslí ve stejném měřítku a tvaru.
+Vadný kus se přegeneruje sám.
+
+#### `veh_skoda105`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a red Škoda 105 saloon.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+#### `veh_skoda120`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a white Škoda 120 saloon.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+#### `veh_trabant`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a light blue Trabant 601 with a white roof.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+#### `veh_lada`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a beige Lada 1200 (Žiguli) saloon.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+#### `veh_avia`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: an orange Avia A31 small lorry with a khaki tarpaulin over the cargo bed.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+#### `veh_karosa`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a cream and red Karosa ŠM 11 city bus — a long rigid bus about four times as long as it is wide.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+Nápis „VB“ na dveřích policejního auta je **výjimka ze zákazu textu**,
+schválená autorem (2026-09-30): Veřejná bezpečnost je dobový znak, ne text
+k překladu.
+
+#### `veh_police`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a Czechoslovak police car: a white and yellow Lada saloon with a blue light bar on the roof.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+#### `veh_fire`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a red Tatra 148 fire engine with a ladder on the roof and white stripes.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+#### `veh_ambulance`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a white Škoda 1203 ambulance van with a red stripe and a blue light on the roof.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
+#### `veh_refuse`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+TWO views of the SAME vehicle, side by side, same scale, same proportions,
+same length, wide empty gap between them: a grey-green LIAZ refuse lorry with a white cab and a rear compactor body.
+
+LEFT view: the vehicle drives TOWARDS the viewer and to the RIGHT, along the
+isometric axis from the upper left to the lower right; we see its FRONT and
+its LEFT side.
+RIGHT view: the same vehicle drives AWAY from the viewer and to the RIGHT,
+along the isometric axis from the lower left to the upper right; we see its
+REAR and its LEFT side.
+
+Classic 2:1 isometric game projection, parallel projection, no perspective.
+The vehicle has its REAL proportions — do not shorten it. Both views must be
+the identical vehicle: same length, same width, same height, same colours.
+```
+
 ## Chodci
 
 Hlavička budov lidi zakazuje. Tady jsou, ale **drobní a bez tváří**: na mapě
