@@ -118,14 +118,93 @@ background, no tower, no nacelle, no shadow, no outline, no text.
 
 ## Vozidla
 
-**Od T125 se vozidla negenerují.** Autor hlásil auta pod špatným úhlem
-o 20–30°; změřeno 15–31° místo izometrických 26,6°, a to ani se šablonou
-kvádrů (`tools/make-vehicle-templates.py`, generátor ji ignoroval), ani
-s přísným zadáním. Zkosení to nespravilo: bok šel do osy, čelo ne.
+**Úhel vozidel (T125).** Generátor kreslí auta z pootočené kamery: bok leží
+zhruba správně (22–34°), ale čelo a záď jsou ploché (11–17° místo 26,6°).
+Zkosení z T124 srovnalo jen bok, čelo zůstalo — autor hlásil auta špatně
+o 20–30°. Náhrada auty z kvádrů (3D model) autor zamítl: **auta mají zůstat
+designově, jak je generátor nakreslil, jen správně vyladěná.**
 
-Auta proto staví `tools/make-vehicles.py` jako 3D modely z kvádrů a promítá
-je stejnou maticí jako mřížku hry — úhel sedí přesně ve všech směrech.
-Původní obrázky z generátoru jsou v `art/parts/archive/`.
+`fit-parts.py` proto u každého vozidla změří Houghovou transformací směr boku
+i čela (`edge_angle`) a převede obrázek afinní maticí, která drží svislice
+svislé (`align_vehicle`). Obě osy pak sedí na ±26,6°; auto je o 10–50 % vyšší,
+víc se ale změnit nedá, aniž by se rozešel úhel.
+
+Archy vozidel se generují z původního zadání níž; archivní pokusy se
+šablonou jsou v `art/parts/archive/`.
+
+#### `cars_front`
+PlĂˇtno: 1536x1024
+Kvalita: high
+
+```text
+A sprite sheet of SIX separate small vehicles in two rows of three, with wide
+empty transparent gaps between them so that no two vehicles touch. EVERY
+vehicle drives in the SAME direction: towards the viewer and to the RIGHT,
+along the isometric axis that runs from the upper left to the lower right, so
+we see its front and its left side. All six are drawn at the same scale, as
+they would stand next to each other in a street.
+
+Top row: a red Ĺ koda 105 saloon; a white Ĺ koda 120 saloon; a light blue
+Trabant 601.
+Bottom row: a beige Lada 1200 (Ĺ˝iguli); an orange Avia A31 small lorry with a
+tarpaulin; a cream and red Karosa Ĺ M 11 city bus (much longer than the cars).
+```
+
+#### `cars_rear`
+PlĂˇtno: 1536x1024
+Kvalita: high
+
+```text
+A sprite sheet of SIX separate small vehicles in two rows of three, with wide
+empty transparent gaps between them so that no two vehicles touch. EVERY
+vehicle drives in the SAME direction: away from the viewer and to the RIGHT,
+along the isometric axis that runs from the lower left to the upper right, so
+we see its rear and its left side. All six are drawn at the same scale, as
+they would stand next to each other in a street.
+
+Top row: a red Ĺ koda 105 saloon; a white Ĺ koda 120 saloon; a light blue
+Trabant 601.
+Bottom row: a beige Lada 1200 (Ĺ˝iguli); an orange Avia A31 small lorry with a
+tarpaulin; a cream and red Karosa Ĺ M 11 city bus (much longer than the cars).
+```
+
+#### `service_front`
+PlĂˇtno: 1536x1024
+Kvalita: high
+
+```text
+A sprite sheet of FOUR separate service vehicles in two rows of two, with wide
+empty transparent gaps between them so that no two vehicles touch. EVERY
+vehicle drives in the SAME direction: towards the viewer and to the RIGHT,
+along the isometric axis that runs from the upper left to the lower right, so
+we see its front and its left side. Same scale for all.
+
+Top row: a police car â€” a white and yellow Lada saloon with a blue light bar
+on the roof; a red Tatra 148 fire engine with a ladder on top.
+Bottom row: a white Ĺ koda 1203 ambulance van with a red stripe and a blue
+light; a grey-green LIAZ refuse lorry with a rear compactor.
+
+The blue lights are plain blue domes, no text on any vehicle.
+```
+
+#### `service_rear`
+PlĂˇtno: 1536x1024
+Kvalita: high
+
+```text
+A sprite sheet of FOUR separate service vehicles in two rows of two, with wide
+empty transparent gaps between them so that no two vehicles touch. EVERY
+vehicle drives in the SAME direction: away from the viewer and to the RIGHT,
+along the isometric axis that runs from the lower left to the upper right, so
+we see its rear and its left side. Same scale for all.
+
+Top row: a police car â€” a white and yellow Lada saloon with a blue light bar
+on the roof; a red Tatra 148 fire engine with a ladder on top.
+Bottom row: a white Ĺ koda 1203 ambulance van with a red stripe and a blue
+light; a grey-green LIAZ refuse lorry with a rear compactor.
+
+The blue lights are plain blue domes, no text on any vehicle.
+```
 
 ## Chodci
 

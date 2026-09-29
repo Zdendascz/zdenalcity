@@ -4,110 +4,110 @@
   "parts": {
     "cars_front_0": {
       "file": "cars_front_0.png",
-      "width": 75,
-      "height": 48,
+      "width": 73,
+      "height": 60,
       "anchor": [
-        38,
-        32
+        36,
+        44
       ]
     },
     "cars_front_1": {
       "file": "cars_front_1.png",
-      "width": 75,
-      "height": 48,
+      "width": 69,
+      "height": 56,
       "anchor": [
-        38,
-        32
+        34,
+        41
       ]
     },
     "cars_front_2": {
       "file": "cars_front_2.png",
-      "width": 66,
-      "height": 44,
+      "width": 62,
+      "height": 61,
       "anchor": [
-        33,
-        30
+        31,
+        45
       ]
     },
     "cars_front_3": {
       "file": "cars_front_3.png",
-      "width": 74,
-      "height": 48,
+      "width": 68,
+      "height": 58,
       "anchor": [
-        37,
-        32
+        34,
+        43
       ]
     },
     "cars_front_4": {
       "file": "cars_front_4.png",
-      "width": 88,
-      "height": 77,
+      "width": 76,
+      "height": 83,
       "anchor": [
-        44,
-        58
+        38,
+        61
       ]
     },
     "cars_front_5": {
       "file": "cars_front_5.png",
-      "width": 125,
-      "height": 100,
+      "width": 94,
+      "height": 84,
       "anchor": [
-        63,
-        72
+        47,
+        62
       ]
     },
     "cars_rear_0": {
       "file": "cars_rear_0.png",
-      "width": 75,
-      "height": 48,
+      "width": 71,
+      "height": 53,
       "anchor": [
-        38,
-        32
+        36,
+        39
       ]
     },
     "cars_rear_1": {
       "file": "cars_rear_1.png",
-      "width": 75,
-      "height": 48,
+      "width": 70,
+      "height": 52,
       "anchor": [
-        38,
-        32
+        35,
+        38
       ]
     },
     "cars_rear_2": {
       "file": "cars_rear_2.png",
-      "width": 66,
-      "height": 44,
+      "width": 63,
+      "height": 52,
       "anchor": [
-        33,
-        30
+        32,
+        38
       ]
     },
     "cars_rear_3": {
       "file": "cars_rear_3.png",
-      "width": 74,
+      "width": 68,
       "height": 48,
       "anchor": [
-        37,
-        32
+        34,
+        36
       ]
     },
     "cars_rear_4": {
       "file": "cars_rear_4.png",
-      "width": 88,
-      "height": 73,
+      "width": 81,
+      "height": 74,
       "anchor": [
-        44,
-        53
+        40,
+        55
       ]
     },
     "cars_rear_5": {
       "file": "cars_rear_5.png",
-      "width": 125,
-      "height": 100,
+      "width": 111,
+      "height": 86,
       "anchor": [
-        63,
-        72
+        56,
+        64
       ]
     },
     "flames_0": {
@@ -356,74 +356,74 @@
     },
     "service_front_0": {
       "file": "service_front_0.png",
-      "width": 75,
-      "height": 48,
+      "width": 76,
+      "height": 66,
       "anchor": [
         38,
-        32
+        49
       ]
     },
     "service_front_1": {
       "file": "service_front_1.png",
       "width": 99,
-      "height": 85,
+      "height": 106,
       "anchor": [
         50,
-        64
+        78
       ]
     },
     "service_front_2": {
       "file": "service_front_2.png",
-      "width": 81,
+      "width": 77,
       "height": 69,
       "anchor": [
-        41,
-        52
+        38,
+        51
       ]
     },
     "service_front_3": {
       "file": "service_front_3.png",
-      "width": 99,
-      "height": 87,
+      "width": 102,
+      "height": 84,
       "anchor": [
-        50,
-        65
+        51,
+        62
       ]
     },
     "service_rear_0": {
       "file": "service_rear_0.png",
-      "width": 75,
-      "height": 48,
+      "width": 76,
+      "height": 74,
       "anchor": [
         38,
-        32
+        55
       ]
     },
     "service_rear_1": {
       "file": "service_rear_1.png",
-      "width": 99,
-      "height": 80,
+      "width": 96,
+      "height": 89,
       "anchor": [
-        50,
-        58
+        48,
+        66
       ]
     },
     "service_rear_2": {
       "file": "service_rear_2.png",
-      "width": 81,
-      "height": 69,
+      "width": 83,
+      "height": 78,
       "anchor": [
-        41,
-        52
+        42,
+        58
       ]
     },
     "service_rear_3": {
       "file": "service_rear_3.png",
-      "width": 99,
-      "height": 81,
+      "width": 96,
+      "height": 97,
       "anchor": [
-        50,
-        59
+        48,
+        72
       ]
     },
     "sidewalk": {

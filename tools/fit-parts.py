@@ -41,33 +41,18 @@ LEVEL_H = 16
 # Cílová velikost jednoho „typického“ předmětu na archu při zoomu 1, v px.
 # Měří se jen podle vybraných předmětů (`reference`), zbytek archu jde stejným
 # měřítkem. U aut jsou to osobáky — autobus je pak přirozeně delší.
-# Vozidla tu nejsou: od T125 je kreslí `make-vehicles.py` jako 3D modely,
-# protože generátor izometrický úhel neudrží.
 SHEETS = {
     # šířka osobního auta na obrazovce: ~0,3 dlaždice podél osy
+    'cars_front': {'measure': 'width', 'size': 17, 'reference': [0, 1, 2, 3], 'anchor': 'car'},
+    'cars_rear': {'measure': 'width', 'size': 17, 'reference': [0, 1, 2, 3], 'anchor': 'car'},
+    'service_front': {'measure': 'width', 'size': 19, 'reference': [0], 'anchor': 'car'},
+    'service_rear': {'measure': 'width', 'size': 19, 'reference': [0], 'anchor': 'car'},
     # člověk: 1,7 m, patro jsou 3 m a 16 px
     'people_walk': {'measure': 'height', 'size': 9, 'reference': None, 'anchor': 'feet'},
     'people_sit': {'measure': 'height', 'size': 7, 'reference': None, 'anchor': 'feet'},
     # plamen: zhruba patro a půl
     'flames': {'measure': 'height', 'size': 22, 'reference': None, 'anchor': 'feet'},
 }
-# Dorovnání sklonu vozidel ve stupních, **odečtené okem** (T124).
-#
-# Generátor kreslí auta s osou pod 6–25°, izometrie ve hře má 26,6°. Dvě
-# automatická měření selhala: spodní obálka (linie kol) chytala u náklaďáku
-# plachtu a u autobusu nárazník, převládající směr hran chytal okna a čelo —
-# rozcházela se až o 20°. Autor hlásil auta „pod špatným úhlem" dvakrát.
-# Každé vozidlo se proto vykreslilo s pěti variantami zkosení na silnici
-# s izometrickými čarami a vybrala se ta, jejíž bok leží v ose (2026-09-29).
-SKEW_OVERRIDES = {
-    'cars_front_0': 15.0, 'cars_front_1': 15.0, 'cars_front_2': 15.0,
-    'cars_front_3': 15.0, 'cars_front_4': 10.0, 'cars_front_5': 10.0,
-    'cars_rear_0': -15.0, 'cars_rear_1': -15.0, 'cars_rear_2': -15.0,
-    'cars_rear_3': -15.0, 'cars_rear_4': -10.0, 'cars_rear_5': -10.0,
-    'service_front_0': 15.0, 'service_front_1': 10.0, 'service_front_2': 15.0, 'service_front_3': 10.0,
-    'service_rear_0': -15.0, 'service_rear_1': -10.0, 'service_rear_2': -15.0, 'service_rear_3': -10.0,
-}
-
 # Rotor: délka lopatky při zoomu 1. Skutečnou velikost na mapě určí matice
 # změřená z obrázku budovy, tohle je jen rozlišení textury.
 ROTOR_RADIUS = 34
@@ -150,6 +135,79 @@ def axis_angle(image: Image.Image) -> float | None:
     return float(np.degrees(np.arctan2(dy, dx)))
 
 
+def edge_angle(crop: Image.Image, low: float, high: float) -> float | None:
+    """Převládající směr rovných hran v rozsahu úhlů (stupně, y dolů).
+
+    Houghova transformace nad hranami: bok auta nesou práh, lišta a okna,
+    čelo nárazník, maska a spodní hrana skla. Váží se délkou úsečky.
+    Ověřeno proti ručnímu odečtu přes body dotyku kol (Škoda 105: bok 29°
+    proti 28,7°, čelo −14° proti −14,5°).
+    """
+    import cv2
+    from scipy.ndimage import gaussian_filter1d
+
+    rgba = np.asarray(crop)
+    gray = cv2.cvtColor(rgba[:, :, :3], cv2.COLOR_RGB2GRAY)
+    gray = (gray * (rgba[:, :, 3] / 255.0)).astype(np.uint8)
+    edges = cv2.Canny(gray, 60, 160)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 360, threshold=40,
+                            minLineLength=max(30, crop.width // 8), maxLineGap=4)
+    if lines is None:
+        return None
+    hist = np.zeros(181)
+    for x1, y1, x2, y2 in lines[:, 0]:
+        if x2 == x1:
+            continue
+        a = (np.degrees(np.arctan2(y2 - y1, x2 - x1)) + 90) % 180 - 90
+        if low < a < high:
+            hist[int(round(a)) + 90] += np.hypot(x2 - x1, y2 - y1)
+    if hist.sum() == 0:
+        return None
+    return float(np.argmax(gaussian_filter1d(hist, 1.2)) - 90)
+
+
+ISO = float(np.degrees(np.arctan(0.5)))
+
+
+def align_vehicle(crop: Image.Image, front: bool, label: str) -> Image.Image:
+    """Srovná vozidlo do izometrie hry (T125).
+
+    Generátor kreslí auta z pootočené kamery: bok leží zhruba správně
+    (22–34°), ale čelo a záď jsou ploché (11–17° místo 26,6°). Zkosení
+    z T124 srovnalo jen bok, čelo zůstalo — autor hlásil auta špatně
+    o 20–30°. Tady se změří **oba** směry a obrázek se převede afinní
+    maticí, která drží svislice svislé:
+
+        x' = x,   y' = b·x + c·y
+
+    `b` a `c` jsou jednoznačně dané tím, že se bok i čelo mají trefit na
+    ±26,6°. Vzhled auta zůstane, jen se natočí jako zbytek města.
+    """
+    if front:
+        side, face = edge_angle(crop, 8, 45), edge_angle(crop, -45, -3)
+        target_side, target_face = ISO, -ISO
+    else:
+        side, face = edge_angle(crop, -45, -3), edge_angle(crop, 3, 60)
+        target_side, target_face = -ISO, ISO
+    if side is None or face is None:
+        print(f'    {label}: úhly nejdou změřit, beru obrázek jak je')
+        return crop
+    t1, t2 = np.tan(np.radians(side)), np.tan(np.radians(face))
+    g1, g2 = np.tan(np.radians(target_side)), np.tan(np.radians(target_face))
+    c = (g1 - g2) / (t1 - t2)
+    b = g1 - c * t1
+    # Výřez se roztáhne tak, aby se výsledek vešel: y' = b·x + c·y.
+    w, h = crop.size
+    ys = [b * x + c * y for x in (0, w) for y in (0, h)]
+    top = min(ys)
+    height = int(np.ceil(max(ys) - top)) + 2
+    # PIL chce inverzní zobrazení: z výstupu (x', y') do vstupu (x, y).
+    inverse = (1, 0, 0, -b / c, 1 / c, top / c)
+    out = crop.transform((w, height), Image.AFFINE, inverse, resample=Image.BICUBIC)
+    print(f'    {label}: bok {side:+.0f}° čelo {face:+.0f}° → b {b:+.3f} c {c:.3f}')
+    return tight(out)
+
+
 def anchor_for(image: Image.Image, kind: str) -> tuple[int, int]:
     width, height = image.size
     if kind == 'car':
@@ -170,6 +228,8 @@ def fit_sheet(name: str, spec: dict, write: bool, index: dict) -> None:
     image = Image.open(RAW / f'{name}.png').convert('RGBA')
     boxes = pieces(image)
     crops = [tight(image.crop(box)) for box in boxes]
+    if spec['anchor'] == 'car':
+        crops = [align_vehicle(crop, name.endswith('_front'), f'{name}_{i}') for i, crop in enumerate(crops)]
     reference = spec['reference'] or list(range(len(crops)))
     measured = [
         (crop.size[0] if spec['measure'] == 'width' else crop.size[1])
@@ -183,16 +243,6 @@ def fit_sheet(name: str, spec: dict, write: bool, index: dict) -> None:
         anchor = anchor_for(small, spec['anchor'])
         part = f'{name}_{order}'
         index[part] = {'file': f'{part}.png', 'width': size[0], 'height': size[1], 'anchor': list(anchor)}
-        if spec['anchor'] == 'car':
-            angle = axis_angle(crop)
-            if angle is not None:
-                # Zepředu jede auto doprava dolů (+26,6°), zezadu doprava nahoru.
-                target = 26.565 if name.endswith('_front') else -26.565
-                # Víc než 14° zkosení auto viditelně pokřiví; tam, kde měření
-                # chytne rovnou hranu plachty místo kol, rozhodlo oko.
-                correction = SKEW_OVERRIDES.get(part, max(-14.0, min(14.0, target - angle)))
-                index[part]['skew'] = round(float(np.radians(correction)), 4)
-                print(f'    {part}: osa {angle:.1f}° → dorovnat o {correction:+.1f}°')
         print(f'    {part}: {size[0]}×{size[1]} kotva {anchor}')
         if write:
             small.save(OUT / f'{part}.png', optimize=True)
