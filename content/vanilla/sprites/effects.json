@@ -5,8 +5,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          349,
-          49
+          461,
+          4
         ],
         "rate": 1,
         "color": "#7c7a78"
@@ -14,8 +14,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          516,
-          2
+          570,
+          104
         ],
         "rate": 1,
         "color": "#7c7a78"
@@ -206,8 +206,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          449,
-          7
+          446,
+          15
         ],
         "when": "powered",
         "rate": 1,
@@ -278,8 +278,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          281,
-          2
+          646,
+          113
         ],
         "when": "powered",
         "rate": 1,
@@ -358,8 +358,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          101,
-          7
+          361,
+          2
         ],
         "when": "powered",
         "rate": 1,

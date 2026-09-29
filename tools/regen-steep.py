@@ -25,8 +25,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / 'art' / 'sprites' / 'raw'
 ARCHIVE = ROOT / 'art' / 'sprites' / 'archive' / 'strme'
-MIN_RATIO = 1.3
-GOOD_RATIO = 1.4
+MIN_RATIO = 1.4
+GOOD_RATIO = 1.5
 TRIES = 3
 PY = sys.executable
 

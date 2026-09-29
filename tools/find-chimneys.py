@@ -36,7 +36,7 @@ CANDIDATES = [
 # Plní se po prohlídce náhledů.
 APPROVED: dict[str, list] = {
     # 2026-09-29, prohlédnuto na výřezech kolem každého kandidáta.
-    'coal_power_plant__a': [0, 1],
+    'coal_power_plant__a': [0, 1],  # přegenerováno podruhé (T124)
     'coal_power_plant__b': [0],
     # c přegenerována kvůli strmému pohledu (T124); věže jsou pro detektor
     # moc široké, středy okrajů odečtené z obrysu.
@@ -53,15 +53,15 @@ APPROVED: dict[str, list] = {
     'industrial_complex__a': [0],
     'industrial_complex__b': [0],  # přegenerováno (T124)
     'industrial_foundry__a': [1],
-    'industrial_foundry__b': [0],
+    'industrial_foundry__b': [0],  # přegenerováno (T124)
     'industrial_foundry__c': [0],
     'industrial_refinery__a': [7],
-    'industrial_refinery__c': [2],
+    'industrial_refinery__c': [5],  # přegenerováno (T124)
     'industrial_smelter__a': [1],
     'industrial_smelter__b': [3],
     'industrial_smelter__c': [1, 2, 4],
     'industrial_works__a': [0],  # přegenerováno (T124)
-    'industrial_works__c': [7],  # přegenerováno (T124)
+    'industrial_works__c': [0],  # přegenerováno podruhé (T124)
     'industrial_large__c': [0],
     'industrial_medium__a': [0],
     'industrial_hall__b': [0],

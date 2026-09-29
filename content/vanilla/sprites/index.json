@@ -73,10 +73,10 @@
       "variant": "a",
       "file": "cinema__a.png",
       "width": 512,
-      "height": 315,
+      "height": 352,
       "anchor": [
-        245,
-        315
+        257,
+        352
       ]
     },
     {
@@ -84,10 +84,10 @@
       "variant": "b",
       "file": "cinema__b.png",
       "width": 512,
-      "height": 313,
+      "height": 355,
       "anchor": [
-        257,
-        313
+        271,
+        355
       ]
     },
     {
@@ -117,10 +117,10 @@
       "variant": "b",
       "file": "city_park__b.png",
       "width": 768,
-      "height": 442,
+      "height": 433,
       "anchor": [
-        384,
-        442
+        382,
+        433
       ]
     },
     {
@@ -139,10 +139,10 @@
       "variant": "a",
       "file": "clinic__a.png",
       "width": 512,
-      "height": 300,
+      "height": 348,
       "anchor": [
-        255,
-        300
+        254,
+        348
       ]
     },
     {
@@ -172,10 +172,10 @@
       "variant": "a",
       "file": "coal_power_plant__a.png",
       "width": 1280,
-      "height": 808,
+      "height": 974,
       "anchor": [
-        594,
-        808
+        640,
+        974
       ]
     },
     {
@@ -216,10 +216,10 @@
       "variant": "b",
       "file": "commercial_arcade__b.png",
       "width": 384,
-      "height": 251,
+      "height": 264,
       "anchor": [
-        256,
-        251
+        241,
+        264
       ]
     },
     {
@@ -303,11 +303,11 @@
       "building": "vanilla:commercial_gallery",
       "variant": "a",
       "file": "commercial_gallery__a.png",
-      "width": 640,
-      "height": 374,
+      "width": 533,
+      "height": 333,
       "anchor": [
-        367,
-        374
+        342,
+        333
       ]
     },
     {
@@ -315,10 +315,10 @@
       "variant": "b",
       "file": "commercial_gallery__b.png",
       "width": 640,
-      "height": 438,
+      "height": 451,
       "anchor": [
-        387,
-        438
+        380,
+        451
       ]
     },
     {
@@ -370,10 +370,10 @@
       "variant": "a",
       "file": "commercial_large__a.png",
       "width": 256,
-      "height": 165,
+      "height": 214,
       "anchor": [
-        124,
-        165
+        118,
+        214
       ]
     },
     {
@@ -381,10 +381,10 @@
       "variant": "b",
       "file": "commercial_large__b.png",
       "width": 256,
-      "height": 169,
+      "height": 189,
       "anchor": [
-        126,
-        169
+        128,
+        189
       ]
     },
     {
@@ -557,10 +557,10 @@
       "variant": "c",
       "file": "commercial_row__c.png",
       "width": 384,
-      "height": 207,
+      "height": 247,
       "anchor": [
-        256,
-        207
+        273,
+        247
       ]
     },
     {
@@ -612,10 +612,10 @@
       "variant": "b",
       "file": "commercial_tower__b.png",
       "width": 512,
-      "height": 374,
+      "height": 433,
       "anchor": [
-        256,
-        374
+        253,
+        433
       ]
     },
     {
@@ -656,10 +656,10 @@
       "variant": "c",
       "file": "community_centre__c.png",
       "width": 512,
-      "height": 307,
+      "height": 340,
       "anchor": [
-        259,
-        307
+        253,
+        340
       ]
     },
     {
@@ -832,10 +832,10 @@
       "variant": "a",
       "file": "fire_station__a.png",
       "width": 512,
-      "height": 331,
+      "height": 421,
       "anchor": [
-        252,
-        331
+        259,
+        421
       ]
     },
     {
@@ -854,10 +854,10 @@
       "variant": "c",
       "file": "fire_station__c.png",
       "width": 512,
-      "height": 319,
+      "height": 325,
       "anchor": [
-        254,
-        319
+        281,
+        325
       ]
     },
     {
@@ -887,10 +887,10 @@
       "variant": "c",
       "file": "fire_station_large__c.png",
       "width": 512,
-      "height": 311,
+      "height": 369,
       "anchor": [
-        255,
-        311
+        254,
+        369
       ]
     },
     {
@@ -942,10 +942,10 @@
       "variant": "b",
       "file": "gallery__b.png",
       "width": 256,
-      "height": 157,
+      "height": 195,
       "anchor": [
-        133,
-        157
+        129,
+        195
       ]
     },
     {
@@ -1008,10 +1008,10 @@
       "variant": "b",
       "file": "high_school__b.png",
       "width": 512,
-      "height": 317,
+      "height": 364,
       "anchor": [
-        257,
-        317
+        272,
+        364
       ]
     },
     {
@@ -1030,10 +1030,10 @@
       "variant": "a",
       "file": "hospital__a.png",
       "width": 768,
-      "height": 480,
+      "height": 628,
       "anchor": [
-        381,
-        480
+        384,
+        628
       ]
     },
     {
@@ -1173,10 +1173,10 @@
       "variant": "b",
       "file": "industrial_foundry__b.png",
       "width": 512,
-      "height": 327,
+      "height": 427,
       "anchor": [
-        255,
-        327
+        256,
+        427
       ]
     },
     {
@@ -1305,10 +1305,10 @@
       "variant": "b",
       "file": "industrial_park__b.png",
       "width": 768,
-      "height": 520,
+      "height": 687,
       "anchor": [
-        397,
-        520
+        384,
+        687
       ]
     },
     {
@@ -1349,10 +1349,10 @@
       "variant": "c",
       "file": "industrial_refinery__c.png",
       "width": 768,
-      "height": 464,
+      "height": 620,
       "anchor": [
-        386,
-        464
+        379,
+        620
       ]
     },
     {
@@ -1415,10 +1415,10 @@
       "variant": "c",
       "file": "industrial_small__c.png",
       "width": 256,
-      "height": 152,
+      "height": 160,
       "anchor": [
-        128,
-        152
+        126,
+        160
       ]
     },
     {
@@ -1470,10 +1470,10 @@
       "variant": "b",
       "file": "industrial_works__b.png",
       "width": 512,
-      "height": 331,
+      "height": 360,
       "anchor": [
-        253,
-        331
+        257,
+        360
       ]
     },
     {
@@ -1481,10 +1481,10 @@
       "variant": "c",
       "file": "industrial_works__c.png",
       "width": 512,
-      "height": 420,
+      "height": 438,
       "anchor": [
-        256,
-        420
+        254,
+        438
       ]
     },
     {
@@ -1503,10 +1503,10 @@
       "variant": "b",
       "file": "industrial_yard__b.png",
       "width": 384,
-      "height": 250,
+      "height": 223,
       "anchor": [
-        237,
-        250
+        253,
+        223
       ]
     },
     {
@@ -1525,10 +1525,10 @@
       "variant": "a",
       "file": "landfill__a.png",
       "width": 768,
-      "height": 399,
+      "height": 408,
       "anchor": [
-        382,
-        399
+        383,
+        408
       ]
     },
     {
@@ -1536,10 +1536,10 @@
       "variant": "b",
       "file": "landfill__b.png",
       "width": 768,
-      "height": 430,
+      "height": 560,
       "anchor": [
-        396,
-        430
+        366,
+        560
       ]
     },
     {
@@ -1635,10 +1635,10 @@
       "variant": "b",
       "file": "museum__b.png",
       "width": 768,
-      "height": 465,
+      "height": 557,
       "anchor": [
-        384,
-        465
+        382,
+        557
       ]
     },
     {
@@ -1668,10 +1668,10 @@
       "variant": "b",
       "file": "nuclear_power_plant__b.png",
       "width": 1536,
-      "height": 995,
+      "height": 1207,
       "anchor": [
-        773,
-        995
+        833,
+        1207
       ]
     },
     {
@@ -1701,10 +1701,10 @@
       "variant": "b",
       "file": "park_large__b.png",
       "width": 512,
-      "height": 286,
+      "height": 294,
       "anchor": [
-        273,
-        286
+        251,
+        294
       ]
     },
     {
@@ -1734,10 +1734,10 @@
       "variant": "b",
       "file": "park_small__b.png",
       "width": 256,
-      "height": 149,
+      "height": 141,
       "anchor": [
-        128,
-        149
+        126,
+        141
       ]
     },
     {
@@ -1789,10 +1789,10 @@
       "variant": "a",
       "file": "plaza__a.png",
       "width": 256,
-      "height": 143,
+      "height": 150,
       "anchor": [
-        128,
-        143
+        130,
+        150
       ]
     },
     {
@@ -1888,10 +1888,10 @@
       "variant": "a",
       "file": "prison__a.png",
       "width": 768,
-      "height": 463,
+      "height": 471,
       "anchor": [
-        385,
-        463
+        382,
+        471
       ]
     },
     {
@@ -1899,10 +1899,10 @@
       "variant": "b",
       "file": "prison__b.png",
       "width": 768,
-      "height": 441,
+      "height": 468,
       "anchor": [
-        383,
-        441
+        404,
+        468
       ]
     },
     {
@@ -1910,10 +1910,10 @@
       "variant": "c",
       "file": "prison__c.png",
       "width": 768,
-      "height": 440,
+      "height": 447,
       "anchor": [
-        373,
-        440
+        377,
+        447
       ]
     },
     {
@@ -1943,10 +1943,10 @@
       "variant": "c",
       "file": "pump_station__c.png",
       "width": 256,
-      "height": 162,
+      "height": 157,
       "anchor": [
-        127,
-        162
+        130,
+        157
       ]
     },
     {
@@ -2119,10 +2119,10 @@
       "variant": "a",
       "file": "residential_quarter__a.png",
       "width": 768,
-      "height": 432,
+      "height": 476,
       "anchor": [
-        416,
-        432
+        385,
+        476
       ]
     },
     {
@@ -2328,10 +2328,10 @@
       "variant": "b",
       "file": "residential_terraces__b.png",
       "width": 640,
-      "height": 428,
+      "height": 505,
       "anchor": [
         384,
-        428
+        505
       ]
     },
     {
@@ -2394,10 +2394,10 @@
       "variant": "b",
       "file": "retirement_home__b.png",
       "width": 768,
-      "height": 454,
+      "height": 557,
       "anchor": [
-        382,
-        454
+        383,
+        557
       ]
     },
     {
@@ -2768,10 +2768,10 @@
       "variant": "c",
       "file": "school__c.png",
       "width": 768,
-      "height": 469,
+      "height": 506,
       "anchor": [
-        380,
-        469
+        371,
+        506
       ]
     },
     {
@@ -2955,10 +2955,10 @@
       "variant": "b",
       "file": "transit_depot__b.png",
       "width": 768,
-      "height": 406,
+      "height": 473,
       "anchor": [
-        382,
-        406
+        374,
+        473
       ]
     },
     {
@@ -3043,10 +3043,10 @@
       "variant": "a",
       "file": "water_treatment__a.png",
       "width": 768,
-      "height": 392,
+      "height": 379,
       "anchor": [
-        374,
-        392
+        372,
+        379
       ]
     },
     {
@@ -3065,10 +3065,10 @@
       "variant": "c",
       "file": "water_treatment__c.png",
       "width": 768,
-      "height": 388,
+      "height": 404,
       "anchor": [
-        368,
-        388
+        383,
+        404
       ]
     },
     {
@@ -3076,10 +3076,10 @@
       "variant": "a",
       "file": "water_works__a.png",
       "width": 768,
-      "height": 410,
+      "height": 414,
       "anchor": [
-        406,
-        410
+        389,
+        414
       ]
     },
     {
@@ -3098,10 +3098,10 @@
       "variant": "c",
       "file": "water_works__c.png",
       "width": 768,
-      "height": 460,
+      "height": 578,
       "anchor": [
-        399,
-        460
+        395,
+        578
       ]
     },
     {
