@@ -53,12 +53,21 @@ SHEETS = {
     # plamen: zhruba patro a půl
     'flames': {'measure': 'height', 'size': 22, 'reference': None, 'anchor': 'feet'},
 }
-# Ruční dorovnání sklonu ve stupních tam, kde měření spodní obálky selže:
-# náklaďák zezadu má dole rovnou hranu plachty, autobus zepředu nárazník.
-# Odečteno z náhledu proti izometrickým čarám (2026-09-29).
+# Dorovnání sklonu vozidel ve stupních, **odečtené okem** (T124).
+#
+# Generátor kreslí auta s osou pod 6–25°, izometrie ve hře má 26,6°. Dvě
+# automatická měření selhala: spodní obálka (linie kol) chytala u náklaďáku
+# plachtu a u autobusu nárazník, převládající směr hran chytal okna a čelo —
+# rozcházela se až o 20°. Autor hlásil auta „pod špatným úhlem" dvakrát.
+# Každé vozidlo se proto vykreslilo s pěti variantami zkosení na silnici
+# s izometrickými čarami a vybrala se ta, jejíž bok leží v ose (2026-09-29).
 SKEW_OVERRIDES = {
-    'cars_rear_4': -11.0,
-    'cars_front_5': 13.0,
+    'cars_front_0': 15.0, 'cars_front_1': 15.0, 'cars_front_2': 15.0,
+    'cars_front_3': 15.0, 'cars_front_4': 10.0, 'cars_front_5': 10.0,
+    'cars_rear_0': -15.0, 'cars_rear_1': -15.0, 'cars_rear_2': -15.0,
+    'cars_rear_3': -15.0, 'cars_rear_4': -10.0, 'cars_rear_5': -10.0,
+    'service_front_0': 15.0, 'service_front_1': 10.0, 'service_front_2': 15.0, 'service_front_3': 10.0,
+    'service_rear_0': -15.0, 'service_rear_1': -10.0, 'service_rear_2': -15.0, 'service_rear_3': -10.0,
 }
 
 # Rotor: délka lopatky při zoomu 1. Skutečnou velikost na mapě určí matice

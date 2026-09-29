@@ -10,7 +10,7 @@
         36,
         36
       ],
-      "skew": 0.236
+      "skew": 0.2618
     },
     "cars_front_1": {
       "file": "cars_front_1.png",
@@ -20,7 +20,7 @@
         34,
         36
       ],
-      "skew": 0.2181
+      "skew": 0.2618
     },
     "cars_front_2": {
       "file": "cars_front_2.png",
@@ -30,7 +30,7 @@
         31,
         34
       ],
-      "skew": 0.2443
+      "skew": 0.2618
     },
     "cars_front_3": {
       "file": "cars_front_3.png",
@@ -40,7 +40,7 @@
         34,
         38
       ],
-      "skew": 0.181
+      "skew": 0.2618
     },
     "cars_front_4": {
       "file": "cars_front_4.png",
@@ -50,7 +50,7 @@
         38,
         56
       ],
-      "skew": 0.0227
+      "skew": 0.1745
     },
     "cars_front_5": {
       "file": "cars_front_5.png",
@@ -60,7 +60,7 @@
         47,
         58
       ],
-      "skew": 0.2269
+      "skew": 0.1745
     },
     "cars_rear_0": {
       "file": "cars_rear_0.png",
@@ -70,7 +70,7 @@
         36,
         31
       ],
-      "skew": -0.2443
+      "skew": -0.2618
     },
     "cars_rear_1": {
       "file": "cars_rear_1.png",
@@ -80,7 +80,7 @@
         35,
         30
       ],
-      "skew": -0.2443
+      "skew": -0.2618
     },
     "cars_rear_2": {
       "file": "cars_rear_2.png",
@@ -90,7 +90,7 @@
         32,
         30
       ],
-      "skew": -0.1853
+      "skew": -0.2618
     },
     "cars_rear_3": {
       "file": "cars_rear_3.png",
@@ -100,7 +100,7 @@
         34,
         32
       ],
-      "skew": -0.2443
+      "skew": -0.2618
     },
     "cars_rear_4": {
       "file": "cars_rear_4.png",
@@ -110,7 +110,7 @@
         40,
         47
       ],
-      "skew": -0.192
+      "skew": -0.1745
     },
     "cars_rear_5": {
       "file": "cars_rear_5.png",
@@ -120,7 +120,7 @@
         56,
         56
       ],
-      "skew": -0.0632
+      "skew": -0.1745
     },
     "flames_0": {
       "file": "flames_0.png",
@@ -374,7 +374,7 @@
         38,
         38
       ],
-      "skew": 0.2286
+      "skew": 0.2618
     },
     "service_front_1": {
       "file": "service_front_1.png",
@@ -384,7 +384,7 @@
         50,
         54
       ],
-      "skew": 0.0743
+      "skew": 0.1745
     },
     "service_front_2": {
       "file": "service_front_2.png",
@@ -394,7 +394,7 @@
         38,
         44
       ],
-      "skew": 0.2443
+      "skew": 0.2618
     },
     "service_front_3": {
       "file": "service_front_3.png",
@@ -404,7 +404,7 @@
         51,
         53
       ],
-      "skew": 0.1514
+      "skew": 0.1745
     },
     "service_rear_0": {
       "file": "service_rear_0.png",
@@ -414,7 +414,7 @@
         38,
         34
       ],
-      "skew": -0.2443
+      "skew": -0.2618
     },
     "service_rear_1": {
       "file": "service_rear_1.png",
@@ -424,7 +424,7 @@
         48,
         44
       ],
-      "skew": -0.2443
+      "skew": -0.1745
     },
     "service_rear_2": {
       "file": "service_rear_2.png",
@@ -434,7 +434,7 @@
         42,
         43
       ],
-      "skew": -0.2443
+      "skew": -0.2618
     },
     "service_rear_3": {
       "file": "service_rear_3.png",
@@ -444,7 +444,7 @@
         48,
         44
       ],
-      "skew": -0.2443
+      "skew": -0.1745
     },
     "sidewalk": {
       "file": "sidewalk.png",
