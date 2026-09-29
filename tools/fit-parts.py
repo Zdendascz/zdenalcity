@@ -53,6 +53,9 @@ SHEETS = {
     # plamen: zhruba patro a půl
     'flames': {'measure': 'height', 'size': 22, 'reference': None, 'anchor': 'feet'},
 }
+# Zmenšení vozidel proti velikosti v `SHEETS`.
+VEHICLE_SIZE = 0.9
+
 # Rotor: délka lopatky při zoomu 1. Skutečnou velikost na mapě určí matice
 # změřená z obrázku budovy, tohle je jen rozlišení textury.
 ROTOR_RADIUS = 34
@@ -236,6 +239,9 @@ def fit_sheet(name: str, spec: dict, write: bool, index: dict) -> None:
         for i, crop in enumerate(crops) if i in reference
     ]
     factor = spec['size'] * SCALE / (sum(measured) / len(measured))
+    if spec['anchor'] == 'car':
+        # Autor: o 10 % menší, ať lépe sedí do pruhů (2026-09-30).
+        factor *= VEHICLE_SIZE
     print(f'  {name}: {len(crops)} kusů, měřítko {factor:.3f}')
     for order, crop in enumerate(crops):
         size = (max(1, round(crop.size[0] * factor)), max(1, round(crop.size[1] * factor)))
