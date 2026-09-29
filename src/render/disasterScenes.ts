@@ -24,6 +24,16 @@ export class DisasterScenes {
   private readonly container = new Container();
   /** Uzly podle id katastrofy — přežijí překreslení, takže se neblikají. */
   private readonly nodes = new Map<number, Sprite>();
+  /**
+   * Pohromy, které se **hýbou** (tornádo): kde uzel je, kam jede a jak daleko
+   * je mezi tím. Simulace posune tornádo jednou za tik, tady se ta cesta
+   * rozloží do snímků (T120).
+   */
+  private readonly movers = new Map<number, { fromX: number; fromY: number; toX: number; toY: number; t: number; scale: number }>();
+  private clock = 0;
+  private dustClock = 0;
+  /** Prach u paty tornáda. Dodá ho `Effects`. */
+  onDust: ((x: number, y: number, base: number) => void) | null = null;
   private scenes: ReadonlyMap<string, TerrainDecor[]> = new Map();
 
   constructor(world: ReadonlyWorldView, parent: Container) {
@@ -101,6 +111,61 @@ export class DisasterScenes {
       if (alive.has(id)) continue;
       node.destroy();
       this.nodes.delete(id);
+      this.movers.delete(id);
+    }
+  }
+
+  /**
+   * Pohne pohromami, které se pohybují (T120).
+   *
+   * Do teď stálo tornádo **tam, kde vzniklo**, i když simulace jeho osu
+   * posouvala dlaždici po dlaždici přes město — obrázek se nehnul. Teď jede
+   * za skutečnou polohou (`state.x/y`) a mezi tiky se poloha dopočítává, takže
+   * jede plynule. Nálevka se kolébá a u paty víří prach.
+   */
+  animate(deltaMS: number, tickFraction: number, motion: boolean): void {
+    this.clock += deltaMS;
+    const t = this.clock / 1000;
+    this.dustClock -= deltaMS;
+    const dust = motion && this.dustClock <= 0;
+    if (dust) this.dustClock = 160;
+
+    for (const disaster of this.world.disasters.active) {
+      if (disaster.finished) continue;
+      const node = this.nodes.get(disaster.id);
+      const x = disaster.state['x'];
+      const y = disaster.state['y'];
+      if (!node || typeof x !== 'number' || typeof y !== 'number') continue;
+
+      let mover = this.movers.get(disaster.id);
+      if (!mover) {
+        // Pohybující se nálevka je o polovinu větší než nehybná scéna: stojí
+        // uprostřed louky a musí být vidět přes půl obrazovky.
+        mover = { fromX: x, fromY: y, toX: x, toY: y, t: 1, scale: node.scale.x * 1.5 };
+        node.scale.y = mover.scale;
+        this.movers.set(disaster.id, mover);
+      }
+      if (mover.toX !== x || mover.toY !== y) {
+        // Nový cíl: vyjede se z místa, kde uzel právě je.
+        const done = Math.min(1, mover.t);
+        mover.fromX += (mover.toX - mover.fromX) * done;
+        mover.fromY += (mover.toY - mover.fromY) * done;
+        mover.toX = x;
+        mover.toY = y;
+        mover.t = 0;
+      }
+      mover.t = Math.min(1, mover.t + tickFraction);
+      const gx = mover.fromX + (mover.toX - mover.fromX) * mover.t;
+      const gy = mover.fromY + (mover.toY - mover.fromY) * mover.t;
+      const base = groundHeightAt(this.world.cornerHeight, gx + 0.5, gy + 0.5);
+      const point = gridToScreen(gx + 0.5, gy + 0.5, base);
+      node.position.set(point.x, point.y);
+      if (motion) {
+        // Kolébání: vršek nálevky opisuje pomalý kruh, pata stojí.
+        node.skew.x = 0.09 * Math.sin(t * 2.3 + disaster.id);
+        node.scale.x = mover.scale * (1 + 0.05 * Math.sin(t * 7.1));
+      }
+      if (dust) this.onDust?.(gx + 0.5, gy + 0.5, base);
     }
   }
 

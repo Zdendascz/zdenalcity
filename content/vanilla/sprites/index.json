@@ -304,10 +304,10 @@
       "variant": "a",
       "file": "commercial_gallery__a.png",
       "width": 640,
-      "height": 363,
+      "height": 326,
       "anchor": [
-        414,
-        363
+        398,
+        326
       ]
     },
     {
@@ -546,10 +546,10 @@
       "variant": "b",
       "file": "commercial_row__b.png",
       "width": 384,
-      "height": 202,
+      "height": 228,
       "anchor": [
-        256,
-        202
+        252,
+        228
       ]
     },
     {
@@ -612,10 +612,10 @@
       "variant": "b",
       "file": "commercial_tower__b.png",
       "width": 512,
-      "height": 353,
+      "height": 374,
       "anchor": [
-        227,
-        353
+        256,
+        374
       ]
     },
     {
@@ -865,10 +865,10 @@
       "variant": "a",
       "file": "fire_station_large__a.png",
       "width": 512,
-      "height": 271,
+      "height": 392,
       "anchor": [
-        251,
-        271
+        264,
+        392
       ]
     },
     {
@@ -953,10 +953,10 @@
       "variant": "c",
       "file": "gallery__c.png",
       "width": 256,
-      "height": 163,
+      "height": 173,
       "anchor": [
-        125,
-        163
+        127,
+        173
       ]
     },
     {
@@ -1074,10 +1074,10 @@
       "variant": "b",
       "file": "incinerator__b.png",
       "width": 768,
-      "height": 688,
+      "height": 647,
       "anchor": [
-        360,
-        688
+        387,
+        647
       ]
     },
     {
@@ -1195,10 +1195,10 @@
       "variant": "a",
       "file": "industrial_hall__a.png",
       "width": 640,
-      "height": 309,
+      "height": 410,
       "anchor": [
-        384,
-        309
+        370,
+        410
       ]
     },
     {
@@ -1217,10 +1217,10 @@
       "variant": "c",
       "file": "industrial_hall__c.png",
       "width": 640,
-      "height": 329,
+      "height": 343,
       "anchor": [
-        396,
-        329
+        376,
+        343
       ]
     },
     {
@@ -1316,10 +1316,10 @@
       "variant": "c",
       "file": "industrial_park__c.png",
       "width": 768,
-      "height": 479,
+      "height": 557,
       "anchor": [
         380,
-        479
+        557
       ]
     },
     {
@@ -1370,11 +1370,11 @@
       "building": "vanilla:industrial_row",
       "variant": "b",
       "file": "industrial_row__b.png",
-      "width": 384,
-      "height": 254,
+      "width": 304,
+      "height": 181,
       "anchor": [
-        256,
-        254
+        203,
+        181
       ]
     },
     {
@@ -1404,10 +1404,10 @@
       "variant": "b",
       "file": "industrial_small__b.png",
       "width": 256,
-      "height": 161,
+      "height": 160,
       "anchor": [
-        128,
-        161
+        127,
+        160
       ]
     },
     {
@@ -1503,10 +1503,10 @@
       "variant": "b",
       "file": "industrial_yard__b.png",
       "width": 384,
-      "height": 179,
+      "height": 250,
       "anchor": [
-        256,
-        179
+        237,
+        250
       ]
     },
     {
@@ -1602,10 +1602,10 @@
       "variant": "b",
       "file": "metro_station__b.png",
       "width": 512,
-      "height": 295,
+      "height": 307,
       "anchor": [
-        242,
-        295
+        255,
+        307
       ]
     },
     {
@@ -1646,10 +1646,10 @@
       "variant": "c",
       "file": "museum__c.png",
       "width": 768,
-      "height": 478,
+      "height": 608,
       "anchor": [
-        385,
-        478
+        388,
+        608
       ]
     },
     {
@@ -1954,10 +1954,10 @@
       "variant": "a",
       "file": "residential_court__a.png",
       "width": 512,
-      "height": 287,
+      "height": 292,
       "anchor": [
-        230,
-        287
+        255,
+        292
       ]
     },
     {
@@ -2086,10 +2086,10 @@
       "variant": "a",
       "file": "residential_medium__a.png",
       "width": 256,
-      "height": 158,
+      "height": 204,
       "anchor": [
-        126,
-        158
+        135,
+        204
       ]
     },
     {
@@ -2757,10 +2757,10 @@
       "variant": "b",
       "file": "school__b.png",
       "width": 768,
-      "height": 393,
+      "height": 476,
       "anchor": [
-        420,
-        393
+        385,
+        476
       ]
     },
     {
@@ -2966,10 +2966,10 @@
       "variant": "c",
       "file": "transit_depot__c.png",
       "width": 768,
-      "height": 427,
+      "height": 494,
       "anchor": [
-        370,
-        427
+        398,
+        494
       ]
     },
     {
@@ -3054,10 +3054,10 @@
       "variant": "b",
       "file": "water_treatment__b.png",
       "width": 768,
-      "height": 359,
+      "height": 461,
       "anchor": [
-        374,
-        359
+        356,
+        461
       ]
     },
     {
@@ -3076,10 +3076,10 @@
       "variant": "a",
       "file": "water_works__a.png",
       "width": 768,
-      "height": 429,
+      "height": 410,
       "anchor": [
-        378,
-        429
+        406,
+        410
       ]
     },
     {

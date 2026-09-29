@@ -90,7 +90,7 @@ const DUST_RADIUS = 9;
 const SMOKE_MS = 3200;
 const SMOKE_EVERY_MS = 420;
 /** Kolik kouře smí žít naráz. Prach má vlastní strop, ať ho kouř nevytlačí. */
-const SMOKE_MAX_ALIVE = 260;
+const SMOKE_MAX_ALIVE = 420;
 
 /** Obdélník obrazovky ve světových souřadnicích — `Viewport` z chunkRendereru. */
 export interface MotionView {
@@ -107,6 +107,8 @@ export interface SmokeEmitter {
   readonly rate: number;
   readonly color: number;
   readonly key: number;
+  /** Velikost obláčku; komín 1, požár víc. */
+  readonly size?: number;
 }
 
 interface Puff {
@@ -206,8 +208,8 @@ export class Effects {
       while (clock <= 0) {
         clock += SMOKE_EVERY_MS / Math.max(0.1, source.rate);
         if (this.smokeAlive >= SMOKE_MAX_ALIVE) continue;
-        const size = 0.35 + this.random() * 0.25;
-        this.spawn(source.x + (this.random() - 0.5) * 2, source.y, source.color, {
+        const size = (0.45 + this.random() * 0.3) * (source.size ?? 1);
+        this.spawn(source.x + (this.random() - 0.5) * 2 * (source.size ?? 1), source.y, source.color, {
           age: 0,
           life: SMOKE_MS * (0.8 + this.random() * 0.4),
           rise: 16 + this.random() * 8,

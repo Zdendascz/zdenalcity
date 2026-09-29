@@ -204,6 +204,10 @@ of the image. The paving, kerbs, planters and fences all stay inside it: they
 are part of the plot, not of the ground around it. Nothing except the roof may
 stick out past it, and nothing may be cut off.
 
+The building is squarely aligned with its plot: every wall, roof edge and
+fence runs exactly parallel to one of the four edges of the diamond. The
+building is NOT rotated or turned relative to the plot.
+
 Lighting is fixed: sunlight from the left. The left-facing wall is clearly
 brighter than the right-facing wall; the roof is the brightest surface.
 

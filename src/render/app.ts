@@ -43,7 +43,7 @@ import { DEFAULT_MAP_SIZE, TERRAIN, ZONE, index } from '@/sim/layers';
 import type { MapSize } from '@/sim/layers';
 import { applyGeneratedMap, balanceWithMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
-import { createSimHost, SPEEDS } from '@/sim/simHost';
+import { createSimHost, SPEEDS, TICK_MS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
@@ -107,6 +107,9 @@ import { GridOverlay } from './gridOverlay';
 import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
 import { DisasterScenes } from './disasterScenes';
 import { Effects } from './effects';
+import { FireLayer } from './fireLayer';
+import { imageUrls, preloadGraphics } from './preload';
+import { Preloader } from '@/ui/preloader';
 import { Vehicles } from './vehicles';
 import type { VehicleLook } from './vehicles';
 import { ServiceMarkers } from './serviceMarkers';
@@ -961,6 +964,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     pickLanguage([...navigator.languages], content.getLanguages()),
   );
 
+  // Grafika se začne stahovat **hned**, zatímco hráč stojí na rozcestníku
+  // (T121). Ukazatel visí na `body`, ne na `mount`: rozcestník si svůj
+  // kontejner přestavuje a vzal by ukazatel s sebou.
+  const preloader = new Preloader(document.body, i18n.t('ui.preload.label'));
+  const preloading = preloadGraphics(imageUrls(content), (progress) => preloader.set(progress));
+
   // Hra začíná dialogem: hráč si vybere jméno města a seed a rovnou vidí, jakou
   // mapu dostane (§3 fáze 3). Teprve pak vzniká svět.
   // Úložiště i soubory jdou přes platform vrstvu (§9). Herní kód nesahá na
@@ -1033,6 +1042,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
               }
             : {}),
         });
+  // Hráč si vybral dřív, než se grafika načetla: počká se, ať budovy
+  // nenaskakují jedna po druhé. Ukazatel se roztáhne přes obrazovku.
+  preloader.block();
+  await preloading;
+  preloader.remove();
+
   const newGame =
     choice.kind === 'game'
       ? choice.game
@@ -1216,6 +1231,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (parts.size === 0) return;
     buildingRenderer.setParts(parts);
     roadRenderer.setSidewalkTexture(parts.get('sidewalk')?.texture);
+    const flames = [...parts.entries()]
+      .filter(([name]) => name.startsWith('flames_'))
+      .sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))
+      .map(([, part]) => part);
+    fireLayer.setTextures(
+      flames.map((part) => part.texture),
+      flames.map((part) => part.anchor),
+      PART_SCALE,
+    );
     buildingRenderer.setLamp(parts.get('street_lamp'));
     const look = (sheet: string, i: number, weight: number): VehicleLook | undefined => {
       const front = parts.get(`${sheet}_front_${i}`);
@@ -1334,6 +1358,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // stoupá před fasádou.
   const effects = new Effects(worldContainer, app.renderer);
   buildingRenderer.onVanished = (area) => effects.dust(area);
+  // Plameny na každé hořící dlaždici (T120) a prach u paty tornáda.
+  const fireLayer = new FireLayer(world, worldContainer);
+  disasterScenes.onDust = (x, y, base) =>
+    effects.dust({ x: x - 0.35, y: y - 0.35, width: 0.7, depth: 0.7, base });
 
   const serviceMarkers = new ServiceMarkers(world, worldContainer);
   serviceMarkers.setLookup(
@@ -2178,6 +2206,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     effects.setVisible(viewMode !== 'underground');
     vehicles.setEnabled(motionOn);
     vehicles.setVisible(viewMode !== 'underground');
+    fireLayer.setEnabled(motionOn);
+    fireLayer.setVisible(viewMode !== 'underground');
     // Barva sítě se řídí pohledem, ne přepínačem: pod zemí bílá, nad zemí
     // černá. Přepnutí sítě naopak pohledem nehne — viz `gridOverlay.ts`.
     gridOverlay.setUnderground(viewMode === 'underground');
@@ -3369,6 +3399,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       world,
       camera,
       setSpeed,
+      startDisaster: (kind: string, x: number, y: number) =>
+        startDisaster(simWorld, content, content.getBalance(), disasterRegistry, kind, x, y),
     };
   }
 
@@ -3475,6 +3507,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Kouř jen z komínů ve výřezu; `viewport` je spočítaný výš pro chunky.
     if (viewMode !== 'underground') {
       effects.smoke(buildingRenderer.smokeSources(), deltaMS, viewport);
+      fireLayer.update(deltaMS, viewport);
+      effects.smoke(fireLayer.smokeSources(), deltaMS, viewport);
+      // Kolik tiku uběhlo za tenhle snímek — tornádo mezi tiky dojíždí.
+      disasterScenes.animate(deltaMS, (deltaMS * (SPEEDS[speedIndex] ?? 0)) / TICK_MS, motionOn);
     }
     effects.update(deltaMS);
     if (viewMode !== 'underground') {

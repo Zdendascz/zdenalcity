@@ -110,8 +110,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          191,
-          2
+          182,
+          7
         ],
         "when": "powered",
         "rate": 1,

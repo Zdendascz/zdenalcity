@@ -662,6 +662,7 @@
   "ui.menu.pan": "Move",
   "ui.view.decor": "Hide trees and rocks",
   "ui.view.motion": "Stop animations",
+  "ui.preload.label": "Loading graphics",
   "ui.home.tagline": "An isometric city builder.",
   "ui.home.beta": "BETA",
   "ui.home.resumeNamed": "Continue in {city} ({minutes} min)",

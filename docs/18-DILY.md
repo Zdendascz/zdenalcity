@@ -9,6 +9,13 @@ chodníku). Generuje `tools/generate-parts.py`, výstup jde do
 Vzniklo 2026-09-29 pro `docs/17-ANIMACE.md`. Autor povolil 24 USD a skript si
 útratu vede v `art/parts/spend.jsonl`.
 
+## WebP
+
+Hra načítá sprity, povrchy, díly i podezdívky jako **WebP** (T121,
+`tools/make-webp.py`): 104 MB PNG → 20 MB. PNG zůstávají jako zdroj pro
+nástroje a testy. **Po každém `fit-*.py` pusť `make-webp.py`**, jinak test
+v `tests/roadDetails.test.ts` spadne na chybějícím WebP.
+
 ## Archy, ne jednotlivé obrázky
 
 Auta a chodci jsou na mapě velcí pár pixelů. Každý zvlášť by stál stejně jako

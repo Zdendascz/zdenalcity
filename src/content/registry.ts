@@ -308,6 +308,20 @@ export class ContentRegistry {
     return this.sprites.get(`${definitionId}|${variant}`);
   }
 
+  /**
+   * Všechny obrázky, které hra na mapě kreslí (T121): sprity budov, povrchy,
+   * díly, podezdívky. Podle toho se přednačítá při startu. Ikony rozhraní ne —
+   * ty jsou malé a načte si je `<img>` sám.
+   */
+  getImageUrls(): string[] {
+    return [
+      ...[...this.sprites.values()].map((sprite) => sprite.url),
+      ...[...this.parts.values()].map((part) => part.url),
+      ...this.tiles.values(),
+      ...this.skirts.values(),
+    ];
+  }
+
   /** Díl pro animaci, nebo `undefined`. Chybějící díl se nekreslí. */
   getPart(name: string): PartImage | undefined {
     return this.parts.get(name);

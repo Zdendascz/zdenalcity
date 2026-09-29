@@ -43,7 +43,7 @@ APPROVED: dict[str, list] = {
     'gas_power_plant__b': [1],
     'gas_power_plant__c': [1],
     'incinerator__a': [0],
-    'incinerator__b': [1],
+    'incinerator__b': [0],  # přegenerováno kvůli natočení (T123)
     'incinerator__c': [1],
     'industrial_chemical__a': [3],
     'industrial_chemical__b': [1],

@@ -36,17 +36,21 @@ export function createVanillaSource(): ContentSource {
     icons[name] = iconFiles[absolute] as string;
   }
 
+  // Sprity, povrchy, díly a podezdívky se načítají jako **WebP** (T121):
+  // v PNG měly sprity 84 MB a hra si je tahala za běhu. PNG zůstávají v repu
+  // jako zdroj pro nástroje, do buildu jde jen WebP — viz `tools/make-webp.py`.
+  //
   // Totéž pro sprity budov. Rozměry a kotvy k nim nese `sprites/index.json`,
   // který vyrábí `tools/fit-sprites.py` — bez něj jsou obrázky jen soubory
   // a renderer by nevěděl, kam je posadit.
-  const spriteFiles = import.meta.glob('../../content/vanilla/sprites/*.png', {
+  const spriteFiles = import.meta.glob('../../content/vanilla/sprites/*.webp', {
     eager: true,
     query: '?url',
     import: 'default',
   });
   const spriteUrls: Record<string, string> = {};
   for (const absolute of Object.keys(spriteFiles).sort()) {
-    const name = relativePath(absolute).slice('sprites/'.length).replace(/\.png$/, '');
+    const name = relativePath(absolute).slice('sprites/'.length).replace(/\.webp$/, '');
     spriteUrls[name] = spriteFiles[absolute] as string;
   }
 
@@ -72,14 +76,14 @@ export function createVanillaSource(): ContentSource {
     // Trosky nejsou terén, ale kreslí se stejně — jako výplň polygonu dlaždice.
     'rubble',
   ]);
-  const tileFiles = import.meta.glob('../../content/vanilla/tiles/*.png', {
+  const tileFiles = import.meta.glob('../../content/vanilla/tiles/*.webp', {
     eager: true,
     query: '?url',
     import: 'default',
   });
   const tiles: Record<string, string> = {};
   for (const absolute of Object.keys(tileFiles).sort()) {
-    const name = relativePath(absolute).slice('tiles/'.length).replace(/\.png$/, '');
+    const name = relativePath(absolute).slice('tiles/'.length).replace(/\.webp$/, '');
     const [terrain, variant] = name.split('__');
     if (terrain === undefined || variant === undefined || !SURFACES.has(terrain)) continue;
     tiles[`${terrain}|${variant}`] = tileFiles[absolute] as string;
@@ -100,26 +104,26 @@ export function createVanillaSource(): ContentSource {
 
   // Díly pro animace (T116). Rozměry a kotvy nese `parts/index.json`, který
   // vyrábí `tools/fit-parts.py`.
-  const partFiles = import.meta.glob('../../content/vanilla/parts/*.png', {
+  const partFiles = import.meta.glob('../../content/vanilla/parts/*.webp', {
     eager: true,
     query: '?url',
     import: 'default',
   });
   const partUrls: Record<string, string> = {};
   for (const absolute of Object.keys(partFiles).sort()) {
-    const name = relativePath(absolute).slice('parts/'.length).replace(/\.png$/, '');
+    const name = relativePath(absolute).slice('parts/'.length).replace(/\.webp$/, '');
     partUrls[name] = partFiles[absolute] as string;
   }
 
   // Materiály podezdívek. Klíč je `kategorie__varianta`.
-  const skirtFiles = import.meta.glob('../../content/vanilla/skirts/*.png', {
+  const skirtFiles = import.meta.glob('../../content/vanilla/skirts/*.webp', {
     eager: true,
     query: '?url',
     import: 'default',
   });
   const skirts: Record<string, string> = {};
   for (const absolute of Object.keys(skirtFiles).sort()) {
-    const name = relativePath(absolute).slice('skirts/'.length).replace(/\.png$/, '');
+    const name = relativePath(absolute).slice('skirts/'.length).replace(/\.webp$/, '');
     skirts[name] = skirtFiles[absolute] as string;
   }
 

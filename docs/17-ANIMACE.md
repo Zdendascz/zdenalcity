@@ -181,7 +181,18 @@ dají houpat **bez nových obrázků**:
 
 **Měří se** čas snímku s lesem přes celou obrazovku, s houpáním a bez něj.
 
-## 7 — pohromy vizuálněji (T120)
+## 7 — pohromy vizuálněji (T120, hotovo)
+
+- **Požár**: `src/render/fireLayer.ts` — plameny z dílu `flames_*` na každé
+  hořící dlaždici ve výřezu, počet a výška podle intenzity, střídají obrázky
+  každých 110 ms. Z každé hořící dlaždice stoupá tmavý kouř přes `Effects`.
+  S vypnutými animacemi plameny stojí, ale jsou vidět — požár je informace.
+- **Tornádo**: do T120 stál obrázek nálevky **tam, kde tornádo vzniklo**,
+  i když simulace jeho osu posouvala přes město. `DisasterScenes.animate`
+  ho teď vede za `state.x/y` a mezi tiky polohu dopočítává; nálevka je
+  o polovinu větší, kolébá se a u paty se práší.
+
+Původní návrh:
 
 Dnes má požár oranžový nádech dlaždice upečený v chunku a **jeden statický
 obrázek** plamenů na místě pohromy. Tornádo je jeden obrázek, který jednou

@@ -3918,6 +3918,20 @@ Animace mají vlastní generátor (`motionRandom`) a na `world.rng` nesahají.
 To je tvrdé pravidlo celé řady: jedno vytažené číslo by rozbilo determinismus.
 
 Ověřeno: `npm run check`, testy čistých funkcí v `tests/effects.test.ts`.
+
+**Noc 2026-09-29 (větev `animace-a-silnice`)**, hotové úkoly:
+
+- T115 auta na silnicích podle zátěže, T118 vozidla služeb vyjíždějí z budov;
+- T116 rotory větrníků (věže přegenerované bez lopatek) a kouř z 32 komínů;
+- T119 les ve větru; T120 plameny na hořících dlaždicích, tornádo se hýbe;
+- T121 přednačítání grafiky s procenty a WebP (104 MB → 20 MB);
+- T122 silnice: značení, 4 pruhy dálnice, chodníky u domů úrovně 2+,
+  lampy, kruhové objezdy, mosty se zábradlím;
+- T123 audit natočení spritů (`tools/audit-orientation.py`): 20 šikmých
+  přegenerováno, zbývají 3 mírné a 17 hraničních k rozhodnutí autora.
+
+Útrata OpenAI v `art/parts/spend.jsonl` (odhad podle ceníku gpt-image-1).
+Ověřováno v headless Edge přes ladicí přístup `window.__citybuilder` (jen vývoj).
 V prohlížeči je vidět prach po bourání lesa a postavená stanice sedí po
 vyrůstání ve správné velikosti i poloze. Samotný průběh vyrůstání se
 nasnímat nepodařilo, protože náhled byl skrytý a prohlížeč nekreslil snímky.
