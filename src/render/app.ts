@@ -1215,6 +1215,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   void loadParts(content).then((parts) => {
     if (parts.size === 0) return;
     buildingRenderer.setParts(parts);
+    roadRenderer.setSidewalkTexture(parts.get('sidewalk')?.texture);
+    buildingRenderer.setLamp(parts.get('street_lamp'));
     const look = (sheet: string, i: number, weight: number): VehicleLook | undefined => {
       const front = parts.get(`${sheet}_front_${i}`);
       const rear = parts.get(`${sheet}_rear_${i}`);

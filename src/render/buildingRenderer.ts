@@ -21,7 +21,10 @@ import { depthOrder } from './depth';
 import type { DepthBox } from './depth';
 import { decorDensity, decorHere, decorPick, decorShift, decorTiles, rubbleSlope } from './decor';
 import type { RubbleSlope, TerrainDecor } from './decor';
-import { index, TERRAIN } from '@/sim/layers';
+import { index, ROAD, TERRAIN } from '@/sim/layers';
+import { houseSides } from './streets';
+import { SIDEWALK, VERGE } from './roadDetails';
+import { ROAD_E, ROAD_N, ROAD_S, ROAD_W } from './roads';
 import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
 import { POP_MS, popScale } from './effects';
 import type { DustArea } from './effects';
@@ -73,6 +76,24 @@ interface Spinner {
   readonly node: Container;
   readonly blade: Sprite;
   readonly rate: number;
+}
+
+/** Díly se kreslí ve čtyřnásobku, stejně jako budovy. */
+const PART_SCALE = 4;
+
+/** Pořadí strany v id lampy: dlaždice × 4 + strana. */
+const ARM_INDEX: Record<number, number> = { [ROAD_N]: 0, [ROAD_E]: 1, [ROAD_S]: 2, [ROAD_W]: 3 };
+
+/** Kam z dlaždice vede silnice — maska jako `roadMask`, jen bez závislosti na sim. */
+function roadArms(road: ArrayLike<number>, size: number, x: number, y: number): number {
+  const at = (nx: number, ny: number): boolean =>
+    nx >= 0 && ny >= 0 && nx < size && ny < size && (road[ny * size + nx] ?? 0) !== 0;
+  return (
+    (at(x, y - 1) ? ROAD_N : 0) |
+    (at(x + 1, y) ? ROAD_E : 0) |
+    (at(x, y + 1) ? ROAD_S : 0) |
+    (at(x - 1, y) ? ROAD_W : 0)
+  );
 }
 
 /** Pod tímhle zoomem je strom pár pixelů a houpání by jen zrnilo. */
@@ -214,6 +235,10 @@ export class BuildingRenderer {
   private readonly baseScale = new Map<number, number>();
   /** Hýbou se budovy? Vypíná přepínač animací i `prefers-reduced-motion`. */
   private motion = true;
+  /** Obrázek lampy (T122). Bez něj se lampy nestaví. */
+  private lamp: LoadedPart | undefined;
+  private lampsStale = false;
+  private lampsBuilt = 0;
   /** Stromy, které se houpou ve větru (T119), s vlastní fází kmitu. */
   private trees: { sprite: Sprite; phase: number }[] = [];
   /** Hodiny větru v ms. Běží i na pauze — pauza zastavuje město, ne vítr. */
@@ -370,8 +395,78 @@ export class BuildingRenderer {
       // Suť přibývá i mizí po jedné dlaždici a její id v `dirty.buildings`
       // nejsou. Průchod mapou je levný a děje se jen při stavbě nebo bourání.
       this.rebuildRubble();
+      this.rebuildLamps();
+    } else if (dirty.buildings.size > 0) {
+      // Dům povyrostl → u silnice přibude chodník a s ním lampa. Sbírá se
+      // to stejně jako u vozovky, nejvýš dvakrát za sekundu.
+      this.lampsStale = true;
     }
+    if (this.lampsStale && performance.now() - this.lampsBuilt > 500) this.rebuildLamps();
     this.reorder();
+  }
+
+  /** Nastaví obrázek lampy (T122) a rozestaví lampy znovu. */
+  setLamp(lamp: LoadedPart | undefined): void {
+    this.lamp = lamp;
+    this.rebuildLamps();
+    this.reorder();
+  }
+
+  /**
+   * Pouliční lampy na zeleném pásu mezi obrubníkem a chodníkem (T122).
+   *
+   * Stojí jen tam, kde je chodník, tedy u domů úrovně 2 a víc, a jen na každé
+   * druhé dlaždici — lampa na každé by z ulice udělala plot. Rameno míří
+   * nad vozovku, proto se obrázek na dvou stranách zrcadlí.
+   *
+   * Id jsou záporná a posunutá o dvě velikosti mapy, za stromy i suť.
+   */
+  private rebuildLamps(): void {
+    const size = this.world.size;
+    const offset = 2 * size * size;
+    for (const id of [...this.views.keys()]) {
+      if (id <= -offset) this.remove(id);
+    }
+    this.lampsStale = false;
+    this.lampsBuilt = performance.now();
+    const lamp = this.lamp;
+    if (lamp === undefined || !this.decorVisible) return;
+
+    const road = this.world.layers.road;
+    const place = SIDEWALK + VERGE / 2;
+    // Strana → poloha na dlaždici a zda zrcadlit (obrázek má rameno vlevo).
+    const spots: [number, number, number, boolean][] = [
+      [ROAD_N, 0.5, place, false],
+      [ROAD_S, 0.5, 1 - place, true],
+      [ROAD_W, place, 0.5, true],
+      [ROAD_E, 1 - place, 0.5, false],
+    ];
+    for (let tile = 0; tile < road.length; tile++) {
+      const type = road[tile] ?? ROAD.none;
+      if (type === ROAD.none || type === ROAD.highway) continue;
+      const x = tile % size;
+      const y = (tile - x) / size;
+      if ((x + y) % 2 !== 0) continue;
+      const sides = houseSides(this.world, x, y);
+      if (sides === 0) continue;
+      const arms = roadArms(road, size, x, y);
+      for (const [side, u, v, flip] of spots) {
+        if (!(sides & side) || arms & side) continue;
+        const gx = x + u;
+        const gy = y + v;
+        const base = groundHeightAt(this.world.cornerHeight, gx, gy);
+        const at = gridToScreen(gx, gy, base);
+        const sprite = new Sprite(lamp.texture);
+        sprite.anchor.set(lamp.anchor[0] / lamp.texture.width, lamp.anchor[1] / lamp.texture.height);
+        sprite.scale.set((flip ? -1 : 1) / PART_SCALE, 1 / PART_SCALE);
+        sprite.position.set(at.x, at.y);
+        const id = -(offset + tile * 4 + ARM_INDEX[side]! + 1);
+        this.container.addChild(sprite);
+        this.views.set(id, sprite);
+        this.boxes.set(id, { x, y, width: 1, depth: 1, base });
+        break;
+      }
+    }
   }
 
   /** Nastaví materiály podezdívek a překreslí je. */
@@ -423,8 +518,11 @@ export class BuildingRenderer {
    * Díky tomu je nese táž mapa a řadí je totéž porovnání.
    */
   private rebuildDecor(): void {
+    // Jen pásmo stromů a balvanů (`-(dlaždice + 1)`). Suť a lampy mají id
+    // dál a staví si je vlastní metody.
+    const decorFloor = -this.world.size * this.world.size;
     for (const id of [...this.views.keys()]) {
-      if (id < 0) this.remove(id);
+      if (id < 0 && id >= decorFloor) this.remove(id);
     }
     this.trees = [];
     // Vypnuté se nejen skryjí, ale ani nevzniknou: uzel, který nikdo nevidí,
@@ -465,11 +563,13 @@ export class BuildingRenderer {
     const size = this.world.size;
     const offset = size * size;
     for (const id of [...this.views.keys()]) {
-      if (id <= -offset) this.remove(id);
+      if (id <= -offset && id > -2 * offset) this.remove(id);
     }
     if (this.rubblePiles.size === 0) return;
 
     const rubble = this.world.rubble;
+    // Lampy mají id za sutí; `id <= -offset` výš by je smazalo taky, a proto
+    // se maže jen pás suti.
     for (let tile = 0; tile < rubble.length; tile++) {
       if ((rubble[tile] ?? 0) === 0) continue;
       const x = tile % size;

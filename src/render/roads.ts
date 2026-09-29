@@ -33,7 +33,7 @@ export type TileQuad = readonly number[];
  * Počítá se bilineárně ze čtyř rohů, takže vozovka jde **po ploše dlaždice**:
  * na svahu se zvedne s ní a od terénu se neodlepí.
  */
-function inside(quad: TileQuad, u: number, v: number): [number, number] {
+export function inside(quad: TileQuad, u: number, v: number): [number, number] {
   const nw: [number, number] = [quad[0] ?? 0, quad[1] ?? 0];
   const ne: [number, number] = [quad[2] ?? 0, quad[3] ?? 0];
   const se: [number, number] = [quad[4] ?? 0, quad[5] ?? 0];

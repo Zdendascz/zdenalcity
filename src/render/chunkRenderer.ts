@@ -1,11 +1,10 @@
 import { Container, Graphics, Matrix } from 'pixi.js';
 import type { Texture } from 'pixi.js';
 import { MAX_HEIGHT, tileCorners } from '@/sim/heights';
-import { index, ROAD, TERRAIN } from '@/sim/layers';
+import { index, ROAD } from '@/sim/layers';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import {
-  BRIDGE_RAIL_COLOR,
   FIRE_COLORS,
   FIRE_MAX_ALPHA,
   FIRE_MIN_ALPHA,
@@ -589,13 +588,9 @@ export class ChunkRenderer {
       return;
     }
 
-    const roadType = this.world.layers.road[tileIndex] ?? ROAD.none;
-    // Vozovka na vodě je most. Kreslí se přes celou dlaždici a světleji, aby
-    // šlo poznat, kde silnice opouští břeh (§7 fáze 3).
-    const bridge = roadType !== ROAD.none && terrain === TERRAIN.water;
-    if (bridge) {
-      graphics.poly(points).fill({ color: BRIDGE_RAIL_COLOR });
-    }
+    // Most (vozovka na vodě) se tu dřív vyplnil světlou barvou přes celou
+    // dlaždici. Od T122 ho kreslí `RoadRenderer` i se zábradlím, bočnicí
+    // a stínem — a kolem desky má být vidět voda, jinak to most není.
     // Elektřina je veličina po dlaždicích, takže patří do chunku. Vrstvy
     // na hrubé mřížce kreslí `CoarseOverlay` — ty do chunků nepatří.
     if (this.overlay === 'power') {
