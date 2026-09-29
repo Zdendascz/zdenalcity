@@ -41,12 +41,10 @@ LEVEL_H = 16
 # Cílová velikost jednoho „typického“ předmětu na archu při zoomu 1, v px.
 # Měří se jen podle vybraných předmětů (`reference`), zbytek archu jde stejným
 # měřítkem. U aut jsou to osobáky — autobus je pak přirozeně delší.
+# Vozidla tu nejsou: od T125 je kreslí `make-vehicles.py` jako 3D modely,
+# protože generátor izometrický úhel neudrží.
 SHEETS = {
     # šířka osobního auta na obrazovce: ~0,3 dlaždice podél osy
-    'cars_front': {'measure': 'width', 'size': 17, 'reference': [0, 1, 2, 3], 'anchor': 'car'},
-    'cars_rear': {'measure': 'width', 'size': 17, 'reference': [0, 1, 2, 3], 'anchor': 'car'},
-    'service_front': {'measure': 'width', 'size': 19, 'reference': [0], 'anchor': 'car'},
-    'service_rear': {'measure': 'width', 'size': 19, 'reference': [0], 'anchor': 'car'},
     # člověk: 1,7 m, patro jsou 3 m a 16 px
     'people_walk': {'measure': 'height', 'size': 9, 'reference': None, 'anchor': 'feet'},
     'people_sit': {'measure': 'height', 'size': 7, 'reference': None, 'anchor': 'feet'},

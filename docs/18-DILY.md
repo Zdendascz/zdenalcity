@@ -118,79 +118,14 @@ background, no tower, no nacelle, no shadow, no outline, no text.
 
 ## Vozidla
 
-#### `cars_front`
-Plátno: 1536x1024
-Kvalita: high
+**Od T125 se vozidla negenerují.** Autor hlásil auta pod špatným úhlem
+o 20–30°; změřeno 15–31° místo izometrických 26,6°, a to ani se šablonou
+kvádrů (`tools/make-vehicle-templates.py`, generátor ji ignoroval), ani
+s přísným zadáním. Zkosení to nespravilo: bok šel do osy, čelo ne.
 
-```text
-A sprite sheet of SIX separate small vehicles in two rows of three, with wide
-empty transparent gaps between them so that no two vehicles touch. EVERY
-vehicle drives in the SAME direction: towards the viewer and to the RIGHT,
-along the isometric axis that runs from the upper left to the lower right, so
-we see its front and its left side. All six are drawn at the same scale, as
-they would stand next to each other in a street.
-
-Top row: a red Škoda 105 saloon; a white Škoda 120 saloon; a light blue
-Trabant 601.
-Bottom row: a beige Lada 1200 (Žiguli); an orange Avia A31 small lorry with a
-tarpaulin; a cream and red Karosa ŠM 11 city bus (much longer than the cars).
-```
-
-#### `cars_rear`
-Plátno: 1536x1024
-Kvalita: high
-
-```text
-A sprite sheet of SIX separate small vehicles in two rows of three, with wide
-empty transparent gaps between them so that no two vehicles touch. EVERY
-vehicle drives in the SAME direction: away from the viewer and to the RIGHT,
-along the isometric axis that runs from the lower left to the upper right, so
-we see its rear and its left side. All six are drawn at the same scale, as
-they would stand next to each other in a street.
-
-Top row: a red Škoda 105 saloon; a white Škoda 120 saloon; a light blue
-Trabant 601.
-Bottom row: a beige Lada 1200 (Žiguli); an orange Avia A31 small lorry with a
-tarpaulin; a cream and red Karosa ŠM 11 city bus (much longer than the cars).
-```
-
-#### `service_front`
-Plátno: 1536x1024
-Kvalita: high
-
-```text
-A sprite sheet of FOUR separate service vehicles in two rows of two, with wide
-empty transparent gaps between them so that no two vehicles touch. EVERY
-vehicle drives in the SAME direction: towards the viewer and to the RIGHT,
-along the isometric axis that runs from the upper left to the lower right, so
-we see its front and its left side. Same scale for all.
-
-Top row: a police car — a white and yellow Lada saloon with a blue light bar
-on the roof; a red Tatra 148 fire engine with a ladder on top.
-Bottom row: a white Škoda 1203 ambulance van with a red stripe and a blue
-light; a grey-green LIAZ refuse lorry with a rear compactor.
-
-The blue lights are plain blue domes, no text on any vehicle.
-```
-
-#### `service_rear`
-Plátno: 1536x1024
-Kvalita: high
-
-```text
-A sprite sheet of FOUR separate service vehicles in two rows of two, with wide
-empty transparent gaps between them so that no two vehicles touch. EVERY
-vehicle drives in the SAME direction: away from the viewer and to the RIGHT,
-along the isometric axis that runs from the lower left to the upper right, so
-we see its rear and its left side. Same scale for all.
-
-Top row: a police car — a white and yellow Lada saloon with a blue light bar
-on the roof; a red Tatra 148 fire engine with a ladder on top.
-Bottom row: a white Škoda 1203 ambulance van with a red stripe and a blue
-light; a grey-green LIAZ refuse lorry with a rear compactor.
-
-The blue lights are plain blue domes, no text on any vehicle.
-```
+Auta proto staví `tools/make-vehicles.py` jako 3D modely z kvádrů a promítá
+je stejnou maticí jako mřížku hry — úhel sedí přesně ve všech směrech.
+Původní obrázky z generátoru jsou v `art/parts/archive/`.
 
 ## Chodci
 

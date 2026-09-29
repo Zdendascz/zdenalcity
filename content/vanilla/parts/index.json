@@ -4,123 +4,111 @@
   "parts": {
     "cars_front_0": {
       "file": "cars_front_0.png",
-      "width": 73,
-      "height": 49,
+      "width": 75,
+      "height": 48,
       "anchor": [
-        36,
-        36
-      ],
-      "skew": 0.2618
+        38,
+        32
+      ]
     },
     "cars_front_1": {
       "file": "cars_front_1.png",
-      "width": 69,
-      "height": 49,
+      "width": 75,
+      "height": 48,
       "anchor": [
-        34,
-        36
-      ],
-      "skew": 0.2618
+        38,
+        32
+      ]
     },
     "cars_front_2": {
       "file": "cars_front_2.png",
-      "width": 62,
-      "height": 46,
+      "width": 66,
+      "height": 44,
       "anchor": [
-        31,
-        34
-      ],
-      "skew": 0.2618
+        33,
+        30
+      ]
     },
     "cars_front_3": {
       "file": "cars_front_3.png",
-      "width": 68,
-      "height": 51,
+      "width": 74,
+      "height": 48,
       "anchor": [
-        34,
-        38
-      ],
-      "skew": 0.2618
+        37,
+        32
+      ]
     },
     "cars_front_4": {
       "file": "cars_front_4.png",
-      "width": 76,
-      "height": 75,
+      "width": 88,
+      "height": 77,
       "anchor": [
-        38,
-        56
-      ],
-      "skew": 0.1745
+        44,
+        58
+      ]
     },
     "cars_front_5": {
       "file": "cars_front_5.png",
-      "width": 94,
-      "height": 79,
+      "width": 125,
+      "height": 100,
       "anchor": [
-        47,
-        58
-      ],
-      "skew": 0.1745
+        63,
+        72
+      ]
     },
     "cars_rear_0": {
       "file": "cars_rear_0.png",
-      "width": 71,
-      "height": 42,
+      "width": 75,
+      "height": 48,
       "anchor": [
-        36,
-        31
-      ],
-      "skew": -0.2618
+        38,
+        32
+      ]
     },
     "cars_rear_1": {
       "file": "cars_rear_1.png",
-      "width": 70,
-      "height": 41,
+      "width": 75,
+      "height": 48,
       "anchor": [
-        35,
-        30
-      ],
-      "skew": -0.2618
+        38,
+        32
+      ]
     },
     "cars_rear_2": {
       "file": "cars_rear_2.png",
-      "width": 63,
-      "height": 41,
+      "width": 66,
+      "height": 44,
       "anchor": [
-        32,
+        33,
         30
-      ],
-      "skew": -0.2618
+      ]
     },
     "cars_rear_3": {
       "file": "cars_rear_3.png",
-      "width": 68,
-      "height": 43,
+      "width": 74,
+      "height": 48,
       "anchor": [
-        34,
+        37,
         32
-      ],
-      "skew": -0.2618
+      ]
     },
     "cars_rear_4": {
       "file": "cars_rear_4.png",
-      "width": 81,
-      "height": 63,
+      "width": 88,
+      "height": 73,
       "anchor": [
-        40,
-        47
-      ],
-      "skew": -0.1745
+        44,
+        53
+      ]
     },
     "cars_rear_5": {
       "file": "cars_rear_5.png",
-      "width": 111,
-      "height": 76,
+      "width": 125,
+      "height": 100,
       "anchor": [
-        56,
-        56
-      ],
-      "skew": -0.1745
+        63,
+        72
+      ]
     },
     "flames_0": {
       "file": "flames_0.png",
@@ -368,83 +356,75 @@
     },
     "service_front_0": {
       "file": "service_front_0.png",
-      "width": 76,
-      "height": 52,
+      "width": 75,
+      "height": 48,
       "anchor": [
         38,
-        38
-      ],
-      "skew": 0.2618
+        32
+      ]
     },
     "service_front_1": {
       "file": "service_front_1.png",
       "width": 99,
-      "height": 73,
+      "height": 85,
       "anchor": [
         50,
-        54
-      ],
-      "skew": 0.1745
+        64
+      ]
     },
     "service_front_2": {
       "file": "service_front_2.png",
-      "width": 77,
-      "height": 59,
+      "width": 81,
+      "height": 69,
       "anchor": [
-        38,
-        44
-      ],
-      "skew": 0.2618
+        41,
+        52
+      ]
     },
     "service_front_3": {
       "file": "service_front_3.png",
-      "width": 102,
-      "height": 72,
+      "width": 99,
+      "height": 87,
       "anchor": [
-        51,
-        53
-      ],
-      "skew": 0.1745
+        50,
+        65
+      ]
     },
     "service_rear_0": {
       "file": "service_rear_0.png",
-      "width": 76,
-      "height": 46,
+      "width": 75,
+      "height": 48,
       "anchor": [
         38,
-        34
-      ],
-      "skew": -0.2618
+        32
+      ]
     },
     "service_rear_1": {
       "file": "service_rear_1.png",
-      "width": 96,
-      "height": 59,
+      "width": 99,
+      "height": 80,
       "anchor": [
-        48,
-        44
-      ],
-      "skew": -0.1745
+        50,
+        58
+      ]
     },
     "service_rear_2": {
       "file": "service_rear_2.png",
-      "width": 83,
-      "height": 58,
+      "width": 81,
+      "height": 69,
       "anchor": [
-        42,
-        43
-      ],
-      "skew": -0.2618
+        41,
+        52
+      ]
     },
     "service_rear_3": {
       "file": "service_rear_3.png",
-      "width": 96,
-      "height": 60,
+      "width": 99,
+      "height": 81,
       "anchor": [
-        48,
-        44
-      ],
-      "skew": -0.1745
+        50,
+        59
+      ]
     },
     "sidewalk": {
       "file": "sidewalk.png",
