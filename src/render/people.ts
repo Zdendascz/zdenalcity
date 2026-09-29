@@ -59,7 +59,9 @@ export interface Entrance {
 const STEP_X = [0, 1, 0, -1] as const;
 const STEP_Y = [-1, 0, 1, 0] as const;
 /** Jak daleko od osy silnice chodec jde — u kraje, kde by byl chodník. */
-const WALK_SIDE = 0.4;
+// Střed chodníku (0,065 od kraje dlaždice), daleko od lamp na pásu zeleně.
+// Dřív 0,4 a chodci procházeli lampami (hlásil autor).
+const WALK_SIDE = 0.44;
 
 /** Pod tímhle zoomem je člověk pixel. */
 export const PEOPLE_MIN_ZOOM = 0.9;

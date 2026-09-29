@@ -511,7 +511,8 @@ export class BuildingRenderer {
     if (lamp === undefined || !this.decorVisible) return;
 
     const road = this.world.layers.road;
-    const place = SIDEWALK + VERGE / 2;
+    // Na kraji pásu u obrubníku, ať chodec na chodníku lampou neprochází.
+    const place = SIDEWALK + VERGE;
     // Strana → poloha na dlaždici a zda zrcadlit (obrázek má rameno vlevo).
     const spots: [number, number, number, boolean][] = [
       [ROAD_N, 0.5, place, false],
