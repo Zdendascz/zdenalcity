@@ -29,12 +29,21 @@ export interface PersonImage {
   readonly anchor: readonly [number, number];
 }
 
-/** Obrázky: chůze k divákovi (na východ), od diváka (na sever) a sezení. */
+/**
+ * Obrázky: chůze k divákovi (na východ), od diváka (na sever) a sezení.
+ *
+ * Chůze je **po postavách a fázích kroku** (T126): `front[postava][fáze]`.
+ * Autor chtěl, aby chodci hýbali rukama a nohama; postava s jedinou fází
+ * se prostě posouvá, jako dřív.
+ */
 export interface PeopleLooks {
-  readonly front: readonly PersonImage[];
-  readonly rear: readonly PersonImage[];
+  readonly front: readonly (readonly PersonImage[])[];
+  readonly rear: readonly (readonly PersonImage[])[];
   readonly sit: readonly PersonImage[];
 }
+
+/** Kolik fází kroku připadá na jednu dlaždici chůze. */
+const FRAMES_PER_TILE = 22;
 
 /** Budova, ke které se chodí: parcela v mřížce. */
 export interface Entrance {
@@ -63,6 +72,8 @@ const SCALE = 4;
 interface Walker {
   sprite: Sprite;
   image: number;
+  /** Ušlá vzdálenost v dlaždicích — podle ní se střídají fáze kroku. */
+  walked: number;
   /** Cesta: body v mřížce, jde se od prvního k poslednímu. */
   path: [number, number][];
   leg: number;
@@ -228,7 +239,7 @@ export class People {
       const sprite = new Sprite();
       sprite.visible = this.visible;
       this.container.addChild(sprite);
-      this.walkers.push({ sprite, image, path, leg: 0, progress: 0, fadeIn: !toward, fadeOut: toward });
+      this.walkers.push({ sprite, image, walked: this.random() * 4, path, leg: 0, progress: 0, fadeIn: !toward, fadeOut: toward });
     }
   }
 
@@ -321,6 +332,7 @@ export class People {
         continue;
       }
       walker.progress += ((WALK_SPEED * elapsed) / 1000) / length;
+      walker.walked += (WALK_SPEED * elapsed) / 1000;
       if (walker.progress >= 1) {
         walker.leg++;
         walker.progress = 0;
@@ -334,7 +346,8 @@ export class People {
       const dy = to[1] - from[1];
       const dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0;
       const set = dir === 1 || dir === 2 ? this.looks.front : this.looks.rear;
-      const look = set[walker.image % set.length]!;
+      const frames = set[walker.image % set.length]!;
+      const look = frames[Math.floor(walker.walked * FRAMES_PER_TILE) % frames.length]!;
       if (walker.sprite.texture !== look.texture) {
         walker.sprite.texture = look.texture;
         walker.sprite.anchor.set(look.anchor[0] / look.texture.width, look.anchor[1] / look.texture.height);

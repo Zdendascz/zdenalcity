@@ -225,6 +225,48 @@ jackets, a headscarf, a shopping bag, a briefcase, a pram. Simple figures,
 faces not detailed. All the same scale.
 ```
 
+#### `walk_front`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+A WALK CYCLE sprite sheet for a game: THREE rows, each row is ONE person shown
+in FOUR animation frames of a walking step, left to right: 1) right leg
+forward, left arm forward; 2) legs passing, arms at the sides; 3) left leg
+forward, right arm forward; 4) legs passing, arms at the sides. The SAME
+person, same clothes, same size and same position in all four frames of a
+row — only arms and legs move, clearly visible swinging. Wide empty gaps
+between all figures, no two figures touch.
+
+Every figure walks TOWARDS the viewer and to the RIGHT, along the isometric
+axis that goes from upper left to lower right.
+
+Row 1: a man in a brown jacket and dark trousers. Row 2: a woman in a red
+coat with a handbag. Row 3: an older woman in a grey coat and a headscarf with
+a shopping bag. Everyday 1980s clothes, simple figures, faces not detailed.
+```
+
+#### `walk_rear`
+Plátno: 1536x1024
+Kvalita: high
+
+```text
+A WALK CYCLE sprite sheet for a game: THREE rows, each row is ONE person shown
+in FOUR animation frames of a walking step, left to right: 1) right leg
+forward, left arm forward; 2) legs passing, arms at the sides; 3) left leg
+forward, right arm forward; 4) legs passing, arms at the sides. The SAME
+person, same clothes, same size and same position in all four frames of a
+row — only arms and legs move, clearly visible swinging. Wide empty gaps
+between all figures, no two figures touch.
+
+Every figure walks AWAY from the viewer and to the RIGHT, along the isometric
+axis that goes from lower left to upper right, so we see their backs.
+
+Row 1: a man in a brown jacket and dark trousers. Row 2: a woman in a red
+coat with a handbag. Row 3: an older woman in a grey coat and a headscarf with
+a shopping bag. Everyday 1980s clothes, simple figures, faces not detailed.
+```
+
 #### `people_sit`
 Plátno: 1536x1024
 Kvalita: medium

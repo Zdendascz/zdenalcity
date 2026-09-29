@@ -49,6 +49,9 @@ SHEETS = {
     'service_rear': {'measure': 'width', 'size': 19, 'reference': [0], 'anchor': 'car'},
     # člověk: 1,7 m, patro jsou 3 m a 16 px
     'people_walk': {'measure': 'height', 'size': 9, 'reference': None, 'anchor': 'feet'},
+    # Cyklus chůze (T126): tři postavy po čtyřech fázích kroku.
+    'walk_front': {'measure': 'height', 'size': 9, 'reference': None, 'anchor': 'walk'},
+    'walk_rear': {'measure': 'height', 'size': 9, 'reference': None, 'anchor': 'walk'},
     'people_sit': {'measure': 'height', 'size': 7, 'reference': None, 'anchor': 'feet'},
     # plamen: zhruba patro a půl
     'flames': {'measure': 'height', 'size': 22, 'reference': None, 'anchor': 'feet'},
@@ -218,6 +221,14 @@ def anchor_for(image: Image.Image, kind: str) -> tuple[int, int]:
         # dvou osách v izometrii, takže „dotek se zemí“ není spodní řádek, ale
         # zhruba čtvrtina výšky nad ním.
         return round(width / 2), round(height * 0.74)
+    if kind == 'walk':
+        # Fáze chůze: nohy se roztahují a stahují, takže střed spodku by
+        # s postavou škubal. Temeno hlavy stojí — vodorovná kotva je pod ním.
+        alpha = alpha_of(image) > 40
+        rows = np.where(alpha.any(axis=1))[0]
+        top = alpha[rows[0]:rows[0] + max(2, height // 12)] if rows.size else alpha
+        cols = np.where(top.any(axis=0))[0]
+        return (int(round(cols.mean())) if cols.size else width // 2), height
     # Nohy, pata plamene, pata sloupu: dole, vodorovně tam, kde je spodní
     # desetina obrázku nejhustší.
     alpha = alpha_of(image)

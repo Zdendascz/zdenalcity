@@ -1249,9 +1249,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       Array.from({ length: to - from }, (_, i) => person(`${sheet}_${from + i}`)).filter(
         (found): found is NonNullable<typeof found> => found !== undefined,
       );
+    // Cyklus chůze (T126): tři postavy po čtyřech fázích. Bez něj staré
+    // nehybné postavy, každá jako „cyklus" o jedné fázi.
+    const cycles = (sheet: string) =>
+      [0, 1, 2].map((p) => range(sheet, p * 4, p * 4 + 4)).filter((frames) => frames.length === 4);
+    const walkFront = cycles('walk_front');
+    const walkRear = cycles('walk_rear');
     people.setLooks({
-      front: range('people_walk', 0, 6),
-      rear: range('people_walk', 6, 12),
+      front: walkFront.length > 0 ? walkFront : range('people_walk', 0, 6).map((look) => [look]),
+      rear: walkRear.length > 0 ? walkRear : range('people_walk', 6, 12).map((look) => [look]),
       sit: range('people_sit', 0, 8),
     });
     fireLayer.setTextures(
