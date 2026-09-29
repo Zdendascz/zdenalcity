@@ -443,6 +443,9 @@ def main() -> int:
             print(f'    úchyty: {index[name]["attach"]}')
     if 'sidewalk' in have:
         fit_material('sidewalk', write, index)
+    # Materiály přechodů povrchů (T130).
+    for name in sorted(n for n in have if n.startswith('band_')):
+        fit_material(name, write, index)
 
     if write:
         index_path.write_text(

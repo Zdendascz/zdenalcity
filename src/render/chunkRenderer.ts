@@ -1,7 +1,34 @@
 import { Container, Graphics, Matrix } from 'pixi.js';
 import type { Texture } from 'pixi.js';
 import { MAX_HEIGHT, tileCorners } from '@/sim/heights';
-import { index, ROAD } from '@/sim/layers';
+import { index, ROAD, TERRAIN } from '@/sim/layers';
+import { bandFor, bandShape, SIDES } from './terrainBands';
+import { inside } from './roads';
+
+/** Mělčina u břehu (T130). */
+const SHALLOW_COLOR = 0x7fc4c0;
+/** Vrstvy pásu: šířka (násobek) a průhlednost — dohromady měkký přechod. */
+const BAND_LAYERS: readonly (readonly [number, number])[] = [
+  [0.15, 0.4],
+  [0.3, 0.22],
+  [0.45, 0.2],
+  [0.6, 0.2],
+  [0.75, 0.18],
+  [0.9, 0.16],
+  [1.05, 0.14],
+  [1.2, 0.12],
+  [1.35, 0.1],
+];
+/** Poloměr zaoblení rohu dlaždice (T130), v podílu hrany. */
+const CORNER_RADIUS = 0.55;
+/** Rohy dlaždice v `(u, v)` a strany, které se v nich potkávají. */
+const CORNERS: readonly (readonly [number, number, number, number])[] = [
+  // u, v, strana A, strana B (indexy do SIDES: 0 S, 1 V, 2 J, 3 Z)
+  [0, 0, 0, 3],
+  [1, 0, 0, 1],
+  [1, 1, 2, 1],
+  [0, 1, 2, 3],
+];
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import {
@@ -219,6 +246,10 @@ interface Chunk {
   readonly x0: number;
   readonly y0: number;
   readonly graphics: Graphics;
+  /** Přechodové pásy mezi povrchy (T130). Vlastní dávka textur. */
+  readonly bands: Graphics;
+  /** Zóny, oheň, suť, elektřina a podzemí — nad pásy. */
+  readonly over: Graphics;
   /**
    * Meze chunku v projekčních souřadnicích. Počítají se jednou v konstruktoru
    * — terén se sice hýbe, ale jen v rámci `MAX_HEIGHT`, se kterým se tady
@@ -290,6 +321,8 @@ export class ChunkRenderer {
    * ve vodě, se šesti zmizely. Atlas ten strop obchází.
    */
   private surfacesByTerrain = new Map<number, Texture[]>();
+  /** Materiály přechodových pásů podle jména (T130). */
+  private bandTextures: ReadonlyMap<string, Texture> = new Map();
   /** Obrázek trosek. Bez něj se kreslí plná barva jako dřív. */
   private rubbleTexture: Texture | undefined;
 
@@ -316,12 +349,23 @@ export class ChunkRenderer {
         const graphics = new Graphics();
         graphics.zIndex = cx + cy;
         this.container.addChild(graphics);
+        // Pásy a překryvy jsou vlastní `Graphics`, aby pásy měly vlastní
+        // rozpočet textur (chunk jich jinak nese sedm) a zóny ležely nad
+        // nimi. Řadí se hned za povrch svého chunku, pod povrch toho před ním.
+        const bands = new Graphics();
+        bands.zIndex = cx + cy + 0.3;
+        this.container.addChild(bands);
+        const over = new Graphics();
+        over.zIndex = cx + cy + 0.6;
+        this.container.addChild(over);
         const x0 = cx * CHUNK_SIZE;
         const y0 = cy * CHUNK_SIZE;
         this.chunks.push({
           x0,
           y0,
           graphics,
+          bands,
+          over,
           bounds: chunkBounds(x0, y0),
           // Čerstvý chunk je prázdný a čeká, jestli na něj bude vidět.
           baked: false,
@@ -402,6 +446,8 @@ export class ChunkRenderer {
         }
       } else if (chunk.baked) {
         chunk.graphics.clear();
+        chunk.bands.clear();
+        chunk.over.clear();
         chunk.baked = false;
         this.bakedCount--;
       }
@@ -431,6 +477,15 @@ export class ChunkRenderer {
       const y = (tileIndex - x) / this.world.size;
       const chunk = this.chunks[this.chunkIndexFor(x, y)];
       if (chunk) chunk.stale = true;
+      // Přechodový pás sousední dlaždice záleží na téhle (T130) — soused
+      // může ležet v jiném chunku.
+      for (const [dx, dy] of SIDES) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= this.world.size || ny >= this.world.size) continue;
+        const near = this.chunks[this.chunkIndexFor(nx, ny)];
+        if (near) near.stale = true;
+      }
     }
 
     /*
@@ -480,8 +535,10 @@ export class ChunkRenderer {
     const chunk = this.chunks[chunkIndex];
     if (!chunk) return;
 
-    const { x0, y0, graphics } = chunk;
+    const { x0, y0, graphics, bands, over } = chunk;
     graphics.clear();
+    bands.clear();
+    over.clear();
     if (!chunk.baked) this.bakedCount++;
     this.bakes++;
     chunk.baked = true;
@@ -492,9 +549,120 @@ export class ChunkRenderer {
     // nezáleží, s převýšením a budovami ano — pravidlo platí od začátku.
     for (let sum = 0; sum <= last * 2; sum++) {
       for (let dy = Math.max(0, sum - last); dy <= Math.min(last, sum); dy++) {
-        this.drawTile(graphics, x0 + sum - dy, y0 + dy);
+        this.drawTile(graphics, x0 + sum - dy, y0 + dy, bands, over);
       }
     }
+  }
+
+  /**
+   * Zaoblí rohy dlaždice (T130): kde na obou stranách rohu leží stejný jiný
+   * povrch a jeden z nich je voda, jeho obrázek překryje roh obloukem. Z vody
+   * tak mizí hvězdy ze špiček kosočtverců.
+   */
+  private roundCorners(
+    g: Graphics,
+    x: number,
+    y: number,
+    terrain: number,
+    corners: readonly [number, number, number, number],
+    quad: number[],
+    light: number,
+  ): void {
+    const size = this.world.size;
+    const terrainAt = (tx: number, ty: number): number =>
+      tx < 0 || ty < 0 || tx >= size || ty >= size ? terrain : (this.world.layers.terrain[index(tx, ty, size)] ?? 0);
+    for (const [cu, cv, a, b] of CORNERS) {
+      const [adx, ady] = SIDES[a]!;
+      const [bdx, bdy] = SIDES[b]!;
+      const other = terrainAt(x + adx, y + ady);
+      // Jen na rozhraní s vodou. Mezi souší to řeší pásy; zaoblený roh cizí
+      // souše s jiným osvětlením a bez stromů vypadal jako vystřižený.
+      if (other === terrain || terrainAt(x + bdx, y + bdy) !== other) continue;
+      if (other !== TERRAIN.water && terrain !== TERRAIN.water) continue;
+      const surface = this.surfaceFor(other, x, y);
+      // Oblouk se středem o poloměr dovnitř od rohu, vypouklý k rohu.
+      const su = cu === 0 ? 1 : -1;
+      const sv = cv === 0 ? 1 : -1;
+      const centre: [number, number] = [cu + su * CORNER_RADIUS, cv + sv * CORNER_RADIUS];
+      const arc: [number, number][] = [];
+      for (let i = 0; i <= 8; i++) {
+        const angle = (i / 8) * (Math.PI / 2);
+        arc.push([centre[0] - su * CORNER_RADIUS * Math.cos(angle), centre[1] - sv * CORNER_RADIUS * Math.sin(angle)]);
+      }
+      const polygon = [[cu, cv] as [number, number], ...arc].flatMap(([u, v]) => inside(quad, u, v));
+      g.poly(polygon).fill({ color: shade(TERRAIN_COLORS[other] ?? TERRAIN_COLORS[0], slopeLight(corners)) });
+      if (surface) {
+        const matrix = tileMatrix(x, y, corners, surface.turn, surface.texture.width || 1);
+        g.poly(polygon).fill({ texture: surface.texture, matrix, color: light, textureSpace: 'global' });
+      }
+      // Roh patří k hranici, takže nese i její pás — mělčinu, mokrý písek.
+      // Bez něj svítil holý povrch v pásu jako klín.
+      const band = bandFor(other, terrain);
+      if (band === 'shallow') {
+        g.poly(polygon).fill({ color: SHALLOW_COLOR, alpha: 0.6 });
+      } else if (band !== null) {
+        const texture = this.bandTextures.get(band);
+        if (texture) {
+          const matrix = tileMatrix(x, y, corners, 0, texture.width || 1);
+          g.poly(polygon).fill({ texture, matrix, color: light, textureSpace: 'global', alpha: 0.8 });
+        }
+      }
+    }
+  }
+
+  /** Materiály přechodových pásů (T130). Bez nich se pásy nekreslí, kromě mělčiny. */
+  setBands(textures: ReadonlyMap<string, Texture>): void {
+    this.bandTextures = textures;
+    this.invalidateAll();
+  }
+
+  /**
+   * Přechodové pásy dlaždice (T130): na každé straně, kde soused je jiný
+   * povrch, pás podle `bandFor`. Na vodě mělčina s pěnou.
+   */
+  private drawBands(
+    g: Graphics,
+    x: number,
+    y: number,
+    terrain: number,
+    corners: readonly [number, number, number, number],
+    quad: number[],
+    light: number,
+  ): void {
+    const size = this.world.size;
+    const terrainAt = (tx: number, ty: number): number =>
+      tx < 0 || ty < 0 || tx >= size || ty >= size ? terrain : (this.world.layers.terrain[index(tx, ty, size)] ?? 0);
+    SIDES.forEach(([dx, dy], side) => {
+      const other = terrainAt(x + dx, y + dy);
+      const material = bandFor(terrain, other);
+      if (material === null) return;
+      // Konce pásu: pokračuje, když i dlaždice vedle (podél hrany) má za
+      // hranicí stejný cizí povrch. Jinak se zúží do ztracena.
+      const [ax, ay] = dx === 0 ? [1, 0] : [0, 1];
+      const continues = (s: number): boolean =>
+        terrainAt(x - ax * s, y - ay * s) === terrain && terrainAt(x - ax * s + dx, y - ay * s + dy) === other;
+      const start = !continues(1);
+      const end = !continues(-1);
+      const layer = (scale: number): number[] =>
+        bandShape(x, y, side, start, end, scale).polygon.flatMap(([u, v]) => inside(quad, u, v));
+
+      if (material === 'shallow') {
+        // Mělčina: světlejší voda u břehu, ztrácí se do hloubky, a pěna na
+        // čáře vody.
+        for (const [scale, alpha] of BAND_LAYERS) g.poly(layer(scale * 0.8)).fill({ color: SHALLOW_COLOR, alpha: alpha * 0.9 });
+        g.poly(layer(0.12)).fill({ color: 0xf4f7f5, alpha: 0.3 });
+        return;
+      }
+      const texture = this.bandTextures.get(material);
+      if (!texture) return;
+      const matrix = tileMatrix(x, y, corners, 0, texture.width || 1);
+      // Několik vrstev rostoucí šířky, každá průsvitná: u hranice se sečtou
+      // do plného pásu, dovnitř dlaždice se pás ztrácí. Jeden ostrý okraj
+      // vypadal jako nalepená záplata.
+      for (const [scale, alpha] of BAND_LAYERS) {
+        g.poly(layer(scale)).fill({ texture, matrix, color: light, textureSpace: 'global', alpha });
+      }
+    });
   }
 
   /**
@@ -552,7 +720,7 @@ export class ChunkRenderer {
     return { texture, turn: (h >>> 8) & 3 };
   }
 
-  private drawTile(graphics: Graphics, x: number, y: number): void {
+  private drawTile(graphics: Graphics, x: number, y: number, bands?: Graphics, over?: Graphics): void {
     if (x >= this.world.size || y >= this.world.size) return;
 
     const tileIndex = index(x, y, this.world.size);
@@ -606,6 +774,13 @@ export class ChunkRenderer {
         .poly(points)
         .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
     }
+
+    // Zaoblení až po pásech a do jejich vrstvy: jinak by ho pás břehu,
+    // kreslený až ke hraně, zase překryl a špičky by zůstaly.
+    if (bands && !underground) this.drawBands(bands, x, y, terrain, corners, points, light);
+    if (!underground) this.roundCorners(bands ?? graphics, x, y, terrain, corners, points, light);
+    // Všechno od zón dál jde do vrstvy nad pásy.
+    if (over) graphics = over;
 
     const zone = this.world.layers.zone[tileIndex] ?? 0;
     const zoneColor = ZONE_COLOR_BY_VALUE[zone];
@@ -827,6 +1002,8 @@ export class ChunkRenderer {
   destroy(): void {
     for (const chunk of this.chunks) {
       chunk.graphics.destroy();
+      chunk.bands.destroy();
+      chunk.over.destroy();
     }
     this.chunks.length = 0;
     this.bakedCount = 0;

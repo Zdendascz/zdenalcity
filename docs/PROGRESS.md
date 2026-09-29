@@ -4159,3 +4159,20 @@ Co odsud zmizelo a kde se to vyřešilo:
 
 Zóna mělčí než půdorys budovy zůstává — dvě odrážky o tomtéž se slily do jedné.
 
+
+## Přechody povrchů (T130, rozhodnutí autora)
+
+„Nejde jen o vodu a písek, ale o všechny přechody mezi všemi povrchy … všude
+přechodové parcely." Na hranici dvou povrchů leží pás přechodového materiálu
+(`src/render/terrainBands.ts`, `bandFor`): řídnoucí tráva v písku, okraj lesa,
+suť pod skálou, rákos u mokřadu, mokrý břeh u vody; na vodě mělčina s pěnou.
+Materiály `content/vanilla/parts/band_*` (zadání v `docs/18-DILY.md`).
+
+- Pás je z devíti průsvitných vrstev rostoucí šířky, vnitřní okraj se vlní šumem
+  ze světových souřadnic, na koncích se zúží. Jeden ostrý okraj vypadal jako
+  nalepená záplata.
+- Pásy jsou v samostatném `Graphics` nad povrchem chunku (rozpočet textur na
+  dávku), zóny a oheň ve třetím nad nimi. Změna dlaždice zneplatní i chunk souseda.
+- Rohy se zaoblují **jen u vody** (hvězdy z kosočtverců). Mezi souší to dělalo
+  vystřižené klíny s jiným osvětlením a bez stromů, tam stačí pásy.
+- Zbývá: zubaté rohy souš–souš (písek/les) jsou zjemněné pásem, ne zaoblené.

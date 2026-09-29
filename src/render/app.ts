@@ -1270,6 +1270,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (parts.size === 0) return;
     buildingRenderer.setParts(parts);
     roadRenderer.setSidewalkTexture(parts.get('sidewalk')?.texture);
+    // Přechody povrchů (T130): materiály pásů jdou do terénních chunků.
+    chunkRenderer.setBands(
+      new Map(
+        [...parts.entries()]
+          .filter(([name]) => name.startsWith('band_'))
+          .map(([name, part]) => {
+            sampleSmooth(part.texture);
+            return [name, part.texture] as const;
+          }),
+      ),
+    );
     const flames = [...parts.entries()]
       .filter(([name]) => name.startsWith('flames_'))
       .sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))

@@ -2,6 +2,51 @@
   "formatVersion": 1,
   "scale": 4,
   "parts": {
+    "band_forest_edge": {
+      "file": "band_forest_edge.png",
+      "width": 256,
+      "height": 256,
+      "anchor": [
+        0,
+        0
+      ]
+    },
+    "band_grass_sand": {
+      "file": "band_grass_sand.png",
+      "width": 256,
+      "height": 256,
+      "anchor": [
+        0,
+        0
+      ]
+    },
+    "band_reeds": {
+      "file": "band_reeds.png",
+      "width": 256,
+      "height": 256,
+      "anchor": [
+        0,
+        0
+      ]
+    },
+    "band_scree": {
+      "file": "band_scree.png",
+      "width": 256,
+      "height": 256,
+      "anchor": [
+        0,
+        0
+      ]
+    },
+    "band_shore": {
+      "file": "band_shore.png",
+      "width": 256,
+      "height": 256,
+      "anchor": [
+        0,
+        0
+      ]
+    },
     "cars_front_0": {
       "file": "cars_front_0.png",
       "width": 65,

@@ -419,6 +419,101 @@ The vehicle has its REAL proportions — do not shorten it. Both views must be
 the identical vehicle: same length, same width, same height, same colours.
 ```
 
+## Přechody povrchů (T130)
+
+Materiály přechodových pásů mezi povrchy. Kreslí se jako výplň pruhu na
+okraji dlaždice (`chunkRenderer`), takže musí být bezešvé a pohledem shora.
+
+#### `band_grass_sand`
+Plátno: 1024x1024
+Kvalita: medium
+Hlavička: ne
+
+```text
+A seamless square texture of GROUND seen from directly above, for a city-builder
+game map; it will be tiled, so the left edge must continue into the right edge
+and the top into the bottom. Soft even daylight, no cast shadows, no
+perspective, fills the whole image edge to edge. Soft-shaded, natural colours a
+touch more saturated than reality. The area shown is EIGHT METRES across and
+seen from far above: no single blades of grass, grains or pebbles are visible,
+only the material as one surface with broad gentle variation. Central Europe.
+No objects, no text.
+
+Sand with thin patchy grass: tufts and small islands of mown grass scattered over pale sand, about half grass and half sand, the grass thinning out.
+```
+
+#### `band_forest_edge`
+Plátno: 1024x1024
+Kvalita: medium
+Hlavička: ne
+
+```text
+A seamless square texture of GROUND seen from directly above, for a city-builder
+game map; it will be tiled, so the left edge must continue into the right edge
+and the top into the bottom. Soft even daylight, no cast shadows, no
+perspective, fills the whole image edge to edge. Soft-shaded, natural colours a
+touch more saturated than reality. The area shown is EIGHT METRES across and
+seen from far above: no single blades of grass, grains or pebbles are visible,
+only the material as one surface with broad gentle variation. Central Europe.
+No objects, no text.
+
+The edge of a deciduous wood on the ground: low shrubs, bramble, fern and fallen leaves over dark soil with a little grass between them.
+```
+
+#### `band_scree`
+Plátno: 1024x1024
+Kvalita: medium
+Hlavička: ne
+
+```text
+A seamless square texture of GROUND seen from directly above, for a city-builder
+game map; it will be tiled, so the left edge must continue into the right edge
+and the top into the bottom. Soft even daylight, no cast shadows, no
+perspective, fills the whole image edge to edge. Soft-shaded, natural colours a
+touch more saturated than reality. The area shown is EIGHT METRES across and
+seen from far above: no single blades of grass, grains or pebbles are visible,
+only the material as one surface with broad gentle variation. Central Europe.
+No objects, no text.
+
+Scree at the foot of a rocky slope: grey gravel and small broken stones with sparse grass and a few low weeds growing through.
+```
+
+#### `band_reeds`
+Plátno: 1024x1024
+Kvalita: medium
+Hlavička: ne
+
+```text
+A seamless square texture of GROUND seen from directly above, for a city-builder
+game map; it will be tiled, so the left edge must continue into the right edge
+and the top into the bottom. Soft even daylight, no cast shadows, no
+perspective, fills the whole image edge to edge. Soft-shaded, natural colours a
+touch more saturated than reality. The area shown is EIGHT METRES across and
+seen from far above: no single blades of grass, grains or pebbles are visible,
+only the material as one surface with broad gentle variation. Central Europe.
+No objects, no text.
+
+A marshy bank: dense green-brown reeds and sedge tussocks with patches of wet mud. Evenly spread over the WHOLE image with the same brightness everywhere — NO vignette, NO darker edges or corners, NO frame.
+```
+
+#### `band_shore`
+Plátno: 1024x1024
+Kvalita: medium
+Hlavička: ne
+
+```text
+A seamless square texture of GROUND seen from directly above, for a city-builder
+game map; it will be tiled, so the left edge must continue into the right edge
+and the top into the bottom. Soft even daylight, no cast shadows, no
+perspective, fills the whole image edge to edge. Soft-shaded, natural colours a
+touch more saturated than reality. The area shown is EIGHT METRES across and
+seen from far above: no single blades of grass, grains or pebbles are visible,
+only the material as one surface with broad gentle variation. Central Europe.
+No objects, no text.
+
+Damp sand of a lake shore: evenly darkened wet sand with a few scattered pebbles and bits of washed-up weed. NO water, NO waves and NO water line anywhere in the image — only wet sand, evenly spread over the WHOLE image with the same brightness everywhere, NO vignette, NO darker edges.
+```
+
 ## Chodci
 
 Hlavička budov lidi zakazuje. Tady jsou, ale **drobní a bez tváří**: na mapě
