@@ -1,22 +1,40 @@
+import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
-import { index } from '../layers';
+import { parcelConducts } from '../conduct';
+import { index, WIRE } from '../layers';
 import { isFlooded } from '../disasters/flood';
 import { markBuildingDirty, markCoverageDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
 /**
- * Elektřina ve dvou krocích.
+ * Elektřina (T129, rozhodnutí autora).
  *
- * 1. **Topologie** — flood fill z elektráren po vodičích do vrstvy `power`.
- *    Vodičem je silnice a budova; samostatné elektrické vedení fáze 1 nemá.
- * 2. **Kapacita** — připojeným budovám se rozdává výroba podle `id`, tedy od
- *    nejstarší. Když výroba nestačí, zbytek zůstane bez proudu.
+ * **Co vede:** souvislý blok zón a budov sám (`parcelConducts`) a elektrické
+ * vedení (`layers.wire`). Silnice nevede nic, zchátralá a pobořená parcela
+ * taky ne. Hráč tedy natahuje vedení jen mezi bloky a k elektrárně.
  *
- * Systém běží každý tik (§5), ale flood fill pouští jen když se síť změnila.
- * Bez toho by se 16 384 dlaždic procházelo čtyřikrát za sekundu pro nic.
+ * **Kapacita:** každý úsek vedení přenese nejvýš `balance.power.wires[typ]`.
+ * Síť se prochází do šířky od elektráren; zátěž se sčítá od spotřebičů
+ * zpátky ke zdroji. Úsek, přes který by šlo víc, než unese, **vypadne**
+ * a s ním všechno, co za ním leží — pokud k tomu nevede jiná cesta. Proto
+ * se výpočet opakuje: vypadlé úseky se vyřadí a proud zkusí jinudy, dokud
+ * nic dalšího nevypadne. Výpadek tak zasáhne **oblast**, ne náhodné domy.
+ *
+ * **Výroba:** každá souvislá síť má svou. Elektrárna na jednom konci mapy
+ * nenapájí čtvrť, ke které nevede vedení. V síti se výroba rozdává podle
+ * `id` budov, tedy od nejstarší.
+ *
+ * Systém běží každý tik (§5), ale přepočítává se jen po změně sítě.
  */
-export function createPowerSystem(catalogue: BuildingCatalogue): System {
+
+/** Pojistka proti nekonečnému kolu vyřazování. Každé kolo vyřadí aspoň úsek. */
+const MAX_ROUNDS = 64;
+
+export function createPowerSystem(catalogue: BuildingCatalogue, balance?: Balance): System {
+  // Bez balancu (starší testy) má vedení neomezenou kapacitu.
+  const capacity = (type: number): number =>
+    balance?.power.wires[type - 1]?.capacity ?? Number.POSITIVE_INFINITY;
   return {
     name: 'power',
     interval: 1,
@@ -24,78 +42,239 @@ export function createPowerSystem(catalogue: BuildingCatalogue): System {
     run(world: WorldState) {
       if (!world.powerNetworkDirty) return;
       world.powerNetworkDirty = false;
-      recompute(world, catalogue);
+      recompute(world, catalogue, capacity);
     },
   };
 }
 
-function recompute(world: WorldState, catalogue: BuildingCatalogue): void {
+interface Plant {
+  readonly id: number;
+  readonly production: number;
+  readonly tiles: number[];
+}
+
+interface Consumer {
+  readonly id: number;
+  readonly consumption: number;
+  readonly tiles: number[];
+}
+
+function recompute(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  capacity: (type: number) => number,
+): void {
   // Pořadí budov je vzestupně podle id — deterministické bez ohledu na to,
   // jak se mapa naplnila (P2).
   const ids = [...world.buildings.keys()].sort((a, b) => a - b);
+  const cells = world.layers.power.length;
 
-  const reached = new Uint8Array(world.layers.power.length);
-  const queue: number[] = [];
-  let production = 0;
-
+  const plants: Plant[] = [];
+  const consumers: Consumer[] = [];
   for (const id of ids) {
     const building = world.buildings.get(id);
-    if (!building) continue;
+    if (!building || building.abandoned) continue;
     const definition = catalogue.get(building.definitionId);
-    const produced = definition?.power?.production ?? 0;
-    if (!definition || produced <= 0) continue;
-    // Odpojená elektrárna nevyrábí **a ani nevede** — blackout je výpadek
-    // zdroje, ne jen chybějící kapacita. Kdyby dál sloužila jako vodič,
-    // vzdálená čtvrť by zůstala „připojená k ničemu" a hráč by na mapě viděl
-    // síť, která nefunguje.
-    if (world.disasters.offlinePlants.has(id)) continue;
+    if (!definition) continue;
+    const tiles = footprintTiles(world, building.x, building.y, definition.footprint);
+    const produced = definition.power?.production ?? 0;
+    // Odpojená elektrárna (blackout) nevyrábí — a nevyrábí ani zchátralá.
+    if (produced > 0 && !world.disasters.offlinePlants.has(id)) {
+      plants.push({ id, production: produced, tiles });
+    }
+    consumers.push({ id, consumption: definition.power?.consumption ?? 0, tiles });
+  }
 
-    production += produced;
-
-    const [width, depth] = definition.footprint;
-    for (let dy = 0; dy < depth; dy++) {
-      for (let dx = 0; dx < width; dx++) {
-        const tile = index(building.x + dx, building.y + dy, world.size);
-        if (reached[tile] === 0) {
-          reached[tile] = 1;
-          queue.push(tile);
-        }
-      }
+  const conducts = new Uint8Array(cells);
+  for (let tile = 0; tile < cells; tile++) {
+    if (isFlooded(world, tile)) continue;
+    if ((world.layers.wire[tile] ?? 0) !== WIRE.none || parcelConducts(world, tile)) conducts[tile] = 1;
+  }
+  // Odpojená elektrárna nevede — kdyby vedla, vzdálená čtvrť by zůstala
+  // „připojená k ničemu" a hráč by na mapě viděl síť, která nefunguje.
+  for (const id of world.disasters.offlinePlants) {
+    const building = world.buildings.get(id);
+    const definition = building && catalogue.get(building.definitionId);
+    if (!building || !definition) continue;
+    for (const tile of footprintTiles(world, building.x, building.y, definition.footprint)) {
+      conducts[tile] = 0;
     }
   }
 
-  floodFill(world, reached, queue);
-  writePowerLayer(world, reached);
-  distributeCapacity(world, catalogue, ids, production);
+  const overloaded = new Uint8Array(cells);
+  let tree = spread(world, conducts, plants);
+  let load = loads(tree, consumers);
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const cut = overloadedWires(world, tree, load, capacity);
+    if (cut.length === 0) break;
+    for (const tile of cut) {
+      overloaded[tile] = 1;
+      conducts[tile] = 0;
+    }
+    tree = spread(world, conducts, plants);
+    load = loads(tree, consumers);
+  }
+
+  // Zátěž a přetížení pro vrstvu elektřiny. Přetížený úsek ukazuje, kolik
+  // by přes něj šlo — tedy zátěž z posledního kola, kdy ještě vedl.
+  const wireLoad = world.wireLoad;
+  for (let tile = 0; tile < cells; tile++) {
+    const isWire = (world.layers.wire[tile] ?? 0) !== WIRE.none;
+    if (!isWire) {
+      wireLoad[tile] = 0;
+    } else if (overloaded[tile] === 0) {
+      wireLoad[tile] = tree.reached[tile] === 1 ? (load[tile] ?? 0) : 0;
+    }
+  }
+  world.wireOverloaded = overloaded;
+  world.powerRevision++;
+
+  writePowerLayer(world, tree.reached);
+  distributeCapacity(world, catalogue, ids, plants, tree);
 }
 
-function floodFill(world: WorldState, reached: Uint8Array, queue: number[]): void {
+interface Tree {
+  /** Dosažená dlaždice 0/1. */
+  reached: Uint8Array;
+  /** Rodič ve stromu hledání, −1 u zdroje. */
+  parent: Int32Array;
+  /** Síť, do které dlaždice patří — index první elektrárny, která ji zasáhla. */
+  network: Int32Array;
+  /** Pořadí, ve kterém se dlaždice dosáhly. */
+  order: number[];
+}
+
+/** Do šířky od všech elektráren naráz, po vodivých dlaždicích. */
+function spread(world: WorldState, conducts: Uint8Array, plants: readonly Plant[]): Tree {
+  const cells = conducts.length;
+  const reached = new Uint8Array(cells);
+  const parent = new Int32Array(cells).fill(-1);
+  const network = new Int32Array(cells).fill(-1);
+  const order: number[] = [];
   const size = world.size;
-  const { road, buildingId } = world.layers;
 
-  const visit = (x: number, y: number): void => {
-    if (x < 0 || y < 0 || x >= size || y >= size) return;
-    const tile = index(x, y, size);
-    if (reached[tile] !== 0) return;
-    // Vodičem je silnice nebo budova. Prázdná dlaždice proud nevede.
-    if (road[tile] === 0 && buildingId[tile] === 0) return;
-    // Ani zaplavená (§5 fáze 4). Přerušené sítě bolí víc než pár zbořených
-    // domů — právě proto je povodeň nebezpečná i tam, kde nic nespadne.
-    if (isFlooded(world, tile)) return;
-    reached[tile] = 1;
-    queue.push(tile);
-  };
+  plants.forEach((plant, p) => {
+    for (const tile of plant.tiles) {
+      if (conducts[tile] === 0 || reached[tile] === 1) continue;
+      reached[tile] = 1;
+      network[tile] = p;
+      order.push(tile);
+    }
+  });
 
-  while (queue.length > 0) {
-    const tile = queue.pop();
-    if (tile === undefined) break;
+  for (let head = 0; head < order.length; head++) {
+    const tile = order[head]!;
     const x = tile % size;
     const y = (tile - x) / size;
-    visit(x, y - 1);
-    visit(x + 1, y);
-    visit(x, y + 1);
-    visit(x - 1, y);
+    const next = (nx: number, ny: number): void => {
+      if (nx < 0 || ny < 0 || nx >= size || ny >= size) return;
+      const n = index(nx, ny, size);
+      if (reached[n] === 1 || conducts[n] === 0) return;
+      reached[n] = 1;
+      parent[n] = tile;
+      network[n] = network[tile]!;
+      order.push(n);
+    };
+    next(x, y - 1);
+    next(x + 1, y);
+    next(x, y + 1);
+    next(x - 1, y);
   }
+
+  // Dvě elektrárny, jejichž sítě se dotknou, jsou jedna síť. Hledání je
+  // přiřadilo té, která dlaždici zasáhla první; tady se sloučí sousedé
+  // s různým označením.
+  const root = plants.map((_, p) => p);
+  const find = (p: number): number => {
+    while (root[p] !== p) p = root[p] = root[root[p]!]!;
+    return p;
+  };
+  for (const tile of order) {
+    const x = tile % size;
+    const y = (tile - x) / size;
+    for (const [nx, ny] of [[x + 1, y], [x, y + 1]] as const) {
+      if (nx >= size || ny >= size) continue;
+      const n = index(nx, ny, size);
+      if (reached[n] === 0) continue;
+      const a = find(network[tile]!);
+      const b = find(network[n]!);
+      if (a !== b) root[Math.max(a, b)] = Math.min(a, b);
+    }
+  }
+  for (const tile of order) network[tile] = find(network[tile]!);
+
+  return { reached, parent, network, order };
+}
+
+/** Zátěž dlaždic: spotřeba budovy visí na její první dosažené dlaždici a sčítá se ke zdroji. */
+function loads(tree: Tree, consumers: readonly Consumer[]): Float64Array {
+  const load = new Float64Array(tree.reached.length);
+  const rank = new Int32Array(tree.reached.length).fill(-1);
+  tree.order.forEach((tile, i) => {
+    rank[tile] = i;
+  });
+  for (const consumer of consumers) {
+    if (consumer.consumption <= 0) continue;
+    let best = -1;
+    for (const tile of consumer.tiles) {
+      const r = rank[tile] ?? -1;
+      if (r >= 0 && (best < 0 || r < (rank[best] ?? 0))) best = tile;
+    }
+    if (best >= 0) load[best] = (load[best] ?? 0) + consumer.consumption;
+  }
+  for (let i = tree.order.length - 1; i >= 0; i--) {
+    const tile = tree.order[i]!;
+    const parent = tree.parent[tile] ?? -1;
+    if (parent >= 0) load[parent] = (load[parent] ?? 0) + (load[tile] ?? 0);
+  }
+  return load;
+}
+
+/**
+ * Přetížené úseky vedení. Bere se jen ten **nejblíž spotřebičům** — jeho
+ * vypadnutím se zátěž nad ním sníží, takže vyšší úsek může vydržet. Vypadne
+ * tak nejmenší možná oblast.
+ */
+function overloadedWires(
+  world: WorldState,
+  tree: Tree,
+  load: Float64Array,
+  capacity: (type: number) => number,
+): number[] {
+  const carried = new Float64Array(load.length);
+  const out: number[] = [];
+  for (let i = tree.order.length - 1; i >= 0; i--) {
+    const tile = tree.order[i]!;
+    const type = world.layers.wire[tile] ?? WIRE.none;
+    // Zátěž bez vypadlých větví pod sebou.
+    let own = load[tile] ?? 0;
+    own -= carried[tile] ?? 0;
+    if (type !== WIRE.none && own > capacity(type) && (tree.parent[tile] ?? -1) >= 0) {
+      out.push(tile);
+      // Tahle větev vypadne celá: ancestorům se její zátěž odečte.
+      for (let p = tree.parent[tile] ?? -1; p >= 0; p = tree.parent[p] ?? -1) {
+        carried[p] = (carried[p] ?? 0) + own;
+      }
+    }
+  }
+  return out;
+}
+
+function footprintTiles(
+  world: WorldState,
+  x: number,
+  y: number,
+  footprint: readonly [number, number] | undefined,
+): number[] {
+  const [width, depth] = footprint ?? [1, 1];
+  const tiles: number[] = [];
+  for (let dy = 0; dy < depth; dy++) {
+    for (let dx = 0; dx < width; dx++) {
+      if (x + dx >= world.size || y + dy >= world.size) continue;
+      tiles.push(index(x + dx, y + dy, world.size));
+    }
+  }
+  return tiles;
 }
 
 function writePowerLayer(world: WorldState, reached: Uint8Array): void {
@@ -114,9 +293,17 @@ function distributeCapacity(
   world: WorldState,
   catalogue: BuildingCatalogue,
   ids: readonly number[],
-  production: number,
+  plants: readonly Plant[],
+  tree: Tree,
 ): void {
-  let remaining = production;
+  // Výroba po sítích: elektrárna patří do sítě své první dosažené dlaždice.
+  const remaining = new Map<number, number>();
+  for (const plant of plants) {
+    const tile = plant.tiles.find((t) => tree.reached[t] === 1);
+    if (tile === undefined) continue;
+    const net = tree.network[tile] ?? -1;
+    remaining.set(net, (remaining.get(net) ?? 0) + plant.production);
+  }
 
   for (const id of ids) {
     const building = world.buildings.get(id);
@@ -124,17 +311,19 @@ function distributeCapacity(
 
     const definition = catalogue.get(building.definitionId);
     const consumption = definition?.power?.consumption ?? 0;
-    const connected = isConnected(world, building.x, building.y, definition?.footprint);
+    const tiles = footprintTiles(world, building.x, building.y, definition?.footprint);
+    const tile = tiles.find((t) => tree.reached[t] === 1);
 
     let powered = false;
-    // Ruina proud nebere a ani se za připojenou nepovažuje — jinak by prázdné
-    // domy ukrajovaly kapacitu živým. Vodičem přes pozemek zůstává.
-    if (connected && !building.abandoned) {
+    // Ruina proud nebere ani nevede (T129).
+    if (tile !== undefined && !building.abandoned) {
+      const net = tree.network[tile] ?? -1;
+      const left = remaining.get(net) ?? 0;
       if (consumption === 0) {
         powered = true; // elektrárny a budovy bez spotřeby
-      } else if (remaining >= consumption) {
+      } else if (left >= consumption) {
         powered = true;
-        remaining -= consumption;
+        remaining.set(net, left - consumption);
       }
     }
 
@@ -142,31 +331,7 @@ function distributeCapacity(
       building.powered = powered;
       markBuildingDirty(world, id);
       // Temná služba nepokrývá (T53), takže změna proudu je změnou pokrytí.
-      // Bez tohohle by blackout zhasnul hasičárnu a mapa pokrytí by o tom
-      // nevěděla až do příští stavby — přesně ten druh tiché chyby, kdy hráč
-      // vidí na mapě dosah, který neexistuje.
       if (definition?.service) markCoverageDirty(world);
     }
   }
-}
-
-function isConnected(
-  world: WorldState,
-  x: number,
-  y: number,
-  footprint: readonly [number, number] | undefined,
-): boolean {
-  const [width, depth] = footprint ?? [1, 1];
-
-  for (let dy = 0; dy < depth; dy++) {
-    for (let dx = 0; dx < width; dx++) {
-      const tileX = x + dx;
-      const tileY = y + dy;
-      if (tileX >= world.size || tileY >= world.size) continue;
-      if (world.layers.power[index(tileX, tileY, world.size)] === 1)
-        return true;
-    }
-  }
-
-  return false;
 }

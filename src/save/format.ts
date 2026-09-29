@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 12;
+export const CURRENT_FORMAT_VERSION = 13;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -45,6 +45,8 @@ export const SAVE_LAYER_ORDER = [
    * by se `layers.bin` přeskládat jako u zrušené `elevation` ve verzi 4.
    */
   'pipe',
+  /** Elektrické vedení, od verze 13 (T129). Opět na konec. */
+  'wire',
 ] as const satisfies readonly (keyof Layers)[];
 
 /**

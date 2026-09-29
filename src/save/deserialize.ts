@@ -796,10 +796,11 @@ export function collectLoadWarnings(
     ),
   ].sort();
 
-  // Vrstva potrubí je v `layers.bin` poslední, takže stačí sáhnout na její
-  // konec — rozbalovat celý save kvůli jednomu „je tam vůbec něco?“ ne.
+  // Vrstva potrubí je v `layers.bin` předposlední (za ní je od verze 13
+  // vedení), takže stačí sáhnout na její místo — rozbalovat celý save kvůli
+  // jednomu „je tam vůbec něco?“ ne.
   const cells = saveMapSize(save.meta) ** 2;
-  const pipes = save.layers.subarray(save.layers.byteLength - cells);
+  const pipes = save.layers.subarray(save.layers.byteLength - 2 * cells, save.layers.byteLength - cells);
   const hasPipes = pipes.some((value) => value !== 0);
   const waterlessBuildings = hasPipes
     ? 0

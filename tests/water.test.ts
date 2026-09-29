@@ -71,8 +71,9 @@ describe('vodovod (§8 fáze 3)', () => {
     expect(w.waterSupply[index(20, 21, MAP_SIZE)]).toBe(0);
   });
 
-  it('budovy vodu nevedou, potrubí musí být pod nimi (§8)', async () => {
-    // Tohle je ten rozdíl proti elektřině, kvůli kterému to není kopie.
+  it('parcela vede vodu sama, potrubí stačí k jejímu okraji (T129)', async () => {
+    // Do T129 musela trubka vést pod každou budovou. Teď je rozvod uvnitř
+    // parcely automatický a hráč staví jen spojky.
     const content = await vanilla();
     const w = world();
     lake(w);
@@ -83,15 +84,13 @@ describe('vodovod (§8 fáze 3)', () => {
     expect(house).toBeDefined();
     if (!house) return;
 
-    // Dům přiléhá k potrubí, ale nemá ho pod sebou.
+    // Dům přiléhá ke konci potrubí — voda je.
     const built = placeBuilding(w, house, 15, 20);
-    run(w, content, 4);
-    expect(w.watered.has(built.id)).toBe(false);
-
-    // Jakmile se potrubí protáhne pod něj, voda je.
-    buildPipe(w, 15, 20, VANILLA_BALANCE);
+    // Dům daleko od sítě — voda není.
+    const island = placeBuilding(w, house, 40, 40);
     run(w, content, 4);
     expect(w.watered.has(built.id)).toBe(true);
+    expect(w.watered.has(island.id)).toBe(false);
   });
 
   it('bez vodárny neteče ani nejdelší potrubí', async () => {

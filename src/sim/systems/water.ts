@@ -1,10 +1,11 @@
+import { parcelConducts } from '../conduct';
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
 import { strongestModifier } from '../disasters/effects';
 import { index } from '../layers';
 import { isFlooded } from '../disasters/flood';
-import { markBuildingDirty, markTileDirty } from '../world';
+import { markBuildingDirty, markNetworksDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
@@ -189,12 +190,18 @@ function floodFill(
         if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
 
         const at = index(nx, ny, size);
-        if (pipe[at] !== 1) continue;
+        // Vodu vede potrubí a od T129 i souvislý blok zón a budov sám.
+        // Blok dosah **nežere**: je to rozvod uvnitř parcel, hráč ho
+        // nestavěl a nemá platit za to, že má velkou čtvrť. Dosah ubírá
+        // jen potrubí, tedy spojky mezi bloky.
+        const parcel = parcelConducts(world, at);
+        if (pipe[at] !== 1 && !parcel) continue;
         // Zaplavené potrubí nevede vodu (§5 fáze 4).
         if (isFlooded(world, at)) continue;
-        if (budget - 1 <= (remaining[at] ?? -1)) continue;
+        const left = parcel && pipe[at] !== 1 ? budget : budget - 1;
+        if (left <= (remaining[at] ?? -1)) continue;
 
-        remaining[at] = budget - 1;
+        remaining[at] = left;
         next.push(at);
       }
     }
@@ -270,6 +277,8 @@ export function createWaterDecaySystem(catalogue: BuildingCatalogue, balance: Ba
           building.jobs = 0;
           world.waterlessStreak.delete(id);
           markBuildingDirty(world, id);
+          // Ruina nevede proud ani vodu (T129).
+          markNetworksDirty(world);
         }
       }
     },

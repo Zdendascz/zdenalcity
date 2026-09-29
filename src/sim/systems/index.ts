@@ -63,7 +63,7 @@ export function createDefaultSystems(
     // Záplava před elektřinou a vodou: zaplavená dlaždice je nevede, takže se
     // to musí propsat dřív, než obě sítě proběhnou.
     createFloodSystem(catalogue, balance),
-    createPowerSystem(catalogue),
+    createPowerSystem(catalogue, balance),
     // Voda hned za elektřinou: růst i chátrání z ní čtou ve stejném tiku.
     createWaterSystem(catalogue, balance),
     // Pokrytí se musí přepočítat dřív, než z něj čte cena půdy a kriminalita.

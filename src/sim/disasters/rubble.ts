@@ -1,5 +1,5 @@
 import { coarseIndex, coarseSizeOf } from '../coarse';
-import { markTileDirty } from '../world';
+import { markNetworksDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 
 /**
@@ -31,6 +31,8 @@ import type { WorldState } from '../world';
  */
 export function spawnRubble(world: WorldState, tile: number, definitionId?: string): void {
   world.rubble[tile] = 1;
+  // Pobořená parcela nevede proud ani vodu (T129).
+  markNetworksDirty(world);
   if (definitionId !== undefined) world.rubbleOf.set(tile, definitionId);
   markTileAt(world, tile);
 }
@@ -39,6 +41,7 @@ export function spawnRubble(world: WorldState, tile: number, definitionId?: stri
 export function clearRubble(world: WorldState, tile: number): void {
   if ((world.rubble[tile] ?? 0) === 0) return;
   world.rubble[tile] = 0;
+  markNetworksDirty(world);
   // Paměť odchází s troskami. Kdyby zůstala, prázdná parcela by se pořád
   // hlásila jako bývalá nemocnice.
   world.rubbleOf.delete(tile);

@@ -48,6 +48,7 @@ export const LEDGER_EXPENSES = [
   'build',
   'roads',
   'pipes',
+  'wires',
   'zoning',
   'terrain',
   'bulldoze',

@@ -11,7 +11,7 @@ import {
   planLevelArea,
 } from './heights';
 import { MAX_FUNDING } from './funding';
-import { inBounds, index, ROAD, TERRAIN, terrainNameKey, ZONE } from './layers';
+import { inBounds, index, ROAD, TERRAIN, terrainNameKey, WIRE, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { earn, spend } from './ledger';
 import { categoryForZone } from './rci';
@@ -64,6 +64,9 @@ export type Command =
   | { type: 'set_service_funding'; serviceClass: string; funding: number }
   | { type: 'build_pipe'; x: number; y: number }
   | { type: 'remove_pipe'; x: number; y: number }
+  /** Elektrické vedení (T129): `wire` je `WIRE.low` nebo `WIRE.high`. */
+  | { type: 'build_wire'; x: number; y: number; wire: number }
+  | { type: 'remove_wire'; x: number; y: number }
   | { type: 'terraform_corner'; x: number; y: number; delta: number }
   /**
    * Vysazení lesa (rozhodnutí autora).
@@ -266,7 +269,9 @@ export function buildRoad(
   // nová dlaždice už je, takže dřív by se ptalo na tvar, který ještě neplatí,
   // a odbočka by při stavbě zbořila ulici, do které se napojuje.
   if (grade && grade.size > 0) collapseUnsupportedRoads(world, grade, noLosses());
-  markPowerNetworkDirty(world); // silnice je vodič
+  // Silnice od T129 nic nevede, ale mohla přepsat zónu nebo suť pod sebou.
+  markPowerNetworkDirty(world);
+  markWaterNetworkDirty(world);
   return OK;
 }
 
@@ -928,6 +933,51 @@ export function removePipe(
   world.layers.pipe[tile] = 0;
   markTileDirty(world, x, y);
   markWaterNetworkDirty(world);
+  return OK;
+}
+
+/**
+ * Položí elektrické vedení (T129), nebo stávající přestaví na jiný typ.
+ *
+ * Vedení smí vést přes silnici i budovu, stejně jako potrubí — spojuje bloky
+ * a do cesty mu stojí jen voda a suť. Přestavba stojí cenu nového typu;
+ * stejný typ podruhé se odmítne.
+ */
+export function buildWire(
+  world: WorldState,
+  x: number,
+  y: number,
+  wire: number,
+  balance?: Balance,
+): CommandResult {
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+  if (wire !== WIRE.low && wire !== WIRE.high) return reject('error.unknownWire');
+
+  const tile = index(x, y, world.size);
+  if (world.layers.terrain[tile] === TERRAIN.water) return reject('error.wireOnWater');
+  if (world.layers.wire[tile] === wire) return reject('error.wireExists');
+  if ((world.rubble[tile] ?? 0) !== 0) return reject('error.rubbleInTheWay');
+
+  const cost = balance?.power.wires[wire - 1]?.cost ?? 0;
+  if (world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  }
+
+  spend(world, 'wires', cost);
+  world.layers.wire[tile] = wire;
+  markTileDirty(world, x, y);
+  markPowerNetworkDirty(world);
+  return OK;
+}
+
+/** Odstraní vedení, a jen vedení — stejná úvaha jako u `removePipe`. */
+export function removeWire(world: WorldState, x: number, y: number): CommandResult {
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+  const tile = index(x, y, world.size);
+  if ((world.layers.wire[tile] ?? WIRE.none) === WIRE.none) return reject('error.noWire');
+  world.layers.wire[tile] = WIRE.none;
+  markTileDirty(world, x, y);
+  markPowerNetworkDirty(world);
   return OK;
 }
 

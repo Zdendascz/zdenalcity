@@ -370,6 +370,47 @@ function widenBuildingIdLayer(layers: Uint8Array, size: number): Uint8Array {
   return out;
 }
 
+/**
+ * Verze 13: elektrické vedení (T129).
+ *
+ * Do verze 12 vedla proud silnice. Od 13 nevede nic kromě bloků zón a budov
+ * a vedení, které hráč natáhne. Starému městu by bez náhrady zhasly všechny
+ * čtvrti, které k elektrárně vedla jen ulice — proto migrace položí vedení
+ * **pod každou silnici** (rozhodnutí autora). Rozehrané město svítí dál
+ * a hráč ho může přestavět.
+ *
+ * Vedení je **vysoké napětí**. Nízké by u elektrárny neslo spotřebu celého
+ * města, přetížilo by se a zhasla by většina čtvrtí — přesně to, čemu má
+ * migrace zabránit.
+ */
+const migrateV12ToV13: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 13 },
+  layers: appendWiresUnderRoads(save.layers, save.meta.grid?.size ?? LEGACY_MAP_SIZE),
+});
+
+/**
+ * Připíše vrstvu vedení: 2 (`WIRE.high`) tam, kde je silnice.
+ *
+ * Rozložení verze 12 natvrdo: `terrain`, `zone`, `road` po bajtu,
+ * `buildingId` čtyři bajty, `power` a `pipe` po bajtu — devět bajtů na
+ * dlaždici. Silnice je třetí vrstva.
+ */
+function appendWiresUnderRoads(layers: Uint8Array, size: number): Uint8Array {
+  const cells = size * size;
+  const BYTES_PER_TILE_V12 = 9;
+  if (layers.byteLength !== cells * BYTES_PER_TILE_V12) return layers; // délku ohlásí `checkSaveFits`
+
+  const out = new Uint8Array(cells * (BYTES_PER_TILE_V12 + 1));
+  out.set(layers, 0);
+  const road = cells * 2;
+  const wire = cells * BYTES_PER_TILE_V12;
+  for (let i = 0; i < cells; i++) {
+    if ((layers[road + i] ?? 0) !== 0) out[wire + i] = 2;
+  }
+  return out;
+}
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
@@ -383,6 +424,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   9: migrateV9ToV10,
   10: migrateV10ToV11,
   11: migrateV11ToV12,
+  12: migrateV12ToV13,
 };
 
 /**

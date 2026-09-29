@@ -20,6 +20,7 @@ import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { MAP_SIZE } from './support/grid';
+import { wireUnderRoads } from './support/power';
 
 /**
  * Síťové a zdravotní katastrofy (T53): blackout, epidemie, chemická havárie.
@@ -58,6 +59,7 @@ function grid(content: ContentRegistry, plants = 1): WorldState {
     expect(result.ok, JSON.stringify(result)).toBe(true);
   }
 
+  wireUnderRoads(world); // T129: proud vede vedení, ne silnice
   const systems = createDefaultSystems(content, balance);
   for (let tick = 0; tick < 500; tick++) {
     tickWorld(world, systems);
@@ -166,6 +168,7 @@ describe('temná služba nepokrývá', () => {
         ).toBe(true);
       }
 
+      wireUnderRoads(world); // T129: proud vede vedení, ne silnice
       const systems = createDefaultSystems(content, balance);
       for (let tick = 0; tick < 30; tick++) tickWorld(world, systems);
       return world.coverage.get('fire')?.[coarseIndex(20, 21, MAP_SIZE)] ?? 0;
@@ -187,6 +190,7 @@ describe('temná služba nepokrývá', () => {
     // zastaví a stavba na obsazené parcele by se neodehrála vůbec. Ulice
     // vede až k šedesátce, takže na silnici dosáhne stejně jako uvnitř města.
     expect(placeDefinition(world, content, 'vanilla:fire_station', 50, 21, balance).ok).toBe(true);
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 30; tick++) tickWorld(world, systems);
     const before = world.coverage.get('fire')?.[coarseIndex(50, 21, MAP_SIZE)] ?? 0;
@@ -217,6 +221,7 @@ describe('temná služba nepokrývá', () => {
     if (!dump) throw new Error('žádné obtěžování v obsahu');
     expect(placeDefinition(world, content, dump.id, 20, 21, balance).ok).toBe(true);
 
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 30; tick++) tickWorld(world, systems);
 
@@ -887,6 +892,7 @@ describe('chemická havárie', () => {
       placeDefinition(world, content, 'vanilla:coal_power_plant', 30, 28, balance).ok,
     ).toBe(true);
 
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 30; tick++) tickWorld(world, systems);
     expect([...world.waterSupply].filter((value) => value !== 0).length).toBeGreaterThan(0);

@@ -43,6 +43,7 @@ import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { assumeWatered } from './support/water';
 import { MAP_SIZE, COARSE_CELLS } from './support/grid';
+import { wireUnderRoads } from './support/power';
 
 const OPTIONS: SaveOptions = {
   cityName: 'Nový Brod',
@@ -80,6 +81,7 @@ async function builtCity(seed = 483928492): Promise<{ world: WorldState; content
   // ne na tom, jestli hráč stihl postavit vodárnu (§8 fáze 3).
   assumeWatered(world);
 
+  wireUnderRoads(world); // T129: proud vede vedení, ne silnice
   const systems = createDefaultSystems(content, content.getBalance());
   for (let tick = 0; tick < 600; tick++) {
     tickWorld(world, systems);
@@ -121,10 +123,10 @@ describe('formát savu', () => {
     expect(packLayers(world.layers).byteLength).toBe(
       expectedLayersByteLength(MAP_SIZE),
     );
-    // 6 vrstev, z toho jedna čtyřbajtová (`buildingId` od verze 12, předtím
+    // 7 vrstev, z toho jedna čtyřbajtová (`buildingId` od verze 12, předtím
     // dvoubajtová). `elevation` zmizela ve verzi 4 (výšku nese `heights.bin`),
-    // `pipe` přibyla ve verzi 5.
-    expect(expectedLayersByteLength(MAP_SIZE)).toBe(MAP_SIZE * MAP_SIZE * 9);
+    // `pipe` přibyla ve verzi 5, `wire` ve verzi 13.
+    expect(expectedLayersByteLength(MAP_SIZE)).toBe(MAP_SIZE * MAP_SIZE * 10);
   });
 
   it('meta.json je v ZIPu nekomprimovaná, aby se dala číst samostatně', async () => {
@@ -202,6 +204,7 @@ describe('round-trip', () => {
     expect(restored.seed).toBe(before.seed);
 
     // A hlavně: pokračování hry se nesmí rozejít.
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, content.getBalance());
     for (let tick = 0; tick < 120; tick++) {
       tickWorld(world, systems);
@@ -227,6 +230,7 @@ describe('round-trip', () => {
     // test má projít celou cestu uložení → načtení → proud → pokrytí.
     expect(placeDefinition(world, content, 'vanilla:coal_power_plant', 25, 41).ok).toBe(true);
 
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, content.getBalance());
     for (let tick = 0; tick < 40; tick++) tickWorld(world, systems);
     const expected = world.coverage.get('police');
@@ -281,6 +285,7 @@ describe('round-trip', () => {
     expect([...restored.coarse.pollution]).toEqual([...world.coarse.pollution]);
 
     // A pokračování hry se nesmí rozejít.
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, content.getBalance());
     for (let tick = 0; tick < 60; tick++) {
       tickWorld(world, systems);

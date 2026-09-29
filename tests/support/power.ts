@@ -1,3 +1,4 @@
+import { WIRE } from '@/sim/layers';
 import type { WorldState } from '@/sim/world';
 
 /**
@@ -21,4 +22,16 @@ export function powerAll(world: WorldState): void {
   // při skutečné změně, jinak by pomocník rozbil testy, které ověřují, že se
   // pokrytí počítá **jen** při změně.
   if (changed) world.coverageDirty = true;
+}
+
+/**
+ * Položí vedení vysokého napětí pod každou silnici — totéž co migrace savu
+ * verze 13 (T129). Pro testy, které stavějí město ulicemi a o síť jim nejde:
+ * do T129 vedla proud silnice sama.
+ */
+export function wireUnderRoads(world: WorldState): void {
+  for (let tile = 0; tile < world.layers.road.length; tile++) {
+    if ((world.layers.road[tile] ?? 0) !== 0) world.layers.wire[tile] = WIRE.high;
+  }
+  world.powerNetworkDirty = true;
 }

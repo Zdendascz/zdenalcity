@@ -33,6 +33,7 @@ import { createWorld, removeBuilding, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { MAP_SIZE } from './support/grid';
+import { wireUnderRoads } from './support/power';
 
 /**
  * Linky MHD (T55): datový model, výběr zastávek, tři módy, tramvaj v dopravě.
@@ -64,6 +65,7 @@ function street(content: ContentRegistry): WorldState {
 
   // Zastávka s trakcí se bez proudu postavit nedá, takže síť musí naběhnout
   // dřív, než test začne stavět.
+  wireUnderRoads(world); // T129: proud vede vedení, ne silnice
   const systems = createDefaultSystems(content, balance);
   for (let tick = 0; tick < 5; tick++) tickWorld(world, systems);
   return world;
@@ -580,6 +582,7 @@ describe('linka rozbitá zvenčí', () => {
 
     // Proud do všech zastávek: kdyby některá zůstala tmavá, `lineRuns` by
     // vracela `false` kvůli trakci a test by měřil něco jiného, než chce.
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 5; tick++) tickWorld(world, systems);
     for (const stop of line.stops) expect(world.buildings.get(stop)?.powered).toBe(true);
@@ -644,6 +647,7 @@ describe('jede, nebo nejede', () => {
     addTransitStop(world, content, balance, line.id, b);
     setLineVehicles(world, balance, line.id, 2);
 
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 10; tick++) tickWorld(world, systems);
     return line;
@@ -675,6 +679,7 @@ describe('jede, nebo nejede', () => {
       }
     }
     world.powerNetworkDirty = true;
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 3; tick++) tickWorld(world, systems);
 
@@ -710,6 +715,7 @@ describe('jede, nebo nejede', () => {
       }
     }
     world.powerNetworkDirty = true;
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 3; tick++) tickWorld(world, systems);
     rebuildTramTiles(world, content, balance);

@@ -29,6 +29,7 @@ import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { VANILLA_BALANCE } from './support/balance';
 import { MAP_SIZE } from './support/grid';
+import { wireUnderRoads } from './support/power';
 
 /**
  * Jízdné a přeprava (T56).
@@ -73,6 +74,7 @@ function town(content: ContentRegistry, houses = 12): WorldState {
     if (building.definitionId === house.id) building.population = 50;
   }
 
+  wireUnderRoads(world); // T129: proud vede vedení, ne silnice
   const systems = createDefaultSystems(content, balance);
   for (let tick = 0; tick < 5; tick++) tickWorld(world, systems);
   return world;
@@ -193,6 +195,7 @@ describe('kapacita a poptávka', () => {
     for (const stop of stops) addTransitStop(world, content, balance, line.id, stop);
     setLineVehicles(world, balance, line.id, 5);
 
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 5; tick++) tickWorld(world, systems);
     computeLineStats(world, content, balance);

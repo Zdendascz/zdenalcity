@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
-import { buildRoad, placeDefinition, zoneArea } from '@/sim/commands';
+import { buildRoad, buildWire, placeDefinition, zoneArea } from '@/sim/commands';
 import { hashCoarseLayers } from '@/sim/coarse';
-import { hashLayers, index, ROAD, TERRAIN, ZONE } from '@/sim/layers';
+import { hashLayers, index, ROAD, TERRAIN, ZONE, WIRE } from '@/sim/layers';
 import { createDefaultSystems } from '@/sim/systems';
 import { applyGeneratedMap, generateTerrain } from '@/sim/mapgen';
 import {
@@ -99,6 +99,12 @@ function buildCity(content: ContentRegistry): WorldState {
     balance,
   );
   expect(plant, JSON.stringify(plant)).toEqual({ ok: true });
+
+  // Od T129 vede proud blok zón sám a silnice nic. Elektrárna přiléhá
+  // k obytnému bloku, obchod s průmyslem jsou ale za ulicí — spojí je jeden
+  // úsek vedení přes ni, jak by to udělal hráč.
+  const crossing = buildWire(world, site.x + 1, roadY, WIRE.high, balance);
+  expect(crossing, JSON.stringify(crossing)).toEqual({ ok: true });
   return world;
 }
 
@@ -237,6 +243,13 @@ function findSite(world: WorldState): { x: number; y: number } {
  * práce. S osmičkou vznikne pár míst hned a smyčka „lidé chtějí práci, práce
  * chce lidi" se rozjede o desítky tiků dřív. Kasa roste s městem, ne proti
  * němu, takže to není o penězích.
+ */
+/*
+ * Posun po elektrickém vedení (T129): kasa 30 591 → 35 209, hash vrstev jiný
+ * (přibyla vrstva `wire`). **Budov 61, obyvatel 192, práce 122 — beze změny;**
+ * po 1000 tikách svítí všech 61 budov. Silnice už proud nevede, město
+ * dostalo jeden úsek vedení přes ulici. Proč kasa vyšla o 4 618 výš, není
+ * rozebrané — růst se nezměnil, takže jde o daně nebo údržbu v průběhu.
  */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {

@@ -13,6 +13,8 @@ import {
   placeDefinition,
   plantTrees,
   removePipe,
+  buildWire,
+  removeWire,
   issueBondCommand,
   requestLoan,
   removeTransitStop,
@@ -161,6 +163,10 @@ class MainThreadSimHost implements SimHost {
         return buildPipe(this.world, cmd.x, cmd.y, this.balance);
       case 'remove_pipe':
         return removePipe(this.world, cmd.x, cmd.y);
+      case 'build_wire':
+        return buildWire(this.world, cmd.x, cmd.y, cmd.wire, this.balance);
+      case 'remove_wire':
+        return removeWire(this.world, cmd.x, cmd.y);
       case 'terraform_corner':
         return terraformCorner(this.world, cmd.x, cmd.y, cmd.delta, this.balance);
       case 'level_area':

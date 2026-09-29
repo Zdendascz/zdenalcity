@@ -6,6 +6,7 @@ import {
   markBuildingDirty,
   markCoverageDirty,
   markPowerNetworkDirty,
+  markWaterNetworkDirty,
   markTileDirty,
   removeBuilding,
 } from './world';
@@ -306,7 +307,10 @@ function abandon(world: WorldState, building: Building): void {
   building.jobs = 0;
   building.levelChangedAtTick = world.tick;
   markBuildingDirty(world, building.id);
-  markPowerNetworkDirty(world); // prázdná budova přestává být spotřebičem
+  // Zchátralá budova přestává být spotřebičem a od T129 i vodičem proudu
+  // a vody — síť za ní se může rozpadnout.
+  markPowerNetworkDirty(world);
+  markWaterNetworkDirty(world);
 }
 
 /**

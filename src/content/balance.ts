@@ -763,6 +763,14 @@ export interface Balance {
   };
 
   /** Vodovod (§8 fáze 3). */
+  /** Elektrické vedení (T129). */
+  power: {
+    /**
+     * Typy vedení v pořadí `WIRE.low`, `WIRE.high`: cena za dlaždici
+     * a kapacita — kolik spotřeby smí úsek přenést, než vypadne všechno za ním.
+     */
+    wires: { cost: number; capacity: number }[];
+  };
   water: {
     /** Dosah sítě v dlaždicích potrubí, když ho definice neurčí sama. */
     defaultRange: number;
@@ -966,6 +974,27 @@ export interface Balance {
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
+}
+
+/** Typy elektrického vedení (T129): nízké a vysoké napětí, v tomhle pořadí. */
+function validatePower(
+  issues: ValidationIssue[],
+  power: Record<string, unknown> | null,
+): Balance['power'] {
+  const wires = power?.['wires'];
+  if (!Array.isArray(wires) || wires.length !== 2) {
+    issues.push({ field: 'power.wires', message: 'musí být pole dvou typů vedení' });
+    return { wires: [{ cost: 0, capacity: 0 }, { cost: 0, capacity: 0 }] };
+  }
+  return {
+    wires: wires.map((raw, i) => {
+      const wire = asRecord(raw);
+      return {
+        cost: num(issues, wire, 'cost', `power.wires[${i}].cost`, 0, 100000),
+        capacity: num(issues, wire, 'capacity', `power.wires[${i}].capacity`, 1, 100000000),
+      };
+    }),
+  };
 }
 
 function section(
@@ -1337,6 +1366,7 @@ export function validateBalance(raw: unknown): {
       abandoned: num(issues, crime, 'abandoned', 'crime.abandoned', 0, 255),
       police: num(issues, crime, 'police', 'crime.police', 0, 10),
     },
+    power: validatePower(issues, section(issues, root, 'power')),
     water: {
       defaultRange: num(issues, water, 'defaultRange', 'water.defaultRange', 1, 1000),
       pipeCost: num(issues, water, 'pipeCost', 'water.pipeCost', 0, 100000),

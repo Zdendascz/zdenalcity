@@ -111,6 +111,12 @@
     "abandoned": 30,
     "police": 0.3
   },
+  "power": {
+    "wires": [
+      { "cost": 12, "capacity": 3000 },
+      { "cost": 60, "capacity": 40000 }
+    ]
+  },
   "water": {
     "defaultRange": 24,
     "pipeCost": 30,
