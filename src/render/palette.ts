@@ -53,7 +53,8 @@ export const ZONE_COLOR_BY_VALUE = [
  * barva navíc mění odstín podle toho, co je pod ní, takže se stejná zóna na
  * trávě a na písku nečetla stejně.
  */
-export const ZONE_OVERLAY_ALPHA = 1;
+// O 15 % průhlednější (přání autora, 2026-09-30): plná barva byla moc křiklavá.
+export const ZONE_OVERLAY_ALPHA = 0.85;
 
 /**
  * Overlay znečištění. Jedna barva, sílu nese průhlednost — ramp přes několik

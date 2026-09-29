@@ -3460,6 +3460,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       world,
       camera,
       setSpeed,
+      load: (base64: string) =>
+        loadFromBytes(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))),
       startDisaster: (kind: string, x: number, y: number) =>
         startDisaster(simWorld, content, content.getBalance(), disasterRegistry, kind, x, y),
     };

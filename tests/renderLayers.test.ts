@@ -436,3 +436,27 @@ function bakedState(renderer: ChunkRenderer, chunkIndex: number): { baked: boole
   const chunk = chunks[chunkIndex];
   return { baked: chunk?.baked ?? false, stale: chunk?.stale ?? true };
 }
+
+describe('barva zóny pod novým domem', () => {
+  it('dům vyrostlý v zóně přepeče chunk pod sebou, i když se dlaždice nezměnily', () => {
+    // Růst zóny hlásí dům jen v `dirty.buildings`. Dřív se chunk nepřepekl
+    // a pod domem zůstala barva zóny, která vykukovala po okrajích parcely.
+    const world = createWorld(1, undefined, 128);
+    const renderer = new ChunkRenderer(world, new Container());
+    const view = viewportFor(0, 0, 1, 1280, 720);
+    renderer.cull(view);
+    const x = 1;
+    const y = 1;
+    const chunkIndex = (renderer as unknown as { chunkIndexFor(x: number, y: number): number }).chunkIndexFor(x, y);
+    expect(bakedState(renderer, chunkIndex)).toEqual({ baked: true, stale: false });
+
+    const id = 7;
+    world.layers.buildingId[y * world.size + x] = id;
+    world.buildings.set(id, { id, x, y } as unknown as WorldState['buildings'] extends Map<number, infer B> ? B : never);
+    const dirty = createDirtySet();
+    dirty.buildings.add(id);
+    renderer.update(dirty);
+
+    expect(bakedState(renderer, chunkIndex).stale).toBe(true);
+  });
+});

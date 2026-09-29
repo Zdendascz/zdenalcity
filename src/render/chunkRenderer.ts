@@ -262,6 +262,8 @@ export class ChunkRenderer {
    * Chunky upečené právě teď. Sleduje se to kvůli měření — bez čísla by
    * nešlo poznat, jestli uvolňování vůbec funguje.
    */
+  /** Chunky pod každou budovou, ať se po zbourání ví, co přepéct. */
+  private readonly buildingChunks = new Map<number, number[]>();
   private bakedCount = 0;
   /**
    * Kolik pečení proběhlo celkem. Monotónní — na rozdíl od `bakedCount` se
@@ -430,6 +432,48 @@ export class ChunkRenderer {
       const chunk = this.chunks[this.chunkIndexFor(x, y)];
       if (chunk) chunk.stale = true;
     }
+
+    /*
+     * Barva zóny se kreslí jen na volné parcele, takže se chunk musí
+     * přepéct, i když se změnila **jen budova**. Růst zóny hlásí nový dům
+     * v `dirty.buildings`, ne v `dirty.tiles` — a pod domem pak zůstala
+     * barva zóny a vykukovala po okrajích pozemku (hlásil autor). U zbourané
+     * budovy už půdorys ve světě není, proto se pamatuje, kde stála.
+     */
+    for (const id of dirty.buildings) {
+      const building = this.world.buildings.get(id);
+      const previous = this.buildingChunks.get(id);
+      if (previous) for (const index of previous) this.markStale(index);
+      if (!building) {
+        this.buildingChunks.delete(id);
+        continue;
+      }
+      const covered = new Set<number>();
+      const [width, depth] = this.footprintOf(id, building);
+      for (let dy = 0; dy < depth; dy++) {
+        for (let dx = 0; dx < width; dx++) {
+          covered.add(this.chunkIndexFor(building.x + dx, building.y + dy));
+        }
+      }
+      for (const index of covered) this.markStale(index);
+      this.buildingChunks.set(id, [...covered]);
+    }
+  }
+
+  private markStale(chunkIndex: number): void {
+    const chunk = this.chunks[chunkIndex];
+    if (chunk) chunk.stale = true;
+  }
+
+  /** Půdorys budovy podle dlaždic, které opravdu drží (vrstva `buildingId`). */
+  private footprintOf(id: number, building: { x: number; y: number }): [number, number] {
+    const size = this.world.size;
+    const ids = this.world.layers.buildingId;
+    let width = 1;
+    while (building.x + width < size && ids[building.y * size + building.x + width] === id) width++;
+    let depth = 1;
+    while (building.y + depth < size && ids[(building.y + depth) * size + building.x] === id) depth++;
+    return [width, depth];
   }
 
   private redraw(chunkIndex: number): void {
