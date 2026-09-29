@@ -613,7 +613,13 @@ export class ChunkRenderer {
     // splněná a nemá co ukazovat — od chvíle, kdy je krycí, by se pod domem
     // prostíral barevný koberec a z města byla mozaika. Rozhodnutí autora:
     // „ty barvy zón jen tam, kde v té parcele není budova".
-    const empty = (this.world.layers.buildingId[tileIndex] ?? 0) === 0;
+    //
+    // A ani pod silnicí: zóna na dlaždici zůstane, i když se přes ni postaví
+    // vozovka, a ta dlaždici nepokryje celou — barva pak vykukovala u krajů
+    // silnic a před zastávkou (hlásil autor).
+    const empty =
+      (this.world.layers.buildingId[tileIndex] ?? 0) === 0 &&
+      (this.world.layers.road[tileIndex] ?? 0) === 0;
     if (zone !== 0 && zoneColor !== undefined && (empty || underground)) {
       // Pod zemí zůstává zóna vidět jen jako náznak: je to hlavní důvod, proč
       // se tam potrubí vede, takže úplně zmizet nesmí.
