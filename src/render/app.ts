@@ -1288,6 +1288,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       PART_SCALE,
     );
     buildingRenderer.setLamp(parts.get('street_lamp'));
+    buildingRenderer.setPoles(parts.get('wood_pole'), parts.get('pylon'));
     const look = (sheet: string, i: number, weight: number): VehicleLook | undefined => {
       const front = parts.get(`${sheet}_front_${i}`);
       const rear = parts.get(`${sheet}_rear_${i}`);

@@ -376,8 +376,13 @@ function widenBuildingIdLayer(layers: Uint8Array, size: number): Uint8Array {
  * Do verze 12 vedla proud silnice. Od 13 nevede nic kromě bloků zón a budov
  * a vedení, které hráč natáhne. Starému městu by bez náhrady zhasly všechny
  * čtvrti, které k elektrárně vedla jen ulice — proto migrace položí vedení
- * **pod každou silnici** (rozhodnutí autora). Rozehrané město svítí dál
- * a hráč ho může přestavět.
+ * tam, kde ulice bloky spojovala (rozhodnutí autora). Rozehrané město svítí
+ * dál a hráč ho může přestavět.
+ *
+ * **Jen spojky, ne pod každou silnici.** První verze položila vedení pod celou
+ * síť ulic a autor to viděl jako dráty „vedoucí po silnici". Teď se v každé
+ * souvislé síti ulic spojí bloky zón a budov, které k ní přiléhají, nejkratšími
+ * cestami po ní — obvykle jeden úsek přes ulici.
  *
  * Vedení je **vysoké napětí**. Nízké by u elektrárny neslo spotřebu celého
  * města, přetížilo by se a zhasla by většina čtvrtí — přesně to, čemu má
@@ -390,11 +395,11 @@ const migrateV12ToV13: Migration = (save) => ({
 });
 
 /**
- * Připíše vrstvu vedení: 2 (`WIRE.high`) tam, kde je silnice.
+ * Připíše vrstvu vedení se spojkami bloků po silnicích (hodnota 2, `WIRE.high`).
  *
  * Rozložení verze 12 natvrdo: `terrain`, `zone`, `road` po bajtu,
  * `buildingId` čtyři bajty, `power` a `pipe` po bajtu — devět bajtů na
- * dlaždici. Silnice je třetí vrstva.
+ * dlaždici.
  */
 function appendWiresUnderRoads(layers: Uint8Array, size: number): Uint8Array {
   const cells = size * size;
@@ -403,12 +408,124 @@ function appendWiresUnderRoads(layers: Uint8Array, size: number): Uint8Array {
 
   const out = new Uint8Array(cells * (BYTES_PER_TILE_V12 + 1));
   out.set(layers, 0);
-  const road = cells * 2;
   const wire = cells * BYTES_PER_TILE_V12;
-  for (let i = 0; i < cells; i++) {
-    if ((layers[road + i] ?? 0) !== 0) out[wire + i] = 2;
-  }
+  for (const tile of roadLinks(layers, size)) out[wire + tile] = 2;
   return out;
+}
+
+/**
+ * Dlaždice silnic, přes které se mají spojit bloky (verze 12 → 13).
+ *
+ * Bloky jsou souvislé plochy zón a budov. V každé souvislé síti ulic se
+ * vezmou bloky, které k ní přiléhají, a propojí se jako strom: z prvního
+ * bloku se hledá do šířky po silnici nejbližší další blok, cesta k němu se
+ * označí, blok se přidá ke stromu a hledá se dál. Deterministické (P2).
+ */
+export function roadLinks(layers: Uint8Array, size: number): number[] {
+  const cells = size * size;
+  const zone = layers.subarray(cells, cells * 2);
+  const road = layers.subarray(cells * 2, cells * 3);
+  const ids = new DataView(layers.buffer, layers.byteOffset + cells * 3, cells * 4);
+  const parcel = (t: number): boolean => (zone[t] ?? 0) !== 0 || ids.getUint32(t * 4, true) !== 0;
+  const isRoad = (t: number): boolean => (road[t] ?? 0) !== 0;
+  const neighbours = (t: number): number[] => {
+    const x = t % size;
+    const y = (t - x) / size;
+    const out: number[] = [];
+    if (y > 0) out.push(t - size);
+    if (x < size - 1) out.push(t + 1);
+    if (y < size - 1) out.push(t + size);
+    if (x > 0) out.push(t - 1);
+    return out;
+  };
+
+  // Bloky: označení souvislých ploch parcel.
+  const block = new Int32Array(cells).fill(-1);
+  let blocks = 0;
+  for (let t = 0; t < cells; t++) {
+    if (!parcel(t) || block[t] !== -1) continue;
+    const stack = [t];
+    block[t] = blocks;
+    while (stack.length > 0) {
+      const at = stack.pop()!;
+      for (const n of neighbours(at)) {
+        if (block[n] === -1 && parcel(n)) {
+          block[n] = blocks;
+          stack.push(n);
+        }
+      }
+    }
+    blocks++;
+  }
+
+  const links: number[] = [];
+  const seenRoad = new Uint8Array(cells);
+  for (let start = 0; start < cells; start++) {
+    if (!isRoad(start) || seenRoad[start] === 1) continue;
+    // Jedna souvislá síť ulic a bloky, které k ní přiléhají.
+    const region: number[] = [];
+    const touching = new Set<number>();
+    const stack = [start];
+    seenRoad[start] = 1;
+    while (stack.length > 0) {
+      const at = stack.pop()!;
+      region.push(at);
+      for (const n of neighbours(at)) {
+        if (isRoad(n) && seenRoad[n] === 0) {
+          seenRoad[n] = 1;
+          stack.push(n);
+        } else if (block[n] !== -1) {
+          touching.add(block[n]!);
+        }
+      }
+    }
+    if (touching.size < 2) continue;
+
+    // Strom: z nejmenšího bloku postupně k nejbližšímu dalšímu.
+    const joined = new Set<number>([Math.min(...touching)]);
+    const inTree = new Uint8Array(cells);
+    while (joined.size < touching.size) {
+      // Do šířky z dlaždic silnice, které sousedí se stromem.
+      const parent = new Int32Array(cells).fill(-2);
+      const queue: number[] = [];
+      for (const t of region) {
+        const nextToTree =
+          inTree[t] === 1 || neighbours(t).some((n) => block[n] !== -1 && joined.has(block[n]!));
+        if (nextToTree) {
+          parent[t] = -1;
+          queue.push(t);
+        }
+      }
+      let found = -1;
+      let foundBlock = -1;
+      for (let head = 0; head < queue.length && found < 0; head++) {
+        const at = queue[head]!;
+        for (const n of neighbours(at)) {
+          if (block[n] !== -1 && !joined.has(block[n]!) && touching.has(block[n]!)) {
+            found = at;
+            foundBlock = block[n]!;
+            break;
+          }
+        }
+        if (found >= 0) break;
+        for (const n of neighbours(at)) {
+          if (isRoad(n) && parent[n] === -2) {
+            parent[n] = at;
+            queue.push(n);
+          }
+        }
+      }
+      if (found < 0) break;
+      for (let t = found; t >= 0; t = parent[t]!) {
+        if (inTree[t] === 0) {
+          inTree[t] = 1;
+          links.push(t);
+        }
+      }
+      joined.add(foundBlock);
+    }
+  }
+  return links.sort((a, b) => a - b);
 }
 
 /** Klíč = verze, ze které se migruje. */

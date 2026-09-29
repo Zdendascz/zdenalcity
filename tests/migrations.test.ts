@@ -258,7 +258,7 @@ describe('fixtury savů', () => {
     expect(countViolations(world.cornerHeight)).toBe(0);
   });
 
-  it('migrace v12 → v13 položí vedení pod každou silnici a nic jiného nepohne (T129)', () => {
+  it('migrace v12 → v13 položí vedení jen jako spojky bloků po silnicích (T129)', () => {
     const v12 = Object.entries(fixtures).find(([path]) => path.includes('v12.city'));
     expect(v12).toBeDefined();
     if (!v12) return;
@@ -272,15 +272,21 @@ describe('fixtury savů', () => {
     expect(after.layers.byteLength).toBe(expectedLayersByteLength(MAP_SIZE));
     // Stávající vrstvy beze změny…
     expect([...after.layers.subarray(0, cells * 9)]).toEqual([...before.layers]);
-    // …a vedení (vysoké napětí) přesně tam, kde je silnice.
+    // …vedení (vysoké napětí) jen na silnici a ne pod každou.
     const road = before.layers.subarray(cells * 2, cells * 3);
     const wire = after.layers.subarray(cells * 9);
     let roads = 0;
+    let wires = 0;
     for (let i = 0; i < cells; i++) {
       if ((road[i] ?? 0) !== 0) roads++;
-      expect(wire[i]).toBe((road[i] ?? 0) !== 0 ? 2 : 0);
+      if ((wire[i] ?? 0) !== 0) {
+        wires++;
+        expect(wire[i]).toBe(2);
+        expect(road[i]).not.toBe(0);
+      }
     }
-    expect(roads).toBeGreaterThan(0);
+    expect(wires).toBeGreaterThan(0);
+    expect(wires).toBeLessThan(roads);
   });
 
   it('migrace v11 → v12 rozšíří buildingId na čtyři bajty a nic jiného nepohne', () => {

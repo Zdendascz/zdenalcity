@@ -344,6 +344,15 @@
         34
       ]
     },
+    "pylon": {
+      "file": "pylon.png",
+      "width": 105,
+      "height": 248,
+      "anchor": [
+        53,
+        248
+      ]
+    },
     "rotor": {
       "file": "rotor.png",
       "width": 305,
@@ -658,6 +667,15 @@
       "anchor": [
         6,
         37
+      ]
+    },
+    "wood_pole": {
+      "file": "wood_pole.png",
+      "width": 32,
+      "height": 120,
+      "anchor": [
+        16,
+        120
       ]
     }
   }

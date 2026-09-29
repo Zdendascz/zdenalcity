@@ -21,7 +21,7 @@ import { depthOrder } from './depth';
 import type { DepthBox } from './depth';
 import { decorDensity, decorHere, decorPick, decorShift, decorTiles, rubbleSlope } from './decor';
 import type { RubbleSlope, TerrainDecor } from './decor';
-import { index, ROAD, TERRAIN } from '@/sim/layers';
+import { index, ROAD, TERRAIN, WIRE } from '@/sim/layers';
 import { houseSides } from './streets';
 import { SIDEWALK, VERGE } from './roadDetails';
 import { ROAD_E, ROAD_N, ROAD_S, ROAD_W } from './roads';
@@ -81,6 +81,15 @@ interface Spinner {
 
 /** Díly se kreslí ve čtyřnásobku, stejně jako budovy. */
 const PART_SCALE = 4;
+
+/**
+ * Výška úchytů drátů nad zemí v patrech (16 px): nízké napětí na vrcholu
+ * dřevěného sloupu (30 px), vysoké ve dvou úrovních ramen stožáru (62 px).
+ */
+const WIRE_HEIGHTS: Record<number, readonly number[]> = {
+  [WIRE.low]: [1.75],
+  [WIRE.high]: [2.8, 2.0],
+};
 
 /** Pořadí strany v id lampy: dlaždice × 4 + strana. */
 const ARM_INDEX: Record<number, number> = { [ROAD_N]: 0, [ROAD_E]: 1, [ROAD_S]: 2, [ROAD_W]: 3 };
@@ -238,6 +247,9 @@ export class BuildingRenderer {
   private motion = true;
   /** Hloubka pro auta podle dlaždice. Maže se při každém přeřazení. */
   private readonly depthCache = new Map<number, number>();
+  /** Sloupy vedení (T129). */
+  private lowPole: LoadedPart | undefined;
+  private pylon: LoadedPart | undefined;
   /** Obrázek lampy (T122). Bez něj se lampy nestaví. */
   private lamp: LoadedPart | undefined;
   private lampsStale = false;
@@ -474,13 +486,136 @@ export class BuildingRenderer {
       // nejsou. Průchod mapou je levný a děje se jen při stavbě nebo bourání.
       this.rebuildRubble();
       this.rebuildLamps();
+      this.rebuildWires();
     } else if (dirty.buildings.size > 0) {
       // Dům povyrostl → u silnice přibude chodník a s ním lampa. Sbírá se
       // to stejně jako u vozovky, nejvýš dvakrát za sekundu.
       this.lampsStale = true;
     }
-    if (this.lampsStale && performance.now() - this.lampsBuilt > 500) this.rebuildLamps();
+    if (this.lampsStale && performance.now() - this.lampsBuilt > 500) {
+      this.rebuildLamps();
+      // Dráty nízkého napětí se chytají domů a zón — nový dům je přesměruje.
+      this.rebuildWires();
+    }
     this.reorder();
+  }
+
+  /** Obrázky sloupů vedení (T129). Bez nich se vedení kreslí jen dráty. */
+  setPoles(lowPole: LoadedPart | undefined, pylon: LoadedPart | undefined): void {
+    this.lowPole = lowPole;
+    this.pylon = pylon;
+    this.rebuildWires();
+    this.reorder();
+  }
+
+  /**
+   * Elektrické vedení na mapě (T129). Autor: „dráty musí být vidět, vysoké
+   * napětí musí být normálně sloupy, nízké musí vést od budovy k budově".
+   *
+   * Každá dlaždice vedení je jeden uzel řazený s domy: sloup (dřevěný, nebo
+   * ocelový stožár) a dráty k sousedům. Dráty vedou ke **každému sousednímu
+   * vedení** a u nízkého napětí i **k sousední zóně či budově** — tím je vidět,
+   * že vedení spojuje bloky. Na silnici ani na budově sloup nestojí: drát
+   * tam jen visí přes ni mezi sloupy nebo domy po stranách.
+   *
+   * Id jsou za lampami: `-(6 · plocha + dlaždice + 1)`.
+   */
+  private rebuildWires(): void {
+    const size = this.world.size;
+    const cells = size * size;
+    const floor = -6 * cells;
+    for (const id of [...this.views.keys()]) {
+      if (id <= floor && id > floor - cells - 1) this.remove(id);
+    }
+    const wire = this.world.layers.wire;
+    const road = this.world.layers.road;
+    const ids = this.world.layers.buildingId;
+    const zone = this.world.layers.zone;
+    const typeAt = (x: number, y: number): number =>
+      x < 0 || y < 0 || x >= size || y >= size ? WIRE.none : (wire[index(x, y, size)] ?? WIRE.none);
+    const parcelAt = (x: number, y: number): boolean => {
+      if (x < 0 || y < 0 || x >= size || y >= size) return false;
+      const t = index(x, y, size);
+      return (ids[t] ?? 0) !== 0 || (zone[t] ?? 0) !== 0;
+    };
+    const ground = (gx: number, gy: number): number => groundHeightAt(this.world.cornerHeight, gx, gy);
+
+    for (let tile = 0; tile < cells; tile++) {
+      const type = wire[tile] ?? WIRE.none;
+      if (type === WIRE.none) continue;
+      const x = tile % size;
+      const y = (tile - x) / size;
+      const node = new Container();
+      const base = ground(x + 0.5, y + 0.5);
+      const heights = WIRE_HEIGHTS[type] ?? WIRE_HEIGHTS[WIRE.low]!;
+      const vertical = typeAt(x, y - 1) !== WIRE.none || typeAt(x, y + 1) !== WIRE.none;
+      const horizontal = typeAt(x - 1, y) !== WIRE.none || typeAt(x + 1, y) !== WIRE.none;
+
+      const cables = new Graphics();
+      const color = type === WIRE.high ? 0x3a3d42 : 0x2b2622;
+      const width = type === WIRE.high ? 0.9 : 0.7;
+      const drawSpan = (fx: number, fy: number, fz: number, tx: number, ty: number, tz: number): void => {
+        const a = gridToScreen(fx, fy, fz);
+        const b = gridToScreen(tx, ty, tz);
+        // Průvěs: drát mezi úchyty lehce klesá.
+        const sag = Math.hypot(b.x - a.x, b.y - a.y) * 0.08;
+        cables
+          .moveTo(a.x, a.y)
+          .quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 + sag, b.x, b.y)
+          .stroke({ width, color, alpha: 0.9 });
+      };
+      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        const other = typeAt(nx, ny);
+        if (other !== WIRE.none) {
+          // K sousednímu vedení do půlky cesty — soused dokreslí zbytek.
+          const mx = x + 0.5 + dx * 0.5;
+          const my = y + 0.5 + dy * 0.5;
+          const otherHeights = WIRE_HEIGHTS[other] ?? heights;
+          heights.forEach((h, i) => {
+            const mid = (h + (otherHeights[i] ?? otherHeights[0] ?? h)) / 2;
+            drawSpan(x + 0.5, y + 0.5, base + h, mx, my, ground(mx, my) + mid);
+          });
+        } else if (parcelAt(nx, ny)) {
+          // Přípojka do bloku: drát k domu nebo do zóny za sousední hranou.
+          const px = x + 0.5 + dx * 0.9;
+          const py = y + 0.5 + dy * 0.9;
+          drawSpan(x + 0.5, y + 0.5, base + heights[0]!, px, py, ground(px, py) + 0.9);
+        }
+      }
+      node.addChild(cables);
+
+      // Sloup jen na volné dlaždici — ne uprostřed silnice ani v domě.
+      // A ne na každé: na rovném úseku stojí vysoké napětí na každé třetí,
+      // nízké na každé druhé dlaždici; na konci, v zatáčce a na odbočce vždy.
+      const free = (road[tile] ?? ROAD.none) === ROAD.none && (ids[tile] ?? 0) === 0;
+      const straight = (vertical && !horizontal) || (horizontal && !vertical);
+      const through =
+        straight &&
+        ((vertical && typeAt(x, y - 1) !== WIRE.none && typeAt(x, y + 1) !== WIRE.none) ||
+          (horizontal && typeAt(x - 1, y) !== WIRE.none && typeAt(x + 1, y) !== WIRE.none));
+      const step = type === WIRE.high ? 3 : 2;
+      const spaced = !through || (vertical ? y : x) % step === 0;
+      const part = type === WIRE.high ? this.pylon : this.lowPole;
+      if (free && spaced && part) {
+        const pole = new Sprite(part.texture);
+        pole.anchor.set(part.anchor[0] / part.texture.width, part.anchor[1] / part.texture.height);
+        // Ramena stožáru jsou na obrázku podél osy x, tedy napříč vedení
+        // podél osy y. Vedení podél osy x potřebuje stožár zrcadlově.
+        const flip = type === WIRE.high && horizontal && !vertical ? -1 : 1;
+        pole.scale.set(flip / PART_SCALE, 1 / PART_SCALE);
+        const at = gridToScreen(x + 0.5, y + 0.5, base);
+        pole.position.set(at.x, at.y);
+        // Sloup pod dráty — dráty začínají u jeho vrcholu.
+        node.addChildAt(pole, 0);
+      }
+
+      const id = floor - tile - 1;
+      this.container.addChild(node);
+      this.views.set(id, node as unknown as Sprite);
+      this.boxes.set(id, { x, y, width: 1, depth: 1, base });
+    }
   }
 
   /** Nastaví obrázek lampy (T122) a rozestaví lampy znovu. */
@@ -503,7 +638,8 @@ export class BuildingRenderer {
     const size = this.world.size;
     const offset = 2 * size * size;
     for (const id of [...this.views.keys()]) {
-      if (id <= -offset) this.remove(id);
+      // Jen pásmo lamp — za ním bydlí vedení (T129).
+      if (id <= -offset && id > -6 * size * size) this.remove(id);
     }
     this.lampsStale = false;
     this.lampsBuilt = performance.now();

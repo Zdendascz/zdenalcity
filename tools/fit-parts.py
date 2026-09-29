@@ -307,16 +307,25 @@ def fit_rotor(write: bool, index: dict) -> None:
         small.save(OUT / 'rotor.png', optimize=True)
 
 
-def fit_lamp(write: bool, index: dict) -> None:
-    image = tight(Image.open(RAW / 'street_lamp.png').convert('RGBA'))
-    factor = LAMP_HEIGHT * SCALE / image.size[1]
-    size = (max(1, round(image.size[0] * factor)), LAMP_HEIGHT * SCALE)
+def fit_upright(name: str, height: int, write: bool, index: dict) -> None:
+    """Předmět, který stojí na patě: lampa, sloup, stožár. `height` px při zoomu 1."""
+    image = tight(Image.open(RAW / f'{name}.png').convert('RGBA'))
+    factor = height * SCALE / image.size[1]
+    size = (max(1, round(image.size[0] * factor)), height * SCALE)
     small = image.resize(size, Image.LANCZOS)
     anchor = anchor_for(small, 'feet')
-    index['street_lamp'] = {'file': 'street_lamp.png', 'width': size[0], 'height': size[1], 'anchor': list(anchor)}
-    print(f'  street_lamp: {size[0]}×{size[1]} kotva {anchor}')
+    index[name] = {'file': f'{name}.png', 'width': size[0], 'height': size[1], 'anchor': list(anchor)}
+    print(f'  {name}: {size[0]}×{size[1]} kotva {anchor}')
     if write:
-        small.save(OUT / 'street_lamp.png', optimize=True)
+        small.save(OUT / f'{name}.png', optimize=True)
+
+
+def fit_lamp(write: bool, index: dict) -> None:
+    fit_upright('street_lamp', LAMP_HEIGHT, write, index)
+
+
+# Sloupy vedení (T129) — výška při zoomu 1. Patro má 16 px.
+UPRIGHTS = {'wood_pole': 30, 'pylon': 62}
 
 
 def fit_material(name: str, write: bool, index: dict) -> None:
@@ -402,6 +411,9 @@ def main() -> int:
         fit_rotor(write, index)
     if 'street_lamp' in have:
         fit_lamp(write, index)
+    for name, height in UPRIGHTS.items():
+        if name in have:
+            fit_upright(name, height, write, index)
     if 'sidewalk' in have:
         fit_material('sidewalk', write, index)
 

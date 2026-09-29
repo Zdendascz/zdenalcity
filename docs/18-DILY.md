@@ -520,6 +520,30 @@ ending in a flat elongated lamp housing. Nothing else in the image. The lamp
 fills the height of the image.
 ```
 
+#### `pylon`
+Plátno: 1024x1536
+Kvalita: high
+
+```text
+A single Czechoslovak high-voltage transmission tower of the 1980s standing on
+its own: a tall grey steel lattice pylon (Danube type) with two cross-arms and
+insulator strings hanging from their ends, on four small concrete footings.
+No wires attached, nothing else in the image. The pylon fills the height of
+the image. Seen from the south-east at the isometric game angle.
+```
+
+#### `wood_pole`
+Plátno: 1024x1536
+Kvalita: medium
+
+```text
+A single Czechoslovak low-voltage wooden utility pole of the 1980s standing on
+its own: a straight dark brown creosoted wooden pole with a short steel
+cross-arm at the top carrying four small white ceramic insulators. No wires
+attached, nothing else in the image. The pole fills the height of the image.
+Seen from the south-east at the isometric game angle.
+```
+
 #### `sidewalk`
 Plátno: 1024x1024
 Kvalita: medium
