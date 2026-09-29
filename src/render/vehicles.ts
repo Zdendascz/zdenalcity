@@ -28,8 +28,11 @@ import { gridToScreen } from './projection';
 const DX = [0, 1, 0, -1] as const;
 const DY = [-1, 0, 1, 0] as const;
 
-/** Rychlost v dlaždicích za sekundu při 1× podle typu silnice. */
-const SPEED = [0, 0.9, 1.3, 2.1] as const;
+/**
+ * Rychlost v dlaždicích za sekundu při 1× podle typu silnice.
+ * O pětinu pomalejší než původně (0,9 / 1,3 / 2,1) — přání autora.
+ */
+const SPEED = [0, 0.72, 1.04, 1.68] as const;
 /** Kam se jezdí vpravo: posun od osy v podílu dlaždice. Dálnice má dva pruhy. */
 const LANES: readonly (readonly number[])[] = [[], [0.09], [0.13], [0.11, 0.26]];
 
