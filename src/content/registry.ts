@@ -119,6 +119,11 @@ export interface PartImage {
   readonly anchor: readonly [number, number];
   readonly scale: number;
   readonly radius?: number;
+  /**
+   * O kolik (radiány) obrázek zkosit, aby podélná osa vozidla ležela na
+   * izometrické ose. Generátor kreslí auta pod ~20° místo 26,6° (T124).
+   */
+  readonly skew?: number;
 }
 
 export interface SourceInfo {

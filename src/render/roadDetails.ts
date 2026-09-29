@@ -63,6 +63,21 @@ function lineV(u: number, from: number, to: number, width = LINE): UV[] {
   return rect(u - width / 2, Math.min(from, to), u + width / 2, Math.max(from, to));
 }
 
+/** Obecná úsečka mezi dvěma body — šikmá krajnice rozšiřujícího se ramene. */
+function segment(from: UV, to: UV, width = LINE): UV[] {
+  const du = to[0] - from[0];
+  const dv = to[1] - from[1];
+  const length = Math.hypot(du, dv) || 1;
+  const nu = (-dv / length) * (width / 2);
+  const nv = (du / length) * (width / 2);
+  return [
+    [from[0] + nu, from[1] + nv],
+    [to[0] + nu, to[1] + nv],
+    [to[0] - nu, to[1] - nv],
+    [from[0] - nu, from[1] - nv],
+  ];
+}
+
 /** Úsečka ve směru `u` (západ–východ) na pozici `v`. */
 function lineU(v: number, from: number, to: number, width = LINE): UV[] {
   return rect(Math.min(from, to), v - width / 2, Math.max(from, to), v + width / 2);
@@ -93,6 +108,8 @@ export interface MarkingOptions {
   readonly edges: boolean;
   /** Přechod pro chodce na ramenech, která vedou do křižovatky. */
   readonly zebraArms?: number;
+  /** Šířka ramen na hraně dlaždice (S, V, J, Z), když se k sousedovi rozšiřují. */
+  readonly armEdges?: readonly number[];
 }
 
 const ARMS = [ROAD_N, ROAD_E, ROAD_S, ROAD_W] as const;
@@ -149,13 +166,31 @@ export function roadMarkings(mask: number, options: MarkingOptions): UV[][] {
   if (options.edges) {
     const a = lo + EDGE_INSET;
     const b = hi - EDGE_INSET;
-    // Krajnice podél ramen.
+    // Krajnice podél ramen. Když se rameno k širšímu sousedovi rozšiřuje
+    // (`armEdges`), jde krajnice šikmo s ním — jinak by na hranici typů
+    // udělala schod.
+    const outer = (side: number): [number, number] => {
+      const h = (options.armEdges?.[side] ?? options.width) / 2;
+      return [0.5 - h + EDGE_INSET, 0.5 + h - EDGE_INSET];
+    };
     for (const arm of arms) {
-      const toEdge = junction ? (arm === ROAD_N || arm === ROAD_W ? lo : hi) : arm === ROAD_N || arm === ROAD_W ? a : b;
-      if (arm === ROAD_N) out.push(lineV(a, 0, toEdge), lineV(b, 0, toEdge));
-      if (arm === ROAD_S) out.push(lineV(a, toEdge, 1), lineV(b, toEdge, 1));
-      if (arm === ROAD_W) out.push(lineU(a, 0, toEdge), lineU(b, 0, toEdge));
-      if (arm === ROAD_E) out.push(lineU(a, toEdge, 1), lineU(b, toEdge, 1));
+      const inner = junction ? (arm === ROAD_N || arm === ROAD_W ? lo : hi) : arm === ROAD_N || arm === ROAD_W ? a : b;
+      if (arm === ROAD_N) {
+        const [ea, eb] = outer(0);
+        out.push(segment([a, inner], [ea, 0]), segment([b, inner], [eb, 0]));
+      }
+      if (arm === ROAD_E) {
+        const [ea, eb] = outer(1);
+        out.push(segment([inner, a], [1, ea]), segment([inner, b], [1, eb]));
+      }
+      if (arm === ROAD_S) {
+        const [ea, eb] = outer(2);
+        out.push(segment([a, inner], [ea, 1]), segment([b, inner], [eb, 1]));
+      }
+      if (arm === ROAD_W) {
+        const [ea, eb] = outer(3);
+        out.push(segment([inner, a], [0, ea]), segment([inner, b], [0, eb]));
+      }
     }
     // A kolem středu tam, kam žádné rameno nevede.
     if (!junction) {

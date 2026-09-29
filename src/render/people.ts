@@ -17,8 +17,9 @@ import { tilesIn } from './vehicles';
  *   vyprázdní. Kdy spoj přijede, simulace **neví** — zná jen počet vozů
  *   a cestujících linky —, takže i příjezd je kosmetika.
  * - **Chodci**: k zastávce a metru přicházejí lidé z okolí a mizí ve vchodu,
- *   jiní z něj odcházejí. Jdou do L, nejdřív po jedné ose, pak po druhé,
- *   stejnými čtyřmi směry jako auta.
+ *   jiní z něj odcházejí. Jdou **po silnici**, podél jejího kraje — do T124
+ *   chodili do L přímo, a tedy i přes domy (hlásil autor). Poslední krok
+ *   vede ze silnice k parcele.
  *
  * Jen vzhled, na simulaci nesahá a `world.rng` nepoužívá.
  */
@@ -35,14 +36,21 @@ export interface PeopleLooks {
   readonly sit: readonly PersonImage[];
 }
 
-/** Vchod budovy, ke kterému se chodí. Mřížkové souřadnice. */
+/** Budova, ke které se chodí: parcela v mřížce. */
 export interface Entrance {
   readonly id: number;
   readonly x: number;
   readonly y: number;
+  readonly width: number;
+  readonly depth: number;
   /** Jak často tam někdo přijde, relativně (metro víc než zastávka). */
   readonly busy: number;
 }
+
+const STEP_X = [0, 1, 0, -1] as const;
+const STEP_Y = [-1, 0, 1, 0] as const;
+/** Jak daleko od osy silnice chodec jde — u kraje, kde by byl chodník. */
+const WALK_SIDE = 0.4;
 
 /** Pod tímhle zoomem je člověk pixel. */
 export const PEOPLE_MIN_ZOOM = 0.9;
@@ -73,7 +81,11 @@ interface Bench {
 
 export class People {
   private readonly world: ReadonlyWorldView;
-  private readonly container = new Container();
+  /** Vrstva budov: lidé se řadí s domy stejně jako auta (T124). */
+  private readonly container: Container;
+  private readonly depthAt: (x: number, y: number) => number;
+  private readonly zIndexOf: (buildingId: number) => number;
+  private visible = true;
   private readonly random = motionRandom(0x9e0e);
   private looks: PeopleLooks = { front: [], rear: [], sit: [] };
   private readonly walkers: Walker[] = [];
@@ -81,13 +93,16 @@ export class People {
   private readonly clocks = new Map<number, number>();
   private enabled = true;
 
-  constructor(world: ReadonlyWorldView, parent: Container) {
+  constructor(
+    world: ReadonlyWorldView,
+    layer: Container,
+    depthAt: (x: number, y: number) => number,
+    zIndexOf: (buildingId: number) => number,
+  ) {
     this.world = world;
-    // Nad budovami: člověk na lavičce sedí **před** přístřeškem, a kdyby byl
-    // pod budovami, zakryl by ho obrázek zastávky, na které sedí.
-    this.container.zIndex = 850_000;
-    this.container.sortableChildren = true;
-    parent.addChild(this.container);
+    this.container = layer;
+    this.depthAt = depthAt;
+    this.zIndexOf = zIndexOf;
   }
 
   setLooks(looks: PeopleLooks): void {
@@ -101,7 +116,9 @@ export class People {
   }
 
   setVisible(visible: boolean): void {
-    this.container.visible = visible;
+    this.visible = visible;
+    for (const walker of this.walkers) walker.sprite.visible = visible;
+    for (const bench of this.benches.values()) for (const person of bench.sitting) if (person) person.visible = visible;
   }
 
   update(
@@ -113,7 +130,6 @@ export class People {
     entrances: readonly Entrance[],
   ): void {
     const hidden = !this.enabled || zoom < PEOPLE_MIN_ZOOM || this.looks.front.length === 0;
-    this.container.visible = !hidden;
     if (hidden) {
       if (this.walkers.length > 0 || this.benches.size > 0) this.clear();
       return;
@@ -181,7 +197,9 @@ export class People {
       sprite.anchor.set(look.anchor[0] / look.texture.width, look.anchor[1] / look.texture.height);
       sprite.scale.set((this.random() < 0.5 ? -1 : 1) / SCALE, 1 / SCALE);
       sprite.position.set(spot.x, spot.y);
-      sprite.zIndex = spot.y;
+      // Hned za svou zastávkou: před přístřeškem, pod domy vepředu.
+      sprite.zIndex = this.zIndexOf(id) + 0.6;
+      sprite.visible = this.visible;
       this.container.addChild(sprite);
       bench.sitting[i] = sprite;
     }
@@ -202,23 +220,89 @@ export class People {
       this.clocks.set(entrance.id, (2200 + this.random() * 3500) / entrance.busy);
       if (this.walkers.length >= MAX_WALKERS) continue;
 
-      // Odkud: bod dvě až tři dlaždice daleko, na kraji dlaždice — tam, kde
-      // by vedl chodník. Cesta do L: po jedné ose, pak po druhé.
-      const angle = Math.floor(this.random() * 4);
-      const far = 2 + this.random() * 1.5;
-      const side = (this.random() - 0.5) * 2.5;
-      const sx = entrance.x + (angle === 0 ? far : angle === 2 ? -far : side);
-      const sy = entrance.y + (angle === 1 ? far : angle === 3 ? -far : side);
-      const corner: [number, number] = this.random() < 0.5 ? [entrance.x, sy] : [sx, entrance.y];
+      const route = this.route(entrance);
+      if (route === null) continue;
       const toward = this.random() < 0.6;
-      const path: [number, number][] = toward
-        ? [[sx, sy], corner, [entrance.x, entrance.y]]
-        : [[entrance.x, entrance.y], corner, [sx, sy]];
+      const path = toward ? route.reverse() : route;
       const image = Math.floor(this.random() * Math.min(this.looks.front.length, this.looks.rear.length));
       const sprite = new Sprite();
+      sprite.visible = this.visible;
       this.container.addChild(sprite);
       this.walkers.push({ sprite, image, path, leg: 0, progress: 0, fadeIn: !toward, fadeOut: toward });
     }
+  }
+
+  /**
+   * Cesta od budovy po silnici: bod u parcely, pak podél silnice dvě až šest
+   * dlaždic daleko. `null`, když u budovy silnice není.
+   */
+  private route(entrance: Entrance): [number, number][] | null {
+    const size = this.world.size;
+    const road = this.world.layers.road;
+    const isRoad = (x: number, y: number): boolean =>
+      x >= 0 && y >= 0 && x < size && y < size && (road[y * size + x] ?? 0) !== 0;
+
+    // Silnice podél obvodu parcely.
+    const starts: [number, number][] = [];
+    for (let i = 0; i < entrance.width; i++) {
+      starts.push([entrance.x + i, entrance.y - 1], [entrance.x + i, entrance.y + entrance.depth]);
+    }
+    for (let j = 0; j < entrance.depth; j++) {
+      starts.push([entrance.x - 1, entrance.y + j], [entrance.x + entrance.width, entrance.y + j]);
+    }
+    const roads = starts.filter(([x, y]) => isRoad(x, y));
+    if (roads.length === 0) return null;
+    const [rx, ry] = roads[Math.floor(this.random() * roads.length)]!;
+
+    // Do šířky po silnici, nejvýš šest kroků; cíl je náhodná dlaždice
+    // aspoň dva kroky daleko.
+    const parent = new Map<number, number>([[ry * size + rx, -1]]);
+    let frontier = [ry * size + rx];
+    const far: number[] = [];
+    for (let depth = 1; depth <= 6 && frontier.length > 0; depth++) {
+      const next: number[] = [];
+      for (const tile of frontier) {
+        const x = tile % size;
+        const y = (tile - x) / size;
+        for (let dir = 0; dir < 4; dir++) {
+          const nx = x + STEP_X[dir]!;
+          const ny = y + STEP_Y[dir]!;
+          const key = ny * size + nx;
+          if (!isRoad(nx, ny) || parent.has(key)) continue;
+          parent.set(key, tile);
+          next.push(key);
+          if (depth >= 2) far.push(key);
+        }
+      }
+      frontier = next;
+    }
+    const goal = far.length > 0 ? far[Math.floor(this.random() * far.length)]! : ry * size + rx;
+    const tiles: number[] = [];
+    for (let tile = goal; tile !== -1; tile = parent.get(tile) ?? -1) tiles.push(tile);
+    tiles.reverse();
+
+    // Body: střed dlaždice posunutý ke kraji, vpravo od směru chůze.
+    const points: [number, number][] = [];
+    // Krok od budovy: nejbližší bod parcely k první dlaždici silnice.
+    const cx = Math.min(Math.max(rx + 0.5, entrance.x), entrance.x + entrance.width);
+    const cy = Math.min(Math.max(ry + 0.5, entrance.y), entrance.y + entrance.depth);
+    points.push([cx, cy]);
+    for (let k = 0; k < tiles.length; k++) {
+      const tile = tiles[k]!;
+      const x = tile % size;
+      const y = (tile - x) / size;
+      const ahead = tiles[k + 1] ?? tiles[k - 1];
+      const ax = ahead === undefined ? x : ahead % size;
+      const ay = ahead === undefined ? y : (ahead - ax) / size;
+      let dx = Math.sign(ax - x);
+      let dy = Math.sign(ay - y);
+      if (tiles[k + 1] === undefined) {
+        dx = -dx;
+        dy = -dy;
+      }
+      points.push([x + 0.5 - dy * WALK_SIDE, y + 0.5 + dx * WALK_SIDE]);
+    }
+    return points;
   }
 
   private moveWalkers(elapsed: number): void {
@@ -259,7 +343,8 @@ export class People {
       walker.sprite.scale.set(flip / SCALE, 1 / SCALE);
       const at = gridToScreen(gx, gy, groundHeightAt(this.world.cornerHeight, gx, gy));
       walker.sprite.position.set(at.x, at.y);
-      walker.sprite.zIndex = at.y;
+      const depth = this.depthAt(Math.floor(gx), Math.floor(gy)) + 0.5 + at.y * 1e-6;
+      if (Math.abs(walker.sprite.zIndex - depth) > 1e-3) walker.sprite.zIndex = depth;
       // Vynoří se z vchodu a zmizí v něm, ne že by se objevil z ničeho.
       const legs = walker.path.length - 1;
       const total = (walker.leg + walker.progress) / legs;

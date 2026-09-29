@@ -59,6 +59,7 @@ export interface LoadedPart {
   readonly texture: Texture;
   readonly anchor: readonly [number, number];
   readonly radius?: number;
+  readonly skew?: number;
 }
 
 /** Kouř, který má zrovna stoupat: bod ve světě a hustota. */
@@ -235,6 +236,8 @@ export class BuildingRenderer {
   private readonly baseScale = new Map<number, number>();
   /** Hýbou se budovy? Vypíná přepínač animací i `prefers-reduced-motion`. */
   private motion = true;
+  /** Hloubka pro auta podle dlaždice. Maže se při každém přeřazení. */
+  private readonly depthCache = new Map<number, number>();
   /** Obrázek lampy (T122). Bez něj se lampy nestaví. */
   private lamp: LoadedPart | undefined;
   private lampsStale = false;
@@ -329,6 +332,66 @@ export class BuildingRenderer {
       }
       tree.sprite.skew.x = swayAt(x, y, t, tree.phase);
     }
+  }
+
+  /**
+   * Vrstva, ve které se řadí budovy, stromy a lampy. Auta do ní přidávají
+   * své sprity, aby se řadila s domy (T124).
+   */
+  get layer(): Container {
+    return this.container;
+  }
+
+  /**
+   * Hloubka pro pohyblivý předmět na dlaždici `x, y`: nejvyšší `zIndex`
+   * mezi domy, stromy a lampami, které stojí **za** ní (celé severně nebo
+   * západně). Předmět s `depthAt + 0,5` se pak nakreslí přes ně a pod vším,
+   * co je vepředu.
+   *
+   * Hledá se jen v okně čtyř dlaždic zpět — dál už nic nesahá tak, aby
+   * překrylo auto. Výsledek se pamatuje, dokud se budovy nepřeřadí.
+   */
+  depthAt(x: number, y: number): number {
+    const size = this.world.size;
+    if (x < 0 || y < 0 || x >= size || y >= size) return 0;
+    const key = y * size + x;
+    const cached = this.depthCache.get(key);
+    if (cached !== undefined) return cached;
+    let best = 0;
+    const ids = this.world.layers.buildingId;
+    const lampBase = 2 * size * size;
+    for (let j = Math.max(0, y - 4); j <= y; j++) {
+      for (let i = Math.max(0, x - 4); i <= x; i++) {
+        const tile = j * size + i;
+        const id = ids[tile] ?? 0;
+        if (id > 0) {
+          const box = this.boxes.get(id);
+          const view = this.views.get(id);
+          if (box && view && (box.x + box.width <= x || box.y + box.depth <= y)) {
+            best = Math.max(best, view.zIndex);
+          }
+        }
+        // Strom, suť a lampy stojí na své dlaždici; za námi jsou, když je
+        // ta dlaždice celá severně nebo západně.
+        if (i < x || j < y) {
+          for (const other of [-(tile + 1), -(tile + 1 + size * size)]) {
+            const view = this.views.get(other);
+            if (view) best = Math.max(best, view.zIndex);
+          }
+          for (let side = 0; side < 4; side++) {
+            const view = this.views.get(-(lampBase + tile * 4 + side + 1));
+            if (view) best = Math.max(best, view.zIndex);
+          }
+        }
+      }
+    }
+    this.depthCache.set(key, best);
+    return best;
+  }
+
+  /** `zIndex` budovy, nebo 0. Lidé na lavičce se řadí hned za ni. */
+  zIndexOf(id: number): number {
+    return this.views.get(id)?.zIndex ?? 0;
   }
 
   /** Lavičky na zastávkách podle id budovy. Sedí na nich `People`. */
@@ -682,6 +745,7 @@ export class BuildingRenderer {
    * jinak by přes fasádu vedl pruh kamene.
    */
   private reorder(): void {
+    this.depthCache.clear();
     const order = depthOrder(this.boxes);
     for (let i = 0; i < order.length; i++) {
       const id = order[i]!;

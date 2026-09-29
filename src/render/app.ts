@@ -787,6 +787,7 @@ export async function loadParts(content: ContentRegistry): Promise<Map<string, L
             texture,
             anchor: part.anchor,
             ...(part.radius === undefined ? {} : { radius: part.radius }),
+            ...(part.skew === undefined ? {} : { skew: part.skew }),
           });
         })
         .catch(() => undefined),
@@ -1262,8 +1263,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const rear = parts.get(`${sheet}_rear_${i}`);
       if (front === undefined || rear === undefined) return undefined;
       return {
-        front: { texture: front.texture, anchor: front.anchor, scale: PART_SCALE },
-        rear: { texture: rear.texture, anchor: rear.anchor, scale: PART_SCALE },
+        front: { texture: front.texture, anchor: front.anchor, scale: PART_SCALE, skew: front.skew ?? 0 },
+        rear: { texture: rear.texture, anchor: rear.anchor, scale: PART_SCALE, skew: rear.skew ?? 0 },
         weight,
       };
     };
@@ -1287,15 +1288,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const waterGlints = new WaterGlints(world, worldContainer, app.renderer);
   const roadRenderer = new RoadRenderer(world, worldContainer);
 
-  // Auta (T115) jezdí nad vozovkou a pod domy — dům vepředu je zakryje,
-  // dům vzadu do silnice nezasahuje. Stejná úvaha jako u scén katastrof.
-  const vehicles = new Vehicles(
-    world,
-    worldContainer,
-    (roadType) => content.getBalance().traffic.roadTypes[roadType - 1]?.capacity ?? 0,
-  );
-  /** Vozidla služeb podle třídy (T118). Plní se, až se načtou díly. */
-  let serviceLooks = new Map<string, VehicleLook>();
 
   // Čtvercová síť leží **nad zemí a pod domy**, ze stejného důvodu jako
   // vozovka: je to hranice pozemku, ne kresba přes město. V podzemním pohledu
@@ -1307,6 +1299,17 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     worldContainer,
     createAppearanceLookup(content),
   );
+
+  // Auta (T115) se řadí **mezi budovy** (T124): ve vlastní vrstvě pod domy
+  // je na svahu ořízla podezdívka domu za nimi.
+  const vehicles = new Vehicles(
+    world,
+    buildingRenderer.layer,
+    (roadType) => content.getBalance().traffic.roadTypes[roadType - 1]?.capacity ?? 0,
+    (x, y) => buildingRenderer.depthAt(x, y),
+  );
+  /** Vozidla služeb podle třídy (T118). Plní se, až se načtou díly. */
+  let serviceLooks = new Map<string, VehicleLook>();
 
   // Tepelné mapy: barva říká **jak je na tom čtvrť**, ne jak velké je číslo.
   // Směr se proto zadává u každé zvlášť — u znečištění je vysoká hodnota zlá,
@@ -1379,7 +1382,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Plameny na každé hořící dlaždici (T120) a prach u paty tornáda.
   const fireLayer = new FireLayer(world, worldContainer);
   // Lidé u zastávek a metra (T118).
-  const people = new People(world, worldContainer);
+  const people = new People(
+    world,
+    buildingRenderer.layer,
+    (x, y) => buildingRenderer.depthAt(x, y),
+    (id) => buildingRenderer.zIndexOf(id),
+  );
   /** Vchody zastávek a metra. Přepočítává se jednou za vteřinu, ne za snímek. */
   let entrances: Entrance[] = [];
   let entrancesAge = Infinity;
@@ -1390,11 +1398,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const definition = content.get(building.definitionId);
       if (definition?.service?.class !== 'transit') continue;
       const [width, depth] = definition.footprint;
-      // Vchod na přední (jižní) hraně parcely, uprostřed.
       out.push({
         id,
-        x: building.x + width / 2,
-        y: building.y + depth,
+        x: building.x,
+        y: building.y,
+        width,
+        depth,
         busy: building.definitionId === 'vanilla:metro_station' ? 2.5 : 1,
       });
     }

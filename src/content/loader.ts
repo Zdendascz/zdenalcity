@@ -290,6 +290,7 @@ export function buildParts(
       anchor,
       scale,
       ...(typeof entry['radius'] === 'number' ? { radius: entry['radius'] } : {}),
+      ...(typeof entry['skew'] === 'number' ? { skew: entry['skew'] } : {}),
     };
   }
   return out;

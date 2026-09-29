@@ -144,6 +144,13 @@ export class RoadRenderer {
       const points = tileQuad(x, y, corners);
       const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
       const width = ROAD_WIDTHS[type] ?? 0.5;
+      // Šířka ramen na hraně: k širšímu sousedovi se rameno rozšíří (T124).
+      const edges = [
+        [0, -1],
+        [1, 0],
+        [0, 1],
+        [-1, 0],
+      ].map(([dx, dy]) => Math.max(width, ROAD_WIDTHS[this.roadType(x + dx!, y + dy!)] ?? 0));
 
       // Most je konstrukce nad vodou, ne asfalt na zemi: kreslí se barvou, ať
       // je poznat, kde silnice opouští břeh (§7 fáze 3).
@@ -189,13 +196,13 @@ export class RoadRenderer {
       // celého tvaru bez čar po vnitřních spárách. Most má obrubu taky —
       // je to okraj betonové desky.
       {
-        for (const polygon of roadPolygons(points, mask, Math.min(1, width + KERB))) {
+        for (const polygon of roadPolygons(points, mask, Math.min(1, width + KERB), edges.map((edge) => Math.min(1, edge + KERB)))) {
           this.graphics.poly(polygon).fill({ color: shade(KERB_COLOR, light) });
         }
       }
 
       const texture = this.textureFor(type);
-      const surfaces = roadPolygons(points, mask, width);
+      const surfaces = roadPolygons(points, mask, width, edges);
       if (circle) {
         const [ring, kerb] = roundabout();
         // Obrubník kolem kruhu: kopie o kus větší, pod asfaltem — stejný
@@ -235,6 +242,7 @@ export class RoadRenderer {
           lanes: type === ROAD.highway ? 4 : 2,
           edges: type !== ROAD.street,
           ...(arms >= 3 && type !== ROAD.highway ? { zebraArms: mask } : {}),
+          armEdges: edges,
         });
         for (const line of lines) {
           this.graphics
@@ -291,6 +299,11 @@ export class RoadRenderer {
   private textureFor(type: number): Texture | undefined {
     const family = ROAD_FAMILIES[type];
     return family === undefined ? undefined : this.textures.get(family);
+  }
+
+  private roadType(x: number, y: number): number {
+    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return ROAD.none;
+    return this.world.layers.road[index(x, y, this.world.size)] ?? ROAD.none;
   }
 
   private isRoad(x: number, y: number): boolean {

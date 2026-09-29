@@ -55,7 +55,17 @@ export interface VehicleImage {
   readonly anchor: readonly [number, number];
   /** Obrázek je `scale`× větší než při zoomu 1. */
   readonly scale: number;
+  /**
+   * Svislé zkosení (radiány), které položí podélnou osu na izometrickou.
+   * Generátor kreslí auta pod ~20° místo 26,6°; bez toho jela bokem (T124).
+   */
+  readonly skew: number;
 }
+
+/** Nejmenší rozestup mezi auty v jednom pruhu, v dlaždicích. */
+const GAP_CAR = 0.3;
+/** Za autobusem a náklaďákem se drží větší odstup — jsou delší. */
+const GAP_LONG = 0.5;
 
 interface Vehicle {
   sprite: Sprite;
@@ -66,6 +76,8 @@ interface Vehicle {
   dir: number;
   /** Kolik z cesty mezi středy už ujelo (0–1). */
   progress: number;
+  /** Pruh: index do `LANES[typ]`. Posun se k němu dotahuje plynule. */
+  laneIndex: number;
   lane: number;
   /** Rychlost v dlaždicích za sekundu, už se zohledněnou zátěží. */
   speed: number;
@@ -83,7 +95,14 @@ interface TileRange {
 
 export class Vehicles {
   private readonly world: ReadonlyWorldView;
-  private readonly container = new Container();
+  /**
+   * Vrstva budov, ne vlastní kontejner (T124). Auto se musí **řadit mezi
+   * domy**: ve vlastní vrstvě pod budovami ho na svahu uřízla podezdívka domu
+   * za ním — autor to hlásil jako auta „uříznutá při klesání a stoupání".
+   */
+  private readonly container: Container;
+  private readonly depthAt: (x: number, y: number) => number;
+  private visible = true;
   private readonly capacityOf: (roadType: number) => number;
   private readonly live: Vehicle[] = [];
   private readonly pool: Sprite[] = [];
@@ -98,11 +117,16 @@ export class Vehicles {
   /** Silnice ve výřezu z posledního přepočtu — z nich se losuje, kde auto vyjede. */
   private roads: number[] = [];
 
-  constructor(world: ReadonlyWorldView, parent: Container, capacityOf: (roadType: number) => number) {
+  constructor(
+    world: ReadonlyWorldView,
+    layer: Container,
+    capacityOf: (roadType: number) => number,
+    depthAt: (x: number, y: number) => number,
+  ) {
     this.world = world;
+    this.container = layer;
     this.capacityOf = capacityOf;
-    this.container.sortableChildren = true;
-    parent.addChild(this.container);
+    this.depthAt = depthAt;
   }
 
   setLooks(looks: readonly VehicleLook[]): void {
@@ -118,7 +142,8 @@ export class Vehicles {
   }
 
   setVisible(visible: boolean): void {
-    this.container.visible = visible;
+    this.visible = visible;
+    for (const vehicle of this.live) vehicle.sprite.visible = visible;
   }
 
   /**
@@ -143,7 +168,6 @@ export class Vehicles {
 
   update(deltaMS: number, speedFactor: number, view: MotionView, zoom: number): void {
     const hidden = !this.enabled || zoom < VEHICLES_MIN_ZOOM || this.looks.length === 0;
-    this.container.visible = !hidden;
     if (hidden) {
       if (this.live.length > 0) this.clear();
       return;
@@ -167,10 +191,24 @@ export class Vehicles {
     }
 
     const seconds = (deltaMS / 1000) * speedFactor;
+    const lanes = this.byLane();
     for (let i = this.live.length - 1; i >= 0; i--) {
       const vehicle = this.live[i]!;
       if (seconds > 0) {
-        vehicle.progress += vehicle.speed * seconds;
+        // Rozestup: auto nevjede do auta před sebou. Na dálnici ho předjede
+        // v druhém pruhu, jinak zpomalí a počká (autor: „vjíždějí do sebe").
+        const step = vehicle.speed * seconds;
+        const gap = this.gapAhead(vehicle, lanes, vehicle.laneIndex);
+        const need = gap.long ? GAP_LONG : GAP_CAR;
+        let move = step;
+        if (gap.distance - step < need) {
+          const other = this.freeLane(vehicle, lanes, need);
+          if (other >= 0) vehicle.laneIndex = other;
+          else move = Math.max(0, gap.distance - need);
+        }
+        const target = LANES[this.roadAt(vehicle.x, vehicle.y)]?.[vehicle.laneIndex] ?? vehicle.lane;
+        vehicle.lane += (target - vehicle.lane) * Math.min(1, seconds * 3);
+        vehicle.progress += move;
         while (vehicle.progress >= 1) {
           vehicle.progress -= 1;
           vehicle.x += DX[vehicle.dir]!;
@@ -245,6 +283,7 @@ export class Vehicles {
   private spawnAt(x: number, y: number, dir: number, look: VehicleLook, tiles: number): void {
     const sprite = this.pool.pop() ?? new Sprite();
     this.container.addChild(sprite);
+    sprite.visible = this.visible;
     const vehicle: Vehicle = {
       sprite,
       look,
@@ -252,11 +291,13 @@ export class Vehicles {
       y,
       dir,
       progress: this.random() * 0.9,
+      laneIndex: -1,
       lane: 0,
       speed: 0,
       remaining: tiles,
     };
     this.turn(vehicle, dir);
+    vehicle.lane = LANES[this.roadAt(x, y)]?.[vehicle.laneIndex] ?? 0.1;
     this.live.push(vehicle);
     this.place(vehicle);
   }
@@ -266,7 +307,10 @@ export class Vehicles {
     vehicle.dir = dir;
     const type = this.roadAt(vehicle.x, vehicle.y);
     const lanes = LANES[type] ?? [0.1];
-    vehicle.lane = lanes[Math.floor(this.random() * lanes.length)] ?? 0.1;
+    // Pruh se drží, dokud ho silnice má; z dálnice na ulici se sjede do jediného.
+    if (vehicle.laneIndex < 0 || vehicle.laneIndex >= lanes.length) {
+      vehicle.laneIndex = Math.floor(this.random() * lanes.length);
+    }
     const capacity = this.capacityOf(type);
     const tile = index(vehicle.x, vehicle.y, this.world.size);
     const ratio = capacity > 0 ? Math.min(1, (this.world.trafficLoad[tile] ?? 0) / capacity) : 0;
@@ -280,6 +324,62 @@ export class Vehicles {
     vehicle.sprite.texture = image.texture;
     vehicle.sprite.anchor.set(image.anchor[0] / image.texture.width, image.anchor[1] / image.texture.height);
     vehicle.sprite.scale.set(flip / image.scale, 1 / image.scale);
+    // Zrcadlený obrázek jede na druhou stranu, takže i zkosení je opačné.
+    vehicle.sprite.skew.y = flip * image.skew;
+  }
+
+  /** Auta podle dlaždice, směru a pruhu — pro hledání toho, kdo jede vepředu. */
+  private byLane(): Map<string, Vehicle[]> {
+    const out = new Map<string, Vehicle[]>();
+    for (const vehicle of this.live) {
+      const key = `${vehicle.x},${vehicle.y},${vehicle.dir},${vehicle.laneIndex}`;
+      const list = out.get(key);
+      if (list) list.push(vehicle);
+      else out.set(key, [vehicle]);
+    }
+    return out;
+  }
+
+  /** Jak daleko je nejbližší auto vepředu v daném pruhu (v dlaždicích). */
+  private gapAhead(
+    vehicle: Vehicle,
+    lanes: Map<string, Vehicle[]>,
+    lane: number,
+  ): { distance: number; long: boolean } {
+    let best = Infinity;
+    let long = false;
+    const here = lanes.get(`${vehicle.x},${vehicle.y},${vehicle.dir},${lane}`) ?? [];
+    for (const other of here) {
+      if (other === vehicle || other.progress <= vehicle.progress) continue;
+      const distance = other.progress - vehicle.progress;
+      if (distance < best) {
+        best = distance;
+        long = other.look.weight < 1;
+      }
+    }
+    const nx = vehicle.x + DX[vehicle.dir]!;
+    const ny = vehicle.y + DY[vehicle.dir]!;
+    for (const other of lanes.get(`${nx},${ny},${vehicle.dir},${lane}`) ?? []) {
+      const distance = 1 - vehicle.progress + other.progress;
+      if (distance < best) {
+        best = distance;
+        long = other.look.weight < 1;
+      }
+    }
+    return { distance: best, long };
+  }
+
+  /** Volný vedlejší pruh pro předjetí, nebo `-1`. */
+  private freeLane(vehicle: Vehicle, lanes: Map<string, Vehicle[]>, need: number): number {
+    const count = LANES[this.roadAt(vehicle.x, vehicle.y)]?.length ?? 1;
+    for (let lane = 0; lane < count; lane++) {
+      if (lane === vehicle.laneIndex) continue;
+      const beside = lanes.get(`${vehicle.x},${vehicle.y},${vehicle.dir},${lane}`) ?? [];
+      // Pruh je volný, když v něm vedle nikdo nejede a vepředu je místo.
+      if (beside.some((other) => Math.abs(other.progress - vehicle.progress) < need)) continue;
+      if (this.gapAhead(vehicle, lanes, lane).distance > need * 2) return lane;
+    }
+    return -1;
   }
 
   /** Poloha na obrazovce: od středu dlaždice ke středu sousední, vpravo od osy. */
@@ -291,7 +391,10 @@ export class Vehicles {
     const gy = vehicle.y + 0.5 + dy * vehicle.progress + dx * vehicle.lane;
     const at = gridToScreen(gx, gy, groundHeightAt(this.world.cornerHeight, gx, gy));
     vehicle.sprite.position.set(at.x, at.y);
-    vehicle.sprite.zIndex = at.y;
+    // Hloubka mezi budovami: za domy, které stojí za dlaždicí, před ostatními.
+    // Přiřazuje se jen při změně — každé přiřazení by vrstvu přeřazovalo.
+    const depth = this.depthAt(Math.floor(gx), Math.floor(gy)) + 0.5 + at.y * 1e-6;
+    if (Math.abs(vehicle.sprite.zIndex - depth) > 1e-3) vehicle.sprite.zIndex = depth;
   }
 
   private roadAt(x: number, y: number): number {
@@ -320,7 +423,6 @@ export class Vehicles {
   destroy(): void {
     this.clear();
     for (const sprite of this.pool) sprite.destroy();
-    this.container.destroy();
   }
 }
 

@@ -53,6 +53,14 @@ SHEETS = {
     # plamen: zhruba patro a půl
     'flames': {'measure': 'height', 'size': 22, 'reference': None, 'anchor': 'feet'},
 }
+# Ruční dorovnání sklonu ve stupních tam, kde měření spodní obálky selže:
+# náklaďák zezadu má dole rovnou hranu plachty, autobus zepředu nárazník.
+# Odečteno z náhledu proti izometrickým čarám (2026-09-29).
+SKEW_OVERRIDES = {
+    'cars_rear_4': -11.0,
+    'cars_front_5': 13.0,
+}
+
 # Rotor: délka lopatky při zoomu 1. Skutečnou velikost na mapě určí matice
 # změřená z obrázku budovy, tohle je jen rozlišení textury.
 ROTOR_RADIUS = 34
@@ -102,6 +110,39 @@ def tight(image: Image.Image) -> Image.Image:
     return image.crop(box) if box else image
 
 
+def axis_angle(image: Image.Image) -> float | None:
+    """Sklon podélné osy vozidla ve stupních (y dolů), nebo None.
+
+    Nejníž na obrázku jsou kola na bližším boku; přímka přes jejich dotyky je
+    podélná osa auta. Bere se spodní konvexní obálka siluety a z ní nejdelší
+    hrana — to je úsečka mezi předním a zadním kolem.
+
+    Generátor kreslí auta pod úhlem kolem 20°, kdežto izometrická osa ve hře
+    má 26,6°. Rozdíl se ve hře dorovná zkosením (`skew` v indexu), jinak auto
+    jede po silnici bokem. Autor to hlásil na pěti snímcích.
+    """
+    alpha = alpha_of(image) > 60
+    cols = np.where(alpha.any(axis=0))[0]
+    if cols.size < 8:
+        return None
+    points = [(float(x), float(np.where(alpha[:, x])[0][-1])) for x in cols]
+    # Spodní obálka (y dolů → hledá se „horní“ obálka v y).
+    hull: list[tuple[float, float]] = []
+    for point in points:
+        while len(hull) >= 2:
+            (x1, y1), (x2, y2) = hull[-2], hull[-1]
+            if (x2 - x1) * (point[1] - y1) - (y2 - y1) * (point[0] - x1) <= 0:
+                hull.pop()
+            else:
+                break
+        hull.append(point)
+    edges = [(b[0] - a[0], b[1] - a[1]) for a, b in zip(hull, hull[1:])]
+    if not edges:
+        return None
+    dx, dy = max(edges, key=lambda e: e[0])
+    return float(np.degrees(np.arctan2(dy, dx)))
+
+
 def anchor_for(image: Image.Image, kind: str) -> tuple[int, int]:
     width, height = image.size
     if kind == 'car':
@@ -135,6 +176,16 @@ def fit_sheet(name: str, spec: dict, write: bool, index: dict) -> None:
         anchor = anchor_for(small, spec['anchor'])
         part = f'{name}_{order}'
         index[part] = {'file': f'{part}.png', 'width': size[0], 'height': size[1], 'anchor': list(anchor)}
+        if spec['anchor'] == 'car':
+            angle = axis_angle(crop)
+            if angle is not None:
+                # Zepředu jede auto doprava dolů (+26,6°), zezadu doprava nahoru.
+                target = 26.565 if name.endswith('_front') else -26.565
+                # Víc než 14° zkosení auto viditelně pokřiví; tam, kde měření
+                # chytne rovnou hranu plachty místo kol, rozhodlo oko.
+                correction = SKEW_OVERRIDES.get(part, max(-14.0, min(14.0, target - angle)))
+                index[part]['skew'] = round(float(np.radians(correction)), 4)
+                print(f'    {part}: osa {angle:.1f}° → dorovnat o {correction:+.1f}°')
         print(f'    {part}: {size[0]}×{size[1]} kotva {anchor}')
         if write:
             small.save(OUT / f'{part}.png', optimize=True)

@@ -9,7 +9,8 @@
       "anchor": [
         36,
         36
-      ]
+      ],
+      "skew": 0.236
     },
     "cars_front_1": {
       "file": "cars_front_1.png",
@@ -18,7 +19,8 @@
       "anchor": [
         34,
         36
-      ]
+      ],
+      "skew": 0.2181
     },
     "cars_front_2": {
       "file": "cars_front_2.png",
@@ -27,7 +29,8 @@
       "anchor": [
         31,
         34
-      ]
+      ],
+      "skew": 0.2443
     },
     "cars_front_3": {
       "file": "cars_front_3.png",
@@ -36,7 +39,8 @@
       "anchor": [
         34,
         38
-      ]
+      ],
+      "skew": 0.181
     },
     "cars_front_4": {
       "file": "cars_front_4.png",
@@ -45,7 +49,8 @@
       "anchor": [
         38,
         56
-      ]
+      ],
+      "skew": 0.0227
     },
     "cars_front_5": {
       "file": "cars_front_5.png",
@@ -54,7 +59,8 @@
       "anchor": [
         47,
         58
-      ]
+      ],
+      "skew": 0.2269
     },
     "cars_rear_0": {
       "file": "cars_rear_0.png",
@@ -63,7 +69,8 @@
       "anchor": [
         36,
         31
-      ]
+      ],
+      "skew": -0.2443
     },
     "cars_rear_1": {
       "file": "cars_rear_1.png",
@@ -72,7 +79,8 @@
       "anchor": [
         35,
         30
-      ]
+      ],
+      "skew": -0.2443
     },
     "cars_rear_2": {
       "file": "cars_rear_2.png",
@@ -81,7 +89,8 @@
       "anchor": [
         32,
         30
-      ]
+      ],
+      "skew": -0.1853
     },
     "cars_rear_3": {
       "file": "cars_rear_3.png",
@@ -90,7 +99,8 @@
       "anchor": [
         34,
         32
-      ]
+      ],
+      "skew": -0.2443
     },
     "cars_rear_4": {
       "file": "cars_rear_4.png",
@@ -99,7 +109,8 @@
       "anchor": [
         40,
         47
-      ]
+      ],
+      "skew": -0.192
     },
     "cars_rear_5": {
       "file": "cars_rear_5.png",
@@ -108,7 +119,8 @@
       "anchor": [
         56,
         56
-      ]
+      ],
+      "skew": -0.0632
     },
     "flames_0": {
       "file": "flames_0.png",
@@ -361,7 +373,8 @@
       "anchor": [
         38,
         38
-      ]
+      ],
+      "skew": 0.2286
     },
     "service_front_1": {
       "file": "service_front_1.png",
@@ -370,7 +383,8 @@
       "anchor": [
         50,
         54
-      ]
+      ],
+      "skew": 0.0743
     },
     "service_front_2": {
       "file": "service_front_2.png",
@@ -379,7 +393,8 @@
       "anchor": [
         38,
         44
-      ]
+      ],
+      "skew": 0.2443
     },
     "service_front_3": {
       "file": "service_front_3.png",
@@ -388,7 +403,8 @@
       "anchor": [
         51,
         53
-      ]
+      ],
+      "skew": 0.1514
     },
     "service_rear_0": {
       "file": "service_rear_0.png",
@@ -397,7 +413,8 @@
       "anchor": [
         38,
         34
-      ]
+      ],
+      "skew": -0.2443
     },
     "service_rear_1": {
       "file": "service_rear_1.png",
@@ -406,7 +423,8 @@
       "anchor": [
         48,
         44
-      ]
+      ],
+      "skew": -0.2443
     },
     "service_rear_2": {
       "file": "service_rear_2.png",
@@ -415,7 +433,8 @@
       "anchor": [
         42,
         43
-      ]
+      ],
+      "skew": -0.2443
     },
     "service_rear_3": {
       "file": "service_rear_3.png",
@@ -424,7 +443,8 @@
       "anchor": [
         48,
         44
-      ]
+      ],
+      "skew": -0.2443
     },
     "sidewalk": {
       "file": "sidewalk.png",
