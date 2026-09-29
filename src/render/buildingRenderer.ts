@@ -60,6 +60,7 @@ export interface LoadedPart {
   readonly anchor: readonly [number, number];
   readonly radius?: number;
   readonly skew?: number;
+  readonly attach?: readonly (readonly [number, number])[];
 }
 
 /** Kouř, který má zrovna stoupat: bod ve světě a hustota. */
@@ -512,11 +513,14 @@ export class BuildingRenderer {
    * Elektrické vedení na mapě (T129). Autor: „dráty musí být vidět, vysoké
    * napětí musí být normálně sloupy, nízké musí vést od budovy k budově".
    *
-   * Každá dlaždice vedení je jeden uzel řazený s domy: sloup (dřevěný, nebo
-   * ocelový stožár) a dráty k sousedům. Dráty vedou ke **každému sousednímu
-   * vedení** a u nízkého napětí i **k sousední zóně či budově** — tím je vidět,
-   * že vedení spojuje bloky. Na silnici ani na budově sloup nestojí: drát
-   * tam jen visí přes ni mezi sloupy nebo domy po stranách.
+   * **Sloupy** stojí na volných dlaždicích vedení (ne na silnici ani v domě):
+   * na rovném úseku vysoké napětí na každé třetí, nízké na každé druhé,
+   * na konci, v zatáčce a na odbočce vždy.
+   *
+   * **Vodiče** vedou jedním rozpětím od úchytu k úchytu — z konců ramen
+   * jednoho sloupu na konce ramen dalšího, s průvěsem. Dřív se kreslily po
+   * kouscích na každé dlaždici a autor je viděl jako „strašné". Úsek, který
+   * končí u bloku zón či budov, se sbíhá do přípojky na jeho okraji.
    *
    * Id jsou za lampami: `-(6 · plocha + dlaždice + 1)`.
    */
@@ -539,82 +543,136 @@ export class BuildingRenderer {
       return (ids[t] ?? 0) !== 0 || (zone[t] ?? 0) !== 0;
     };
     const ground = (gx: number, gy: number): number => groundHeightAt(this.world.cornerHeight, gx, gy);
+    const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const;
 
+    /** Kotva rozpětí: dlaždice, kde vodiče začínají a končí. */
+    interface Anchor {
+      tile: number;
+      x: number;
+      y: number;
+      type: number;
+      pole: boolean;
+      flip: number;
+    }
+    const anchors = new Map<number, Anchor>();
     for (let tile = 0; tile < cells; tile++) {
       const type = wire[tile] ?? WIRE.none;
       if (type === WIRE.none) continue;
       const x = tile % size;
       const y = (tile - x) / size;
+      const links = DIRS.map(([dx, dy]) => typeAt(x + dx, y + dy) !== WIRE.none);
+      const vertical = links[0] || links[2];
+      const horizontal = links[1] || links[3];
+      const straight = (links[0] && links[2] && !horizontal) || (links[1] && links[3] && !vertical);
+      const free = (road[tile] ?? ROAD.none) === ROAD.none && (ids[tile] ?? 0) === 0;
+      const step = type === WIRE.high ? 3 : 2;
+      const pole = free && (!straight || (vertical ? y : x) % step === 0);
+      // Kotvou je sloup, a taky každý konec a zlom, i bez sloupu (na silnici).
+      if (!pole && straight) continue;
+      // Ramena stožáru jsou na obrázku podél osy x, tedy napříč vedení podél
+      // osy y. Vedení podél osy x potřebuje stožár zrcadlově.
+      const flip = horizontal && !vertical ? -1 : 1;
+      anchors.set(tile, { tile, x, y, type, pole, flip });
+    }
+
+    const partOf = (type: number): LoadedPart | undefined => (type === WIRE.high ? this.pylon : this.lowPole);
+    /** Body úchytů kotvy na obrazovce. */
+    const attachments = (anchor: Anchor): { x: number; y: number }[] => {
+      const base = gridToScreen(anchor.x + 0.5, anchor.y + 0.5, ground(anchor.x + 0.5, anchor.y + 0.5));
+      const part = partOf(anchor.type);
+      const points = part?.attach;
+      if (!part || !points || points.length === 0) {
+        const h = (WIRE_HEIGHTS[anchor.type] ?? [1.75])[0]! * LEVEL_H;
+        return [{ x: base.x, y: base.y - h }];
+      }
+      return points.map(([px, py]) => ({
+        x: base.x + ((px - part.anchor[0]) * anchor.flip) / PART_SCALE,
+        y: base.y + (py - part.anchor[1]) / PART_SCALE,
+      }));
+    };
+
+    for (const anchor of anchors.values()) {
       const node = new Container();
-      const base = ground(x + 0.5, y + 0.5);
-      const heights = WIRE_HEIGHTS[type] ?? WIRE_HEIGHTS[WIRE.low]!;
-      const vertical = typeAt(x, y - 1) !== WIRE.none || typeAt(x, y + 1) !== WIRE.none;
-      const horizontal = typeAt(x - 1, y) !== WIRE.none || typeAt(x + 1, y) !== WIRE.none;
+      const base = ground(anchor.x + 0.5, anchor.y + 0.5);
+      const part = partOf(anchor.type);
+      if (anchor.pole && part) {
+        const pole = new Sprite(part.texture);
+        pole.anchor.set(part.anchor[0] / part.texture.width, part.anchor[1] / part.texture.height);
+        pole.scale.set(anchor.flip / PART_SCALE, 1 / PART_SCALE);
+        const at = gridToScreen(anchor.x + 0.5, anchor.y + 0.5, base);
+        pole.position.set(at.x, at.y);
+        node.addChild(pole);
+      }
 
       const cables = new Graphics();
-      const color = type === WIRE.high ? 0x3a3d42 : 0x2b2622;
-      const width = type === WIRE.high ? 0.9 : 0.7;
-      const drawSpan = (fx: number, fy: number, fz: number, tx: number, ty: number, tz: number): void => {
-        const a = gridToScreen(fx, fy, fz);
-        const b = gridToScreen(tx, ty, tz);
-        // Průvěs: drát mezi úchyty lehce klesá.
-        const sag = Math.hypot(b.x - a.x, b.y - a.y) * 0.08;
+      const color = anchor.type === WIRE.high ? 0x3b3f45 : 0x2b2622;
+      const width = anchor.type === WIRE.high ? 0.8 : 0.6;
+      const span = (from: { x: number; y: number }, to: { x: number; y: number }): void => {
+        const sag = Math.hypot(to.x - from.x, to.y - from.y) * 0.05;
         cables
-          .moveTo(a.x, a.y)
-          .quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 + sag, b.x, b.y)
-          .stroke({ width, color, alpha: 0.9 });
+          .moveTo(from.x, from.y)
+          .quadraticCurveTo((from.x + to.x) / 2, (from.y + to.y) / 2 + sag, to.x, to.y)
+          .stroke({ width, color, alpha: 0.85 });
       };
-      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
-        const nx = x + dx;
-        const ny = y + dy;
-        const other = typeAt(nx, ny);
-        if (other !== WIRE.none) {
-          // K sousednímu vedení do půlky cesty — soused dokreslí zbytek.
-          const mx = x + 0.5 + dx * 0.5;
-          const my = y + 0.5 + dy * 0.5;
-          const otherHeights = WIRE_HEIGHTS[other] ?? heights;
-          heights.forEach((h, i) => {
-            const mid = (h + (otherHeights[i] ?? otherHeights[0] ?? h)) / 2;
-            drawSpan(x + 0.5, y + 0.5, base + h, mx, my, ground(mx, my) + mid);
-          });
-        } else if (parcelAt(nx, ny)) {
-          // Přípojka do bloku: drát k domu nebo do zóny za sousední hranou.
-          const px = x + 0.5 + dx * 0.9;
-          const py = y + 0.5 + dy * 0.9;
-          drawSpan(x + 0.5, y + 0.5, base + heights[0]!, px, py, ground(px, py) + 0.9);
+      const mine = attachments(anchor);
+
+      // Přes ulici bez sloupu: úsek, který spojuje dva protější bloky, je
+      // jeden drát z bloku do bloku, ne dva zalomené uprostřed silnice.
+      const parcelDirs = DIRS.filter(([dx, dy]) => parcelAt(anchor.x + dx, anchor.y + dy));
+      const wireDirs = DIRS.filter(([dx, dy]) => typeAt(anchor.x + dx, anchor.y + dy) !== WIRE.none);
+      if (!anchor.pole && wireDirs.length === 0 && parcelDirs.length === 2) {
+        const [a, b] = parcelDirs as [(typeof DIRS)[number], (typeof DIRS)[number]];
+        if (a[0] === -b[0] && a[1] === -b[1]) {
+          const end = ([dx, dy]: (typeof DIRS)[number]): { x: number; y: number } => {
+            const px = anchor.x + 0.5 + dx * 0.75;
+            const py = anchor.y + 0.5 + dy * 0.75;
+            return gridToScreen(px, py, ground(px, py) + 1.1);
+          };
+          span(end(a), end(b));
+          node.addChild(cables);
+          const id = floor - anchor.tile - 1;
+          this.container.addChild(node);
+          this.views.set(id, node as unknown as Sprite);
+          this.boxes.set(id, { x: anchor.x, y: anchor.y, width: 1, depth: 1, base });
+          continue;
+        }
+      }
+
+      for (const [dx, dy] of DIRS) {
+        if (typeAt(anchor.x + dx, anchor.y + dy) !== WIRE.none) {
+          // Po vedení k další kotvě. Každé rozpětí kreslí jen jeho počátek
+          // s menším indexem dlaždice, ať se nekreslí dvakrát.
+          let x = anchor.x + dx;
+          let y = anchor.y + dy;
+          let other = anchors.get(index(x, y, size));
+          while (!other && typeAt(x + dx, y + dy) !== WIRE.none) {
+            x += dx;
+            y += dy;
+            other = anchors.get(index(x, y, size));
+          }
+          if (!other) {
+            // Vedení skončilo bez kotvy (nemělo by nastat) — konec je tady.
+            continue;
+          }
+          if (other.tile < anchor.tile) continue;
+          const theirs = attachments(other);
+          mine.forEach((from, i) => span(from, theirs[i % theirs.length]!));
+        } else if (parcelAt(anchor.x + dx, anchor.y + dy)) {
+          // Přípojka do bloku: vodiče se sbíhají na okraj sousední parcely.
+          const px = anchor.x + 0.5 + dx * 0.75;
+          const py = anchor.y + 0.5 + dy * 0.75;
+          const target = gridToScreen(px, py, ground(px, py) + 1.1);
+          for (const from of mine) span(from, target);
         }
       }
       node.addChild(cables);
 
-      // Sloup jen na volné dlaždici — ne uprostřed silnice ani v domě.
-      // A ne na každé: na rovném úseku stojí vysoké napětí na každé třetí,
-      // nízké na každé druhé dlaždici; na konci, v zatáčce a na odbočce vždy.
-      const free = (road[tile] ?? ROAD.none) === ROAD.none && (ids[tile] ?? 0) === 0;
-      const straight = (vertical && !horizontal) || (horizontal && !vertical);
-      const through =
-        straight &&
-        ((vertical && typeAt(x, y - 1) !== WIRE.none && typeAt(x, y + 1) !== WIRE.none) ||
-          (horizontal && typeAt(x - 1, y) !== WIRE.none && typeAt(x + 1, y) !== WIRE.none));
-      const step = type === WIRE.high ? 3 : 2;
-      const spaced = !through || (vertical ? y : x) % step === 0;
-      const part = type === WIRE.high ? this.pylon : this.lowPole;
-      if (free && spaced && part) {
-        const pole = new Sprite(part.texture);
-        pole.anchor.set(part.anchor[0] / part.texture.width, part.anchor[1] / part.texture.height);
-        // Ramena stožáru jsou na obrázku podél osy x, tedy napříč vedení
-        // podél osy y. Vedení podél osy x potřebuje stožár zrcadlově.
-        const flip = type === WIRE.high && horizontal && !vertical ? -1 : 1;
-        pole.scale.set(flip / PART_SCALE, 1 / PART_SCALE);
-        const at = gridToScreen(x + 0.5, y + 0.5, base);
-        pole.position.set(at.x, at.y);
-        // Sloup pod dráty — dráty začínají u jeho vrcholu.
-        node.addChildAt(pole, 0);
-      }
-
-      const id = floor - tile - 1;
+      const id = floor - anchor.tile - 1;
       this.container.addChild(node);
+      // Uzel je `Container`, ne `Sprite` ani `Graphics`; mapa pohledů ho nese
+      // jen kvůli řazení a úklidu, žádná jiná cesta na něj nesahá.
       this.views.set(id, node as unknown as Sprite);
-      this.boxes.set(id, { x, y, width: 1, depth: 1, base });
+      this.boxes.set(id, { x: anchor.x, y: anchor.y, width: 1, depth: 1, base });
     }
   }
 

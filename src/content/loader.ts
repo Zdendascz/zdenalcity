@@ -291,6 +291,13 @@ export function buildParts(
       scale,
       ...(typeof entry['radius'] === 'number' ? { radius: entry['radius'] } : {}),
       ...(typeof entry['skew'] === 'number' ? { skew: entry['skew'] } : {}),
+      ...(Array.isArray(entry['attach'])
+        ? {
+            attach: entry['attach']
+              .map(pair)
+              .filter((point): point is [number, number] => point !== undefined),
+          }
+        : {}),
     };
   }
   return out;

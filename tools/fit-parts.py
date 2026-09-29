@@ -328,6 +328,30 @@ def fit_lamp(write: bool, index: dict) -> None:
 UPRIGHTS = {'wood_pole': 30, 'pylon': 62}
 
 
+def wire_attachments(image: Image.Image) -> list[list[int]]:
+    """Úchyty vodičů: spodní konce izolátorů na krajích ramen, shora dolů
+    a zleva doprava. Hledá se v levé a pravé pětině obrázku; patky stožáru
+    (spodní pětina) se vynechají."""
+    alpha = alpha_of(image) > 80
+    h, w = alpha.shape
+    points: list[list[int]] = []
+    for cols in (range(0, max(1, int(w * 0.2))), range(int(w * 0.8), w)):
+        side = np.zeros_like(alpha)
+        for c in cols:
+            side[:, c] = alpha[:, c]
+        side[int(h * 0.8):, :] = False
+        labels, count = ndimage.label(side)
+        for i in range(1, count + 1):
+            ys, xs = np.where(labels == i)
+            if ys.size < 8:
+                continue
+            b = int(ys.argmax())
+            points.append([int(xs[b]), int(ys[b])])
+    # Pořadí: podle výšky, pak zleva — shodné na všech stožárech, ať se vodiče
+    # párují správně.
+    return sorted(points, key=lambda p: (p[1] // max(1, h // 20), p[0]))
+
+
 def fit_material(name: str, write: bool, index: dict) -> None:
     image = Image.open(RAW / f'{name}.png').convert('RGBA').resize((MATERIAL, MATERIAL), Image.LANCZOS)
     index[name] = {'file': f'{name}.png', 'width': MATERIAL, 'height': MATERIAL, 'anchor': [0, 0]}
@@ -414,6 +438,9 @@ def main() -> int:
     for name, height in UPRIGHTS.items():
         if name in have:
             fit_upright(name, height, write, index)
+            fitted = Image.open(OUT / f'{name}.png').convert('RGBA')
+            index[name]['attach'] = wire_attachments(fitted)
+            print(f'    úchyty: {index[name]["attach"]}')
     if 'sidewalk' in have:
         fit_material('sidewalk', write, index)
 

@@ -124,6 +124,8 @@ export interface PartImage {
    * izometrické ose. Generátor kreslí auta pod ~20° místo 26,6° (T124).
    */
   readonly skew?: number;
+  /** Úchyty vodičů v pixelech obrázku (sloupy vedení, T129). */
+  readonly attach?: readonly (readonly [number, number])[];
 }
 
 export interface SourceInfo {

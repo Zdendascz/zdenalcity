@@ -581,14 +581,15 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       cost: content.getBalance().water.pipeCost,
       action: { kind: 'pipe' },
     },
-    // Vedení (T129) do nabídky Energetika vedle elektráren. Nízké napětí
+    // Vedení (T129) má vlastní nabídku hned vedle Energetiky — do ní se tři
+    // nástroje navíc nevešly (roleta nejvýš šest položek). Nízké napětí
     // rozvádí po čtvrti, vysoké nese proud od elektrárny.
     {
       id: 'wire:low',
       labelKey: 'ui.tool.wire.low',
       icon: 'bolt',
       hotkey: 'j',
-      groupKey: 'ui.menu.power',
+      groupKey: 'ui.menu.wires',
       groupIcon: 'bolt',
       cost: content.getBalance().power.wires[0]?.cost ?? 0,
       action: { kind: 'wire', wire: WIRE.low },
@@ -597,10 +598,19 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       id: 'wire:high',
       labelKey: 'ui.tool.wire.high',
       icon: 'bolt',
-      groupKey: 'ui.menu.power',
+      groupKey: 'ui.menu.wires',
       groupIcon: 'bolt',
       cost: content.getBalance().power.wires[1]?.cost ?? 0,
       action: { kind: 'wire', wire: WIRE.high },
+    },
+    // Odstranění vedení — tažením po trase, jen vedení, nic pod ním.
+    {
+      id: 'wire:remove',
+      labelKey: 'ui.tool.wire.remove',
+      icon: 'bulldoze',
+      groupKey: 'ui.menu.wires',
+      groupIcon: 'bolt',
+      action: { kind: 'wire', wire: WIRE.none },
     },
   ];
 
@@ -810,6 +820,7 @@ export async function loadParts(content: ContentRegistry): Promise<Map<string, L
             anchor: part.anchor,
             ...(part.radius === undefined ? {} : { radius: part.radius }),
             ...(part.skew === undefined ? {} : { skew: part.skew }),
+            ...(part.attach === undefined ? {} : { attach: part.attach }),
           });
         })
         .catch(() => undefined),
@@ -1516,6 +1527,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         i18n.t('ui.save.noWaterNetwork', { count: startupWarnings.waterlessBuildings }),
       );
     }
+    if (startupWarnings.unwiredBuildings > 0) {
+      notifications.show(
+        i18n.t('ui.save.noPowerLines', { count: startupWarnings.unwiredBuildings }),
+      );
+    }
   }
   const legend = new Legend(mount, i18n);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
@@ -1682,6 +1698,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         notifications.show(
           i18n.t('ui.save.noWaterNetwork', { count: warnings.waterlessBuildings }),
         );
+      }
+      if (warnings.unwiredBuildings > 0) {
+        notifications.show(i18n.t('ui.save.noPowerLines', { count: warnings.unwiredBuildings }));
       }
     } catch (error) {
       message = {
@@ -2756,7 +2775,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         dispatch({ type: 'build_pipe', x: tile.x, y: tile.y });
         break;
       case 'wire':
-        dispatch({ type: 'build_wire', x: tile.x, y: tile.y, wire: action.wire });
+        dispatch(
+          action.wire === WIRE.none
+            ? { type: 'remove_wire', x: tile.x, y: tile.y }
+            : { type: 'build_wire', x: tile.x, y: tile.y, wire: action.wire },
+        );
         break;
       case 'fill':
         dispatch({ type: 'level_area', x: tile.x, y: tile.y, w: 1, h: 1, mode: 'fill' });
@@ -3254,7 +3277,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         action.kind === 'pipe'
           ? { type: 'build_pipe', x: tile.x, y: tile.y }
           : action.kind === 'wire'
-            ? { type: 'build_wire', x: tile.x, y: tile.y, wire: action.wire }
+            ? action.wire === WIRE.none
+              ? { type: 'remove_wire', x: tile.x, y: tile.y }
+              : { type: 'build_wire', x: tile.x, y: tile.y, wire: action.wire }
             : { type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType };
       const result = host.dispatch(command);
       if (result.ok) built++;

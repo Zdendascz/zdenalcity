@@ -757,6 +757,15 @@ export function bulldoze(
     return OK;
   }
 
+  // Elektrické vedení (T129) bourá buldozer stejně jako potrubí: až když na
+  // dlaždici nic vyššího nestojí. Autorovi chybělo, jak dráty odstranit.
+  if ((world.layers.wire[tile] ?? WIRE.none) !== WIRE.none) {
+    world.layers.wire[tile] = WIRE.none;
+    markTileDirty(world, x, y);
+    markPowerNetworkDirty(world);
+    return OK;
+  }
+
   if (world.layers.pipe[tile] === 1) {
     world.layers.pipe[tile] = 0;
     markTileDirty(world, x, y);

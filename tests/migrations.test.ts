@@ -6,7 +6,6 @@ import {
   collectLoadWarnings,
   expectedCoarseByteLength,
   expectedHeightsByteLength,
-  expectedLayersByteLength,
   readSaveMeta,
   unpackSave,
 } from '@/save/deserialize';
@@ -258,35 +257,43 @@ describe('fixtury savů', () => {
     expect(countViolations(world.cornerHeight)).toBe(0);
   });
 
-  it('migrace v12 → v13 položí vedení jen jako spojky bloků po silnicích (T129)', () => {
+  it('migrace v12 → v13 přidá prázdnou vrstvu vedení a nic jiného nepohne (T129)', () => {
     const v12 = Object.entries(fixtures).find(([path]) => path.includes('v12.city'));
     expect(v12).toBeDefined();
     if (!v12) return;
 
     const before = unpackSave(decode(v12[1] as string));
-    expect(before.meta.formatVersion).toBe(12);
     const after = migrate(before, MIGRATIONS, 13);
     const cells = MAP_SIZE * MAP_SIZE;
 
     expect(after.meta.formatVersion).toBe(13);
-    expect(after.layers.byteLength).toBe(expectedLayersByteLength(MAP_SIZE));
-    // Stávající vrstvy beze změny…
+    expect(after.layers.byteLength).toBe(cells * 10);
     expect([...after.layers.subarray(0, cells * 9)]).toEqual([...before.layers]);
-    // …vedení (vysoké napětí) jen na silnici a ne pod každou.
+    // Autor: „města zhasnou a musí se to dodělat" — žádné vedení navíc.
+    expect(after.layers.subarray(cells * 9).every((value) => value === 0)).toBe(true);
+  });
+
+  it('migrace v13 → v14 smaže vedení pod silnicemi a jinde ho nechá (T129)', () => {
+    const v13 = Object.entries(fixtures).find(([path]) => path.includes('v13.city'));
+    expect(v13).toBeDefined();
+    if (!v13) return;
+
+    const before = unpackSave(decode(v13[1] as string));
+    expect(before.meta.formatVersion).toBe(13);
+    const cells = MAP_SIZE * MAP_SIZE;
+    // Fixtura v13 vznikla první verzí migrace, takže vedení pod silnicemi má.
     const road = before.layers.subarray(cells * 2, cells * 3);
-    const wire = after.layers.subarray(cells * 9);
-    let roads = 0;
-    let wires = 0;
+    const wiresBefore = before.layers.subarray(cells * 9);
+    expect(wiresBefore.some((value, i) => value !== 0 && (road[i] ?? 0) !== 0)).toBe(true);
+
+    const after = migrate(before, MIGRATIONS, 14);
+    expect(after.meta.formatVersion).toBe(14);
+    expect([...after.layers.subarray(0, cells * 9)]).toEqual([...before.layers.subarray(0, cells * 9)]);
+    const wiresAfter = after.layers.subarray(cells * 9);
     for (let i = 0; i < cells; i++) {
-      if ((road[i] ?? 0) !== 0) roads++;
-      if ((wire[i] ?? 0) !== 0) {
-        wires++;
-        expect(wire[i]).toBe(2);
-        expect(road[i]).not.toBe(0);
-      }
+      const expected = (road[i] ?? 0) !== 0 ? 0 : (wiresBefore[i] ?? 0);
+      expect(wiresAfter[i]).toBe(expected);
     }
-    expect(wires).toBeGreaterThan(0);
-    expect(wires).toBeLessThan(roads);
   });
 
   it('migrace v11 → v12 rozšíří buildingId na čtyři bajty a nic jiného nepohne', () => {

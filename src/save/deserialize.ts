@@ -774,6 +774,12 @@ export interface LoadWarnings {
    * jakkoli.
    */
   waterlessBuildings: number;
+  /**
+   * Kolik budov bere proud, ale ve městě není jediný úsek vedení (T129).
+   * Typicky město z doby, kdy proud vedla silnice — po aktualizaci svítí jen
+   * bloky přiléhající k elektrárně a hráč musí vedení natáhnout.
+   */
+  unwiredBuildings: number;
 }
 
 /**
@@ -808,7 +814,16 @@ export function collectLoadWarnings(
         (building) => catalogue.get(building.definitionId)?.construction.requiresWater === true,
       ).length;
 
-  return { missingSources, missingDefinitions, waterlessBuildings };
+  // Vedení je v `layers.bin` poslední vrstva (od verze 13).
+  const wires = save.layers.subarray(save.layers.byteLength - cells);
+  const hasWires = wires.some((value) => value !== 0);
+  const unwiredBuildings = hasWires
+    ? 0
+    : save.entities.buildings.filter(
+        (building) => (catalogue.get(building.definitionId)?.power?.consumption ?? 0) > 0,
+      ).length;
+
+  return { missingSources, missingDefinitions, waterlessBuildings, unwiredBuildings };
 }
 
 /** Číslo, které musí být celé a v mezích. Jinak je save poškozený. */
