@@ -560,10 +560,17 @@ export class BuildingRenderer {
       if (type === WIRE.none) continue;
       const x = tile % size;
       const y = (tile - x) / size;
-      const links = DIRS.map(([dx, dy]) => typeAt(x + dx, y + dy) !== WIRE.none);
+      // Rovný úsek se posuzuje jen podle vedení **stejného typu**. Styk
+      // nízkého a vysokého napětí je vždy kotva — tam se drát přepojuje.
+      const links = DIRS.map(([dx, dy]) => typeAt(x + dx, y + dy) === type);
+      const foreign = DIRS.some(([dx, dy]) => {
+        const other = typeAt(x + dx, y + dy);
+        return other !== WIRE.none && other !== type;
+      });
       const vertical = links[0] || links[2];
       const horizontal = links[1] || links[3];
-      const straight = (links[0] && links[2] && !horizontal) || (links[1] && links[3] && !vertical);
+      const straight =
+        !foreign && ((links[0] && links[2] && !horizontal) || (links[1] && links[3] && !vertical));
       const free = (road[tile] ?? ROAD.none) === ROAD.none && (ids[tile] ?? 0) === 0;
       const step = type === WIRE.high ? 3 : 2;
       const pole = free && (!straight || (vertical ? y : x) % step === 0);
@@ -638,31 +645,56 @@ export class BuildingRenderer {
         }
       }
 
+      /** Bod přípojky na okraji sousední parcely. */
+      const dropPoint = ([dx, dy]: (typeof DIRS)[number], lift: number): { x: number; y: number } => {
+        const px = anchor.x + 0.5 + dx * 0.75;
+        const py = anchor.y + 0.5 + dy * 0.75;
+        return gridToScreen(px, py, ground(px, py) + lift);
+      };
+
       for (const [dx, dy] of DIRS) {
-        if (typeAt(anchor.x + dx, anchor.y + dy) !== WIRE.none) {
-          // Po vedení k další kotvě. Každé rozpětí kreslí jen jeho počátek
-          // s menším indexem dlaždice, ať se nekreslí dvakrát.
-          let x = anchor.x + dx;
-          let y = anchor.y + dy;
-          let other = anchors.get(index(x, y, size));
-          while (!other && typeAt(x + dx, y + dy) !== WIRE.none) {
-            x += dx;
-            y += dy;
-            other = anchors.get(index(x, y, size));
-          }
-          if (!other) {
-            // Vedení skončilo bez kotvy (nemělo by nastat) — konec je tady.
-            continue;
-          }
-          if (other.tile < anchor.tile) continue;
+        const next = typeAt(anchor.x + dx, anchor.y + dy);
+        if (next === WIRE.none) continue;
+        if (next !== anchor.type) {
+          // Styk napětí: jeden drát z nízkého na spodní úchyt stožáru.
+          // Kreslí ho strana nízkého napětí.
+          if (anchor.type !== WIRE.low) continue;
+          const other = anchors.get(index(anchor.x + dx, anchor.y + dy, size));
+          if (!other) continue;
           const theirs = attachments(other);
-          mine.forEach((from, i) => span(from, theirs[i % theirs.length]!));
-        } else if (parcelAt(anchor.x + dx, anchor.y + dy)) {
-          // Přípojka do bloku: vodiče se sbíhají na okraj sousední parcely.
-          const px = anchor.x + 0.5 + dx * 0.75;
-          const py = anchor.y + 0.5 + dy * 0.75;
-          const target = gridToScreen(px, py, ground(px, py) + 1.1);
-          for (const from of mine) span(from, target);
+          span(mine[0]!, theirs[theirs.length - 1]!);
+          continue;
+        }
+        // Po vedení téhož typu k další kotvě. Každé rozpětí kreslí jen jeho
+        // počátek s menším indexem dlaždice, ať se nekreslí dvakrát.
+        let x = anchor.x + dx;
+        let y = anchor.y + dy;
+        let other = anchors.get(index(x, y, size));
+        while (!other && typeAt(x + dx, y + dy) === anchor.type) {
+          x += dx;
+          y += dy;
+          other = anchors.get(index(x, y, size));
+        }
+        if (!other || other.tile < anchor.tile) continue;
+        const theirs = attachments(other);
+        mine.forEach((from, i) => span(from, theirs[i % theirs.length]!));
+      }
+
+      // Přípojka do bloku **jen na konci vedení** a jen jedna — dřív ji
+      // pouštěl každý sloup do každé sousední parcely a vznikla změť drátů.
+      // Přednost má směr, kterým vedení pokračuje dál.
+      if (wireDirs.length <= 1) {
+        const back = wireDirs[0];
+        const ahead = back ? DIRS.find(([dx, dy]) => dx === -back[0] && dy === -back[1]) : undefined;
+        const target =
+          (ahead && parcelAt(anchor.x + ahead[0], anchor.y + ahead[1]) ? ahead : undefined) ?? parcelDirs[0];
+        if (target) {
+          if (anchor.type === WIRE.high) {
+            // Vysoké napětí do bloku jedním kabelem dolů, jako do rozvodny.
+            span(mine[mine.length - 1]!, dropPoint(target, 0.4));
+          } else {
+            for (const from of mine) span(from, dropPoint(target, 1.1));
+          }
         }
       }
       node.addChild(cables);
