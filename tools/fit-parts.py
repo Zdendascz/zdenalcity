@@ -214,90 +214,6 @@ def align_vehicle(crop: Image.Image, front: bool, label: str) -> Image.Image:
     return tight(out)
 
 
-# Skutečné rozměry vozidel v metrech (délka, šířka), v pořadí na archu.
-# Autobus a náklaďáky o kus zkrácené, ať nezaberou celou dlaždici.
-VEHICLE_DIMS = {
-    'cars': [(4.2, 1.6), (4.2, 1.6), (3.6, 1.5), (4.1, 1.6), (5.2, 2.1), (8.5, 2.5)],
-    'service': [(4.3, 1.65), (6.2, 2.3), (4.6, 1.8), (6.2, 2.3)],
-}
-# px na metr při zoomu 1 (dlaždice ~11 m), vynásobí se měřítkem dílů.
-VEHICLE_PX_PER_M = 3.0
-# Nejvíc, o kolik se bok smí protáhnout; víc už kola vypadají jako ovály.
-MAX_STRETCH = 2.2
-# Ruční poloha spodního rohu (podíl šířky), kde ho detektor netrefí.
-APEX_OVERRIDES = {'service_front_1': 0.66}
-
-
-def bottom_apex(image: Image.Image) -> int:
-    """x spodního rohu vozidla: kde se stýká bok s čelem (nebo zádí).
-
-    Spodek siluety je po srovnání dvojice přímek se sklonem ±1/2 a hledá se
-    vrchol té „střechy obráceně", pod kterou se vejde celý obrys.
-    """
-    a = alpha_of(image) > 60
-    cols = np.where(a.any(axis=0))[0]
-    x0, x1 = int(cols[0]), int(cols[-1])
-    bottom = np.array([np.where(a[:, x])[0][-1] if a[:, x].any() else 0 for x in range(a.shape[1])], float)
-    xs = np.arange(x0, x1 + 1)
-    best = None
-    for ax in range(x0, x1 + 1):
-        env = bottom[ax] - 0.5 * np.abs(xs - ax)
-        seg = bottom[x0:x1 + 1]
-        score = np.maximum(0, seg - env).sum() + 0.02 * np.maximum(0, env - seg).sum()
-        if best is None or score < best[0]:
-            best = (score, ax)
-    return best[1]
-
-
-def stretch_side(image: Image.Image, apex: int, factor: float, front: bool) -> Image.Image:
-    """Protáhne bok vozidla podél jeho osy (T127).
-
-    Generátor kreslí vozidla zkrácená: zepředu poměr délky k šířce kolem
-    1,0, zezadu 1,3–1,7, skutečné auto má 2,6. Stejný autobus pak byl
-    z jedné strany dlouhý a z druhé krátký — autor to hlásil. Bok leží celý
-    na jedné straně spodního rohu (zepředu vlevo, zezadu vpravo), takže se
-    ta strana natáhne vodorovně a posune se svisle tak, aby hrany zůstaly
-    na izometrické ose a svislice svislé. Druhá strana se nehne.
-    """
-    import cv2
-    rgba = np.asarray(image)
-    h, w = rgba.shape[:2]
-    left = front
-    grow = int(np.ceil((apex if left else w - apex) * (factor - 1)))
-    new_w = w + grow
-    new_h = h + int(np.ceil(0.5 * (apex if left else w - apex) * (factor - 1))) + 2
-    shift_y = new_h - h
-    xs, ys = np.meshgrid(np.arange(new_w, dtype=np.float32), np.arange(new_h, dtype=np.float32))
-    new_apex = apex + grow if left else apex
-    dx_new = xs - new_apex
-    on_side = dx_new < 0 if left else dx_new > 0
-    dx_old = np.where(on_side, dx_new / factor, dx_new)
-    src_x = apex + dx_old
-    # Na boku: y' = y + 0,5·|dx|·(f−1)·(−1) — hrana stoupá od rohu, protažením
-    # se její konec dostane výš, proto se zdroj bere níž.
-    lift = np.where(on_side, 0.5 * np.abs(dx_old) * (factor - 1), 0)
-    src_y = ys - shift_y + lift
-    out = cv2.remap(rgba, src_x.astype(np.float32), src_y.astype(np.float32), cv2.INTER_CUBIC,
-                    borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
-    return tight(Image.fromarray(out, 'RGBA'))
-
-
-def proportion_vehicle(crop: Image.Image, front: bool, sheet: str, i: int, label: str) -> tuple[Image.Image, float]:
-    """Protáhne bok na skutečný poměr a vrátí měřítko do skutečné velikosti."""
-    length, width = VEHICLE_DIMS[sheet][i]
-    w = crop.width
-    apex = int(APEX_OVERRIDES[label] * w) if label in APEX_OVERRIDES else bottom_apex(crop)
-    side = apex if front else w - apex
-    face = w - apex if front else apex
-    factor = min(MAX_STRETCH, max(1.0, (length / width) / max(0.2, side / max(1, face))))
-    if factor > 1.02:
-        crop = stretch_side(crop, apex, factor, front)
-    # Vodorovný rozměr izometrického půdorysu je (L + W)·cos 26,6°.
-    target = (length + width) * np.cos(np.arctan(0.5)) * VEHICLE_PX_PER_M * SCALE
-    print(f'    {label}: bok/čelo {side / max(1, face):.2f} → protažení {factor:.2f}')
-    return crop, target / crop.width
-
-
 def anchor_for(image: Image.Image, kind: str) -> tuple[int, int]:
     width, height = image.size
     if kind == 'car':
@@ -339,12 +255,7 @@ def fit_sheet(name: str, spec: dict, write: bool, index: dict) -> None:
         factor *= VEHICLE_SIZE
     print(f'  {name}: {len(crops)} kusů, měřítko {factor:.3f}')
     for order, crop in enumerate(crops):
-        scale = factor
-        if spec['anchor'] == 'car':
-            sheet = name.rsplit('_', 1)[0]
-            crop, scale = proportion_vehicle(crop, name.endswith('_front'), sheet, order, f'{name}_{order}')
-            scale *= VEHICLE_SIZE
-        size = (max(1, round(crop.size[0] * scale)), max(1, round(crop.size[1] * scale)))
+        size = (max(1, round(crop.size[0] * factor)), max(1, round(crop.size[1] * factor)))
         small = crop.resize(size, Image.LANCZOS)
         anchor = anchor_for(small, spec['anchor'])
         part = f'{name}_{order}'
