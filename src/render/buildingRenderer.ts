@@ -382,6 +382,14 @@ export class BuildingRenderer {
             const view = this.views.get(-(lampBase + tile * 4 + side + 1));
             if (view) best = Math.max(best, view.zIndex);
           }
+        } else {
+          // Lampa na **téže** dlaždici: stojí-li na severním nebo západním
+          // kraji, je za autem. Bez tohohle trčela lampa z auta (hlásil
+          // autor). Jižní a východní zůstávají před ním.
+          for (const side of [0, 3]) {
+            const view = this.views.get(-(lampBase + tile * 4 + side + 1));
+            if (view) best = Math.max(best, view.zIndex);
+          }
         }
       }
     }
