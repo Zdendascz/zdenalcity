@@ -73,6 +73,10 @@ export interface ReadonlyWorldView {
   readonly cornerHeight: Readonly<Uint8Array>;
   /** Kam došla voda. Podzemní pohled ji kreslí, jinak se nikde nezobrazuje (§8). */
   readonly waterSupply: Readonly<Uint8Array>;
+  /** Zátěž a přetížení vedení a číslo přepočtu sítě (T129). Runtime. */
+  readonly wireLoad: Readonly<Float32Array>;
+  readonly wireOverloaded: Readonly<Uint8Array>;
+  readonly powerRevision: number;
   /** Spokojenost na hrubé mřížce — hlavní číslo HUDu a vlastní overlay (§9). */
   readonly happiness: Readonly<Uint8Array>;
   /**

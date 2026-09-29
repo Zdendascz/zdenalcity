@@ -803,8 +803,10 @@ export class ChunkRenderer {
    * takže by červená znamenala „chybí tu vedení", což by mátlo.
    */
   private drawPowerOverlay(graphics: Graphics, points: number[], tileIndex: number): void {
+    // Od T129 vede proud blok zón a budov, silnice ne. Vedení kreslí
+    // `WireOverlay` nad silnicemi, i s vytížením.
     const isConductor =
-      (this.world.layers.road[tileIndex] ?? ROAD.none) !== ROAD.none ||
+      (this.world.layers.zone[tileIndex] ?? 0) !== 0 ||
       this.world.layers.buildingId[tileIndex] !== 0;
     if (!isConductor) return;
 

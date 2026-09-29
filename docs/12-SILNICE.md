@@ -249,7 +249,7 @@ proběhnout, musí se upravit terén pod silnicí tak, aby bylo vše v pořádku
 
 ### Proč to bylo horší, než to vypadalo
 
-Silnice je **vodič elektřiny**. Díra v ní odřízne čtvrť od elektrárny,
+Silnice byla do T129 **vodič elektřiny** (od T129 vede proud jen vedení a bloky zón a budov). Díra v ní odřízne čtvrť od elektrárny,
 nenapájené domy neplatí daň a městu spadne příjem na nulu. Příkaz přitom vrátil
 `ok` a odhad ceny mlčel — hráč se to nedozvěděl a hledal chybu v rozpočtu.
 

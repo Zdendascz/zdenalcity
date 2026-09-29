@@ -29,6 +29,7 @@ import { el } from './dom';
 export const ROUTINE_REASONS: ReadonlySet<string> = new Set([
   'error.roadExists',
   'error.pipeExists',
+  'error.wireExists',
   'error.roadInTheWay',
   'error.rubbleInTheWay',
   'error.occupied',

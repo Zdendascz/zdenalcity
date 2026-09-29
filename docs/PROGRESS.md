@@ -3936,6 +3936,24 @@ V prohlížeči je vidět prach po bourání lesa a postavená stanice sedí po
 vyrůstání ve správné velikosti i poloze. Samotný průběh vyrůstání se
 nasnímat nepodařilo, protože náhled byl skrytý a prohlížeč nekreslil snímky.
 
+## Elektřina a voda přes bloky a vedení (T129, rozhodnutí autora)
+
+Rozvod proudu i vody je automaticky pod každou parcelou se zónou nebo budovou:
+souvislý blok vede sám (`src/sim/conduct.ts`). Hráč staví jen spojky mezi bloky
+a ke zdroji — **elektrické vedení** (nízké / vysoké napětí, nová vrstva `wire`)
+a potrubí. **Silnice nevede nic.** Zchátralá a pobořená parcela nevede.
+
+- Vedení má kapacitu (`balance.power.wires`: 3 000 a 40 000). Přetížený úsek
+  vypadne a oblast za ním zhasne; proud nejdřív zkusí jinou cestu.
+- Výroba se dělí po sítích, ne celoměstsky.
+- Voda: blok dosah nespotřebovává, dosah ubírá jen potrubí.
+- Save verze 13: migrace položí **vysoké napětí pod každou silnici**, aby staré
+  město svítilo dál (nízké by se u elektrárny přetížilo).
+- UI: dva nástroje v nabídce Energetika (klávesa `j`), vedení s vytížením ve
+  vrstvě Elektřina (`render/wireOverlay.ts`), buldozer v té vrstvě bourá vedení.
+
+Otevřené: v golden městě vyšla kasa o 4 618 výš, růst beze změny — nerozebráno.
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c

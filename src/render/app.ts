@@ -39,7 +39,7 @@ import type { Command } from '@/sim/commands';
 import type { CommandResult } from '@/sim/result';
 import { MAX_FUNDING, fundingCost, fundingEffect } from '@/sim/funding';
 import { cornerIndex, tileBaseHeight, tileCorners } from '@/sim/heights';
-import { DEFAULT_MAP_SIZE, TERRAIN, ZONE, index } from '@/sim/layers';
+import { DEFAULT_MAP_SIZE, TERRAIN, WIRE, ZONE, index } from '@/sim/layers';
 import type { MapSize } from '@/sim/layers';
 import { applyGeneratedMap, balanceWithMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
@@ -117,6 +117,7 @@ import { Vehicles } from './vehicles';
 import type { VehicleLook } from './vehicles';
 import { ServiceMarkers } from './serviceMarkers';
 import { TrafficOverlay } from './trafficOverlay';
+import { WireOverlay } from './wireOverlay';
 import { DebugOverlay } from './debugOverlay';
 import {
   BACKGROUND_COLOR,
@@ -579,6 +580,27 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupIcon: 'pump_station',
       cost: content.getBalance().water.pipeCost,
       action: { kind: 'pipe' },
+    },
+    // Vedení (T129) do nabídky Energetika vedle elektráren. Nízké napětí
+    // rozvádí po čtvrti, vysoké nese proud od elektrárny.
+    {
+      id: 'wire:low',
+      labelKey: 'ui.tool.wire.low',
+      icon: 'bolt',
+      hotkey: 'j',
+      groupKey: 'ui.menu.power',
+      groupIcon: 'bolt',
+      cost: content.getBalance().power.wires[0]?.cost ?? 0,
+      action: { kind: 'wire', wire: WIRE.low },
+    },
+    {
+      id: 'wire:high',
+      labelKey: 'ui.tool.wire.high',
+      icon: 'bolt',
+      groupKey: 'ui.menu.power',
+      groupIcon: 'bolt',
+      cost: content.getBalance().power.wires[1]?.cost ?? 0,
+      action: { kind: 'wire', wire: WIRE.high },
     },
   ];
 
@@ -1438,6 +1460,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     (roadType) => content.getBalance().traffic.roadTypes[roadType - 1]?.capacity ?? 0,
   );
 
+  // Elektrické vedení (T129) s vytížením, jen ve vrstvě elektřiny.
+  const wireOverlay = new WireOverlay(
+    worldContainer,
+    world,
+    (type) => content.getBalance().power.wires[type - 1]?.capacity ?? 1,
+  );
+
   const hover = new Graphics();
   worldContainer.addChild(hover);
 
@@ -2094,7 +2123,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   function dragKind(): 'area' | 'line' | null {
     const kind = activeTool.action.kind;
     if (kind === 'zone') return 'area';
-    if (kind === 'road' || kind === 'pipe') return 'line';
+    if (kind === 'road' || kind === 'pipe' || kind === 'wire') return 'line';
     return null;
   }
 
@@ -2245,6 +2274,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const coarseId = layerMode === 'power' || layerMode === 'traffic' ? 'none' : layerMode;
     coarseOverlay.setActive(coarseId);
     trafficOverlay.setVisible(layerMode === 'traffic');
+    wireOverlay.setVisible(layerMode === 'power' && viewMode !== 'underground');
     // Špendlíky jen u mapy dosahu: tam se hráč ptá „kde ta stanice je".
     // U tepelných map by ukazovaly na budovu, která s tou veličinou nesouvisí.
     serviceMarkers.setActive(
@@ -2445,6 +2475,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // mapu. Hlásil to autor.
     if (tool.action.kind === 'pipe') setView('underground');
     else if (tool.action.kind !== 'bulldoze' && tool.action.kind !== 'pan') setView('surface');
+    // Vedení je vidět ve vrstvě elektřiny (T129) — hráč ho má vidět, když ho
+    // staví, stejně jako potrubí v podzemí.
+    if (tool.action.kind === 'wire' && layerMode !== 'power') toggleLayer('power');
   }
 
   // Vysunutou řadu vlastní HUD: je společná pro schované nástroje i schované
@@ -2721,6 +2754,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       case 'pipe':
         dispatch({ type: 'build_pipe', x: tile.x, y: tile.y });
         break;
+      case 'wire':
+        dispatch({ type: 'build_wire', x: tile.x, y: tile.y, wire: action.wire });
+        break;
       case 'fill':
         dispatch({ type: 'level_area', x: tile.x, y: tile.y, w: 1, h: 1, mode: 'fill' });
         break;
@@ -2730,11 +2766,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       case 'bulldoze': {
         const buildingIdBefore =
           world.layers.buildingId[tile.y * world.size + tile.x] ?? 0;
-        // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.
+        // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi. Ve vrstvě
+        // elektřiny bourá vedení (T129): hráč se na něj dívá a míří na něj.
+        const wireHere = (world.layers.wire[tile.y * world.size + tile.x] ?? 0) !== 0;
         const result =
           viewMode === 'underground'
             ? dispatch({ type: 'remove_pipe', x: tile.x, y: tile.y })
-            : dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
+            : layerMode === 'power' && wireHere
+              ? dispatch({ type: 'remove_wire', x: tile.x, y: tile.y })
+              : dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
         undone = result.ok;
         // Silnice a stromy taky zvednou prach. Budova si svůj obláček zvedne
         // sama, až zmizí z mapy, a větší — dvakrát ji prášit nemá smysl.
@@ -3175,7 +3215,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     // Silnice a potrubí: každá dlaždice je vlastní příkaz, ale hlásí se jen
     // první odmítnutí — jinak by most přes řeku vyplivl deset stejných hlášek.
-    if (action.kind !== 'road' && action.kind !== 'pipe') return;
+    if (action.kind !== 'road' && action.kind !== 'pipe' && action.kind !== 'wire') return;
 
     /*
      * Nejdřív se **sečte**, teprve pak staví (T-revize, nález 14).
@@ -3212,7 +3252,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const command: Command =
         action.kind === 'pipe'
           ? { type: 'build_pipe', x: tile.x, y: tile.y }
-          : { type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType };
+          : action.kind === 'wire'
+            ? { type: 'build_wire', x: tile.x, y: tile.y, wire: action.wire }
+            : { type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType };
       const result = host.dispatch(command);
       if (result.ok) built++;
       else if (!complained && !isRoutine(result.reason)) {
@@ -3564,6 +3606,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     serviceMarkers.update(dirty.fullRedraw || dirty.buildings.size > 0);
     disasterScenes.update();
     trafficOverlay.update();
+    wireOverlay.update(dirty.fullRedraw || dirty.tiles.size > 0);
     buildingRenderer.animate(deltaMS);
     buildingRenderer.sway(deltaMS, viewport, camera.zoom);
     placementGhost.animate(deltaMS);

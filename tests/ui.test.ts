@@ -104,8 +104,9 @@ describe('paleta nástrojů', () => {
     // Potrubí **musí** být v paletě jako samostatný nástroj. Dokud jím byla
     // přepnutá silnice, lišta hlásila „Ulice, 10" a účtovala šest.
     expect(byKey.get('ui.menu.water')?.tools.map((tool) => tool.action.kind)).toContain('pipe');
-    // Uhelná, plynová, jaderná a větrná.
-    expect(byKey.get('ui.menu.power')?.tools).toHaveLength(4);
+    // Uhelná, plynová, jaderná a větrná — a od T129 dvě vedení.
+    expect(byKey.get('ui.menu.power')?.tools).toHaveLength(6);
+    expect(byKey.get('ui.menu.power')?.tools.filter((tool) => tool.action.kind === 'wire')).toHaveLength(2);
     expect(byKey.get('ui.menu.culture')?.tools).toHaveLength(4);
     expect(byKey.get('ui.menu.waste')?.tools).toHaveLength(2);
     // Silnice mají vlastní roletu, ne společnou se stavbou.

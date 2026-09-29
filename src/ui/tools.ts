@@ -26,6 +26,8 @@ export type ToolAction =
    * poznat, že se vodovod vůbec staví.
    */
   | { kind: 'pipe' }
+  /** Elektrické vedení (T129): `wire` je `WIRE.low` nebo `WIRE.high`. */
+  | { kind: 'wire'; wire: number }
   | { kind: 'bulldoze' }
   | { kind: 'zone'; zone: ZoneType }
   | { kind: 'place'; definitionId: string }
