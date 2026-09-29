@@ -38,9 +38,11 @@ APPROVED: dict[str, list] = {
     # 2026-09-29, prohlédnuto na výřezech kolem každého kandidáta.
     'coal_power_plant__a': [0, 1],
     'coal_power_plant__b': [0],
-    'coal_power_plant__c': [(1, 'steam'), (2, 'steam'), 3],
+    # c přegenerována kvůli strmému pohledu (T124); věže jsou pro detektor
+    # moc široké, středy okrajů odečtené z obrysu.
+    'coal_power_plant__c': [(330, 225, 'steam'), (795, 120, 'steam'), 0],
     'gas_power_plant__a': [1],
-    'gas_power_plant__b': [1],
+    'gas_power_plant__b': [1],  # přegenerováno (T124)
     'gas_power_plant__c': [1],
     'incinerator__a': [0],
     'incinerator__b': [0],  # přegenerováno kvůli natočení (T123)
@@ -49,7 +51,7 @@ APPROVED: dict[str, list] = {
     'industrial_chemical__b': [1],
     'industrial_chemical__c': [0],
     'industrial_complex__a': [0],
-    'industrial_complex__b': [0],
+    'industrial_complex__b': [0],  # přegenerováno (T124)
     'industrial_foundry__a': [1],
     'industrial_foundry__b': [0],
     'industrial_foundry__c': [0],
@@ -58,8 +60,8 @@ APPROVED: dict[str, list] = {
     'industrial_smelter__a': [1],
     'industrial_smelter__b': [3],
     'industrial_smelter__c': [1, 2, 4],
-    'industrial_works__a': [1],
-    'industrial_works__c': [2],
+    'industrial_works__a': [0],  # přegenerováno (T124)
+    'industrial_works__c': [7],  # přegenerováno (T124)
     'industrial_large__c': [0],
     'industrial_medium__a': [0],
     'industrial_hall__b': [0],
@@ -135,6 +137,10 @@ def apply() -> None:
         points = []
         for choice in chosen:
             kind = 'smoke'
+            if isinstance(choice, tuple) and len(choice) == 3:
+                x, y, kind = choice
+                points.append((x, y, kind))
+                continue
             if isinstance(choice, tuple) and isinstance(choice[1], str):
                 choice, kind = choice
             x, y = found[choice] if isinstance(choice, int) else choice

@@ -179,6 +179,11 @@ design — ten nese styl, text nese obsah.
 ```
 Isometric city-builder building asset, seen from the south-east.
 
+Camera: the classic isometric game camera, looking down at about 30 degrees
+above the horizon — NOT from high above and NOT a bird's-eye view. The walls
+are clearly visible and tall; the plot diamond is about twice as wide as it
+is tall.
+
 Rendering style: a soft-shaded 3D render, not a drawing. Believable materials
 — rough render, brick, concrete, painted steel, glass with a faint warm
 interior glow. Smooth gradients across surfaces and gentle ambient occlusion

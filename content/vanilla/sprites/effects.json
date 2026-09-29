@@ -36,8 +36,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          271,
-          130
+          330,
+          227
         ],
         "rate": 1.8,
         "color": "#eef0f2"
@@ -45,8 +45,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          586,
-          22
+          795,
+          122
         ],
         "rate": 1.8,
         "color": "#eef0f2"
@@ -54,8 +54,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          961,
-          2
+          927,
+          3
         ],
         "rate": 1,
         "color": "#7c7a78"
@@ -76,7 +76,7 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          370,
+          413,
           2
         ],
         "rate": 1,
@@ -170,8 +170,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          409,
-          3
+          258,
+          2
         ],
         "when": "powered",
         "rate": 1,
@@ -182,8 +182,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          667,
-          2
+          694,
+          8
         ],
         "when": "powered",
         "rate": 1,
@@ -346,8 +346,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          284,
-          3
+          252,
+          2
         ],
         "when": "powered",
         "rate": 1,
@@ -358,8 +358,8 @@
       {
         "type": "vanilla:smoke",
         "at": [
-          133,
-          2
+          101,
+          7
         ],
         "when": "powered",
         "rate": 1,
