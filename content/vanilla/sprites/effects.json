@@ -366,6 +366,144 @@
         "color": "#7c7a78"
       }
     ],
+    "vanilla:tram_stop|a": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          125,
+          103
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          140,
+          110
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          152,
+          116
+        ]
+      }
+    ],
+    "vanilla:tram_stop|b": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          135,
+          90
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          148,
+          96
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          160,
+          102
+        ]
+      }
+    ],
+    "vanilla:tram_stop|c": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          95,
+          70
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          108,
+          76
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          58,
+          90
+        ]
+      }
+    ],
+    "vanilla:transit_stop|a": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          122,
+          80
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          137,
+          87
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          152,
+          94
+        ]
+      }
+    ],
+    "vanilla:transit_stop|b": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          118,
+          103
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          132,
+          110
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          146,
+          117
+        ]
+      }
+    ],
+    "vanilla:transit_stop|c": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          135,
+          100
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          150,
+          106
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          165,
+          112
+        ]
+      }
+    ],
     "vanilla:wind_turbine|a": [
       {
         "type": "vanilla:spin",

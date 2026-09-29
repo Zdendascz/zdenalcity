@@ -115,7 +115,12 @@ vyrobí falešná auta:
 **Měří se** FPS na mapě 512 × 512 (akceptační kritérium 2 fáze 4) se
 zapnutými a vypnutými auty. Vrstva projde, když pokles nepřekročí 3 FPS.
 
-## Vrstva 4 — voda (T117)
+## Vrstva 4 — voda (T117, hotovo)
+
+`src/render/water.ts`: odlesky na vodních dlaždicích ve výřezu (0,6 na
+dlaždici, strop 500), pod mosty ne. Běží i na pauze.
+
+Původní návrh:
 
 Voda je upečená v chunku a pečení se kvůli ní rozbíjet nebude. Nad vodními
 dlaždicemi ve výřezu se kreslí **odlesky**: pár světlých čárek na dlaždici,
@@ -124,7 +129,15 @@ které pomalu mizí a objevují se jinde. Stejný `ParticleContainer` jako prach
 Posun textury vody (vytáhnout vodu z pečení a hýbat maticí) je druhá možnost.
 Zkusí se jen tehdy, když odlesky nebudou stačit.
 
-## 5 — život u budov služeb (T118)
+## 5 — život u budov služeb (T118, hotovo)
+
+- vozidla služeb jezdí z `vehicles.ts` (viz vrstva 3);
+- `src/render/people.ts`: chodci přicházejí k zastávkám a metru a mizí ve
+  vchodu, jiní odcházejí; na lavičkách (efekt `vanilla:seat`, body odečtené
+  z obrázků šesti zastávek) si lidé sedají a po „příjezdu spoje“ zmizí;
+- chodci jdou do L přes trávu, ne po chodníku — cesty pro pěší síť nemá.
+
+Původní návrh:
 
 Přání autora: *u policejní stanice odjede auto, u metra prochází lidé, na
 zastávkách chvíli sedí, chvíli ne.*

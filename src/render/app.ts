@@ -108,6 +108,9 @@ import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
 import { DisasterScenes } from './disasterScenes';
 import { Effects } from './effects';
 import { FireLayer } from './fireLayer';
+import { People } from './people';
+import type { Entrance } from './people';
+import { WaterGlints } from './water';
 import { imageUrls, preloadGraphics } from './preload';
 import { Preloader } from '@/ui/preloader';
 import { Vehicles } from './vehicles';
@@ -1235,6 +1238,19 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       .filter(([name]) => name.startsWith('flames_'))
       .sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))
       .map(([, part]) => part);
+    const person = (name: string) => {
+      const part = parts.get(name);
+      return part === undefined ? undefined : { texture: part.texture, anchor: part.anchor };
+    };
+    const range = (sheet: string, from: number, to: number) =>
+      Array.from({ length: to - from }, (_, i) => person(`${sheet}_${from + i}`)).filter(
+        (found): found is NonNullable<typeof found> => found !== undefined,
+      );
+    people.setLooks({
+      front: range('people_walk', 0, 6),
+      rear: range('people_walk', 6, 12),
+      sit: range('people_sit', 0, 8),
+    });
     fireLayer.setTextures(
       flames.map((part) => part.texture),
       flames.map((part) => part.anchor),
@@ -1267,6 +1283,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   });
   // Silnice leží **mezi terénem a budovami**: kreslí se po chunku, ale pod
   // domy. Vlastní kontejner, ne řazení podle hloubky — vozovka je země.
+  // Odlesky na vodě (T117): nad upečenou vodou, pod mosty a silnicemi.
+  const waterGlints = new WaterGlints(world, worldContainer, app.renderer);
   const roadRenderer = new RoadRenderer(world, worldContainer);
 
   // Auta (T115) jezdí nad vozovkou a pod domy — dům vepředu je zakryje,
@@ -1360,6 +1378,28 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   buildingRenderer.onVanished = (area) => effects.dust(area);
   // Plameny na každé hořící dlaždici (T120) a prach u paty tornáda.
   const fireLayer = new FireLayer(world, worldContainer);
+  // Lidé u zastávek a metra (T118).
+  const people = new People(world, worldContainer);
+  /** Vchody zastávek a metra. Přepočítává se jednou za vteřinu, ne za snímek. */
+  let entrances: Entrance[] = [];
+  let entrancesAge = Infinity;
+  function transitEntrances(): Entrance[] {
+    const out: Entrance[] = [];
+    for (const [id, building] of world.buildings) {
+      if (building.abandoned) continue;
+      const definition = content.get(building.definitionId);
+      if (definition?.service?.class !== 'transit') continue;
+      const [width, depth] = definition.footprint;
+      // Vchod na přední (jižní) hraně parcely, uprostřed.
+      out.push({
+        id,
+        x: building.x + width / 2,
+        y: building.y + depth,
+        busy: building.definitionId === 'vanilla:metro_station' ? 2.5 : 1,
+      });
+    }
+    return out;
+  }
   disasterScenes.onDust = (x, y, base) =>
     effects.dust({ x: x - 0.35, y: y - 0.35, width: 0.7, depth: 0.7, base });
 
@@ -2208,6 +2248,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     vehicles.setVisible(viewMode !== 'underground');
     fireLayer.setEnabled(motionOn);
     fireLayer.setVisible(viewMode !== 'underground');
+    people.setEnabled(motionOn);
+    people.setVisible(viewMode !== 'underground');
+    waterGlints.setEnabled(motionOn);
+    waterGlints.setVisible(viewMode !== 'underground');
     // Barva sítě se řídí pohledem, ne přepínačem: pod zemí bílá, nad zemí
     // černá. Přepnutí sítě naopak pohledem nehne — viz `gridOverlay.ts`.
     gridOverlay.setUnderground(viewMode === 'underground');
@@ -3517,6 +3561,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const speedFactor = [0, 1, 1.5, 2, 2.5][speedIndex] ?? 1;
       vehicles.update(deltaMS, speedFactor, viewport, camera.zoom);
       dispatchServiceVehicles(deltaMS * speedFactor, viewport);
+      entrancesAge += deltaMS;
+      if (entrancesAge > 1000) {
+        entrancesAge = 0;
+        entrances = transitEntrances();
+      }
+      people.update(deltaMS, speedFactor, viewport, camera.zoom, buildingRenderer.seatSpots(), entrances);
+      waterGlints.update(deltaMS, viewport, camera.zoom);
     }
 
     // Šipky posouvají **konstantní rychlostí na obrazovce**, ne v souřadnicích

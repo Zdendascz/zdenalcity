@@ -249,6 +249,8 @@ export class BuildingRenderer {
   private readonly spinners = new Map<number, Spinner[]>();
   /** Komíny podle id budovy — body ve světě, odkud stoupá kouř. */
   private readonly chimneys = new Map<number, SmokeSource[]>();
+  /** Místa k sezení na zastávkách (T118) — body ve světě podle id budovy. */
+  private readonly seats = new Map<number, { x: number; y: number }[]>();
   /** Díly pro efekty. Bez nich se efekt nekreslí, budova stojí dál. */
   private parts: ReadonlyMap<string, LoadedPart> = new Map();
   /** Budova zmizela z mapy. Dostane půdorys, nad kterým se má zaprášit. */
@@ -327,6 +329,11 @@ export class BuildingRenderer {
       }
       tree.sprite.skew.x = swayAt(x, y, t, tree.phase);
     }
+  }
+
+  /** Lavičky na zastávkách podle id budovy. Sedí na nich `People`. */
+  seatSpots(): ReadonlyMap<number, readonly { x: number; y: number }[]> {
+    return this.seats;
   }
 
   /** Odkud právě stoupá kouř. `Effects` z toho dělá obláčky. */
@@ -1102,6 +1109,7 @@ export class BuildingRenderer {
     const scale = fit / image.scale;
     const spinners: Spinner[] = [];
     const chimneys: SmokeSource[] = [];
+    const seats: { x: number; y: number }[] = [];
     for (const effect of image.effects) {
       if (effect.when === 'powered' && !running) continue;
       const x = sprite.position.x + (effect.at[0] - image.anchor[0]) * scale;
@@ -1133,6 +1141,9 @@ export class BuildingRenderer {
           blade,
           rate: (effect.rate ?? SPIN_RATE) * (0.85 + spread * 0.3),
         });
+      } else if (effect.type === 'vanilla:seat') {
+        // Na lavičku se dá sednout i bez proudu — jen ne u ruiny.
+        if (this.world.buildings.get(id)?.abandoned !== true) seats.push({ x, y });
       } else if (effect.type === 'vanilla:smoke') {
         if (!running) continue;
         chimneys.push({
@@ -1146,12 +1157,14 @@ export class BuildingRenderer {
     }
     if (spinners.length > 0) this.spinners.set(id, spinners);
     if (chimneys.length > 0) this.chimneys.set(id, chimneys);
+    if (seats.length > 0) this.seats.set(id, seats);
   }
 
   private clearEffects(id: number): void {
     for (const spinner of this.spinners.get(id) ?? []) spinner.node.destroy({ children: true });
     this.spinners.delete(id);
     this.chimneys.delete(id);
+    this.seats.delete(id);
   }
 
   private remove(id: number): void {
