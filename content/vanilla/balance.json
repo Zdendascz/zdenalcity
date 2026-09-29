@@ -2,7 +2,9 @@
   "economy": {
     "taxableValuePerUnit": 70,
     "startingFunds": 60000,
-    "defaultTaxRate": 7
+    "defaultTaxRate": 7,
+    "residentialTaxShare": 0.5,
+    "serviceUpkeepMultiplier": 2
   },
   "services": {
     "costSlope": 20,

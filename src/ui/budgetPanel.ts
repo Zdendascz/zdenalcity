@@ -307,7 +307,7 @@ export class BudgetPanel {
         t('ui.budget.formula.tax', {
           base: formatNumber(line.taxBase),
           unit: t(line.taxUnitKey),
-          value: valuePerUnit,
+          value: line.valuePerUnit || valuePerUnit,
           rate: line.taxRate,
           income: formatNumber(line.income),
         }),

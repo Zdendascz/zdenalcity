@@ -7,7 +7,7 @@ import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, placeDefinition, setTaxRate, zoneArea } from '@/sim/commands';
 import { ZONE } from '@/sim/layers';
 import { createDemandSystem, createEconomySystem, createGrowthSystem } from '@/sim/systems';
-import { computeBudget, taxFrom } from '@/sim/systems/economy';
+import { computeBudget, taxFrom, taxValuePerUnit } from '@/sim/systems/economy';
 import {
   createWorld,
   DEFAULT_TAX_RATE,
@@ -28,7 +28,8 @@ import type { Balance } from '@/content/balance';
  */
 const BALANCE: Balance = {
   ...VANILLA_BALANCE,
-  economy: { ...VANILLA_BALANCE.economy, taxableValuePerUnit: 40 },
+  // Neutrální koeficienty: testy tu hlídají mechaniku výpočtu, ne ladění.
+  economy: { ...VANILLA_BALANCE.economy, taxableValuePerUnit: 40, residentialTaxShare: 1, serviceUpkeepMultiplier: 1 },
 };
 
 const HOUSE: Definition = {
@@ -574,5 +575,18 @@ describe('vanilla balanc', () => {
       const tax = taxFrom(base(definition), rate, unit);
       expect(tax / definition.economy.upkeep, id).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe('ladění ekonomiky (2026-09-30)', () => {
+  it('bydlení vynáší polovinu a služby stojí dvojnásobek údržby', () => {
+    expect(VANILLA_BALANCE.economy.residentialTaxShare).toBe(0.5);
+    expect(VANILLA_BALANCE.economy.serviceUpkeepMultiplier).toBe(2);
+  });
+
+  it('koeficienty se promítnou do daně i údržby', () => {
+    const halved: Balance = { ...BALANCE, economy: { ...BALANCE.economy, residentialTaxShare: 0.5, serviceUpkeepMultiplier: 2 } };
+    expect(taxValuePerUnit(halved, 'residential')).toBe(20);
+    expect(taxValuePerUnit(halved, 'industrial')).toBe(40);
   });
 });

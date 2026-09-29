@@ -555,7 +555,15 @@ export interface Balance {
    * Ekonomika. Původně konstanty fáze 1 v kódu — přesunuty sem, aby šel balanc
    * ladit bez zásahu do kódu.
    */
-  economy: { taxableValuePerUnit: number; startingFunds: number; defaultTaxRate: number };
+  economy: {
+    taxableValuePerUnit: number;
+    startingFunds: number;
+    defaultTaxRate: number;
+    /** Kolik z hodnoty jednotky daní bydlení (0–1). */
+    residentialTaxShare: number;
+    /** Násobek údržby budov služeb. */
+    serviceUpkeepMultiplier: number;
+  };
 
   demand: {
     workerRatio: number;
@@ -1232,6 +1240,15 @@ export function validateBalance(raw: unknown): {
       ),
       startingFunds: num(issues, economy, 'startingFunds', 'economy.startingFunds', 0, 100000000),
       defaultTaxRate: num(issues, economy, 'defaultTaxRate', 'economy.defaultTaxRate', 0, 100),
+      residentialTaxShare: num(issues, economy, 'residentialTaxShare', 'economy.residentialTaxShare', 0, 1),
+      serviceUpkeepMultiplier: num(
+        issues,
+        economy,
+        'serviceUpkeepMultiplier',
+        'economy.serviceUpkeepMultiplier',
+        0,
+        20,
+      ),
     },
     demand: {
       workerRatio: num(issues, demand, 'workerRatio', 'demand.workerRatio', 0, 1),

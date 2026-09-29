@@ -50,6 +50,8 @@ export interface BudgetLine {
   taxUnitKey: string | null;
   /** Sazba v procentech; `null` u budov, které se nedaní. */
   taxRate: number | null;
+  /** Hodnota jednoho obyvatele či místa pro daň — u bydlení snížená. */
+  valuePerUnit: number;
   /** Údržba jedné budovy podle definice. */
   upkeepEach: number;
   /** Kolik budov údržbu opravdu platí — temné jsou mimo provoz. */
@@ -121,7 +123,19 @@ export function buildingMonthlyTax(
   if (!isRciCategory(category) || !building.powered || building.abandoned) return 0;
 
   const taxable = category === 'residential' ? building.population : building.jobs;
-  return taxFrom(taxable, world.economy.taxRates[category], balance.economy.taxableValuePerUnit);
+  return taxFrom(taxable, world.economy.taxRates[category], taxValuePerUnit(balance, category));
+}
+
+/**
+ * Hodnota jednotky pro daň podle kategorie.
+ *
+ * Bydlení vynáší jen část (`residentialTaxShare`, 2026-09-30: polovina).
+ * Autor: vyúčtování „strašně nesedí" — město mělo přebytek 4,5 milionu ročně
+ * a daň z bydlení tvořila většinu příjmů.
+ */
+export function taxValuePerUnit(balance: Balance, category: string): number {
+  const base = balance.economy.taxableValuePerUnit;
+  return category === 'residential' ? base * balance.economy.residentialTaxShare : base;
 }
 
 /**
@@ -145,7 +159,11 @@ export function buildingMonthlyUpkeep(
   // služby stojí dvanáctinásobek údržby, ne dvojnásobek. Křivka je jedna
   // a bydlí v `sim/funding.ts`, ať se cena nemůže rozejít s posuvníkem.
   const funding = serviceClass === undefined ? 1 : serviceFunding(world, serviceClass);
-  return Math.round(definition.economy.upkeep * fundingCost(balance, funding));
+  // Služby stojí násobek údržby z definice (`serviceUpkeepMultiplier`,
+  // 2026-09-30: dvojnásobek). Násobí se tady, ne v definicích, ať se dá
+  // ladit jedním číslem a mod s vlastní službou ho dostane zadarmo.
+  const multiplier = serviceClass === undefined ? 1 : balance.economy.serviceUpkeepMultiplier;
+  return Math.round(definition.economy.upkeep * multiplier * fundingCost(balance, funding));
 }
 
 /**
@@ -200,6 +218,7 @@ export function computeBudget(
               ? 'ui.budget.unit.population'
               : 'ui.budget.unit.jobs',
         taxRate: taxedAs === null ? null : world.economy.taxRates[taxedAs],
+        valuePerUnit: taxedAs === null ? 0 : taxValuePerUnit(balance, taxedAs),
         upkeepEach: definition.economy.upkeep,
         upkeepCount: 0,
       };
@@ -274,7 +293,7 @@ export function computeBudget(
   // v UI tvrdil něco jiného, než kolik ve sloupci opravdu stojí.
   for (const line of byDefinition.values()) {
     if (line.taxRate === null) continue;
-    line.income = taxFrom(line.taxBase, line.taxRate, balance.economy.taxableValuePerUnit);
+    line.income = taxFrom(line.taxBase, line.taxRate, line.valuePerUnit);
     income += line.income;
   }
 
