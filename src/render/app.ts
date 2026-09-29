@@ -973,6 +973,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // kontejner přestavuje a vzal by ukazatel s sebou.
   const preloader = new Preloader(document.body, i18n.t('ui.preload.label'));
   const preloading = preloadGraphics(imageUrls(content), (progress) => preloader.set(progress));
+  // Hotovo dřív, než si hráč vybral: proužek zmizí, na rozcestníku nemá co dělat.
+  void preloading.then(() => preloader.remove());
 
   // Hra začíná dialogem: hráč si vybere jméno města a seed a rovnou vidí, jakou
   // mapu dostane (§3 fáze 3). Teprve pak vzniká svět.

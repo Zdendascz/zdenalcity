@@ -8,7 +8,7 @@ import {
   sidewalks,
 } from '@/render/roadDetails';
 import type { UV } from '@/render/roadDetails';
-import { ROAD_E, ROAD_N, ROAD_S, ROAD_W } from '@/render/roads';
+import { ROAD_E, ROAD_N, ROAD_S, ROAD_W, roadPolygons } from '@/render/roads';
 
 const bounds = (points: readonly UV[]) => ({
   u0: Math.min(...points.map((p) => p[0])),
@@ -96,5 +96,25 @@ describe('WebP k obrázkům obsahu (T121)', () => {
     const webps = new Set(Object.keys(import.meta.glob('../content/vanilla/{sprites,tiles,parts,skirts}/*.webp')));
     const missing = pngs.filter((png) => !webps.has(png.replace(/\.png$/, '.webp')));
     expect(missing, 'pusť python tools/make-webp.py').toEqual([]);
+  });
+});
+
+describe('přechod mezi typy silnic (T124)', () => {
+  // Plochá dlaždice o velikosti 1 × 1 v souřadnicích (u, v): čtyři rohy
+  // S, V, J, Z jako `tileQuad`, ať se dá číst přímo v u a v.
+  const unit = [0, 0, 1, 0, 1, 1, 0, 1];
+
+  it('rameno k širšímu sousedovi má na hraně jeho šířku, ne svou', () => {
+    const street = 0.38;
+    const avenue = 0.55;
+    const polygons = roadPolygons(unit, ROAD_E | ROAD_W, street, [street, avenue, street, street]);
+    // Rameno na východ: body s u = 1 jsou na hraně.
+    const east = polygons.find((p) => p.some((value, i) => i % 2 === 0 && value === 1)) ?? [];
+    const onEdge = east.filter((_, i) => i % 2 === 1 && east[i - 1] === 1);
+    expect(Math.max(...onEdge) - Math.min(...onEdge)).toBeCloseTo(avenue, 5);
+    // U středu zůstává šířka ulice — rameno se rozšiřuje plynule.
+    const west = polygons.find((p) => p.some((value, i) => i % 2 === 0 && value === 0)) ?? [];
+    const westEdge = west.filter((_, i) => i % 2 === 1 && west[i - 1] === 0);
+    expect(Math.max(...westEdge) - Math.min(...westEdge)).toBeCloseTo(street, 5);
   });
 });
