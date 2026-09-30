@@ -1,3 +1,10 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * `@/render/effects` importuje Pixi, které při načtení sáhne na `navigator`.
+ * Bez DOM se soubor vůbec nenačte a jeho testy tiše neběží. Pragma je na
+ * jeden soubor, ne globální nastavení — simulační testy zůstávají ve `node`.
+ */
 import { describe, expect, it } from 'vitest';
 import { dustCount, ghostPulse, motionRandom, popScale } from '@/render/effects';
 
