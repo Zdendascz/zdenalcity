@@ -191,12 +191,15 @@ export function showHome(
       finish({ kind: 'game', game: { cityName: '', seed: 0, size: 128, disasters: true, resume: true } });
     });
     const info = options.resumeInfo;
-    resume.textContent = info
-      ? i18n.t('ui.home.resumeNamed', {
-          city: info.name,
-          minutes: Math.max(1, Math.round(info.playtimeSeconds / 60)),
-        })
-      : t('ui.home.resume');
+    resume.append(
+      iconSvg('resume'),
+      info
+        ? i18n.t('ui.home.resumeNamed', {
+            city: info.name,
+            minutes: Math.max(1, Math.round(info.playtimeSeconds / 60)),
+          })
+        : t('ui.home.resume'),
+    );
     actions.appendChild(resume);
   }
 
@@ -208,7 +211,7 @@ export function showHome(
       });
     },
   );
-  start.textContent = t('ui.home.newCity');
+  start.append(iconSvg('start-city'), t('ui.home.newCity'));
   actions.appendChild(start);
 
   // Varování, že nové město to rozehrané přepíše — a jedno kliknutí, kterým

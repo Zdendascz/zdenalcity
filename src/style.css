@@ -1668,6 +1668,25 @@ body {
   color: var(--text-dim);
 }
 
+/* Nadpis volby s ikonou (velikost mapy). */
+.dialog__field-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dialog__field-head .icon--image {
+  width: 23px;
+  height: 23px;
+}
+
+/* Tlačítka dialogu mají ikonu vedle textu; bez flexu by seděla na účaří. */
+.dialog__actions .chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
 /*
  * Jedna věta o tom, co ta volba udělá. Drobná a pod ovladačem — vysvětlení,
  * ne popisek (T-revize, nález 32).
@@ -2016,6 +2035,18 @@ body {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.home__button .icon--image {
+  width: 26px;
+  height: 26px;
+}
+
+.home__actions .home__button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
 }
 
 .home__button:hover {
