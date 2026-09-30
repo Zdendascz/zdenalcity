@@ -353,6 +353,35 @@ export function placedFootprint(
 }
 
 /**
+ * Dlaždice, které budova **doopravdy drží** — ze stejného důvodu jako
+ * `placedFootprint`, jen jako seznam.
+ *
+ * Potřebuje to, kdo z budovy dělá trosky nebo ji přestavuje (audit T132).
+ * Katastrofy i úrovně braly půdorys z definice, takže stará elektrárna 4 × 4,
+ * dnes definovaná jako 5 × 5, po sobě nechala trosky i na parcelách sousedů
+ * — na parku, na silnici, na druhé elektrárně. U okraje mapy navíc sahaly
+ * mimo ni.
+ */
+export function ownedTiles(
+  world: FootprintView,
+  building: { readonly id: number; readonly x: number; readonly y: number },
+  footprint: readonly [number, number],
+): number[] {
+  const [width, depth] = footprint;
+  const tiles: number[] = [];
+  for (let dy = 0; dy < depth; dy++) {
+    for (let dx = 0; dx < width; dx++) {
+      const x = building.x + dx;
+      const y = building.y + dy;
+      if (!inBounds(x, y, world.size)) continue;
+      const tile = index(x, y, world.size);
+      if (world.layers.buildingId[tile] === building.id) tiles.push(tile);
+    }
+  }
+  return tiles;
+}
+
+/**
  * Postaví budovu a přidělí jí **nové** id.
  *
  * Id se po zbourání **nerecyklují** a spoléhá na to víc míst, než je vidět:

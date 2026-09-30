@@ -96,6 +96,43 @@ describe('validace balancu', () => {
     });
   });
 
+  it('ceny musí být celé koruny, koeficienty ne (T132)', () => {
+    // Necelá cena udělala z kasy necelé číslo a save s ní se pak nenačetl.
+    const broken = copyOfVanilla();
+    const traffic = broken['traffic'] as { roadTypes: Record<string, unknown>[]; bridgeCost: number };
+    traffic.roadTypes[0]!['cost'] = 12.5;
+    traffic.bridgeCost = 0.5;
+    const modes = (broken['transit'] as { modes: Record<string, Record<string, unknown>> }).modes;
+    modes['bus']!['vehicleCost'] = 900.1;
+    // Údržba silnic se sčítá a zaokrouhluje až v součtu — desetinná smí být.
+    traffic.roadTypes[1]!['upkeep'] = 2.5;
+
+    const { balance, issues } = validateBalance(broken);
+    expect(balance).toBeNull();
+    const fields = issues.map((issue) => issue.field);
+    expect(fields).toContain('traffic.roadTypes[0].cost');
+    expect(fields).toContain('traffic.bridgeCost');
+    expect(fields).toContain('transit.modes.bus.vehicleCost');
+    expect(fields).not.toContain('traffic.roadTypes[1].upkeep');
+  });
+
+  it('typy silnic musí být přesně tři (T132)', () => {
+    // Typ je index do vrstvy i do ceníku: s méně typy by dálnice stála nulu,
+    // s víc by šlo stavět něco, co vrstva a save neunesou.
+    for (const count of [1, 2, 4]) {
+      const broken = copyOfVanilla();
+      const traffic = broken['traffic'] as { roadTypes: unknown[] };
+      const first = traffic.roadTypes[0];
+      traffic.roadTypes = Array.from({ length: count }, (_, i) => ({
+        ...(first as Record<string, unknown>),
+        id: `road${i}`,
+      }));
+
+      const { issues } = validateBalance(broken);
+      expect(issues.map((issue) => issue.field), `${count} typů`).toContain('traffic.roadTypes');
+    }
+  });
+
   it('bez balancu registr rovnou řekne, že chybí', async () => {
     const content = new ContentRegistry();
     await content.load({ label: 'test', manifest: MANIFEST, definitions: [], locales: {} });

@@ -40,6 +40,100 @@ export interface Modifier {
   readonly source: number;
 }
 
+/** Všechny druhy postihu. Save s jiným druhem pochází odjinud. */
+export const MODIFIER_KINDS: readonly Modifier['kind'][] = [
+  'suppressService',
+  'spikeTraffic',
+  'spikeCrime',
+  'crimeFloor',
+  'happinessPenalty',
+  'landValuePenalty',
+  'contaminateWater',
+  'blockTile',
+  'taxLoss',
+];
+
+/** Nejvyšší absolutní hodnota počítadla ve stavu pohromy. Tiky, oběti, škody. */
+const MAX_STATE_NUMBER = 1e12;
+
+/**
+ * Proč vlastní stav pohromy ze savu nejde použít, nebo `null` (audit T132).
+ *
+ * Save je cizí vstup — sdílí se na Discordu. Stav pohromy si přitom každá
+ * implementace čte po svém a věří mu: `{ offline: 5 }` u blackoutu prošlo
+ * načtením a pak **každý tik** vyhodilo výjimku, válka gangů s poloměrem
+ * 10⁹ protočila smyčku přes miliardy buněk. Kontroluje se proto podle
+ * **jména pole**, protože stejná jména znamenají u všech pohrom totéž:
+ * `cells` jsou buňky hrubé mřížky, `front` dlaždice, `offline` id budov,
+ * `radius` vzdálenost. Neznámé pole (mod) smí být jen číslo, přepínač, krátký
+ * text nebo pole čísel — vnořené objekty implementace nepíšou.
+ *
+ * Meze jsou **mapou, ne balancem**: balanc se mezi uložením a načtením může
+ * změnit a pohroma, která se do mapy vejde, se dohraje.
+ */
+export function disasterStateProblem(size: number, state: Record<string, unknown>): string | null {
+  const cells = size * size;
+  const coarseCells = Math.ceil(size / 4) ** 2;
+  const keys = Object.keys(state);
+  if (keys.length > 32) return 'příliš mnoho polí';
+
+  const intIn = (value: unknown, low: number, high: number): boolean =>
+    typeof value === 'number' && Number.isInteger(value) && value >= low && value <= high;
+  const numIn = (value: unknown, low: number, high: number): boolean =>
+    typeof value === 'number' && Number.isFinite(value) && value >= low && value <= high;
+  const intArray = (value: unknown, low: number, high: number, max: number): boolean =>
+    Array.isArray(value) && value.length <= max && value.every((item) => intIn(item, low, high));
+
+  for (const key of keys) {
+    const value = state[key];
+    let ok: boolean;
+    switch (key) {
+      case 'cells':
+        ok = intArray(value, 0, coarseCells - 1, coarseCells);
+        break;
+      case 'front':
+        ok = intArray(value, 0, cells - 1, cells);
+        break;
+      case 'offline':
+        ok = intArray(value, 1, 0xffffffff, 4096);
+        break;
+      case 'tile':
+      case 'blocked':
+        ok = intIn(value, 0, cells - 1);
+        break;
+      case 'batch':
+        ok = intIn(value, 0, cells);
+        break;
+      // Vzdálenosti. Každá z nich řídí smyčku přes okolí, takže víc než
+      // mapa znamená jen zbytečné točení.
+      case 'radius':
+      case 'width':
+      case 'reach':
+      case 'advance':
+        ok = numIn(value, 0, size);
+        break;
+      case 'x':
+      case 'y':
+        ok = numIn(value, -size, 2 * size);
+        break;
+      case 'recovering':
+      case 'wildfire':
+        ok = typeof value === 'boolean';
+        break;
+      default:
+        ok =
+          numIn(value, -MAX_STATE_NUMBER, MAX_STATE_NUMBER) ||
+          typeof value === 'boolean' ||
+          (typeof value === 'string' && value.length <= 256) ||
+          (Array.isArray(value) &&
+            value.length <= cells &&
+            value.every((item) => numIn(item, -MAX_STATE_NUMBER, MAX_STATE_NUMBER)));
+    }
+    if (!ok) return `pole ${key} má nepřípustnou hodnotu`;
+  }
+  return null;
+}
+
 /** Běžící katastrofa. Vlastní stav si drží implementace, tohle je evidence. */
 export interface ActiveDisaster {
   readonly id: number;

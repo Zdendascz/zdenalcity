@@ -14,7 +14,7 @@ import { MAX_FUNDING } from './funding';
 import { inBounds, index, ROAD, TERRAIN, terrainNameKey, WIRE, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { earn, spend } from './ledger';
-import { categoryForZone } from './rci';
+import { categoryForZone, isRciCategory } from './rci';
 import { gradeForRoads, planRoadGradeAround } from './roads';
 import { checkRequirements, presentDefinitions } from './requirements';
 import {
@@ -184,6 +184,18 @@ export function buildRoad(
   balance?: Balance,
 ): CommandResult {
   if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+  // Typ silnice je index do vrstvy i do tabulky cen (audit T132). Příkaz umí
+  // přijít z konzole nebo z budoucího vstupu, ne jen z lišty: `1.5` nebo `9`
+  // by se do Uint8 zapsalo jako jiná silnice nebo nesmysl a cena by vyšla
+  // nulová, protože `roadTypes[8]` neexistuje.
+  if (
+    !Number.isInteger(type) ||
+    type < ROAD.street ||
+    type > ROAD.highway ||
+    (balance !== undefined && type > balance.traffic.roadTypes.length)
+  ) {
+    return reject('error.unknownRoadType', { roadType: String(type) });
+  }
 
   const tile = index(x, y, world.size);
   if (world.layers.buildingId[tile] !== 0) return reject('error.occupied');
@@ -520,6 +532,31 @@ export function placeDefinition(
 }
 
 /**
+ * Příkaz `place_building`, tedy ruční stavba **od hráče** (audit T132).
+ *
+ * Budovy zón (bydlení, obchod, průmysl) ručně stavět nejdou: rostou samy
+ * z poptávky, a kdo by si je postavil, obešel by poptávku, daně i cenu půdy
+ * — v menu nejsou, ale příkaz přijde i z konzole nebo z budoucího vstupu.
+ * Kontrola je tady, ne v `placeDefinition`: tu používají testy a nástroje,
+ * které si zónovou budovu na místo postavit potřebují, aby zkoumaly něco
+ * jiného než růst.
+ */
+export function placeDefinitionCommand(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  definitionId: string,
+  x: number,
+  y: number,
+  balance?: Balance,
+): CommandResult {
+  const definition = catalogue.get(definitionId);
+  if (definition && isRciCategory(definition.category)) {
+    return reject('error.notPlaceable');
+  }
+  return placeDefinition(world, catalogue, definitionId, x, y, balance);
+}
+
+/**
  * Vyznačí obdélník zónou. Dlaždice, na které to nejde (voda, silnice, budova),
  * se přeskočí — hráč nemá důvod řešit, že mu výběr zasahuje do řeky. Když
  * neprojde ani jedna, je to odmítnutí i s důvodem.
@@ -535,6 +572,9 @@ export function zoneArea(
   zone: ZoneType,
   balance?: Balance,
 ): CommandResult {
+  // Obdélník větší než mapa nemá smysl a smyčka níž by kvůli `w = 1e9` běžela
+  // do zamrznutí karty (audit T132). Lišta takový nepošle, konzole ano.
+  if (!validArea(world, w, h)) return reject('error.outOfBounds');
   // Nejdřív se **jen sepíše**, co by se změnilo, a teprve pak se sahá na svět.
   // Srovnání terénu se od T68 platí a bez peněz se nezónuje; kdyby se značky
   // psaly průběžně, zůstala by po odmítnutí půlka čtvrti vyznačená.
@@ -882,6 +922,9 @@ export function setServiceFunding(
 export function setTaxRate(world: WorldState, zone: ZoneType, rate: number): CommandResult {
   const category = categoryForZone(zone);
   if (!category) return reject('error.notAZone');
+  // `NaN` by ořezáním prošel jako `NaN` a daně by od té chvíle nevybíraly
+  // nic; save s ním se pak odmítl načíst (audit T132).
+  if (!Number.isFinite(rate)) return reject('error.invalidTaxRate');
 
   world.economy.taxRates[category] = Math.max(
     MIN_TAX_RATE,
@@ -1193,7 +1236,21 @@ export function levelArea(
   height?: number,
 ): CommandResult {
   if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+  // Stejná mez jako u zón: plán srovnání prochází celý obdélník (T132).
+  if (!validArea(world, w, h)) return reject('error.outOfBounds');
   return commit(world, estimateLevelArea(world, x, y, w, h, balance, mode, height));
+}
+
+/**
+ * Rozměr obdélníku z příkazu: celé číslo od nuly do hrany mapy.
+ *
+ * Nula je platná (prázdný výběr, odmítne se až důvodem „nic se nezměnilo"),
+ * záporné, necelé nebo větší než mapa ne.
+ */
+function validArea(world: WorldState, w: number, h: number): boolean {
+  const fits = (side: number): boolean =>
+    Number.isInteger(side) && side >= 0 && side <= world.size;
+  return fits(w) && fits(h);
 }
 
 /* ------------------------------------------------------------------ MHD -- */
@@ -1222,8 +1279,29 @@ export function createTransitLine(
   return OK;
 }
 
-export function deleteTransitLine(world: WorldState, lineId: number): CommandResult {
-  if (!removeLine(world, lineId)) return reject('error.unknownLine', { id: lineId });
+/**
+ * Zruší linku a **proplatí její vozidla** (audit T132).
+ *
+ * Stejně jako `setLineVehicles` na nulu: plná cena vozidla, stejný řádek
+ * knihy. Do T132 se zrušením linky vozidla ztratila, takže hráč, který linku
+ * nejdřív vyprázdnil a pak smazal, dostal peníze zpátky, a ten, kdo ji smazal
+ * rovnou, ne — tentýž tah se dvěma cenami.
+ *
+ * Linka módu, který obsah nezná (mod zmizel), se smaže bez náhrady: cenu
+ * vozidla není odkud vzít.
+ */
+export function deleteTransitLine(
+  world: WorldState,
+  lineId: number,
+  balance?: Balance,
+): CommandResult {
+  const line = findLine(world, lineId);
+  if (!line) return reject('error.unknownLine', { id: lineId });
+
+  const mode = balance ? modeOf(balance, line.mode) : undefined;
+  const refund = mode ? line.vehicles * mode.vehicleCost : 0;
+  removeLine(world, lineId);
+  if (refund > 0) earn(world, 'refund', refund);
   return OK;
 }
 

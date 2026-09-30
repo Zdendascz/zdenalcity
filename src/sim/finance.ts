@@ -95,7 +95,9 @@ export function loanProblems(
   termMonths: number,
 ): LoanProblem[] {
   const problems: LoanProblem[] = [];
-  if (!Number.isFinite(amount) || amount <= 0) problems.push('invalidAmount');
+  // Celé číslo, ne jen konečné (audit T132): jistina jde rovnou do kasy
+  // a kasa s desetinnou čárkou už nejde uložit — `checkSaveFits` ji odmítne.
+  if (!Number.isInteger(amount) || amount <= 0) problems.push('invalidAmount');
   else if (amount > loanCap(world, balance, termMonths)) problems.push('overCap');
 
   if (!Number.isInteger(termMonths) || termMonths < balance.finance.minTermMonths) {
@@ -444,7 +446,9 @@ export function bondProblems(
 
   if (world.tick < world.bondsBlockedUntil) problems.push('blocked');
 
-  if (!Number.isFinite(offered) || offered <= 0) problems.push('invalidAmount');
+  // Celé číslo ze stejného důvodu jako u půjčky (T132): `offered` jde do
+  // savu a ten desetinné číslo odmítne načíst.
+  if (!Number.isInteger(offered) || offered <= 0) problems.push('invalidAmount');
   else if (offered > bondCap(world, balance)) problems.push('invalidAmount');
 
   if (!Number.isFinite(rate) || rate < 0 || rate > bonds.maxRate) problems.push('invalidRate');

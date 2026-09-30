@@ -1,10 +1,10 @@
-import { strFromU8, unzipSync } from 'fflate';
+import { Inflate, strFromU8 } from 'fflate';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { coarseCellsOf, coarseSizeOf } from '@/sim/coarse';
-import { cornerCellsOf } from '@/sim/heights';
+import { cornerCellsOf, MAX_HEIGHT } from '@/sim/heights';
 import type { CoarseLayers } from '@/sim/coarse';
 import type { Layers } from '@/sim/layers';
-import { MAP_SIZES, MAX_BUILDING_ID } from '@/sim/layers';
+import { inBounds, MAP_SIZES, MAX_BUILDING_ID, ROAD, TERRAIN, WIRE, ZONE } from '@/sim/layers';
 import { MAX_LEVEL } from '@/content/schema';
 import { Rng } from '@/sim/rng';
 import { RCI_CATEGORIES } from '@/sim/rci';
@@ -14,7 +14,6 @@ import { MAX_LINE_VEHICLES } from '@/sim/transit';
 import {
   MAX_TAX_RATE,
   MIN_TAX_RATE,
-  NEUTRAL_HAPPINESS,
   rebuildTileIndex,
   resizeWorld,
 } from '@/sim/world';
@@ -26,6 +25,7 @@ import type {
 } from '@/sim/world';
 import {
   MAX_SAVE_FILE_BYTES,
+  SAVE_COARSE_BYTES_PER_CELL,
   SAVE_COARSE_LAYER_ORDER,
   SAVE_DISASTER_LAYER_ORDER,
   SAVE_FILES,
@@ -34,6 +34,7 @@ import {
 } from './format';
 import type {
   SaveData,
+  SaveDerivedState,
   SaveDisasterState,
   SaveEntities,
   SaveFinanceState,
@@ -42,9 +43,9 @@ import type {
   SaveState,
   SaveTransitState,
 } from './format';
-import { rememberPopulation } from '@/sim/finance';
 import { noLosses, repairUnsupportedRoads } from '@/sim/disasters/damage';
 import { countBurning } from '@/sim/disasters/fire';
+import { disasterStateProblem, MODIFIER_KINDS } from '@/sim/disasters/state';
 import type { Modifier } from '@/sim/disasters/state';
 
 function fail(message: string): never {
@@ -216,6 +217,58 @@ function parseTransit(raw: Record<string, unknown>): SaveTransitState {
   };
 }
 
+/** Prázdný stav s pamětí — to, s čím se načítal save do verze 14. */
+function emptyDerived(): SaveDerivedState {
+  return {
+    trafficLoad: [],
+    jobAccess: [],
+    lineStats: [],
+    transitRelief: [],
+    downgradeStreak: [],
+    waterlessStreak: [],
+    coverage: [],
+    watered: [],
+  };
+}
+
+/**
+ * Stav s pamětí (verze 15). Tady se kontroluje **tvar**; meze proti velikosti
+ * mapy a proti zdravému rozumu hlídá `checkSaveFits`.
+ */
+function parseDerived(raw: Record<string, unknown>): SaveDerivedState {
+  const what = 'state.derived';
+  return {
+    trafficLoad: pairArray(raw['trafficLoad'], `${what}.trafficLoad`),
+    jobAccess: pairArray(raw['jobAccess'], `${what}.jobAccess`),
+    lineStats: asArray(raw['lineStats'], `${what}.lineStats`).map((value, i) => {
+      const where = `${what}.lineStats[${i}]`;
+      const [id, rawStats] = asArray(value, where);
+      if (typeof id !== 'number' || !Number.isInteger(id)) fail(`${where}[0] musí být id linky`);
+      const stats = asRecord(rawStats, `${where}[1]`);
+      return [
+        id,
+        {
+          demand: num(stats, 'demand', `${where}[1]`),
+          capacity: num(stats, 'capacity', `${where}[1]`),
+          transported: num(stats, 'transported', `${where}[1]`),
+          income: num(stats, 'income', `${where}[1]`),
+          upkeep: num(stats, 'upkeep', `${where}[1]`),
+        },
+      ];
+    }),
+    transitRelief: pairArray(raw['transitRelief'], `${what}.transitRelief`),
+    downgradeStreak: pairArray(raw['downgradeStreak'], `${what}.downgradeStreak`),
+    waterlessStreak: pairArray(raw['waterlessStreak'], `${what}.waterlessStreak`),
+    coverage: asArray(raw['coverage'], `${what}.coverage`).map((value, i) => {
+      const where = `${what}.coverage[${i}]`;
+      const [serviceClass, cells] = asArray(value, where);
+      if (typeof serviceClass !== 'string') fail(`${where}[0] musí být třída služby`);
+      return [serviceClass, numberArray(cells, `${where}[1]`)];
+    }),
+    watered: numberArray(raw['watered'], `${what}.watered`),
+  };
+}
+
 function parseFinance(raw: Record<string, unknown>): SaveFinanceState {
   const what = 'state.finance';
   return {
@@ -306,7 +359,9 @@ function pairArray(value: unknown, what: string): [number, number][] {
   return asArray(value, what).map((item, i) => {
     const pair = asArray(item, `${what}[${i}]`);
     const [a, b] = pair;
-    if (typeof a !== 'number' || typeof b !== 'number') {
+    // `Number.isFinite`, ne jen `typeof`: JSON umí `1e400`, a to se přečte
+    // jako nekonečno (audit T132).
+    if (typeof a !== 'number' || typeof b !== 'number' || !Number.isFinite(a) || !Number.isFinite(b)) {
       fail(`${what}[${i}] musí být dvojice čísel`);
     }
     return [a, b] as [number, number];
@@ -454,6 +509,8 @@ function emptyFinance(): SaveFinanceState {
  * sám o sobě neví, jak je starý.
  */
 const PHASE_FOUR_VERSION = 6;
+/** Od téhle verze nese save stav s pamětí (`state.derived`, audit T132). */
+const DERIVED_VERSION = 15;
 
 function parseState(
   raw: Record<string, unknown>,
@@ -513,6 +570,12 @@ function parseState(
     finance: hasPhaseFour
       ? parseFinance(asRecord(raw['finance'], 'state.finance'))
       : emptyFinance(),
+    // Stav s pamětí nese až verze 15 (T132). Stejná úvaha jako u fáze 4:
+    // u starších se nevyžaduje, u novějších chybějící sekce znamená vadný soubor.
+    derived:
+      formatVersion >= DERIVED_VERSION
+        ? parseDerived(asRecord(raw['derived'], 'state.derived'))
+        : emptyDerived(),
     economy: {
       funds: int(economyRaw, 'funds', 'state.economy'),
       taxRates,
@@ -560,18 +623,21 @@ export function saveMapSize(meta: SaveMeta): number {
 }
 
 /**
- * Očekávaná délka `coarse.bin`: tři jednobajtové vrstvy na hrubé mřížce.
+ * Očekávaná délka `coarse.bin`: tři jednobajtové vrstvy na hrubé mřížce a od
+ * verze 15 za nimi spokojenost.
  *
  * `size` je hrana **mapy**, ne hrubé mřížky — od T42 ji nese `meta.grid.size`
  * a save z mapy 512 × 512 je jinak dlouhý než ze 128 × 128.
  */
 export function expectedCoarseByteLength(size: number): number {
-  return coarseCellsOf(size) * SAVE_COARSE_LAYER_ORDER.length;
+  return coarseCellsOf(size) * SAVE_COARSE_BYTES_PER_CELL;
 }
 
+/** Hrubé vrstvy a za nimi spokojenost (verze 15). */
 export function unpackCoarseInto(
   bytes: Uint8Array,
   coarse: CoarseLayers,
+  happiness: Uint8Array,
   size: number,
 ): void {
   const cells = coarseCellsOf(size);
@@ -586,6 +652,7 @@ export function unpackCoarseInto(
     coarse[name].set(bytes.subarray(offset, offset + cells));
     offset += cells;
   }
+  happiness.set(bytes.subarray(offset, offset + cells));
 }
 
 /** Očekávaná délka `heights.bin`: jeden bajt na roh mřížky. */
@@ -686,33 +753,166 @@ function maxUnpackedBytes(name: string): number {
 const KNOWN_FILES: readonly string[] = Object.values(SAVE_FILES);
 
 /**
+ * Kolik položek smí mít archiv savu. Hra jich píše osm; zbytek je rezerva
+ * pro soubory, které přibudou s dalšími verzemi formátu.
+ */
+const MAX_ZIP_ENTRIES = 16;
+
+/**
+ * Po kolika bajtech komprimovaných dat se rozbaluje. Deflate umí nafouknout
+ * bajt nejvýš zhruba na tisíc, takže jeden krok přes strop přidá nanejvýš
+ * pár megabajtů, než se rozbalování utne.
+ */
+const INFLATE_STEP = 4096;
+
+/** Jedna položka ze seznamu na konci ZIPu, i s tím, kde leží její data. */
+interface ZipEntry {
+  name: string;
+  compression: number;
+  compressedSize: number;
+  originalSize: number;
+  dataStart: number;
+}
+
+/**
+ * Přečte ústřední adresář ZIPu. Nic nerozbaluje.
+ *
+ * Vlastní čtení, ne `unzipSync` (audit T132). Ten rozbalí **každou položku
+ * adresáře**, a adresář smí na tentýž záznam ukazovat kolikrát chce: soubor
+ * o 256 kB s tisícovkou odkazů na jeden `layers.bin` zamrazil kartu na
+ * 4,8 s a čtyřmegabajtový by ji zamrazil na hodiny. A délku po rozbalení
+ * bral z hlavičky jen jako první odhad — co hlavička zatajila, dorostlo.
+ *
+ * Tady se proto odmítne všechno, co hra sama nikdy nenapíše: víc než
+ * `MAX_ZIP_ENTRIES` položek, jméno dvakrát, šifrování, ZIP64 a odkaz mimo
+ * soubor.
+ */
+function readZipDirectory(bytes: Uint8Array): ZipEntry[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const length = bytes.byteLength;
+  const u16 = (at: number): number => view.getUint16(at, true);
+  const u32 = (at: number): number => view.getUint32(at, true);
+  const broken = (): never => fail('save není čitelný ZIP');
+
+  // Konec ústředního adresáře: 22 bajtů a za nimi nanejvýš 65 535 bajtů
+  // komentáře. Hledá se odzadu.
+  let end = -1;
+  for (let at = length - 22; at >= 0 && at >= length - 22 - 0xffff; at--) {
+    if (u32(at) === 0x06054b50) {
+      end = at;
+      break;
+    }
+  }
+  if (end < 0) broken();
+
+  const count = u16(end + 10);
+  const directory = u32(end + 16);
+  if (count === 0xffff || directory === 0xffffffff) fail('save nesmí být ZIP64');
+  if (count > MAX_ZIP_ENTRIES) {
+    fail(`archiv má ${count} položek, save hry má nejvýš ${MAX_ZIP_ENTRIES}`);
+  }
+
+  const entries: ZipEntry[] = [];
+  const names = new Set<string>();
+  let at = directory;
+  for (let i = 0; i < count; i++) {
+    if (at + 46 > length || u32(at) !== 0x02014b50) broken();
+    const flags = u16(at + 8);
+    if ((flags & 1) !== 0) fail('save nesmí být šifrovaný');
+    const compression = u16(at + 10);
+    const compressedSize = u32(at + 20);
+    const originalSize = u32(at + 24);
+    const nameLength = u16(at + 28);
+    const extraLength = u16(at + 30);
+    const commentLength = u16(at + 32);
+    const local = u32(at + 42);
+    if (at + 46 + nameLength > length) broken();
+    const name = strFromU8(bytes.subarray(at + 46, at + 46 + nameLength), true);
+    at += 46 + nameLength + extraLength + commentLength;
+
+    // Druhý záznam téhož jména je přesně ten trik s tisíci odkazy na jednu
+    // bombu. Hra ho nenapíše nikdy, takže se nehledá, který z nich platí.
+    if (names.has(name)) fail(`${name} je v archivu dvakrát`);
+    names.add(name);
+
+    if (local + 30 > length || u32(local) !== 0x04034b50) broken();
+    const dataStart = local + 30 + u16(local + 26) + u16(local + 28);
+    if (dataStart + compressedSize > length) broken();
+
+    entries.push({ name, compression, compressedSize, originalSize, dataStart });
+  }
+  return entries;
+}
+
+/**
+ * Rozbalí jednu položku a **utne to**, jakmile výstup přeroste `limit`.
+ *
+ * Rozbaluje se po kouscích přes proudový `Inflate`, takže bomba se zastaví
+ * po pár megabajtech, ne až když dojde paměť. Výsledek musí mít přesně
+ * délku z hlavičky: hlavička, která lže, znamená soubor, který nepsala hra.
+ */
+function inflateEntry(bytes: Uint8Array, entry: ZipEntry, limit: number): Uint8Array {
+  const { name, originalSize } = entry;
+  if (originalSize > limit) {
+    fail(`${name} má po rozbalení ${originalSize} B, povoleno je nejvýš ${limit} B`);
+  }
+  const data = bytes.subarray(entry.dataStart, entry.dataStart + entry.compressedSize);
+
+  if (entry.compression === 0) {
+    if (entry.compressedSize !== originalSize) fail(`${name} má v hlavičce dvě různé délky`);
+    return data.slice();
+  }
+  if (entry.compression !== 8) fail(`${name} je zkomprimovaný neznámou metodou`);
+  // Deflate data nikdy o moc nezvětší; komprimovaná položka výrazně delší
+  // než výsledek je jen balast, přes který by se procesor prokousával.
+  if (entry.compressedSize > originalSize + 1024 + Math.ceil(originalSize / 1000)) {
+    fail(`${name} je v komprimované podobě delší, než po rozbalení`);
+  }
+
+  const out = new Uint8Array(originalSize);
+  let written = 0;
+  let finished = false;
+  const inflater = new Inflate((chunk, final) => {
+    if (written + chunk.length > originalSize) {
+      fail(`${name} se rozbaluje na víc než ${originalSize} B, které hlásí hlavička`);
+    }
+    out.set(chunk, written);
+    written += chunk.length;
+    if (final) finished = true;
+  });
+  try {
+    for (let offset = 0; offset < data.length; offset += INFLATE_STEP) {
+      const end = Math.min(data.length, offset + INFLATE_STEP);
+      inflater.push(data.subarray(offset, end), end === data.length);
+    }
+    if (data.length === 0) inflater.push(new Uint8Array(0), true);
+  } catch (error) {
+    if (error instanceof SaveFormatError) throw error;
+    fail(`${name} není čitelný deflate`);
+  }
+  if (!finished || written !== originalSize) {
+    fail(`${name} má po rozbalení ${written} B, hlavička hlásí ${originalSize} B`);
+  }
+  return out;
+}
+
+/**
  * Rozbalí archiv a **do paměti pustí jen to, co má smysl**.
  *
- * `filter` běží nad hlavičkami, tedy dřív, než se cokoli dekomprimuje: neznámé
- * jméno se přeskočí, příliš velká položka taky. Hlavička ale umí lhát, tak se
- * délka po rozbalení kontroluje ještě jednou.
+ * Neznámé jméno se přeskočí bez rozbalení. Známé se rozbaluje jen do stropu
+ * pro svůj druh a jen do délky, kterou samo hlásí (`inflateEntry`).
  */
 function unzipGuarded(bytes: Uint8Array, wanted?: string): Record<string, Uint8Array> {
   if (bytes.byteLength > MAX_SAVE_FILE_BYTES) {
     fail(`soubor má ${bytes.byteLength} B, save hry má nejvýš ${MAX_SAVE_FILE_BYTES} B`);
   }
+  if (bytes.byteLength < 22) fail('save není čitelný ZIP');
 
-  let files: Record<string, Uint8Array>;
-  try {
-    files = unzipSync(bytes, {
-      filter: (file) =>
-        (wanted === undefined ? KNOWN_FILES.includes(file.name) : file.name === wanted) &&
-        file.originalSize <= maxUnpackedBytes(file.name),
-    });
-  } catch {
-    fail('save není čitelný ZIP');
-  }
-
-  for (const [name, content] of Object.entries(files)) {
-    const limit = maxUnpackedBytes(name);
-    if (content.byteLength > limit) {
-      fail(`${name} má po rozbalení ${content.byteLength} B, povoleno je nejvýš ${limit} B`);
-    }
+  const files: Record<string, Uint8Array> = {};
+  for (const entry of readZipDirectory(bytes)) {
+    const take = wanted === undefined ? KNOWN_FILES.includes(entry.name) : entry.name === wanted;
+    if (!take) continue;
+    files[entry.name] = inflateEntry(bytes, entry, maxUnpackedBytes(entry.name));
   }
   return files;
 }
@@ -944,6 +1144,224 @@ export function checkSaveFits(save: SaveData): void {
       `state.economy.taxRates.${category}`,
     );
   }
+
+  checkDerivedFits(save, size);
+  checkStateFits(save, size);
+  checkLayerValuesFit(save, size);
+}
+
+/**
+ * Meze stavu, které do T132 hlídal jen typ (audit T132, nález 14).
+ *
+ * Každé z těch čísel prošlo parserem jako „číslo" a pak dělalo něco, co hra
+ * sama nikdy neudělá: nákaza 10³⁰⁰ přetekla do nekonečna, buňka postihu
+ * 10¹² se hledala v poli o tisíci prvcích, záporný tik přetočil kalendář,
+ * rating nad jedničku dával půjčky se záporným úrokem a jízdné 10³⁰⁸ udělalo
+ * z kasy nekonečno, které se pak nedalo uložit.
+ */
+function checkStateFits(save: SaveData, size: number): void {
+  const state = save.state;
+  const cells = size * size;
+  const coarseCells = coarseCellsOf(size);
+  const MAX_MONEY = 1e15; // pod 2⁵³, aby sčítání v kase zůstalo přesné
+
+  inRange(state.tick, 0, Number.MAX_SAFE_INTEGER, 'state.tick');
+  inRange(state.trafficCursor, 0, MAX_BUILDING_ID, 'state.trafficCursor');
+
+  const economy = state.economy;
+  inRange(economy.funds, -MAX_MONEY, MAX_MONEY, 'state.economy.funds');
+  inRange(economy.lastIncome, -MAX_MONEY, MAX_MONEY, 'state.economy.lastIncome');
+  inRange(economy.lastExpenses, -MAX_MONEY, MAX_MONEY, 'state.economy.lastExpenses');
+  inRange(economy.lastPopulation, 0, 1e12, 'state.economy.lastPopulation');
+  inRealRange(economy.creditRating, 0, 1, 'state.economy.creditRating');
+  for (const category of RCI_CATEGORIES) {
+    inRealRange(state.demand[category], -1e6, 1e6, `state.demand.${category}`);
+  }
+
+  const disasters = state.disasters;
+  const what = 'state.disasters';
+  inRange(disasters.nextId, 1, Number.MAX_SAFE_INTEGER, `${what}.nextId`);
+  disasters.active.forEach((entry, i) => {
+    inRange(entry.id, 0, Number.MAX_SAFE_INTEGER, `${what}.active[${i}].id`);
+    inRange(entry.startedAtTick, 0, Number.MAX_SAFE_INTEGER, `${what}.active[${i}].startedAtTick`);
+    // Poloha a vlastní stav se neodmítají: taková pohroma se při načtení
+    // jen ukončí (`applyDisastersToWorld`).
+  });
+  disasters.modifiers.forEach((modifier, i) => {
+    const where = `${what}.modifiers[${i}]`;
+    if (!(MODIFIER_KINDS as readonly string[]).includes(modifier.kind)) {
+      fail(`${where}.kind ${modifier.kind} hra nezná`);
+    }
+    // `blockTile` nese dlaždice, ostatní buňky hrubé mřížky — mez je mapa.
+    if (modifier.cells.length > cells) fail(`${where}.cells má víc prvků než mapa dlaždic`);
+    modifier.cells.forEach((cell, j) => inRange(cell, 0, cells - 1, `${where}.cells[${j}]`));
+    inRealRange(modifier.amount, -1e6, 1e6, `${where}.amount`);
+    inRange(modifier.until, 0, Number.MAX_SAFE_INTEGER, `${where}.until`);
+    inRange(modifier.source, 0, Number.MAX_SAFE_INTEGER, `${where}.source`);
+  });
+  for (const [kind, tick] of Object.entries(disasters.lastOccurrence)) {
+    inRange(tick, 0, Number.MAX_SAFE_INTEGER, `${what}.lastOccurrence.${kind}`);
+  }
+  for (const [kind, ceiling] of Object.entries(disasters.riskCeiling)) {
+    inRealRange(ceiling, 0, 1e6, `${what}.riskCeiling.${kind}`);
+  }
+  disasters.offlinePlants.forEach((id, i) =>
+    inRange(id, 1, MAX_BUILDING_ID, `${what}.offlinePlants[${i}]`),
+  );
+  disasters.infection.forEach(([cell, level], i) => {
+    inRange(cell, 0, coarseCells - 1, `${what}.infection[${i}][0]`);
+    inRealRange(level, 0, 1, `${what}.infection[${i}][1]`);
+  });
+  disasters.rubbleOf.forEach(([tile, id], i) => {
+    inRange(tile, 0, cells - 1, `${what}.rubbleOf[${i}][0]`);
+    if (id.length > 256) fail(`${what}.rubbleOf[${i}][1] je příliš dlouhé id`);
+  });
+
+  const transit = state.transit;
+  inRange(transit.nextLineId, 1, Number.MAX_SAFE_INTEGER, 'state.transit.nextLineId');
+  for (const line of transit.lines) {
+    // Jízdné se násobí cestujícími a jde do kasy. Nad milion za jízdu to
+    // není tarif, ale pokus kasu přetéct.
+    inRealRange(line.fare, 0, 1e6, `state.transit.lines[id=${line.id}].fare`);
+    // Zastávky se na existenci nekontrolují — neznámá z linky při načtení
+    // vypadne (`applyTransitToWorld`). Hlídá se jen délka.
+    if (line.stops.length > 1000) fail(`state.transit.lines[id=${line.id}].stops je příliš dlouhé`);
+  }
+  transit.lostStops.forEach(([tile, lost], i) => {
+    inRange(tile, 0, cells - 1, `state.transit.lostStops[${i}][0]`);
+    lost.forEach(([lineId, index], j) => {
+      inRange(lineId, 1, Number.MAX_SAFE_INTEGER, `state.transit.lostStops[${i}][1][${j}][0]`);
+      inRange(index, 0, 1000, `state.transit.lostStops[${i}][1][${j}][1]`);
+    });
+  });
+
+  const finance = state.finance;
+  const loans = new Set<number>();
+  for (const loan of finance.loans) {
+    if (loans.has(loan.id)) fail(`state.finance.loans[id=${loan.id}].id se v savu opakuje`);
+    loans.add(loan.id);
+  }
+  const bonds = new Set<number>();
+  for (const bond of finance.bonds) {
+    if (bonds.has(bond.id)) fail(`state.finance.bonds[id=${bond.id}].id se v savu opakuje`);
+    bonds.add(bond.id);
+  }
+  finance.grantProgress.forEach(([id, ticks], i) =>
+    inRange(ticks, 0, Number.MAX_SAFE_INTEGER, `state.finance.grantProgress[${i}] (${id})`),
+  );
+}
+
+/**
+ * Hodnoty ve vrstvách mapy (audit T132). Silnice 7 nebo vedení 200 by se
+ * načetly, a pak by se četlo mimo tabulku cen a kapacit — silnice bez
+ * kapacity, vedení bez stropu. Patra nad `MAX_HEIGHT` rozbijí kaskádu.
+ */
+function checkLayerValuesFit(save: SaveData, size: number): void {
+  const cells = size * size;
+  const limits: Partial<Record<(typeof SAVE_LAYER_ORDER)[number], number>> = {
+    terrain: Math.max(...Object.values(TERRAIN)),
+    zone: Math.max(...Object.values(ZONE)),
+    road: Math.max(...Object.values(ROAD)),
+    power: 1,
+    pipe: 1,
+    wire: Math.max(...Object.values(WIRE)),
+  };
+
+  let offset = 0;
+  for (const name of SAVE_LAYER_ORDER) {
+    const width = name === 'buildingId' ? 4 : 1;
+    const limit = limits[name];
+    if (limit !== undefined) {
+      const layer = save.layers.subarray(offset, offset + cells);
+      for (let tile = 0; tile < cells; tile++) {
+        if ((layer[tile] ?? 0) > limit) {
+          fail(`${SAVE_FILES.layers}: vrstva ${name} má na dlaždici ${tile} hodnotu ${layer[tile]}, nejvýš smí ${limit}`);
+        }
+      }
+    }
+    offset += cells * width;
+  }
+
+  for (let corner = 0; corner < save.heights.length; corner++) {
+    if ((save.heights[corner] ?? 0) > MAX_HEIGHT) {
+      fail(`${SAVE_FILES.heights}: roh ${corner} má patro ${save.heights[corner]}, nejvýš smí ${MAX_HEIGHT}`);
+    }
+  }
+
+  // Oheň, povodeň a poškození smí celý bajt; příznak lesa a trosky jen 0/1.
+  let disasterOffset = 0;
+  for (const name of SAVE_DISASTER_LAYER_ORDER) {
+    if (name === 'fireFlags' || name === 'rubble') {
+      const layer = save.disasters.subarray(disasterOffset, disasterOffset + cells);
+      for (let tile = 0; tile < cells; tile++) {
+        if ((layer[tile] ?? 0) > 1) {
+          fail(`${SAVE_FILES.disasters}: vrstva ${name} má na dlaždici ${tile} hodnotu ${layer[tile]}, nejvýš smí 1`);
+        }
+      }
+    }
+    disasterOffset += cells;
+  }
+}
+
+/** Desetinné číslo v mezích. Nekonečno ani NaN neprojde. */
+function inRealRange(value: number, low: number, high: number, what: string): void {
+  if (!Number.isFinite(value) || value < low || value > high) {
+    fail(`${what} je ${value}, čeká se číslo mezi ${low} a ${high}`);
+  }
+}
+
+/**
+ * Stav s pamětí (verze 15). Save sdílený na Discordu je cizí vstup, takže se
+ * meze hlídají i tady: dlaždice mimo mapu by zapsala za konec vrstvy
+ * a necelé jízdné by udělalo necelou kasu, kterou pak hra odmítne uložit.
+ */
+function checkDerivedFits(save: SaveData, size: number): void {
+  const derived = save.state.derived;
+  const cells = size * size;
+  const coarseCells = coarseCellsOf(size);
+  const what = 'state.derived';
+
+  derived.trafficLoad.forEach(([tile, load], i) => {
+    inRange(tile, 0, cells - 1, `${what}.trafficLoad[${i}][0]`);
+    inRealRange(load, 0, 1e9, `${what}.trafficLoad[${i}][1]`);
+  });
+  derived.jobAccess.forEach(([id, access], i) => {
+    inRange(id, 1, MAX_BUILDING_ID, `${what}.jobAccess[${i}][0]`);
+    inRealRange(access, 0, 1, `${what}.jobAccess[${i}][1]`);
+  });
+  derived.lineStats.forEach(([id, stats], i) => {
+    const where = `${what}.lineStats[${i}]`;
+    inRange(id, 1, Number.MAX_SAFE_INTEGER, `${where}[0]`);
+    inRealRange(stats.demand, 0, 1e12, `${where}.demand`);
+    inRealRange(stats.capacity, 0, 1e12, `${where}.capacity`);
+    inRealRange(stats.transported, 0, 1e12, `${where}.transported`);
+    // Příjem a údržba jdou rovnou do kasy, a ta musí zůstat celá.
+    inRange(stats.income, 0, 1e12, `${where}.income`);
+    inRange(stats.upkeep, 0, 1e12, `${where}.upkeep`);
+  });
+  derived.transitRelief.forEach(([cell, relief], i) => {
+    inRange(cell, 0, coarseCells - 1, `${what}.transitRelief[${i}][0]`);
+    // Součet podílů nepřekročí jedničku jen v přesné aritmetice; v plovoucí
+    // čárce může vyjít o zaokrouhlení výš.
+    inRealRange(relief, 0, 1 + 1e-9, `${what}.transitRelief[${i}][1]`);
+  });
+  for (const key of ['downgradeStreak', 'waterlessStreak'] as const) {
+    derived[key].forEach(([id, streak], i) => {
+      inRange(id, 1, MAX_BUILDING_ID, `${what}.${key}[${i}][0]`);
+      inRange(streak, 0, 1e6, `${what}.${key}[${i}][1]`);
+    });
+  }
+  const classes = new Set<string>();
+  derived.coverage.forEach(([serviceClass, values], i) => {
+    const where = `${what}.coverage[${i}]`;
+    if (classes.has(serviceClass)) fail(`${where}: třída ${serviceClass} se opakuje`);
+    classes.add(serviceClass);
+    if (values.length !== coarseCells) {
+      fail(`${where} má ${values.length} buněk, k mapě ${size} × ${size} patří ${coarseCells}`);
+    }
+    values.forEach((value, cell) => inRange(value, 0, 255, `${where}[${cell}]`));
+  });
+  derived.watered.forEach((id, i) => inRange(id, 1, MAX_BUILDING_ID, `${what}.watered[${i}]`));
 }
 
 /**
@@ -983,14 +1401,15 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
     world.buildings.set(building.id, { ...building });
   }
   world.nextBuildingId = save.entities.nextBuildingId;
-  // Populace pro měření růstu je **odvozená** z budov, které save nese —
-  // dopočítá se, místo aby se ukládala. Načtené město tak startuje s nulovým
-  // růstem, ne s falešným skokem proti nule.
-  rememberPopulation(world);
+  // `lastPopulation` se bere **ze savu** (audit T132). Do T132 se tady
+  // dopočítávala z budov u každého savu, takže první měsíční uzávěrka po
+  // načtení měřila růst proti jinému číslu než hra bez přerušení. Savu
+  // starší verze 6, který ji nenese, ji z budov dopočítá migrace.
 
   // Hrubé vrstvy nese formát verze 2. Starší save jimi projde s vynulovaným
-  // `coarse.bin`, který mu doplnila migrace.
-  unpackCoarseInto(save.coarse, world.coarse, size);
+  // `coarse.bin`, který mu doplnila migrace. Za nimi od verze 15 spokojenost;
+  // starším ji migrace doplnila neutrální.
+  unpackCoarseInto(save.coarse, world.coarse, world.happiness, size);
   // Patra nese verze 4; starším je migrace doplnila jako rovinu.
   unpackHeightsInto(save.heights, world.cornerHeight, size);
 
@@ -998,35 +1417,55 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   // Pokrytí se **musí** označit za špinavé: bez toho by ho `serviceSystem`
   // nikdy nepřepočítal a všechny služby by po loadu přestaly fungovat —
   // žádný bonus k ceně půdy, žádné srážení kriminality, žádné zdravotnictví.
+  //
+  // Od verze 15 se ale nejdřív převezme pokrytí ze savu (T132): katastrofy,
+  // oheň a povodeň z něj čtou v prvním tiku dřív, než se přepočítá. Přepočet
+  // pak dá totéž, co by dala hra bez přerušení — pokrytí je čistá funkce města.
   world.coverage.clear();
+  for (const [serviceClass, values] of save.state.derived.coverage) {
+    world.coverage.set(serviceClass, Uint8Array.from(values));
+  }
   world.coverageDirty = true;
   world.serviceFunding.clear();
   for (const [serviceClass, funding] of Object.entries(save.state.serviceFunding)) {
     world.serviceFunding.set(serviceClass, funding);
   }
+  const derived = save.state.derived;
+  // Počítadla chátrání jsou hystereze, tedy paměť — od verze 15 se ukládají
+  // (T132). Starší save je nemá a začne od nuly, jako do té doby každý.
   world.downgradeStreak.clear();
+  for (const [id, streak] of derived.downgradeStreak) {
+    if (world.buildings.has(id)) world.downgradeStreak.set(id, streak);
+  }
 
-  // Doprava se neukládá (R10) — a právě proto se musí **vynulovat**. Zátěž ani
-  // dosažitelnost práce z předchozího města nesmí přetéct do načteného: silnice
-  // jsou jinde, budovy mají jiná id a chvíli by hra počítala s dopravou, která
-  // v tomhle městě nikdy nebyla. Kurzor je jediné, co se přenáší ze savu.
+  // Zátěž silnic a dosažitelnost práce se **vyhlazují** přes mnoho běhů
+  // vzorkování, takže se od verze 15 ukládají (T132). Co přijde odjinud než
+  // ze savu, se vynuluje: z předchozího města nesmí přetéct nic.
   world.trafficLoad.fill(0);
+  for (const [tile, load] of derived.trafficLoad) world.trafficLoad[tile] = load;
   world.jobAccess.clear();
+  for (const [id, access] of derived.jobAccess) {
+    if (world.buildings.has(id)) world.jobAccess.set(id, access);
+  }
+  // Násobitele dostupnosti jsou **výstup** růstu, ne paměť: růst je přepíše
+  // dřív, než je kdokoli kromě panelu parcely použije.
   world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
   world.cityJobAccess = 1;
   world.trafficCursor = save.state.trafficCursor;
 
-  // Spokojenost se taky neukládá (R10). Nulou začít nesmí — načtené město
-  // by na první pohled vypadalo jako zoufalé — proto výchozí neutrál.
-  world.happiness.fill(NEUTRAL_HAPPINESS);
-
-  // Voda je odvozená z potrubí a zdrojů, takže se stejně jako doprava musí
-  // **vynulovat**, ne nechat přetéct: zavodněné budovy minulého města mají
-  // jiná id a počítadlo chátrání by načtenému městu strhlo obyvatele za
-  // sucho, které se stalo někde jinde.
+  // Voda je odvozená z potrubí a zdrojů, takže se musí **vynulovat**, ne
+  // nechat přetéct, a v prvním tiku se přepočítá. Seznam zavodněných budov se
+  // ale převezme ze savu (verze 15): epidemie a los katastrof se na něj ptají
+  // ještě před vodovodem.
   world.waterSupply.fill(0);
   world.watered.clear();
+  for (const id of save.state.derived.watered) {
+    if (world.buildings.has(id)) world.watered.add(id);
+  }
   world.waterlessStreak.clear();
+  for (const [id, streak] of derived.waterlessStreak) {
+    if (world.buildings.has(id)) world.waterlessStreak.set(id, streak);
+  }
   world.waterNetworkDirty = true;
 
   // Původ mapy: co save neví, bereme jako ruční mapu (migrace to doplňuje stejně).
@@ -1082,15 +1521,23 @@ function applyDisastersToWorld(world: WorldState, save: SaveData, size: number):
     world.disasters.riskCeiling.set(kind, ceiling);
   }
 
-  world.disasters.active = raw.active.map((entry) => ({
-    id: entry.id,
-    kind: entry.kind,
-    startedAtTick: entry.startedAtTick,
-    x: entry.x,
-    y: entry.y,
-    state: { ...entry.state },
-    finished: entry.finished,
-  }));
+  // Pohroma, jejíž vlastní stav nedává smysl, se **ukončí**, ne načte (audit
+  // T132): plánovač ji v prvním tiku uklidí i s postihy, jako by doběhla.
+  // Celý save kvůli ní odmítat nemá cenu — hráč by přišel o město kvůli
+  // jednomu požáru. Stav se zahodí, ať ho nečte ani rozhraní.
+  world.disasters.active = raw.active.map((entry) => {
+    const onMap = inBounds(entry.x, entry.y, size);
+    const usable = onMap && disasterStateProblem(size, entry.state) === null;
+    return {
+      id: entry.id,
+      kind: entry.kind,
+      startedAtTick: entry.startedAtTick,
+      x: onMap ? entry.x : 0,
+      y: onMap ? entry.y : 0,
+      state: usable ? { ...entry.state } : {},
+      finished: entry.finished || !usable,
+    };
+  });
 
   world.disasters.modifiers = raw.modifiers.map((modifier) => ({
     kind: modifier.kind as Modifier['kind'],
@@ -1116,9 +1563,8 @@ function applyDisastersToWorld(world: WorldState, save: SaveData, size: number):
 /**
  * Linky do světa (verze 6).
  *
- * Statistiky přepravy se **nepřebírají**: jsou odvozené z linek a města
- * a přepočítají se při první měsíční uzávěrce. Koridor tramvají se označí za
- * špinavý, aby se dopočítal hned.
+ * Koridor tramvají se označí za špinavý, aby se dopočítal hned — je to čistá
+ * funkce linek a silnic.
  */
 function applyTransitToWorld(world: WorldState, save: SaveData): void {
   // Zastávka, kterou svět nezná, z linky **vypadne**. Za běhu to dělá
@@ -1142,8 +1588,18 @@ function applyTransitToWorld(world: WorldState, save: SaveData): void {
     );
   }
 
+  // Statistiky přepravy se počítají **jednou za měsíc** a do té doby z nich
+  // čte rozpočet i doprava. Dopočítat je hned po načtení by znamenalo počítat
+  // z jiného města, než ze kterého je spočítala hra bez přerušení — proto se
+  // od verze 15 ukládají (T132). Linka, která ze savu nevzešla, statistiku
+  // nedostane; zbytek vyřeší příští uzávěrka.
+  const derived = save.state.derived;
   world.lineStats.clear();
+  for (const [id, stats] of derived.lineStats) {
+    if (world.lines.some((line) => line.id === id)) world.lineStats.set(id, { ...stats });
+  }
   world.transitRelief.clear();
+  for (const [cell, relief] of derived.transitRelief) world.transitRelief.set(cell, relief);
   world.tramTiles.clear();
   world.transitDirty = true;
 }

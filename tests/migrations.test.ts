@@ -296,6 +296,101 @@ describe('fixtury savů', () => {
     }
   });
 
+  it('migrace v13 → v14 nechá hráčův přechod vedení přes ulici (T132)', () => {
+    const v13 = Object.entries(fixtures).find(([path]) => path.includes('v13.city'));
+    expect(v13).toBeDefined();
+    if (!v13) return;
+
+    const before = unpackSave(decode(v13[1] as string));
+    const cells = MAP_SIZE * MAP_SIZE;
+    const layers = before.layers.slice();
+    const road = layers.subarray(cells * 2, cells * 3);
+    const wire = layers.subarray(cells * 9);
+    const at = (x: number, y: number): number => y * MAP_SIZE + x;
+    const wiredRoad = (x: number, y: number): boolean =>
+      (road[at(x, y)] ?? 0) !== 0 && (wire[at(x, y)] ?? 0) !== 0;
+
+    // Najde se kus vodorovné ulice, kde vedení není ani na ní, ani vedle:
+    // parcela nad, ulice, parcela pod. Tam hráč natáhne přechod.
+    let crossing: [number, number] | null = null;
+    for (let y = 2; y < MAP_SIZE - 2 && !crossing; y++) {
+      for (let x = 2; x < MAP_SIZE - 2 && !crossing; x++) {
+        if (road[at(x, y)] === 0 || road[at(x, y - 1)] !== 0 || road[at(x, y + 1)] !== 0) continue;
+        const near = [
+          [x, y],
+          [x - 1, y],
+          [x + 1, y],
+        ] as const;
+        if (near.some(([nx, ny]) => wiredRoad(nx, ny))) continue;
+        crossing = [x, y];
+      }
+    }
+    expect(crossing).not.toBeNull();
+    if (!crossing) return;
+    const [cx, cy] = crossing;
+    wire[at(cx, cy - 1)] = 1;
+    wire[at(cx, cy)] = 1;
+    wire[at(cx, cy + 1)] = 1;
+
+    const after = migrate({ ...before, layers }, MIGRATIONS, 14);
+    const wiresAfter = after.layers.subarray(cells * 9);
+    // Přechod přežil celý…
+    expect(wiresAfter[at(cx, cy - 1)]).toBe(1);
+    expect(wiresAfter[at(cx, cy)]).toBe(1);
+    expect(wiresAfter[at(cx, cy + 1)]).toBe(1);
+    // …a vygenerované vedení podél silnic zmizelo jako dřív.
+    for (let i = 0; i < cells; i++) {
+      if (i === at(cx, cy)) continue;
+      if ((road[i] ?? 0) !== 0) expect(wiresAfter[i]).toBe(0);
+    }
+  });
+
+  it('migrace v14 → v15 doplní neutrální spokojenost a prázdný stav s pamětí (T132)', () => {
+    const v14 = Object.entries(fixtures).find(([path]) => path.includes('v14.city'));
+    expect(v14).toBeDefined();
+    if (!v14) return;
+
+    const before = unpackSave(decode(v14[1] as string));
+    expect(before.meta.formatVersion).toBe(14);
+    const coarseCells = COARSE_SIZE * COARSE_SIZE;
+    expect(before.coarse.byteLength).toBe(coarseCells * 3);
+
+    const after = migrate(before, MIGRATIONS, 15);
+    expect(after.meta.formatVersion).toBe(15);
+    expect(after.coarse.byteLength).toBe(coarseCells * 4);
+    expect([...after.coarse.subarray(0, coarseCells * 3)]).toEqual([...before.coarse]);
+    expect(after.coarse.subarray(coarseCells * 3).every((value) => value === 128)).toBe(true);
+    expect(after.state.derived).toEqual({
+      trafficLoad: [],
+      jobAccess: [],
+      lineStats: [],
+      transitRelief: [],
+      downgradeStreak: [],
+      waterlessStreak: [],
+      coverage: [],
+      watered: [],
+    });
+    // Nic jiného se nehne.
+    expect(after.layers).toEqual(before.layers);
+    expect(after.entities).toEqual(before.entities);
+    expect(after.state.economy).toEqual(before.state.economy);
+  });
+
+  it('migrace v5 → v6 dopočítá populaci pro měření růstu z budov (T132)', () => {
+    const v5 = Object.entries(fixtures).find(([path]) => path.includes('v5.city'));
+    expect(v5).toBeDefined();
+    if (!v5) return;
+
+    const before = unpackSave(decode(v5[1] as string));
+    const after = migrate(before, MIGRATIONS, 6);
+    const population = before.entities.buildings.reduce(
+      (sum, building) => sum + (building.abandoned ? 0 : building.population),
+      0,
+    );
+    expect(population).toBeGreaterThan(0);
+    expect(after.state.economy.lastPopulation).toBe(population);
+  });
+
   it('migrace v11 → v12 rozšíří buildingId na čtyři bajty a nic jiného nepohne', () => {
     const v11 = Object.entries(fixtures).find(([path]) => path.includes('v11.city'));
     expect(v11).toBeDefined();

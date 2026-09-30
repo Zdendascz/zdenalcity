@@ -4239,3 +4239,64 @@ Nálezy z auditu rozhraní, každý ověřený v kódu před opravou.
 Ověřeno ve vývojovém sestavení v headless Edge: tlačítka rychlosti ukazují
 1/2/3/4 šipky pro 1×/2×/4×/8×, dialog nové hry má ikony a `role=dialog`,
 anglická verze má `lang=en` a „7%".
+
+## Audit: simulace, save a bezpečnost (T132)
+
+Nálezy auditu ověřené proti kódu a opravené. Save je od teď **verze 15**.
+
+**„Ulož a načti" = „hraj dál".** Test `save.continuation.test.ts` staví město
+s vodárnou, elektrárnou, službami, linkou a všemi katastrofami, ukládá ho
+v tikách 1, 500, 929 (den před uzávěrkou) a 1200, načte do cizího světa
+a po 1 600 tikách porovná vrstvy, budovy, RNG, kasu i spokojenost s městem bez
+přerušení. Ručně prověřeno i uložení po každých 23 a 37 tikách až do 3 000,
+včetně uložení uprostřed požáru a blackoutu. Co se kvůli tomu změnilo:
+
+- Růst bere kandidáty v pořadí dlaždic, ne v pořadí množiny zón (ta si
+  pamatovala pořadí zónování, po načtení pořadí dlaždic).
+- Kolony a údržba silnic sčítají přes silnice v pořadí dlaždic
+  (`roadTilesInOrder`) — desetinný součet v jiném pořadí se lišil v posledním
+  bitu a po čase rozešel riziko nehod.
+- Save 15 ukládá stav s pamětí: spokojenost jako čtvrtou vrstvu `coarse.bin`,
+  v `state.derived` zátěž silnic, dosažitelnost práce, statistiky linek, úlevu
+  z MHD, počítadla chátrání, pokrytí službami a seznam zavodněných budov.
+  Pokrytí a voda se po načtení přepočítají stejně, ale katastrofy, oheň
+  a povodeň z nich čtou v prvním tiku dřív. Starším savům migrace doplní
+  neutrál a prázdno — to, s čím se načítaly dosud.
+- Neukládá se rozvedená voda ani elektrická síť (přepočítají se v prvním
+  tiku, než z nich kdo čte) a násobitele dostupnosti pro panel parcely
+  (výstup růstu, do dalšího běhu ukazuje panel jedničky).
+- Pokrytí třídy, která z města zmizela, se maže místo nulování.
+- `lastPopulation` se bere ze savu; savu staršímu verze 6 ji dopočítá migrace.
+
+**Sítě po katastrofách.** Konec zamoření vody a potlačení služby přepočítá
+vodovod a pokrytí. Zaplavení a opadnutí přepočítá elektřinu i vodovod (a zbytek
+odtoku pod půl tiku už nenechá na suché dlaždici hloubku). Katastrofy ničí
+i vedení, samotný úsek taky. Trosky a změny úrovně počítají s dlaždicemi, které
+budova opravdu drží (`ownedTiles`) — stará elektrárna 4 × 4 nechávala trosky
+u sousedů a snížení úrovně mazalo kus sousední budovy.
+
+**Migrace 13 → 14** maže jen vedení, které vede podél silnice; hráčův přechod
+přes ulici zůstane. Savy, které verzí 14 už prošly, přechody ztratily a vrátit
+je nejde.
+
+**Příkazy.** Zrušená linka proplatí vozidla (jako `set_vehicles` na nulu).
+Validuje se typ silnice, ruční stavba budovy zóny (`placeDefinitionCommand`),
+sazba daně, celé částky půjčky a dluhopisu a rozměr obdélníku zón a srovnání.
+**Balanc:** ceny jen celé koruny, typy silnic přesně tři.
+
+**Save jako cizí vstup** (sdílí se na Discordu):
+
+- ZIP se čte vlastním čtením adresáře (`readZipDirectory`): nejvýš 16 položek,
+  žádné jméno dvakrát, žádné šifrování ani ZIP64, komprimovaná data nesmí být
+  výrazně delší než výsledek, a rozbaluje se proudově po 4 kB s utnutím, jakmile
+  výstup přeroste délku z hlavičky. Do T132 se každá položka adresáře rozbalila
+  zvlášť a délka z hlavičky byla jen odhad: 256 kB zamrazilo kartu na 4,8 s.
+- Vlastní stav pohromy se kontroluje podle jména pole
+  (`disasterStateProblem`); nesmyslný stav nebo pohroma mimo mapu se při
+  načtení ukončí, save se kvůli ní neodmítá.
+- Meze pro tik, kasu, rating, kurzor dopravy, nákazu, postihy, jízdné,
+  ztracené zastávky, trosky, postup grantů, duplicitní id půjček a dluhopisů
+  a hodnoty ve vrstvách (silnice, vedení, terén, zóny, patra, trosky).
+
+Zbývá (mimo `src/sim` a `src/save`): `has()` v `src/ui/i18n.ts` bere klíče
+i z prototypu, takže město pojmenované „constructor" se přeloží divně.

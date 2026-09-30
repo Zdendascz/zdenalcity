@@ -4,9 +4,11 @@ import { COARSE_FACTOR, coarseIndex, coarseSizeOf } from '../coarse';
 import { tileBaseHeight } from '../heights';
 import { index, TERRAIN } from '../layers';
 import type { System } from '../systems/index';
-import { markTileDirty, removeBuilding } from '../world';
+import { markNetworksDirty, markTileDirty, removeBuilding } from '../world';
 import type { WorldState } from '../world';
 import type { Disaster, DisasterContext } from './registry';
+import { ownedTiles } from '../buildings';
+import { destroyInfrastructure, noLosses } from './damage';
 import { spawnRubble } from './rubble';
 import { addToll, blameFor } from './state';
 import type { ActiveDisaster } from './state';
@@ -35,7 +37,14 @@ const NEIGHBOURS = [
   [-1, 0],
 ] as const;
 
-/** Je dlaždice pod vodou? Ptá se na to elektřina, vodovod i doprava. */
+/**
+ * Je dlaždice pod vodou? Ptá se na to elektřina, vodovod i doprava.
+ *
+ * Elektřina a vodovod se ale přepočítávají **jen při změně sítě**, takže
+ * každý přechod mezi suchou a zaplavenou dlaždicí je musí označit za špinavé
+ * (`floodTile`, `drainTile`; audit T132). Do té doby zaplavená čtvrť svítila,
+ * dokud hráč náhodou nesáhl na vedení, a po opadnutí zase zůstala potmě.
+ */
 export function isFlooded(world: WorldState, tile: number): boolean {
   return (world.flood[tile] ?? 0) > 0;
 }
@@ -61,9 +70,11 @@ export function floodTile(
     newDepth > (world.floodDepth[tile] ?? 0) || newDuration > (world.flood[tile] ?? 0);
   if (!changed) return false;
 
+  const wasDry = (world.flood[tile] ?? 0) === 0;
   world.floodDepth[tile] = Math.max(world.floodDepth[tile] ?? 0, newDepth);
   world.flood[tile] = Math.max(world.flood[tile] ?? 0, newDuration);
   markTileAt(world, tile);
+  if (wasDry) markNetworksDirty(world);
   return true;
 }
 
@@ -90,9 +101,11 @@ export function floodPerCell(world: WorldState): Float32Array {
 /** Voda opadla. Poškození zůstává — sesbírané škody se odpuštěním vody nemažou. */
 export function drainTile(world: WorldState, tile: number): void {
   if ((world.flood[tile] ?? 0) === 0 && (world.floodDepth[tile] ?? 0) === 0) return;
+  const wasWet = (world.flood[tile] ?? 0) > 0;
   world.flood[tile] = 0;
   world.floodDepth[tile] = 0;
   markTileAt(world, tile);
+  if (wasWet) markNetworksDirty(world);
 }
 
 /**
@@ -137,10 +150,13 @@ export function createFloodSystem(catalogue: BuildingCatalogue, balance: Balance
 
         // Opadání zrychlují hasiči. Je to jediné místo, kde se pokrytí hasiči
         // vyplatí i tam, kde nikdy nehořelo.
+        // Zaokrouhluje se **před** porovnáním s nulou. Do T132 se zbytek
+        // 0,4 zapsal jako nula mimo `drainTile`: dlaždice oschla, ale hloubka
+        // na ní zůstala a elektřina ani vodovod se o tom nedozvěděly.
         const drain = 1 + (coverage?.[cell] ?? 0) * flood.drainPerCoverage;
-        const remaining = left - drain;
+        const remaining = clampByte(left - drain);
         if (remaining <= 0) drainTile(world, tile);
-        else world.flood[tile] = clampByte(remaining);
+        else world.flood[tile] = remaining;
       }
 
       if (destroyed.length > 0) washAway(world, catalogue, balance, destroyed);
@@ -173,31 +189,19 @@ function washAway(
       continue;
     }
 
-    // Infrastruktura bez budovy: vozovka i potrubí. Právě tohle je ten důvod,
-    // proč jsou trosky vrstva a ne stav budovy (R15).
-    if ((world.layers.road[tile] ?? 0) !== 0 || (world.layers.pipe[tile] ?? 0) !== 0) {
-      world.layers.road[tile] = 0;
-      world.roadTiles.delete(tile);
-      world.layers.pipe[tile] = 0;
-      world.powerNetworkDirty = true;
-      world.waterNetworkDirty = true;
-      spawnRubble(world, tile);
-      markTileAt(world, tile);
-    }
+    // Infrastruktura bez budovy: vozovka, potrubí i vedení. Právě tohle je ten
+    // důvod, proč jsou trosky vrstva a ne stav budovy (R15). Stejná cesta jako
+    // u ostatních katastrof, ať voda neumí něco, co oheň ne (T132).
+    destroyInfrastructure(world, tile, noLosses());
   }
 
   for (const id of [...doomed].sort((a, b) => a - b)) {
     const building = world.buildings.get(id);
     if (!building) continue;
-    const [width, depth] = catalogue.get(building.definitionId)?.footprint ?? [1, 1];
-
-    for (let dy = 0; dy < depth; dy++) {
-      for (let dx = 0; dx < width; dx++) {
-        const x = building.x + dx;
-        const y = building.y + dy;
-        if (x >= world.size || y >= world.size) continue;
-        spawnRubble(world, index(x, y, world.size), building.definitionId);
-      }
+    // Trosky jen tam, kde budova opravdu stojí (T132, `ownedTiles`).
+    const footprint = catalogue.get(building.definitionId)?.footprint ?? [1, 1];
+    for (const owned of ownedTiles(world, building, footprint)) {
+      spawnRubble(world, owned, building.definitionId);
     }
 
     const inside = building.population;

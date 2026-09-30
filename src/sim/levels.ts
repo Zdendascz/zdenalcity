@@ -1,4 +1,5 @@
 import type { Definition } from '@/content/schema';
+import { ownedTiles, placedFootprint } from './buildings';
 import type { BuildingCatalogue } from './catalogue';
 import { inBounds, index } from './layers';
 import { checkRequirements, presentDefinitions } from './requirements';
@@ -130,7 +131,9 @@ function planWiden(
   building: Building,
   present: ReadonlySet<string>,
 ): Upgrade | null {
-  const [width, depth] = definition.footprint;
+  // Půdorys, který budova **drží**, ne ten z dnešní definice (T132): kdyby
+  // definice mezitím povyrostla, rostlo by se z plochy, na které stojí sousedé.
+  const [width, depth] = placedFootprint(world, building, definition.footprint);
   const zone =
     world.layers.zone[index(building.x, building.y, world.size)] ?? 0;
 
@@ -217,7 +220,8 @@ function planTaller(
   building: Building,
   present: ReadonlySet<string>,
 ): Upgrade | null {
-  const [width, depth] = definition.footprint;
+  // Totéž co u rozšíření: vyšší budova smí stát jen tam, kde stála nižší.
+  const [width, depth] = placedFootprint(world, building, definition.footprint);
   const taller = pickDefinition(
     world,
     catalogue,
@@ -252,7 +256,7 @@ export function tryDowngrade(
     return true;
   }
 
-  const [width, depth] = definition.footprint;
+  const [width, depth] = placedFootprint(world, building, definition.footprint);
   const smaller = pickShrunk(world, catalogue, definition.category, width, depth, lower);
   if (!smaller) return false;
 
@@ -326,7 +330,7 @@ function apply(
   building: Building,
   upgrade: Upgrade,
 ): void {
-  clearFootprint(world, previous, building.x, building.y);
+  clearFootprint(world, previous, building);
   for (const id of upgrade.absorbed) removeBuilding(world, id);
 
   const { definition } = upgrade;
@@ -341,10 +345,14 @@ function apply(
   const [width, depth] = definition.footprint;
   for (let dy = 0; dy < depth; dy++) {
     for (let dx = 0; dx < width; dx++) {
-      world.layers.buildingId[
-        index(upgrade.x + dx, upgrade.y + dy, world.size)
-      ] = building.id;
-      markTileDirty(world, upgrade.x + dx, upgrade.y + dy);
+      const x = upgrade.x + dx;
+      const y = upgrade.y + dy;
+      // Plány se k okraji mapy nedostanou (`claimable` ho hlídá), ale zápis
+      // mimo mřížku by se u pravého okraje zalomil na další řádek — do cizí
+      // parcely na druhém konci mapy.
+      if (!inBounds(x, y, world.size)) continue;
+      world.layers.buildingId[index(x, y, world.size)] = building.id;
+      markTileDirty(world, x, y);
     }
   }
 
@@ -353,12 +361,17 @@ function apply(
   if (previous.service || definition.service) markCoverageDirty(world);
 }
 
-function clearFootprint(world: WorldState, definition: Definition, x: number, y: number): void {
-  const [width, depth] = definition.footprint;
-  for (let dy = 0; dy < depth; dy++) {
-    for (let dx = 0; dx < width; dx++) {
-      world.layers.buildingId[index(x + dx, y + dy, world.size)] = 0;
-      markTileDirty(world, x + dx, y + dy);
-    }
+/**
+ * Uvolní dlaždice, které budova **drží** (T132, `ownedTiles`).
+ *
+ * Do T132 se mazal půdorys podle definice. Když definice mezitím povyrostla,
+ * smazal se kus sousední budovy z mapy — ta pak stála napůl neviditelná
+ * a její dlaždice šly zastavět znovu.
+ */
+function clearFootprint(world: WorldState, definition: Definition, building: Building): void {
+  for (const tile of ownedTiles(world, building, definition.footprint)) {
+    world.layers.buildingId[tile] = 0;
+    const x = tile % world.size;
+    markTileDirty(world, x, (tile - x) / world.size);
   }
 }

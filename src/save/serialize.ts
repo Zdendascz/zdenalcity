@@ -8,6 +8,7 @@ import type { WorldState } from '@/sim/world';
 import {
   CURRENT_FORMAT_VERSION,
   GAME_VERSION,
+  SAVE_COARSE_BYTES_PER_CELL,
   SAVE_COARSE_LAYER_ORDER,
   SAVE_DISASTER_LAYER_ORDER,
   SAVE_FILES,
@@ -15,6 +16,7 @@ import {
 } from './format';
 import type {
   SaveData,
+  SaveDerivedState,
   SaveDisasterState,
   SaveFinanceState,
   SaveSourceInfo,
@@ -84,15 +86,18 @@ export function packLayers(layers: Layers): Uint8Array {
 /**
  * Hrubé vrstvy do jednoho bufferu. Všechny jsou jednobajtové, takže endianita
  * nehraje roli — kdyby některá přestala být, je to nová verze formátu.
+ *
+ * Za nimi od verze 15 spokojenost (`SAVE_COARSE_BYTES_PER_CELL`).
  */
-export function packCoarseLayers(coarse: CoarseLayers): Uint8Array {
+export function packCoarseLayers(coarse: CoarseLayers, happiness: Uint8Array): Uint8Array {
   const cells = coarse.pollution.length;
-  const buffer = new Uint8Array(cells * SAVE_COARSE_LAYER_ORDER.length);
+  const buffer = new Uint8Array(cells * SAVE_COARSE_BYTES_PER_CELL);
   let offset = 0;
   for (const name of SAVE_COARSE_LAYER_ORDER) {
     buffer.set(coarse[name], offset);
     offset += cells;
   }
+  buffer.set(happiness, offset);
   return buffer;
 }
 
@@ -201,6 +206,46 @@ function packFinance(world: WorldState): SaveFinanceState {
   };
 }
 
+/**
+ * Stav s pamětí (verze 15, audit T132). Řídce a setříděně podle klíče —
+ * `Map` si pamatuje pořadí vkládání a save musí být bajtově stabilní.
+ */
+function packDerived(world: WorldState): SaveDerivedState {
+  const pairs = (map: ReadonlyMap<number, number>): [number, number][] =>
+    [...map.entries()].sort(([a], [b]) => a - b);
+
+  // Zátěž je nenulová jen na silnicích, takže řídce je to zlomek plné vrstvy.
+  const trafficLoad: [number, number][] = [];
+  for (let tile = 0; tile < world.trafficLoad.length; tile++) {
+    const load = world.trafficLoad[tile] ?? 0;
+    if (load !== 0) trafficLoad.push([tile, load]);
+  }
+
+  return {
+    trafficLoad,
+    jobAccess: pairs(world.jobAccess),
+    lineStats: [...world.lineStats.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([id, stats]) => [
+        id,
+        {
+          demand: stats.demand,
+          capacity: stats.capacity,
+          transported: stats.transported,
+          income: stats.income,
+          upkeep: stats.upkeep,
+        },
+      ]),
+    transitRelief: pairs(world.transitRelief),
+    downgradeStreak: pairs(world.downgradeStreak),
+    waterlessStreak: pairs(world.waterlessStreak),
+    coverage: [...world.coverage.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([serviceClass, cells]) => [serviceClass, Array.from(cells)]),
+    watered: [...world.watered].sort((a, b) => a - b),
+  };
+}
+
 /** Mapa na objekt se setříděnými klíči — save musí být bajtově stabilní. */
 function copyLedger(ledger: Ledger): Ledger {
   const sorted = (side: Record<string, number>): Record<string, number> => {
@@ -238,7 +283,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
       },
     },
     layers: packLayers(world.layers),
-    coarse: packCoarseLayers(world.coarse),
+    coarse: packCoarseLayers(world.coarse, world.happiness),
     // Patra jdou do savu tak, jak jsou: jeden bajt na roh, žádné pořadí vrstev.
     heights: Uint8Array.from(world.cornerHeight),
     terraform: packTerraform(world),
@@ -271,6 +316,7 @@ export function toSaveData(world: WorldState, options: SaveOptions): SaveData {
       disasters: packDisasters(world),
       transit: packTransit(world),
       finance: packFinance(world),
+      derived: packDerived(world),
     },
   };
 }

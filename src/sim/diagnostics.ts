@@ -11,6 +11,7 @@ import type { BuildingCatalogue } from './catalogue';
 import { seedDefinitions } from './levels';
 import { roadReach } from './systems/growth';
 import { waterProximity } from './systems/landValue';
+import { roadTilesInOrder } from './world';
 import type { WorldState } from './world';
 import { roadCapacityFactor } from './transit';
 import { happinessDemandFactor } from './systems/happiness';
@@ -91,8 +92,9 @@ export function coarseCongestion(
 
   // Kolony jsou vlastnost silnic, tak se prochází seznam silnic (R20 fáze 4).
   // Průchod celou mapou tady byl nejdražší kus spokojenosti: ta se počítá
-  // z kolon a na 512 × 512 stála 8,9 ms na jeden běh.
-  for (const tile of world.roadTiles) {
+  // z kolon a na 512 × 512 stála 8,9 ms na jeden běh. V pořadí dlaždic,
+  // protože se sčítají desetinná čísla (T132, `roadTilesInOrder`).
+  for (const tile of roadTilesInOrder(world)) {
     const roadType = world.layers.road[tile] ?? ROAD.none;
     if (roadType === ROAD.none) continue;
 
