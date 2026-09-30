@@ -993,6 +993,24 @@ const SURFACE_VARIANT_LIMIT = 1;
  */
 const SCREENSHOT_RESOLUTION = 2;
 
+/**
+ * Komprese automatického uložení (T134).
+ *
+ * Změřeno na ukázkovém městě (dřív `public/demo/`): deflate na devítce 150–170 ms
+ * (47,4 kB), na trojce 21–23 ms (52,9 kB), na jedničce 25–28 ms (59,6 kB) —
+ * a to v obsluze snímku nebo při zavírání karty. Trojka je stejně rychlá jako
+ * jednička a o desetinu menší. Autosave žije jen v prohlížeči a za dvě minuty
+ * ho přepíše další, takže o 12 % větší soubor nevadí. Stažené město a rychlé
+ * uložení zůstávají na devítce.
+ */
+const AUTOSAVE_ZIP_LEVEL = 3;
+
+/**
+ * Jak dlouho nejvýš čeká periodický autosave na volnou chvíli prohlížeče
+ * (`requestIdleCallback`), než se provede i tak.
+ */
+const AUTOSAVE_IDLE_TIMEOUT_MS = 5000;
+
 /** Druhy terénu, ke kterým se hledá obrázek. Sedí na `TERRAIN` v `sim/layers.ts`. */
 const TERRAIN_NAMES = ['grass', 'water', 'sand', 'rock', 'forest', 'marsh'] as const;
 
@@ -1900,7 +1918,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   function autosaveNow(verify = true): void {
     if (restarting) return;
     try {
-      const bytes = serializeSave(simWorld, saveOptions());
+      const bytes = serializeSave(simWorld, saveOptions(), AUTOSAVE_ZIP_LEVEL);
       if (verify && !saveIsReadable(bytes)) return;
 
       // Bez `await`: na `pagehide` už není kam čekat. Zápis v prohlížeči běží
@@ -1925,6 +1943,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     } catch {
       // Rozehranou hru neshodí ani plné úložiště.
     }
+  }
+
+  /**
+   * Periodický autosave, až bude prohlížeč volný (T134). Serializace a zápis
+   * pak neukousnou snímek uprostřed posouvání mapy. Kde `requestIdleCallback`
+   * není (Safari), uloží se hned jako dřív. `pagehide` sem nechodí — tam se
+   * musí uložit synchronně.
+   */
+  function autosaveWhenIdle(verify: boolean): void {
+    if (typeof window.requestIdleCallback !== 'function') {
+      autosaveNow(verify);
+      return;
+    }
+    window.requestIdleCallback(() => autosaveNow(verify), { timeout: AUTOSAVE_IDLE_TIMEOUT_MS });
   }
 
   /**
@@ -3725,7 +3757,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (autosaveDue <= 0) {
       autosaveDue = AUTOSAVE_EVERY_MS;
       autosaveRuns++;
-      autosaveNow(autosaveRuns % AUTOSAVE_VERIFY_EVERY === 1);
+      autosaveWhenIdle(autosaveRuns % AUTOSAVE_VERIFY_EVERY === 1);
     }
 
     // Hlásí se **po kroku**: pohroma, která právě vznikla, se má ohlásit
