@@ -1257,7 +1257,21 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const world = host.getSnapshot();
 
   const app = new Application();
-  await app.init({ background: BACKGROUND_COLOR, resizeTo: mount, antialias: true });
+  /*
+   * `manageImports: false` (T134): Pixi by si jinak při startu dotáhl celé
+   * prostředí prohlížeče — přístupnost, DOM kontejnery, vlastní systém událostí
+   * a filtry. Hra nic z toho nepoužívá: vstup čte z DOM událostí na plátně,
+   * text kreslí HTML a filtry ani masky nemá. Co potřebuje (grafika, sprity,
+   * ticker, `resizeTo`, načítání textur, `extract`), si Pixi registruje samo
+   * při importu tříd. `touch-action: none` na plátně, které jinak nastavuje
+   * systém událostí, drží `style.css`.
+   */
+  await app.init({
+    background: BACKGROUND_COLOR,
+    resizeTo: mount,
+    antialias: true,
+    manageImports: false,
+  });
   mount.appendChild(app.canvas);
 
   const worldContainer = new Container();
