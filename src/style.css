@@ -1061,6 +1061,24 @@ body {
   background: transparent;
 }
 
+/* Vedení (T136). Barvy sedí s `LOAD_COLORS`, `OVERLOAD_COLOR` a `DEAD_COLOR`
+ * ve `wireOverlay.ts`. */
+.legend__swatch--wire-low {
+  background: #3ecf5a;
+}
+
+.legend__swatch--wire-high {
+  background: #e23b2e;
+}
+
+.legend__swatch--wire-overloaded {
+  background: #7a0d0d;
+}
+
+.legend__swatch--wire-dead {
+  background: #8a8f96;
+}
+
 .legend__label {
   color: var(--text-dim);
 }

@@ -55,6 +55,7 @@ export const LEDGER_EXPENSES = [
   'vehicles',
   'upkeep.buildings',
   'upkeep.roads',
+  'upkeep.wires',
   'upkeep.transit',
   'loanPayment',
   'bondCoupon',

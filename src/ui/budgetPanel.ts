@@ -180,6 +180,19 @@ export class BudgetPanel {
       table.appendChild(row);
     }
 
+    // Vedení taky (T136): vysoké napětí je v údržbě znát.
+    if (budget.wires.count > 0) {
+      const row = el('tr');
+      row.appendChild(el('td', 'sheet__name', t('ui.budget.wires')));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, formatNumber(budget.wires.count)));
+      row.appendChild(el('td'));
+      row.appendChild(el('td', undefined, '-'));
+      row.appendChild(el('td', undefined, `−${formatNumber(budget.wires.upkeep)}`));
+      row.appendChild(el('td', 'is-negative', formatNumber(-budget.wires.upkeep)));
+      table.appendChild(row);
+    }
+
     // MHD taky vlastní řádek: vozidlo není budova a jízdné není daň.
     if (budget.transit.lines > 0) {
       const row = el('tr');
@@ -272,6 +285,8 @@ export class BudgetPanel {
       budget.valuePerUnit,
       budget.roads.count,
       budget.roads.upkeep,
+      budget.wires.count,
+      budget.wires.upkeep,
       budget.transit.lines,
       budget.transit.vehicles,
       budget.transit.income,

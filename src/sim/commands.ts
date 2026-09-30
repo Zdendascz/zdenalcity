@@ -59,6 +59,8 @@ export type Command =
   | { type: 'build_road'; x: number; y: number; roadType?: number }
   | { type: 'bulldoze'; x: number; y: number }
   | { type: 'zone'; x: number; y: number; w: number; h: number; zone: ZoneType }
+  /** Zbourá v obdélníku jen opuštěné budovy a suť (T136). */
+  | { type: 'demolish_ruins'; x: number; y: number; w: number; h: number }
   | { type: 'place_building'; definitionId: string; x: number; y: number }
   | { type: 'set_tax_rate'; zone: ZoneType; rate: number }
   | { type: 'set_service_funding'; serviceClass: string; funding: number }
@@ -741,6 +743,56 @@ export function estimateZoning(
     planZoneLevelling(world, x, y, w, h, balance?.map.maxLevelledZoneTiles ?? Infinity).size *
     (balance?.map.terraformCost ?? 0)
   );
+}
+
+/**
+ * Hromadné bourání ruin (T136, přání autora): v obdélníku zbourá **jen
+ * opuštěné budovy** a uklidí suť. Obydlené domy, silnice, zóny, vedení ani
+ * les nechá být — tažení přes celou čtvrť je bezpečné.
+ *
+ * Ruiny ve městě po změně pravidel elektřiny rozsekaly bloky (opuštěná budova
+ * proud nevede) a bourat je po jedné bylo k ničemu. Úklid suti stojí jako
+ * buldozerem; když na všechno nestačí peníze, nebourá se nic — půl uklizené
+ * čtvrti by hráč nečekal.
+ */
+export function demolishRuins(
+  world: WorldState,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  balance?: Balance,
+): CommandResult {
+  if (!validArea(world, w, h)) return reject('error.outOfBounds');
+  const ruins = new Set<number>();
+  const rubble: number[] = [];
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      if (!inBounds(x + dx, y + dy, world.size)) continue;
+      const tile = index(x + dx, y + dy, world.size);
+      const id = world.layers.buildingId[tile] ?? 0;
+      if (id !== 0) {
+        if (world.buildings.get(id)?.abandoned === true) ruins.add(id);
+        continue;
+      }
+      if ((world.rubble[tile] ?? 0) !== 0) rubble.push(tile);
+    }
+  }
+  if (ruins.size === 0 && rubble.length === 0) return reject('error.noRuins');
+
+  const cost = rubble.length * (balance?.disasters.rubble.clearCost ?? 0);
+  if (world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  }
+  // Pořadí podle id: stejné tažení dá vždycky stejný výsledek (P2).
+  for (const id of [...ruins].sort((a, b) => a - b)) removeBuilding(world, id);
+  if (cost > 0) spend(world, 'bulldoze', cost);
+  for (const tile of rubble) {
+    clearRubble(world, tile);
+    const tx = tile % world.size;
+    markTileDirty(world, tx, (tile - tx) / world.size);
+  }
+  return OK;
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { coarseCellsOf, coarseIndex } from './coarse';
-import { index, ROAD, TERRAIN, ZONE } from './layers';
+import { index, ROAD, TERRAIN, WIRE, ZONE } from './layers';
 import { coarseTerrainShare } from './terrain';
 import { floodPerCell } from './disasters/flood';
 import { hasRubble, rubblePerCell } from './disasters/rubble';
@@ -324,6 +324,11 @@ export interface ParcelExplanation {
    * (hlásil autor) — je potřeba mu říct, že musí zbourat.
    */
   powerBlockedByRuin: boolean;
+  /**
+   * Vedení na dlaždici a jak je vytížené (T136): „ať člověk ví co a jak".
+   * `null`, když tu vedení není.
+   */
+  wire: ParcelWire | null;
   pollution: number;
   crime: number;
   /** Spokojenost v této čtvrti, 0–255. Kdo ji nevidí, neví, co spravit (§12). */
@@ -447,6 +452,29 @@ export function worstBlocker(reasons: Iterable<string>): string | null {
   return worst;
 }
 
+export interface ParcelWire {
+  /** `WIRE.low` nebo `WIRE.high`. */
+  type: number;
+  /** Kolik přes úsek teče (u přetíženého: kolik by teklo). */
+  load: number;
+  capacity: number;
+  /** Došel sem proud? */
+  live: boolean;
+  overloaded: boolean;
+}
+
+function parcelWire(world: WorldState, balance: Balance, tile: number): ParcelWire | null {
+  const type = world.layers.wire[tile] ?? WIRE.none;
+  if (type === WIRE.none) return null;
+  return {
+    type,
+    load: Math.round(world.wireLoad[tile] ?? 0),
+    capacity: balance.power.wires[type - 1]?.capacity ?? 0,
+    live: (world.wireLive[tile] ?? 0) === 1,
+    overloaded: (world.wireOverloaded[tile] ?? 0) === 1,
+  };
+}
+
 export function explainParcel(
   world: WorldState,
   balance: Balance,
@@ -486,6 +514,7 @@ export function explainParcel(
     cityJobAccessFactor: world.cityJobAccess,
     water: world.waterSupply[tile] === 1,
     power: world.layers.power[tile] === 1,
+    wire: parcelWire(world, balance, tile),
     powerBlockedByRuin:
       (world.rubble[tile] ?? 0) !== 0 ||
       world.buildings.get(world.layers.buildingId[tile] ?? 0)?.abandoned === true,

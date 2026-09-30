@@ -162,6 +162,13 @@ export function pushFinanceNotice(world: WorldState, notice: FinanceNotice): voi
   if (world.financeNotices.length > MAX_FINANCE_NOTICES) world.financeNotices.shift();
 }
 
+/** Zatížení trafostanice (T136): kolik přes ni teče, kolik unese, jestli vypadla. */
+export interface TransformerLoad {
+  load: number;
+  capacity: number;
+  overloaded: boolean;
+}
+
 export interface WorldState {
   readonly size: number;
   readonly seed: number;
@@ -282,6 +289,13 @@ export interface WorldState {
   wireLoad: Float32Array;
   /** Úsek vedení je přetížený a všechno za ním je bez proudu. Runtime. */
   wireOverloaded: Uint8Array;
+  /**
+   * Došel na úsek vedení proud? Runtime. Vrstva `power` to neříká: vysoké
+   * napětí vede nad parcelou, která sama proud nemá (T136).
+   */
+  wireLive: Uint8Array;
+  /** Zatížení trafostanic podle id budovy (T136). Runtime, přepočítá se se sítí. */
+  transformerLoad: Map<number, TransformerLoad>;
   /** Zvedne se při každém přepočtu sítě — podle toho se překreslí vedení. */
   powerRevision: number;
 
@@ -560,6 +574,8 @@ export function createWorld(
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
     wireLoad: new Float32Array(size * size),
     wireOverloaded: new Uint8Array(size * size),
+    wireLive: new Uint8Array(size * size),
+    transformerLoad: new Map(),
     powerRevision: 0,
     waterSupply: new Uint8Array(size * size),
     watered: new Set(),
@@ -695,6 +711,8 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.waterSupply = new Uint8Array(size * size);
   world.wireLoad = new Float32Array(size * size);
   world.wireOverloaded = new Uint8Array(size * size);
+  world.wireLive = new Uint8Array(size * size);
+  world.transformerLoad = new Map();
   world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
   world.happiness = new Uint8Array(coarseCellsOf(size)).fill(NEUTRAL_HAPPINESS);
   // Seznamy patří ke starým vrstvám; nové jsou prázdné.

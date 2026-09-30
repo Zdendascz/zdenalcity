@@ -108,7 +108,11 @@ export interface BuildingDefinition {
     services: Readonly<Record<string, number>>;
     buildings: readonly string[];
   };
-  power?: { production?: number; consumption?: number };
+  /**
+   * `transformer` je kapacita trafostanice (T136): budova spojí vysoké napětí
+   * s nízkým a přenese nejvýš tolik. Bez něj vysoké napětí do bloku nevede.
+   */
+  power?: { production?: number; consumption?: number; transformer?: number };
   /**
    * Vodovod (§8 fáze 3). `range` je dosah sítě v dlaždicích potrubí od téhle
    * budovy — čerpací stanice je zdroj s dosahem, ale bez vlastní výroby,
@@ -675,12 +679,14 @@ function validatePower(
   if (!section) return undefined;
   const production = optionalInt(issues, section, 'production', 'power.production', 0);
   const consumption = optionalInt(issues, section, 'consumption', 'power.consumption', 0);
-  if (production === undefined && consumption === undefined) {
-    issues.push({ field: 'power', message: 'musí mít production nebo consumption' });
+  const transformer = optionalInt(issues, section, 'transformer', 'power.transformer', 1);
+  if (production === undefined && consumption === undefined && transformer === undefined) {
+    issues.push({ field: 'power', message: 'musí mít production, consumption nebo transformer' });
   }
   return {
     ...(production !== undefined ? { production } : {}),
     ...(consumption !== undefined ? { consumption } : {}),
+    ...(transformer !== undefined ? { transformer } : {}),
   };
 }
 

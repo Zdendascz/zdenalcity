@@ -32,6 +32,8 @@ export type ToolAction =
    */
   | { kind: 'wire'; wire: number }
   | { kind: 'bulldoze' }
+  /** Hromadné bourání: v obdélníku jen opuštěné budovy a suť (T136). */
+  | { kind: 'demolishRuins' }
   | { kind: 'zone'; zone: ZoneType }
   | { kind: 'place'; definitionId: string }
   /** Terraforming: kladná delta zvedá, záporná sníží. Nula srovná oblast. */
@@ -63,5 +65,10 @@ export interface ToolOption {
   groupIcon: string;
   /** Cena, pokud ji zná — vypíše se v nabídce napravo od jména. */
   cost?: number;
+  /**
+   * Kolik nástroj unese — vedení a trafostanice (T136). Vypíše se vedle ceny,
+   * „ať člověk ví co a jak".
+   */
+  capacity?: number;
   action: ToolAction;
 }

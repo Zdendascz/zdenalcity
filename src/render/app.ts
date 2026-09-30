@@ -565,6 +565,17 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupIcon: 'bulldoze',
       action: { kind: 'bulldoze' },
     },
+    // Hromadné bourání ruin (T136): tažením přes čtvrť, sáhne jen na opuštěné
+    // budovy a suť. **Vlastní tlačítko**, ne roleta u buldozeru: ten má zůstat
+    // na jedno kliknutí.
+    {
+      id: 'bulldoze:ruins',
+      labelKey: 'ui.tool.demolishRuins',
+      icon: 'explosion',
+      groupKey: 'ui.tool.demolishRuins',
+      groupIcon: 'explosion',
+      action: { kind: 'demolishRuins' },
+    },
     // Rušení zón je **vlastní nástroj** (rozhodnutí autora, T62). Buldozer se
     // zóny nedotkne, takže probourat průsek proti ohni už nesmaže čtvrť pod
     // ním. Je to zóna s hodnotou „žádná", ne buldozer — dostane tím tažení
@@ -601,6 +612,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupKey: 'ui.menu.wires',
       groupIcon: 'bolt',
       cost: content.getBalance().power.wires[0]?.cost ?? 0,
+      capacity: content.getBalance().power.wires[0]?.capacity ?? 0,
       action: { kind: 'wire', wire: WIRE.low },
     },
     {
@@ -610,6 +622,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupKey: 'ui.menu.wires',
       groupIcon: 'bolt',
       cost: content.getBalance().power.wires[1]?.cost ?? 0,
+      capacity: content.getBalance().power.wires[1]?.capacity ?? 0,
       action: { kind: 'wire', wire: WIRE.high },
     },
     // Odstranění vedení — tažením po trase, jen vedení, nic pod ním.
@@ -642,6 +655,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupKey: `ui.menu.${menu}`,
       groupIcon: firstIcon.get(menu) ?? 'gear',
       cost: definition.construction.cost,
+      ...(definition.power?.transformer !== undefined ? { capacity: definition.power.transformer } : {}),
       action: { kind: 'place' as const, definitionId: definition.id },
     });
   });
@@ -1687,6 +1701,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         i18n.t('ui.save.noPowerLines', { count: startupWarnings.unwiredBuildings }),
       );
     }
+    if (startupWarnings.needsTransformers) notifications.show(i18n.t('ui.save.needsTransformers'));
   }
   const legend = new Legend(mount, i18n);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
@@ -1857,6 +1872,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       if (warnings.unwiredBuildings > 0) {
         notifications.show(i18n.t('ui.save.noPowerLines', { count: warnings.unwiredBuildings }));
       }
+      if (warnings.needsTransformers) notifications.show(i18n.t('ui.save.needsTransformers'));
     } catch (error) {
       message = {
         key: 'ui.save.failed',
@@ -2311,7 +2327,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   function dragKind(): 'area' | 'line' | null {
     const kind = activeTool.action.kind;
-    if (kind === 'zone') return 'area';
+    if (kind === 'zone' || kind === 'demolishRuins') return 'area';
     if (kind === 'road' || kind === 'pipe' || kind === 'wire') return 'line';
     return null;
   }
@@ -2525,6 +2541,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         ['power-on', 'ui.legend.power.on'],
         ['power-off', 'ui.legend.power.off'],
         ['power-none', 'ui.legend.power.none'],
+        // Vedení (T136): barva podle vytížení proti kapacitě.
+        ['wire-low', 'ui.legend.wire.low'],
+        ['wire-high', 'ui.legend.wire.high'],
+        ['wire-overloaded', 'ui.legend.wire.overloaded'],
+        ['wire-dead', 'ui.legend.wire.dead'],
       ]);
       return;
     }
@@ -3425,6 +3446,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (!anchor || tiles.length === 0) return;
 
     const action = activeTool.action;
+    if (action.kind === 'demolishRuins') {
+      const xs = tiles.map((tile) => tile.x);
+      const ys = tiles.map((tile) => tile.y);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      // Bourání jde vrátit jako buldozerem: snímek před, nabídka „Zpět" po.
+      const snapshot = undoSnapshotNow();
+      const result = dispatch({
+        type: 'demolish_ruins',
+        x,
+        y,
+        w: Math.max(...xs) - x + 1,
+        h: Math.max(...ys) - y + 1,
+      });
+      if (result.ok) undoBar.show('ui.undo.demolished', snapshot);
+      return;
+    }
     if (action.kind === 'zone') {
       const xs = tiles.map((tile) => tile.x);
       const ys = tiles.map((tile) => tile.y);

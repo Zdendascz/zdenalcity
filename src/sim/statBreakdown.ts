@@ -150,6 +150,7 @@ function explainBalance(
   }
   add(income, 'ui.ledger.fare', budget.transit.income);
   add(expenses, 'ui.ledger.upkeep.roads', budget.roads.upkeep);
+  add(expenses, 'ui.ledger.upkeep.wires', budget.wires.upkeep);
   add(expenses, 'ui.ledger.upkeep.transit', budget.transit.upkeep);
   add(expenses, 'ui.ledger.loanPayment', budget.debt.payment);
   add(expenses, 'ui.ledger.bondCoupon', budget.debt.bondPayment);

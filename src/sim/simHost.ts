@@ -9,6 +9,7 @@ import {
   bulldoze,
   createTransitLine,
   deleteTransitLine,
+  demolishRuins,
   levelArea,
   placeDefinitionCommand,
   plantTrees,
@@ -32,7 +33,7 @@ import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import type { System } from './systems';
 import { createDirtySet, tickWorld } from './world';
-import type { Building, DemandState, DirtySet, EconomyState, WorldState } from './world';
+import type { Building, DemandState, DirtySet, EconomyState, TransformerLoad, WorldState } from './world';
 
 /**
  * Délka jednoho herního dne při rychlosti 1×.
@@ -76,6 +77,8 @@ export interface ReadonlyWorldView {
   /** Zátěž a přetížení vedení a číslo přepočtu sítě (T129). Runtime. */
   readonly wireLoad: Readonly<Float32Array>;
   readonly wireOverloaded: Readonly<Uint8Array>;
+  readonly wireLive: Readonly<Uint8Array>;
+  readonly transformerLoad: ReadonlyMap<number, TransformerLoad>;
   readonly powerRevision: number;
   /** Spokojenost na hrubé mřížce — hlavní číslo HUDu a vlastní overlay (§9). */
   readonly happiness: Readonly<Uint8Array>;
@@ -152,6 +155,8 @@ class MainThreadSimHost implements SimHost {
         return bulldoze(this.world, cmd.x, cmd.y, this.balance);
       case 'zone':
         return zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone, this.balance);
+      case 'demolish_ruins':
+        return demolishRuins(this.world, cmd.x, cmd.y, cmd.w, cmd.h, this.balance);
       case 'place_building':
         return placeDefinitionCommand(
           this.world,

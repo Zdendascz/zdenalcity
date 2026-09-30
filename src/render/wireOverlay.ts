@@ -78,7 +78,7 @@ export class WireOverlay {
       let color: number;
       if ((world.wireOverloaded[tile] ?? 0) !== 0) {
         color = OVERLOAD_COLOR;
-      } else if ((world.layers.power[tile] ?? 0) === 0) {
+      } else if ((world.wireLive[tile] ?? 0) === 0) {
         color = DEAD_COLOR;
       } else {
         const ratio = Math.min(1, (world.wireLoad[tile] ?? 0) / Math.max(1, this.capacity(type)));

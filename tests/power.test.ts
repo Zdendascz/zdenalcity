@@ -239,7 +239,7 @@ describe('kapacita výroby', () => {
 describe('kapacita vedení (T129)', () => {
   const weak: Balance = {
     ...VANILLA_BALANCE,
-    power: { wires: [{ cost: 0, capacity: 30 }, { cost: 0, capacity: 1000 }] },
+    power: { wires: [{ cost: 0, capacity: 30, upkeep: 0 }, { cost: 0, capacity: 1000, upkeep: 0 }] },
   };
 
   /** Elektrárna – jeden úsek vedení na (7, 11) – dva domy za ním (40 z výroby 50). */
@@ -264,23 +264,22 @@ describe('kapacita vedení (T129)', () => {
     expect(at(world, 5, 11)).toBe(1);
   });
 
-  it('vysoké napětí stejnou zátěž unese', () => {
-    const { world, catalogue } = behindOneWire(WIRE.high);
-    tickPower(world, catalogue, weak);
-
-    const houses = [...world.buildings.values()].filter((b) => b.definitionId === 'test:house');
-    expect(houses.every((b) => b.powered)).toBe(true);
-    expect(world.wireOverloaded[index(7, 11, world.size)]).toBe(0);
-    expect(world.wireLoad[index(7, 11, world.size)]).toBe(40);
-  });
-
   it('když úsek vypadne, proud zkusí jinou cestu', () => {
-    // Nízké napětí vypadne; druhá cesta vysokým napětím oblast zachrání.
-    const { world, catalogue } = behindOneWire(WIRE.low);
-    // Obchvat vysokým napětím: (6, 12) elektrárna → (7, 12) → (8, 12) → dům (8, 11).
-    buildWire(world, 7, 12, WIRE.high);
-    buildWire(world, 8, 12, WIRE.high);
-    tickPower(world, catalogue, weak);
+    // Jeden úsek nízkého napětí vypadne; druhý souběžný oblast zachrání,
+    // protože každý nese jen část.
+    const catalogue = catalogueOf(PLANT, HOUSE);
+    const roomy: Balance = {
+      ...VANILLA_BALANCE,
+      power: { wires: [{ cost: 0, capacity: 25, upkeep: 0 }, { cost: 0, capacity: 1000, upkeep: 0 }] },
+    };
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    // Dva domy za dvěma samostatnými úseky: (7, 11) → (8, 11) a (7, 12) → (8, 12).
+    buildWire(world, 7, 11, WIRE.low);
+    buildWire(world, 7, 12, WIRE.low);
+    placeDefinition(world, catalogue, 'test:house', 8, 11);
+    placeDefinition(world, catalogue, 'test:house', 8, 12);
+    tickPower(world, catalogue, roomy);
     const houses = [...world.buildings.values()].filter((b) => b.definitionId === 'test:house');
     expect(houses.every((b) => b.powered)).toBe(true);
   });
@@ -307,8 +306,8 @@ describe('vedení přes vodu a silnice přes zónu (T131)', () => {
     const world = createWorld(1);
     placeDefinition(world, catalogue, 'test:plant', 5, 11);
     world.layers.terrain[index(7, 11, world.size)] = TERRAIN.water;
-    expect(buildWire(world, 7, 11, WIRE.high).ok).toBe(true);
-    buildWire(world, 8, 11, WIRE.high);
+    expect(buildWire(world, 7, 11, WIRE.low).ok).toBe(true);
+    buildWire(world, 8, 11, WIRE.low);
     tickPower(world, catalogue);
     expect(at(world, 8, 11)).toBe(1);
   });
@@ -392,5 +391,92 @@ describe('vanilla elektrárna', () => {
     expect([...world.buildings.values()].filter((b) => b.powered).length).toBe(
       housesBefore.length + 1,
     );
+  });
+});
+
+const TRAFO: Definition = {
+  id: 'test:trafo',
+  type: 'building',
+  category: 'utility',
+  name: 'building.trafo.name',
+  description: 'building.trafo.desc',
+  footprint: [1, 1],
+  level: 1,
+  construction: { cost: 0, requiresRoad: false, requiresPower: false, allowedTerrain: [0] },
+  economy: { upkeep: 0 },
+  power: { transformer: 30 },
+  graphics: { color: '#9aa3ab', heightLevels: 1 },
+};
+
+describe('vysoké a nízké napětí, trafostanice (T136)', () => {
+  /** Elektrárna (5–6, 11–12), vysoké napětí (7..9, 11), dům na (11, 11). */
+  function line(withTrafo: boolean): { world: WorldState; catalogue: BuildingCatalogue } {
+    const catalogue = catalogueOf(PLANT, HOUSE, TRAFO);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    for (const x of [7, 8, 9]) buildWire(world, x, 11, WIRE.high);
+    if (withTrafo) placeDefinition(world, catalogue, 'test:trafo', 10, 11);
+    else buildWire(world, 10, 11, WIRE.high);
+    placeDefinition(world, catalogue, 'test:house', 11, 11);
+    return { world, catalogue };
+  }
+
+  const house = (world: WorldState) => [...world.buildings.values()].find((b) => b.definitionId === 'test:house');
+
+  it('vysoké napětí do domu nevede', () => {
+    const { world, catalogue } = line(false);
+    tickPower(world, catalogue);
+    expect(world.wireLive[index(10, 11, world.size)]).toBe(1); // vedení žije
+    expect(house(world)?.powered).toBe(false); // dům ne
+    expect(at(world, 11, 11)).toBe(0);
+  });
+
+  it('přes trafo proud do bloku dojde a trafo hlásí zatížení', () => {
+    const { world, catalogue } = line(true);
+    tickPower(world, catalogue);
+    expect(house(world)?.powered).toBe(true);
+    const trafo = [...world.buildings.values()].find((b) => b.definitionId === 'test:trafo');
+    expect(world.transformerLoad.get(trafo!.id)).toEqual({ load: 20, capacity: 30, overloaded: false });
+  });
+
+  it('přetížené trafo vypadne a blok za ním zhasne', () => {
+    const { world, catalogue } = line(true);
+    placeDefinition(world, catalogue, 'test:house', 12, 11); // 2 × 20 = 40 > 30
+    tickPower(world, catalogue);
+    const houses = [...world.buildings.values()].filter((b) => b.definitionId === 'test:house');
+    expect(houses.every((b) => !b.powered)).toBe(true);
+    const trafo = [...world.buildings.values()].find((b) => b.definitionId === 'test:trafo');
+    expect(world.transformerLoad.get(trafo!.id)?.overloaded).toBe(true);
+  });
+
+  it('vysoké napětí přes zónu blok nenapojí', () => {
+    const catalogue = catalogueOf(PLANT);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    for (let x = 7; x <= 12; x++) buildWire(world, x, 11, WIRE.high);
+    zoneArea(world, 10, 11, 3, 3, ZONE.residential);
+    tickPower(world, catalogue);
+    expect(world.wireLive[index(11, 11, world.size)]).toBe(1);
+    expect(at(world, 11, 12)).toBe(0);
+    expect(at(world, 11, 11)).toBe(0); // parcela pod vedením taky ne
+  });
+
+  it('nízké napětí jde přímo z elektrárny', () => {
+    const catalogue = catalogueOf(PLANT, HOUSE);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    buildWire(world, 7, 11, WIRE.low);
+    placeDefinition(world, catalogue, 'test:house', 8, 11);
+    tickPower(world, catalogue);
+    expect([...world.buildings.values()].find((b) => b.definitionId === 'test:house')?.powered).toBe(true);
+  });
+
+  it('nízké napětí mimo síť je mrtvé, i když je zelené podle zátěže', () => {
+    const catalogue = catalogueOf(PLANT);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    buildWire(world, 20, 20, WIRE.low);
+    tickPower(world, catalogue);
+    expect(world.wireLive[index(20, 20, world.size)]).toBe(0);
   });
 });

@@ -989,6 +989,12 @@ export interface LoadWarnings {
    * bloky přiléhající k elektrárně a hráč musí vedení natáhnout.
    */
   unwiredBuildings: number;
+  /**
+   * Město má vysoké napětí, ale ani jednu trafostanici (T136). Do té doby
+   * vedlo vysoké napětí rovnou do bloků; teď jen přes trafo, takže bloky na
+   * něm zhasnou. Rozhodnutí autora: nechat zhasnout a hráči to říct.
+   */
+  needsTransformers: boolean;
 }
 
 /**
@@ -1032,7 +1038,14 @@ export function collectLoadWarnings(
         (building) => (catalogue.get(building.definitionId)?.power?.consumption ?? 0) > 0,
       ).length;
 
-  return { missingSources, missingDefinitions, waterlessBuildings, unwiredBuildings };
+  const hasHighVoltage = wires.some((value) => value === 2);
+  const needsTransformers =
+    hasHighVoltage &&
+    !save.entities.buildings.some(
+      (building) => (catalogue.get(building.definitionId)?.power?.transformer ?? 0) > 0,
+    );
+
+  return { missingSources, missingDefinitions, waterlessBuildings, unwiredBuildings, needsTransformers };
 }
 
 /** Číslo, které musí být celé a v mezích. Jinak je save poškozený. */

@@ -103,7 +103,7 @@ function buildCity(content: ContentRegistry): WorldState {
   // Od T129 vede proud blok zón sám a silnice nic. Elektrárna přiléhá
   // k obytnému bloku, obchod s průmyslem jsou ale za ulicí — spojí je jeden
   // úsek vedení přes ni, jak by to udělal hráč.
-  const crossing = buildWire(world, site.x + 1, roadY, WIRE.high, balance);
+  const crossing = buildWire(world, site.x + 1, roadY, WIRE.low, balance);
   expect(crossing, JSON.stringify(crossing)).toEqual({ ok: true });
   return world;
 }
@@ -250,6 +250,12 @@ function findSite(world: WorldState): { x: number; y: number } {
  * po 1000 tikách svítí všech 61 budov. Silnice už proud nevede, město
  * dostalo jeden úsek vedení přes ulici. Proč kasa vyšla o 4 618 výš, není
  * rozebrané — růst se nezměnil, takže jde o daně nebo údržbu v průběhu.
+ */
+/*
+ * Vysoké a nízké napětí (T136): přes ulici vede úsek **nízkého** napětí,
+ * protože vysoké do bloku bez trafa nevede. Kasa 35 209 → 35 257 (úsek stojí
+ * 12 místo 60, údržba 0,2 se zaokrouhlí na 0), hash vrstev jiný (hodnota
+ * vedení 1 místo 2). Budov 61, obyvatel 192, práce 122 — beze změny.
  */
 describe('golden: město po 1000 tikách', () => {
   it('pevný seed a plná sestava systémů dají stabilní hashe', async () => {

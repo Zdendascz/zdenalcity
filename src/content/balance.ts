@@ -769,8 +769,11 @@ export interface Balance {
     /**
      * Typy vedení v pořadí `WIRE.low`, `WIRE.high`: cena za dlaždici
      * a kapacita — kolik spotřeby smí úsek přenést, než vypadne všechno za ním.
+     * `upkeep` je měsíční údržba za dlaždici; smí být desetinná, součet se
+     * zaokrouhlí jednou (jako u silnic). Vysoké napětí je výrazně dražší
+     * (rozhodnutí autora, T136).
      */
-    wires: { cost: number; capacity: number }[];
+    wires: { cost: number; capacity: number; upkeep: number }[];
   };
   water: {
     /** Dosah sítě v dlaždicích potrubí, když ho definice neurčí sama. */
@@ -985,7 +988,12 @@ function validatePower(
   const wires = power?.['wires'];
   if (!Array.isArray(wires) || wires.length !== 2) {
     issues.push({ field: 'power.wires', message: 'musí být pole dvou typů vedení' });
-    return { wires: [{ cost: 0, capacity: 0 }, { cost: 0, capacity: 0 }] };
+    return {
+      wires: [
+        { cost: 0, capacity: 0, upkeep: 0 },
+        { cost: 0, capacity: 0, upkeep: 0 },
+      ],
+    };
   }
   return {
     wires: wires.map((raw, i) => {
@@ -993,6 +1001,8 @@ function validatePower(
       return {
         cost: money(issues, wire, 'cost', `power.wires[${i}].cost`, 0, 100000),
         capacity: num(issues, wire, 'capacity', `power.wires[${i}].capacity`, 1, 100000000),
+        // Starší mod údržbu vedení nezná — pak je zadarmo, jako do T136.
+        upkeep: wire?.['upkeep'] === undefined ? 0 : num(issues, wire, 'upkeep', `power.wires[${i}].upkeep`, 0, 10000),
       };
     }),
   };

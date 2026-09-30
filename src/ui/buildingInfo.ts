@@ -283,6 +283,21 @@ export class BuildingInfo {
       'ui.info.powered',
       building.powered ? t('ui.info.poweredYes') : t('ui.info.poweredNo'),
     ]);
+    // Trafostanice: kolik přes ni teče proti tomu, co unese (T136).
+    const transformer = world.transformerLoad.get(building.id);
+    if (transformer) {
+      rows.push([
+        'ui.info.transformerLoad',
+        transformer.overloaded
+          ? t('ui.info.transformerOverloaded', {
+              load: formatNumber(transformer.load),
+              capacity: formatNumber(transformer.capacity),
+            })
+          : `${formatNumber(transformer.load)} / ${formatNumber(transformer.capacity)}`,
+      ]);
+    } else if ((definition.power?.transformer ?? 0) > 0) {
+      rows.push(['ui.info.transformerLoad', `0 / ${formatNumber(definition.power?.transformer ?? 0)}`]);
+    }
 
     // Co budova zpracuje. Bez tohohle řádku byla spalovna k nerozeznání od
     // kůlny: karta o ní neřekla vůbec nic a hráč neměl jak zjistit, jestli mu
@@ -548,6 +563,20 @@ export class BuildingInfo {
       ),
     );
     parent.appendChild(power);
+
+    // Vedení na dlaždici: typ a vytížení proti kapacitě (T136).
+    const wire = parcel.wire;
+    if (wire !== null) {
+      const kind = t(wire.type === 2 ? 'ui.tool.wire.high' : 'ui.tool.wire.low');
+      const state = wire.overloaded
+        ? t('ui.parcel.wireOverloaded', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
+        : wire.live
+          ? t('ui.parcel.wireLoad', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
+          : t('ui.parcel.wireDead', { capacity: formatNumber(wire.capacity) });
+      parent.appendChild(
+        meter(kind, state, wire.live ? Math.min(1, wire.load / Math.max(1, wire.capacity)) : 0),
+      );
+    }
 
     const rows: [string, string][] = [['ui.info.position', `${parcel.x}, ${parcel.y}`]];
     if (parcel.demand !== null) rows.push(['ui.hud.demand', formatNumber(parcel.demand)]);

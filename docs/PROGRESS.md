@@ -4417,3 +4417,30 @@ Zbývá: špičky při požáru (40–70 ms) dělá hlavně simulace (`fire.ts`,
 bourání a přepočty sítí po něm) a přeřazení; `render` při plném oddálení
 (zoom 0,5) je kolem 9 ms, protože je vidět většina města. Body 6 a 12
 (start a `antialias`) řeší jiná úloha.
+
+## Vysoké a nízké napětí, trafostanice, bourání ruin (T136, rozhodnutí autora)
+
+„Vysoké napětí nejde napojit do budov, vyjma elektráren. Do budov a zón jde
+jen nízké napětí a mezi vysokým a nízkým musí být trafo. Vysoké napětí je
+také výrazně dražší na údržbu." A: „ve chvíli, kdy dojede k budově nebo do
+zóny, tak je elektřina v celé budově i celé zóně" (to platilo už od T129).
+
+- **Síť má dvě vrstvy** (`power.ts`): nízké napětí se vším, co odebírá,
+  a vysoké napětí. Potkají se jen v elektrárně (celým půdorysem, bez limitu;
+  elektrárna napájí obojí) a v trafostanici (jedna dlaždice, kapacita trafa,
+  oběma směry). Vysoké napětí vede přes blok, ale nenapojí ho.
+- **Trafostanice** `vanilla:transformer` 1×1, 40 000, 800, údržba 20;
+  **rozvodna** `vanilla:substation` 2×2, 100 000, 3 000, údržba 60. Definice mají
+  `power.transformer`. Jsou v nabídce Vedení. Sprity a/b/c vygenerované (0,40 USD).
+- **Údržba vedení** `balance.power.wires[].upkeep`: nízké 0,2, vysoké 3 za
+  dlaždici a měsíc. Vlastní řádek v rozpočtu a v knize (`upkeep.wires`).
+- **Kapacita je vidět:** v nabídce „unese …", v panelu parcely typ vedení
+  a zatížení / kapacita (nebo bez proudu, přetížené), v panelu trafa jeho
+  zatížení, v legendě vrstvy elektřiny barvy vedení. Mrtvé vedení je šedé
+  (`world.wireLive`).
+- **Rozehraná města** (rozhodnutí autora): nechat zhasnout, hláška
+  `ui.save.needsTransformers`, když má město vysoké napětí a žádné trafo.
+- **Hromadné bourání ruin:** vlastní nástroj v liště (tažení obdélníku),
+  příkaz `demolish_ruins` zbourá jen opuštěné budovy a uklidí suť; jde vrátit.
+- Golden město přemosťuje ulici nízkým napětím: kasa 35 209 → 35 257,
+  budovy, obyvatelé a práce beze změny.

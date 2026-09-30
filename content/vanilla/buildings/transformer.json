@@ -1,0 +1,33 @@
+{
+  "id": "vanilla:transformer",
+  "type": "building",
+  "category": "utility",
+  "menu": "wires",
+  "name": "building.transformer.name",
+  "description": "building.transformer.desc",
+  "footprint": [
+    1,
+    1
+  ],
+  "construction": {
+    "cost": 800,
+    "requiresRoad": false,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2,
+      4
+    ]
+  },
+  "economy": {
+    "upkeep": 20
+  },
+  "power": {
+    "transformer": 40000
+  },
+  "graphics": {
+    "color": "#9aa3ab",
+    "heightLevels": 1,
+    "icon": "bolt"
+  }
+}

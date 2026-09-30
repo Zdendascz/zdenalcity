@@ -2,7 +2,7 @@ import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '../catalogue';
 import { cellOfTile, strongestModifier } from '../disasters/effects';
-import { index, ROAD } from '../layers';
+import { index, ROAD, WIRE } from '../layers';
 import { isRciCategory } from '../rci';
 import type { RciCategory } from '../rci';
 import { closeYearIfDue } from '../ledger';
@@ -86,6 +86,11 @@ export interface Budget {
   lines: BudgetLine[];
   /** Údržba silnic. Nejsou to budovy, takže mají vlastní řádek (§4 fáze 3). */
   roads: RoadBudget;
+  /**
+   * Údržba elektrického vedení (T136): dlaždice vedení obou typů dohromady.
+   * Vysoké napětí je výrazně dražší (rozhodnutí autora).
+   */
+  wires: RoadBudget;
   /**
    * MHD. Taky vlastní řádek: vozidlo není budova a jízdné není daň, takže
    * do rozpisu po definicích nepatří ani jedno.
@@ -264,6 +269,19 @@ export function computeBudget(
   roads.upkeep = Math.round(roads.upkeep);
   expenses += roads.upkeep;
 
+  // Vedení po celé mapě, jednou za měsíc. Údržba smí být desetinná
+  // (dlaždice nízkého napětí stojí zlomek), zaokrouhluje se až součet.
+  const wires: RoadBudget = { count: 0, upkeep: 0 };
+  const wireLayer = world.layers.wire;
+  for (let tile = 0; tile < wireLayer.length; tile++) {
+    const value = wireLayer[tile] ?? WIRE.none;
+    if (value === WIRE.none) continue;
+    wires.count++;
+    wires.upkeep += balance.power.wires[value - 1]?.upkeep ?? 0;
+  }
+  wires.upkeep = Math.round(wires.upkeep);
+  expenses += wires.upkeep;
+
   // Jízdné a údržba vozidel. Obojí je měsíční a počítá ho `transitSystem`,
   // rozpočet jen sečte — jinak by se výpis a skutečnost rozešly.
   const totals = transitTotals(world);
@@ -302,6 +320,7 @@ export function computeBudget(
     // Stabilní pořadí, ať tabulka neposkakuje.
     lines: [...byDefinition.values()].sort((a, b) => a.definitionId.localeCompare(b.definitionId)),
     roads,
+    wires,
     transit,
     debt,
     income,
@@ -343,6 +362,7 @@ export function createEconomySystem(catalogue: BuildingCatalogue, balance: Balan
         record(world.economy.ledger.expenses, 'upkeep.buildings', line.upkeep);
       }
       record(world.economy.ledger.expenses, 'upkeep.roads', budget.roads.upkeep);
+      record(world.economy.ledger.expenses, 'upkeep.wires', budget.wires.upkeep);
       record(world.economy.ledger.expenses, 'upkeep.transit', budget.transit.upkeep);
       record(world.economy.ledger.income, 'fare', budget.transit.income);
 
