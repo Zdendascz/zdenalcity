@@ -4444,3 +4444,21 @@ zóny, tak je elektřina v celé budově i celé zóně" (to platilo už od T129
   příkaz `demolish_ruins` zbourá jen opuštěné budovy a uklidí suť; jde vrátit.
 - Golden město přemosťuje ulici nízkým napětím: kasa 35 209 → 35 257,
   budovy, obyvatelé a práce beze změny.
+
+## Síť jako tok: souběžné přípojky se sčítají (T137, hlášení autora)
+
+„Jakto, že je tam vedení přetížené? Je tam 8 520 z 20 000." Dvě chyby:
+síť se procházela **stromem**, takže celá spotřeba (i tranzit přes blok do
+dalších čtvrtí) šla jedinou přípojkou, i když k bloku vedly tři — vypadla
+jedna po druhé. A vypadlý úsek ukazoval zatížení z dřívějšího přepočtu.
+
+- `power.ts` počítá **maximální tok** (Dinic): neomezené celky (blok,
+  elektrárna, trafo) jsou oblasti, úsek vedení mimo parcelu uzel s kapacitou,
+  trafo hrana s kapacitou. Elektrárny dodávají nejvýš výkon, oblasti berou
+  nejvýš spotřebu. V oblasti se proud rozdává od nejstarší budovy.
+- Nic nevypadává: úsek jede nejvýš na plno. **Plný** (tmavě červený) je jen
+  úsek na minimálním řezu — ten opravdu omezuje.
+- Zátěž se rozkládá: tok se zkusí s kapacitami staženými na 25/50/75 % a bere
+  se první, se kterým projde všechno. Jinak by si tok cesty vybral libovolně.
+- Na savu autora (mesto 39): blok u 7,115 svítí celý (31 budov, 9 370),
+  rozvodna nese 60 000 ze 100 000. Přepočet ze zapamatovaného tvaru ~12 ms.

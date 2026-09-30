@@ -14,22 +14,17 @@ import type { System } from './index';
  * vedení (`layers.wire`). Silnice nevede nic, zchátralá a pobořená parcela
  * taky ne. Hráč tedy natahuje vedení jen mezi bloky a k elektrárně.
  *
- * **Kapacita:** každý úsek vedení přenese nejvýš `balance.power.wires[typ]`.
- * Síť se prochází do šířky od elektráren; zátěž se sčítá od spotřebičů
- * zpátky ke zdroji. Úsek, přes který by šlo víc, než unese, **vypadne**
- * a s ním všechno, co za ním leží — pokud k tomu nevede jiná cesta. Proto
- * se výpočet opakuje: vypadlé úseky se vyřadí a proud zkusí jinudy, dokud
- * nic dalšího nevypadne. Výpadek tak zasáhne **oblast**, ne náhodné domy.
+ * **Kapacita:** každý úsek vedení přenese nejvýš `balance.power.wires[typ]`,
+ * trafo nejvýš svou kapacitu. Síť se počítá jako **maximální tok** (T137):
+ * souběžné přípojky se sčítají a úsek, který jede na plno, dál nic nepustí.
+ * Co se do bloku nevejde, nedostanou jeho nejnovější budovy.
  *
  * **Výroba:** každá souvislá síť má svou. Elektrárna na jednom konci mapy
- * nenapájí čtvrť, ke které nevede vedení. V síti se výroba rozdává podle
+ * nenapájí čtvrť, ke které nevede vedení. V oblasti se proud rozdává podle
  * `id` budov, tedy od nejstarší.
  *
  * Systém běží každý tik (§5), ale přepočítává se jen po změně sítě.
  */
-
-/** Pojistka proti nekonečnému kolu vyřazování. Každé kolo vyřadí aspoň úsek. */
-const MAX_ROUNDS = 64;
 
 /**
  * Snímek toho, **co vede** — parcely a vedení (nebo potrubí) — z posledního
@@ -124,18 +119,12 @@ function same(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
   return true;
 }
 
-/** Co zůstává z minulého úplného přepočtu elektřiny. */
+/** Tvar sítě z minulého úplného přepočtu (T133) — graf pro výpočet toku. */
 interface PowerCache {
   readonly snapshot: ConductSnapshot;
-  /** Elektrárny (id, výkon, dlaždice) a odstavené — mění strom hledání. */
+  /** Elektrárny, odstavené a trafa — mění tvar grafu. */
   readonly plantsKey: string;
-  /** Vodiče před vyřazováním přetížených úseků. Kopíruje se, kola ho mění. */
-  readonly conducts: Uint8Array;
-  readonly limited: Uint8Array;
-  /** Dlaždice, kde se potkají vrstvy (elektrárny a trafa). */
-  readonly bridges: Uint8Array;
-  /** Strom prvního hledání; pořadí zdrojů je v `plantsKey`. */
-  readonly tree: Tree;
+  readonly graph: Graph;
 }
 
 const powerCache = new WeakMap<WorldState, PowerCache>();
@@ -183,7 +172,7 @@ interface Transformer {
 }
 
 /*
- * **Dvě vrstvy sítě** (T136, rozhodnutí autora). Uzel sítě je dlaždice
+ * **Dvě vrstvy sítě** (T136, rozhodnutí autora). Uzel mřížky je dlaždice
  * v jedné ze dvou vrstev:
  *
  * - nízké napětí (0 … cells−1): všechno, co odebírá — souvislý blok zón
@@ -195,7 +184,51 @@ interface Transformer {
  * s kapacitou trafa). Vysoké napětí tak vede přes blok, ale do něj ne:
  * „Vysoké napětí nejde napojit do budov, vyjma elektráren. Do budov a zón
  * jde jen nízké napětí a mezi vysokým a nízkým musí být trafo."
+ *
+ * **Tok, ne strom** (T137, hlášení autora „jakto, že je tam vedení
+ * přetížené? je tam 8 520 z 20 000"). Do T137 se síť procházela stromem
+ * hledání: celá spotřeba bloku šla jedinou cestou, i když k němu vedly tři
+ * souběžné přípojky. Jedna vypadla, pak druhá, pak třetí, a blok zhasl, ač
+ * dohromady unesly trojnásobek. Teď se síť počítá jako **maximální tok**:
+ *
+ * - Co vede bez omezení (blok, elektrárna, trafostanice), se slije do
+ *   jedné **oblasti**. Úsek vedení mimo parcelu je vlastní uzel s kapacitou
+ *   typu vedení, trafo hrana s kapacitou trafa.
+ * - Elektrárny dodávají do své oblasti nejvýš svůj výkon, oblast odebírá
+ *   nejvýš spotřebu svých budov. Proud se rozdělí do všech cest, kudy vede.
+ * - Úsek, který jede na plno, je **plný** (ve vrstvě tmavě červený); dál už
+ *   nic nepustí. Co se do oblasti nevejde, nedostanou budovy s vyšším id —
+ *   výpadek zasáhne část bloku, ne celý blok kvůli jednomu drátu.
  */
+
+/** Kapacita „bez omezení" — větší než jakákoli výroba ve hře. */
+const UNLIMITED = 1e15;
+
+/** Stažení kapacit při rozkládání zátěže, od nejmenšího (viz `recompute`). */
+const BALANCE_STEPS = [0.25, 0.5, 0.75] as const;
+
+function sum(values: Float64Array): number {
+  let total = 0;
+  for (const value of values) total += value;
+  return total;
+}
+
+/** Graf sítě: oblasti a úseky vedení s kapacitou, spojené hranami. */
+interface Graph {
+  readonly cells: number;
+  /** Uzel grafu každého uzlu mřížky (2·cells): −1 nevede. */
+  readonly nodeOf: Int32Array;
+  /** Počet oblastí; mají uzly 0 … regions−1. Úsek vedení k je `regions + k`. */
+  readonly regions: number;
+  /** Uzel mřížky úseku vedení k. */
+  readonly wireNode: Int32Array;
+  /** Kapacita úseku vedení k. */
+  readonly wireCap: Float64Array;
+  /** Neomezené hrany mezi uzly grafu, po dvojicích [a, b, a, b, …]. */
+  readonly links: Int32Array;
+  /** Trafa: uzly grafu obou stran, kapacita, id budovy. */
+  readonly trafos: readonly { a: number; b: number; capacity: number; id: number }[];
+}
 
 function recompute(
   world: WorldState,
@@ -230,278 +263,444 @@ function recompute(
   }
 
   // Tvar sítě z minula, když se nezměnilo, co vede, ani kde jsou elektrárny
-  // a trafa (T133, viz `ConductSnapshot`).
+  // a trafa (T133, viz `ConductSnapshot`). Tok se počítá pokaždé znovu —
+  // mění se se spotřebou.
   const offline = [...world.disasters.offlinePlants].sort((a, b) => a - b).join(',');
   const plantsKey =
-    `${plants.map((plant) => `${plant.id}:${plant.production}:${plant.tiles.join(',')}`).join('|')}#${offline}` +
+    `${plants.map((plant) => `${plant.id}:${plant.tiles.join(',')}`).join('|')}#${offline}` +
     `#${transformers.map((t) => `${t.id}:${t.capacity}:${t.tiles.join(',')}`).join('|')}`;
   const cached = powerCache.get(world);
-  let conducts: Uint8Array;
-  let limited: Uint8Array;
-  let bridges: Uint8Array;
-  let tree: Tree;
+  let graph: Graph;
   if (cached && cached.plantsKey === plantsKey && cached.snapshot.matches(world, world.layers.wire)) {
-    conducts = cached.conducts.slice();
-    limited = cached.limited;
-    bridges = cached.bridges;
-    tree = cached.tree;
+    graph = cached.graph;
   } else {
-    conducts = new Uint8Array(cells * 2);
-    // Kapacitu má jen vedení mimo parcelu: přes parcelu vede blok sám
-    // a neomezeně. Kdyby se úsek počítal, jeho přetížení by zhaslo i parcelu
-    // pod ním — a s ní celý blok (audit, hlášení autora „i když mám napojeno").
-    limited = new Uint8Array(cells * 2);
-    // Kde se vrstvy potkají: elektrárna všude, trafo na jedné dlaždici.
-    bridges = new Uint8Array(cells);
-    const hub = new Uint8Array(cells);
-    for (const plant of plants) {
-      for (const tile of plant.tiles) {
-        bridges[tile] = 1;
-        hub[tile] = 1;
-      }
-    }
-    for (const transformer of transformers) {
-      for (const tile of transformer.tiles) hub[tile] = 1;
-      bridges[transformer.bridge] = 1;
-    }
-    for (let tile = 0; tile < cells; tile++) {
-      if (isFlooded(world, tile)) continue;
-      const parcel = parcelConducts(world, tile);
-      const wire = (world.rubble[tile] ?? 0) === 0 ? (world.layers.wire[tile] ?? WIRE.none) : WIRE.none;
-      if (parcel || wire === WIRE.low) conducts[tile] = 1;
-      if (wire === WIRE.low && !parcel) limited[tile] = 1;
-      // Vysoké napětí má svou vrstvu; elektrárna a trafo v ní stojí celým
-      // půdorysem, ať se k nim vedení připojí z kterékoli strany.
-      if (wire === WIRE.high || hub[tile] === 1) conducts[cells + tile] = 1;
-      if (wire === WIRE.high && hub[tile] === 0) limited[cells + tile] = 1;
-    }
-    // Odpojená elektrárna nevede — kdyby vedla, vzdálená čtvrť by zůstala
-    // „připojená k ničemu" a hráč by na mapě viděl síť, která nefunguje.
-    for (const id of world.disasters.offlinePlants) {
-      const building = world.buildings.get(id);
-      const definition = building && catalogue.get(building.definitionId);
-      if (!building || !definition) continue;
-      for (const tile of footprintTiles(world, building.x, building.y, definition.footprint)) {
-        conducts[tile] = 0;
-        conducts[cells + tile] = 0;
-        bridges[tile] = 0;
-      }
-    }
-    tree = spread(world, conducts, bridges, plants);
+    graph = buildGraph(world, catalogue, capacity, plants, transformers);
     const snapshot = cached?.snapshot ?? new ConductSnapshot();
     snapshot.capture(world, world.layers.wire);
-    powerCache.set(world, { snapshot, plantsKey, conducts: conducts.slice(), limited, bridges, tree });
+    powerCache.set(world, { snapshot, plantsKey, graph });
   }
 
-  const trafoAt = new Map<number, Transformer>();
-  for (const transformer of transformers) trafoAt.set(transformer.bridge, transformer);
-  const nodeCapacity = (node: number): number => {
-    if (limited[node] !== 1) return Number.POSITIVE_INFINITY;
-    return capacity(node >= cells ? WIRE.high : WIRE.low);
+  const { nodeOf, regions } = graph;
+  const regionOfTiles = (tiles: readonly number[]): number => {
+    for (const tile of tiles) {
+      const node = nodeOf[tile] ?? -1;
+      if (node >= 0 && node < regions) return node;
+    }
+    return -1;
   };
 
-  const overloaded = new Uint8Array(cells * 2);
-  const trafoOverloaded = new Set<number>();
-  let load = loads(tree, consumers, cells);
-  for (let round = 0; round < MAX_ROUNDS; round++) {
-    const cut = overloadedNodes(tree, load, cells, nodeCapacity, trafoAt, trafoOverloaded);
-    if (cut.length === 0) break;
-    for (const node of cut) {
-      overloaded[node] = 1;
-      conducts[node] = 0;
-    }
-    tree = spread(world, conducts, bridges, plants);
-    load = loads(tree, consumers, cells);
+  // Výroba a spotřeba po oblastech.
+  const supply = new Float64Array(regions);
+  for (const plant of plants) {
+    const region = regionOfTiles(plant.tiles);
+    if (region >= 0) supply[region] = (supply[region] ?? 0) + plant.production;
+  }
+  const demand = new Float64Array(regions);
+  const consumerRegion = new Map<number, number>();
+  for (const consumer of consumers) {
+    const region = regionOfTiles(consumer.tiles);
+    consumerRegion.set(consumer.id, region);
+    if (region >= 0 && consumer.consumption > 0) demand[region] = (demand[region] ?? 0) + consumer.consumption;
   }
 
-  // Zátěž a přetížení pro vrstvu elektřiny, po dlaždicích vedení: uzel té
-  // vrstvy, ve které vedení leží. Přetížený úsek ukazuje, kolik by přes něj
-  // šlo — tedy zátěž z posledního kola, kdy ještě vedl.
+  // Tok s rozloženou zátěží: nejdřív s kapacitami staženými na čtvrtinu,
+  // polovinu, tři čtvrtiny. Když i tak projde všechno, co projít může, bere
+  // se ten — maximální tok si jinak cesty vybírá libovolně a ukázal by plný
+  // úsek tam, kde by stačila desetina (hráč by hledal problém, který není).
+  let flow = maxFlow(graph, supply, demand, 1);
+  const best = sum(flow.delivered);
+  for (const scale of BALANCE_STEPS) {
+    const tried = maxFlow(graph, supply, demand, scale);
+    if (sum(tried.delivered) >= best - 1e-6) {
+      flow = tried;
+      break;
+    }
+  }
+
+  // Kam proud dojde: oblasti spojené s elektrárnou cestou, která vede.
+  const reached = reachFromSources(graph, supply);
+
+  // Výstupy po dlaždicích vedení.
   const wireLoad = world.wireLoad;
   const wireOverloaded = new Uint8Array(cells);
   const wireLive = new Uint8Array(cells);
+  wireLoad.fill(0);
+  for (let k = 0; k < graph.wireNode.length; k++) {
+    const gridNode = graph.wireNode[k]!;
+    const tile = gridNode >= cells ? gridNode - cells : gridNode;
+    const through = flow.wire[k] ?? 0;
+    wireLoad[tile] = Math.round(through);
+    wireLive[tile] = reached[regions + k] ?? 0;
+    // Plný je jen úsek, který opravdu omezuje — leží na úzkém hrdle sítě.
+    if (flow.wireLimits[k] === 1) wireOverloaded[tile] = 1;
+  }
+  // Vedení přes parcelu nebo trafo nemá vlastní uzel — žije s oblastí.
   for (let tile = 0; tile < cells; tile++) {
     const type = world.layers.wire[tile] ?? WIRE.none;
-    if (type === WIRE.none) {
-      wireLoad[tile] = 0;
-      continue;
-    }
-    const node = type === WIRE.high ? cells + tile : tile;
-    wireOverloaded[tile] = overloaded[node] ?? 0;
-    wireLive[tile] = tree.reached[node] ?? 0;
-    if (overloaded[node] === 0) wireLoad[tile] = tree.reached[node] === 1 ? (load[node] ?? 0) : 0;
+    if (type === WIRE.none) continue;
+    const node = nodeOf[type === WIRE.high ? cells + tile : tile] ?? -1;
+    if (node >= 0 && node < regions) wireLive[tile] = reached[node] ?? 0;
   }
   world.wireOverloaded = wireOverloaded;
   world.wireLive = wireLive;
 
-  // Zatížení trafostanic: tok přes přepojení vrstev na jejich dlaždici.
   const transformerLoad = new Map<number, TransformerLoad>();
-  for (const transformer of transformers) {
-    transformerLoad.set(transformer.id, {
-      load: Math.round(bridgeFlow(tree, load, cells, transformer.bridge)),
-      capacity: transformer.capacity,
-      overloaded: trafoOverloaded.has(transformer.bridge),
+  graph.trafos.forEach((trafo, i) => {
+    const load = Math.abs(flow.trafo[i] ?? 0);
+    transformerLoad.set(trafo.id, {
+      load: Math.round(load),
+      capacity: trafo.capacity,
+      overloaded: flow.trafoLimits[i] === 1,
     });
+  });
+  // Trafo, které do sítě vůbec nevede (zaplavené), hlásí nulu.
+  for (const transformer of transformers) {
+    if (!transformerLoad.has(transformer.id)) {
+      transformerLoad.set(transformer.id, { load: 0, capacity: transformer.capacity, overloaded: false });
+    }
   }
   world.transformerLoad = transformerLoad;
   world.powerRevision++;
 
-  writePowerLayer(world, tree.reached);
-  distributeCapacity(world, catalogue, ids, plants, tree, cells);
+  writePowerLayer(world, graph, reached, flow.delivered, demand);
+  distributeCapacity(world, catalogue, ids, consumerRegion, reached, flow.delivered);
 }
 
-interface Tree {
-  /** Dosažený uzel 0/1 (obě vrstvy za sebou). */
-  reached: Uint8Array;
-  /** Rodič ve stromu hledání, −1 u zdroje. */
-  parent: Int32Array;
-  /** Síť, do které uzel patří — index první elektrárny, která ho zasáhla. */
-  network: Int32Array;
-  /** Pořadí, ve kterém se uzly dosáhly. */
-  order: number[];
-}
-
-/** Do šířky od všech elektráren naráz, po vodivých uzlech obou vrstev. */
-function spread(
+/**
+ * Sestaví graf sítě: sleje neomezené uzly do oblastí a dá vlastní uzel
+ * každému úseku vedení s kapacitou.
+ */
+function buildGraph(
   world: WorldState,
-  conducts: Uint8Array,
-  bridges: Uint8Array,
+  catalogue: BuildingCatalogue,
+  capacity: (type: number) => number,
   plants: readonly Plant[],
-): Tree {
-  const nodes = conducts.length;
-  const cells = nodes / 2;
-  const reached = new Uint8Array(nodes);
-  const parent = new Int32Array(nodes).fill(-1);
-  const network = new Int32Array(nodes).fill(-1);
-  const order: number[] = [];
+  transformers: readonly Transformer[],
+): Graph {
+  const cells = world.layers.power.length;
   const size = world.size;
+  const conducts = new Uint8Array(cells * 2);
+  // Kapacitu má jen vedení mimo parcelu: přes parcelu vede blok sám
+  // a neomezeně. Kdyby se úsek počítal, jeho přetížení by zhaslo i parcelu
+  // pod ním — a s ní celý blok (audit, hlášení autora „i když mám napojeno").
+  const limited = new Uint8Array(cells * 2);
+  // Elektrárna stojí v obou vrstvách celým půdorysem a vrstvy v ní splývají;
+  // trafo v obou vrstvách stojí taky, ale přepojuje jen přes svou kapacitu.
+  const hub = new Uint8Array(cells);
+  const plantTile = new Uint8Array(cells);
+  for (const plant of plants) {
+    for (const tile of plant.tiles) {
+      hub[tile] = 1;
+      plantTile[tile] = 1;
+    }
+  }
+  for (const transformer of transformers) for (const tile of transformer.tiles) hub[tile] = 1;
+  for (let tile = 0; tile < cells; tile++) {
+    if (isFlooded(world, tile)) continue;
+    const parcel = parcelConducts(world, tile);
+    const wire = (world.rubble[tile] ?? 0) === 0 ? (world.layers.wire[tile] ?? WIRE.none) : WIRE.none;
+    if (parcel || wire === WIRE.low) conducts[tile] = 1;
+    if (wire === WIRE.low && !parcel) limited[tile] = 1;
+    if (wire === WIRE.high || hub[tile] === 1) conducts[cells + tile] = 1;
+    if (wire === WIRE.high && hub[tile] === 0) limited[cells + tile] = 1;
+  }
+  // Odpojená elektrárna nevede — kdyby vedla, vzdálená čtvrť by zůstala
+  // „připojená k ničemu" a hráč by na mapě viděl síť, která nefunguje.
+  for (const id of world.disasters.offlinePlants) {
+    const building = world.buildings.get(id);
+    const definition = building && catalogue.get(building.definitionId);
+    if (!building || !definition) continue;
+    for (const tile of footprintTiles(world, building.x, building.y, definition.footprint)) {
+      conducts[tile] = 0;
+      conducts[cells + tile] = 0;
+      plantTile[tile] = 0;
+    }
+  }
 
-  // Dvě elektrárny, jejichž sítě se dotknou, jsou jedna síť: kdo narazí na
-  // uzel s cizím označením, sítě sloučí.
-  const root = plants.map((_, p) => p);
-  const find = (p: number): number => {
-    while (root[p] !== p) p = root[p] = root[root[p]!]!;
-    return p;
+  // Oblasti: sjednocení neomezených uzlů po sousedech v téže vrstvě
+  // a v elektrárně napříč vrstvami.
+  const nodes = cells * 2;
+  const root = new Int32Array(nodes);
+  for (let n = 0; n < nodes; n++) root[n] = n;
+  const find = (n: number): number => {
+    while (root[n] !== n) {
+      root[n] = root[root[n]!]!;
+      n = root[n]!;
+    }
+    return n;
+  };
+  const unite = (a: number, b: number): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) root[Math.max(ra, rb)] = Math.min(ra, rb);
+  };
+  const free = (n: number): boolean => conducts[n] === 1 && limited[n] === 0;
+  for (let layer = 0; layer < nodes; layer += cells) {
+    for (let tile = 0; tile < cells; tile++) {
+      const n = layer + tile;
+      if (!free(n)) continue;
+      const x = tile % size;
+      if (x < size - 1 && free(n + 1)) unite(n, n + 1);
+      if (tile + size < cells && free(n + size)) unite(n, n + size);
+    }
+  }
+  for (let tile = 0; tile < cells; tile++) {
+    if (plantTile[tile] === 1 && free(tile) && free(cells + tile)) unite(tile, cells + tile);
+  }
+
+  // Čísla uzlů grafu: oblasti v pořadí uzlů mřížky, pak úseky vedení.
+  const nodeOf = new Int32Array(nodes).fill(-1);
+  const regionOfRoot = new Map<number, number>();
+  for (let n = 0; n < nodes; n++) {
+    if (!free(n)) continue;
+    const r = find(n);
+    let region = regionOfRoot.get(r);
+    if (region === undefined) {
+      region = regionOfRoot.size;
+      regionOfRoot.set(r, region);
+    }
+    nodeOf[n] = region;
+  }
+  const regions = regionOfRoot.size;
+  const wireNodes: number[] = [];
+  const wireCaps: number[] = [];
+  for (let n = 0; n < nodes; n++) {
+    if (conducts[n] !== 1 || limited[n] !== 1) continue;
+    nodeOf[n] = regions + wireNodes.length;
+    wireNodes.push(n);
+    wireCaps.push(capacity(n >= cells ? WIRE.high : WIRE.low));
+  }
+
+  // Hrany mezi různými uzly grafu (oblast–úsek, úsek–úsek) po sousedech.
+  const links: number[] = [];
+  for (let layer = 0; layer < nodes; layer += cells) {
+    for (let tile = 0; tile < cells; tile++) {
+      const a = nodeOf[layer + tile] ?? -1;
+      if (a < 0) continue;
+      const x = tile % size;
+      if (x < size - 1) {
+        const b = nodeOf[layer + tile + 1] ?? -1;
+        if (b >= 0 && b !== a) links.push(a, b);
+      }
+      if (tile + size < cells) {
+        const b = nodeOf[layer + tile + size] ?? -1;
+        if (b >= 0 && b !== a) links.push(a, b);
+      }
+    }
+  }
+
+  const trafos: { a: number; b: number; capacity: number; id: number }[] = [];
+  for (const transformer of transformers) {
+    const a = nodeOf[transformer.bridge] ?? -1;
+    const b = nodeOf[cells + transformer.bridge] ?? -1;
+    if (a < 0 || b < 0 || a === b) continue;
+    trafos.push({ a, b, capacity: transformer.capacity, id: transformer.id });
+  }
+
+  return {
+    cells,
+    nodeOf,
+    regions,
+    wireNode: Int32Array.from(wireNodes),
+    wireCap: Float64Array.from(wireCaps),
+    links: Int32Array.from(links),
+    trafos,
+  };
+}
+
+interface FlowResult {
+  /** Kolik dostala každá oblast (≤ spotřeba). */
+  delivered: Float64Array;
+  /** Tok přes úsek vedení k. */
+  wire: Float64Array;
+  /** Čistý tok přes trafo i (znaménko podle směru). */
+  trafo: Float64Array;
+  /** Úsek vedení k je úzké hrdlo: jede na plno a za ním chybí proud. */
+  wireLimits: Uint8Array;
+  /** Totéž pro trafo i. */
+  trafoLimits: Uint8Array;
+}
+
+/**
+ * Maximální tok (Dinic) od elektráren ke spotřebě. Úsek vedení je rozdělený
+ * na vstup a výstup s kapacitou mezi nimi; oblast je jeden uzel. Pořadí hran
+ * je dané pořadím uzlů, takže výsledek je deterministický (P2).
+ */
+function maxFlow(graph: Graph, supply: Float64Array, demand: Float64Array, scale: number): FlowResult {
+  const R = graph.regions;
+  const W = graph.wireNode.length;
+  const S = R + 2 * W;
+  const T = S + 1;
+  const N = T + 1;
+  const into = (g: number): number => (g < R ? g : R + 2 * (g - R));
+  const outOf = (g: number): number => (g < R ? g : R + 2 * (g - R) + 1);
+
+  const head: number[] = new Array<number>(N).fill(-1);
+  const to: number[] = [];
+  const cap: number[] = [];
+  const next: number[] = [];
+  const addArc = (u: number, v: number, c: number): number => {
+    const e = to.length;
+    to.push(v, u);
+    cap.push(c, 0);
+    next.push(head[u]!, head[v]!);
+    head[u] = e;
+    head[v] = e + 1;
+    return e;
   };
 
-  plants.forEach((plant, p) => {
-    for (const tile of plant.tiles) {
-      for (const node of [tile, cells + tile]) {
-        if (conducts[node] === 0 || reached[node] === 1) continue;
-        reached[node] = 1;
-        network[node] = p;
-        order.push(node);
+  const wireArc: number[] = [];
+  for (let k = 0; k < W; k++) {
+    wireArc.push(addArc(R + 2 * k, R + 2 * k + 1, (graph.wireCap[k] ?? UNLIMITED) * scale));
+  }
+  const links = graph.links;
+  for (let i = 0; i < links.length; i += 2) {
+    const a = links[i]!;
+    const b = links[i + 1]!;
+    addArc(outOf(a), into(b), UNLIMITED);
+    addArc(outOf(b), into(a), UNLIMITED);
+  }
+  const trafoArcs: [number, number][] = graph.trafos.map((trafo) => [
+    addArc(outOf(trafo.a), into(trafo.b), trafo.capacity * scale),
+    addArc(outOf(trafo.b), into(trafo.a), trafo.capacity * scale),
+  ]);
+  const sinkArc: number[] = [];
+  for (let r = 0; r < R; r++) {
+    if ((supply[r] ?? 0) > 0) addArc(S, r, supply[r]!);
+    sinkArc.push((demand[r] ?? 0) > 0 ? addArc(r, T, demand[r]!) : -1);
+  }
+  // Původní kapacity, ať jde na konci spočítat tok hrany.
+  const initial = cap.slice();
+
+  const level = new Int32Array(N);
+  const iter = new Int32Array(N);
+  const queue = new Int32Array(N);
+  const bfs = (): boolean => {
+    level.fill(-1);
+    level[S] = 0;
+    let qh = 0;
+    let qt = 0;
+    queue[qt++] = S;
+    while (qh < qt) {
+      const u = queue[qh++]!;
+      for (let e = head[u]!; e >= 0; e = next[e]!) {
+        const v = to[e]!;
+        if (cap[e]! > 1e-9 && level[v] === -1) {
+          level[v] = level[u]! + 1;
+          queue[qt++] = v;
+        }
       }
     }
+    return level[T] !== -1;
+  };
+  // Hledání cesty bez rekurze (mapa 512² má tisíce úseků za sebou).
+  const stackNode = new Int32Array(N);
+  const stackEdge = new Int32Array(N);
+  const augment = (): number => {
+    let depth = 0;
+    stackNode[0] = S;
+    for (;;) {
+      const u = stackNode[depth]!;
+      if (u === T) {
+        let pushed = Infinity;
+        for (let d = 0; d < depth; d++) pushed = Math.min(pushed, cap[stackEdge[d]!]!);
+        for (let d = 0; d < depth; d++) {
+          const e = stackEdge[d]!;
+          cap[e]! -= pushed;
+          cap[e ^ 1]! += pushed;
+        }
+        return pushed;
+      }
+      let advanced = false;
+      for (; iter[u]! >= 0; iter[u] = next[iter[u]!]!) {
+        const e = iter[u]!;
+        const v = to[e]!;
+        if (cap[e]! > 1e-9 && level[v] === level[u]! + 1) {
+          stackEdge[depth] = e;
+          stackNode[++depth] = v;
+          advanced = true;
+          break;
+        }
+      }
+      if (advanced) continue;
+      // Slepá ulička: uzel vyřadit z vrstvy a vrátit se.
+      level[u] = -1;
+      if (depth === 0) return 0;
+      depth--;
+      const back = stackNode[depth]!;
+      iter[back] = next[iter[back]!]!;
+    }
+  };
+  while (bfs()) {
+    for (let u = 0; u < N; u++) iter[u] = head[u]!;
+    for (;;) {
+      const pushed = augment();
+      if (pushed <= 1e-9) break;
+    }
+  }
+
+  const used = (e: number): number => (initial[e] ?? 0) - (cap[e] ?? 0);
+  const delivered = new Float64Array(R);
+  sinkArc.forEach((e, r) => {
+    if (e >= 0) delivered[r] = used(e);
+  });
+  const wire = new Float64Array(W);
+  wireArc.forEach((e, k) => {
+    wire[k] = used(e);
+  });
+  const trafo = new Float64Array(graph.trafos.length);
+  trafoArcs.forEach(([ab, ba], i) => {
+    trafo[i] = used(ab) - used(ba);
   });
 
-  for (let head = 0; head < order.length; head++) {
-    const node = order[head]!;
-    const layer = node >= cells ? cells : 0;
-    const tile = node - layer;
-    const x = tile % size;
-    const y = (tile - x) / size;
-    const visit = (n: number): void => {
-      if (conducts[n] === 0) return;
-      if (reached[n] === 1) {
-        const a = find(network[node]!);
-        const b = find(network[n]!);
-        if (a !== b) root[Math.max(a, b)] = Math.min(a, b);
-        return;
-      }
-      reached[n] = 1;
-      parent[n] = node;
-      network[n] = network[node]!;
-      order.push(n);
-    };
-    if (y > 0) visit(layer + tile - size);
-    if (x < size - 1) visit(layer + tile + 1);
-    if (y < size - 1) visit(layer + tile + size);
-    if (x > 0) visit(layer + tile - 1);
-    // Přepojení vrstev v elektrárně a trafu.
-    if (bridges[tile] === 1) visit(layer === 0 ? cells + tile : tile);
-  }
-
-  for (const node of order) network[node] = find(network[node]!);
-  return { reached, parent, network, order };
-}
-
-/**
- * Zátěž uzlů: spotřeba budovy visí na její první dosažené dlaždici nízkého
- * napětí a sčítá se ke zdroji.
- */
-function loads(tree: Tree, consumers: readonly Consumer[], cells: number): Float64Array {
-  const load = new Float64Array(tree.reached.length);
-  const rank = new Int32Array(cells).fill(-1);
-  tree.order.forEach((node, i) => {
-    if (node < cells) rank[node] = i;
-  });
-  for (const consumer of consumers) {
-    if (consumer.consumption <= 0) continue;
-    let best = -1;
-    for (const tile of consumer.tiles) {
-      const r = rank[tile] ?? -1;
-      if (r >= 0 && (best < 0 || r < (rank[best] ?? 0))) best = tile;
+  // Úzké hrdlo: po posledním hledání drží `level` dosažitelnost od zdroje ve
+  // zbytkové síti. Hrana, jejíž začátek dosažitelný je a konec ne, leží na
+  // minimálním řezu — ta opravdu omezuje. Při staženém měřítku nic z toho
+  // neplatí: tok tam prošel celý, vedení tedy nic neomezuje.
+  const wireLimits = new Uint8Array(W);
+  const trafoLimits = new Uint8Array(graph.trafos.length);
+  if (scale === 1) {
+    for (let k = 0; k < W; k++) {
+      if (level[R + 2 * k] !== -1 && level[R + 2 * k + 1] === -1) wireLimits[k] = 1;
     }
-    if (best >= 0) load[best] = (load[best] ?? 0) + consumer.consumption;
+    graph.trafos.forEach((t, i) => {
+      const ab = level[outOf(t.a)] !== -1 && level[into(t.b)] === -1;
+      const ba = level[outOf(t.b)] !== -1 && level[into(t.a)] === -1;
+      if (ab || ba) trafoLimits[i] = 1;
+    });
   }
-  for (let i = tree.order.length - 1; i >= 0; i--) {
-    const node = tree.order[i]!;
-    const parent = tree.parent[node] ?? -1;
-    if (parent >= 0) load[parent] = (load[parent] ?? 0) + (load[node] ?? 0);
-  }
-  return load;
+  return { delivered, wire, trafo, wireLimits, trafoLimits };
 }
 
-/**
- * Kolik teče přes přepojení vrstev na dlaždici trafa: zátěž toho konce, který
- * visí na druhém. Trafo může jet oběma směry (elektrárna na nízkém napětí
- * napájí vysoké), proto se neptá, která vrstva je nahoře.
- */
-function bridgeFlow(tree: Tree, load: Float64Array, cells: number, tile: number): number {
-  if (tree.parent[tile] === cells + tile) return load[tile] ?? 0;
-  if (tree.parent[cells + tile] === tile) return load[cells + tile] ?? 0;
-  return 0;
-}
-
-/**
- * Přetížené uzly: úsek vedení nad kapacitou, nebo trafo, přes které teče víc,
- * než unese. Bere se jen ten **nejblíž spotřebičům** — jeho vypadnutím se
- * zátěž nad ním sníží, takže vyšší úsek může vydržet. Vypadne tak nejmenší
- * možná oblast. U trafa vypadne jeho výstup: uzel, který na přepojení visí.
- */
-function overloadedNodes(
-  tree: Tree,
-  load: Float64Array,
-  cells: number,
-  nodeCapacity: (node: number) => number,
-  trafoAt: ReadonlyMap<number, Transformer>,
-  trafoOverloaded: Set<number>,
-): number[] {
-  const carried = new Float64Array(load.length);
-  const out: number[] = [];
-  for (let i = tree.order.length - 1; i >= 0; i--) {
-    const node = tree.order[i]!;
-    const parent = tree.parent[node] ?? -1;
-    if (parent < 0) continue;
-    const tile = node >= cells ? node - cells : node;
-    // Zátěž bez vypadlých větví pod sebou.
-    const own = (load[node] ?? 0) - (carried[node] ?? 0);
-    let limit = nodeCapacity(node);
-    const trafo = trafoAt.get(tile);
-    // Uzel visí na druhé vrstvě téže dlaždice: tohle je výstup trafa.
-    const throughTrafo = trafo !== undefined && parent === (node >= cells ? tile : cells + tile);
-    if (trafo !== undefined && throughTrafo) limit = Math.min(limit, trafo.capacity);
-    if (own > limit) {
-      out.push(node);
-      if (throughTrafo) trafoOverloaded.add(tile);
-      // Tahle větev vypadne celá: předkům se její zátěž odečte.
-      for (let p = parent; p >= 0; p = tree.parent[p] ?? -1) {
-        carried[p] = (carried[p] ?? 0) + own;
-      }
+/** Uzly grafu spojené s elektrárnou cestou, která vede (bez ohledu na kapacitu). */
+function reachFromSources(graph: Graph, supply: Float64Array): Uint8Array {
+  const total = graph.regions + graph.wireNode.length;
+  const adjacency: number[][] = Array.from({ length: total }, () => []);
+  const links = graph.links;
+  for (let i = 0; i < links.length; i += 2) {
+    adjacency[links[i]!]!.push(links[i + 1]!);
+    adjacency[links[i + 1]!]!.push(links[i]!);
+  }
+  for (const trafo of graph.trafos) {
+    adjacency[trafo.a]!.push(trafo.b);
+    adjacency[trafo.b]!.push(trafo.a);
+  }
+  const reached = new Uint8Array(total);
+  const queue: number[] = [];
+  for (let r = 0; r < graph.regions; r++) {
+    if ((supply[r] ?? 0) > 0) {
+      reached[r] = 1;
+      queue.push(r);
     }
   }
-  return out;
+  for (let head = 0; head < queue.length; head++) {
+    for (const v of adjacency[queue[head]!]!) {
+      if (reached[v] === 1) continue;
+      reached[v] = 1;
+      queue.push(v);
+    }
+  }
+  return reached;
 }
 
 function footprintTiles(
@@ -521,12 +720,27 @@ function footprintTiles(
   return tiles;
 }
 
-/** Vrstva `power` je proud **na parcele** — nízké napětí, ne vedení nad ní. */
-function writePowerLayer(world: WorldState, reached: Uint8Array): void {
+/**
+ * Vrstva `power` je proud **na parcele** — nízké napětí, ne vedení nad ní.
+ * Parcela má proud, když je její oblast spojená s elektrárnou a něco do ní
+ * teče (nebo nic nepotřebuje). Blok, kterému plné přípojky nedají nic, proud
+ * nemá, i když k němu vedení vede.
+ */
+function writePowerLayer(
+  world: WorldState,
+  graph: Graph,
+  reached: Uint8Array,
+  delivered: Float64Array,
+  demand: Float64Array,
+): void {
   const power = world.layers.power;
-
+  const { nodeOf, regions } = graph;
   for (let tile = 0; tile < power.length; tile++) {
-    const next = reached[tile] === 1 ? 1 : 0;
+    const node = nodeOf[tile] ?? -1;
+    let next = 0;
+    if (node >= 0 && reached[node] === 1) {
+      next = node >= regions || (demand[node] ?? 0) === 0 || (delivered[node] ?? 0) > 0 ? 1 : 0;
+    }
     if (power[tile] === next) continue;
     power[tile] = next;
     const x = tile % world.size;
@@ -534,49 +748,36 @@ function writePowerLayer(world: WorldState, reached: Uint8Array): void {
   }
 }
 
+/**
+ * Proud budovám: každá oblast rozdá, co do ní dotekla, **od nejstarší
+ * budovy** (podle id). Když přípojky nestačí, zhasnou nejnovější domy, ne
+ * celý blok.
+ */
 function distributeCapacity(
   world: WorldState,
   catalogue: BuildingCatalogue,
   ids: readonly number[],
-  plants: readonly Plant[],
-  tree: Tree,
-  cells: number,
+  consumerRegion: ReadonlyMap<number, number>,
+  reached: Uint8Array,
+  delivered: Float64Array,
 ): void {
-  // Výroba po sítích: elektrárna patří do sítě své první dosažené dlaždice.
-  // Stojí v obou vrstvách a ty jsou v ní propojené, takže síť je jedna, ať ji
-  // hledání zasáhlo kteroukoli.
-  const remaining = new Map<number, number>();
-  for (const plant of plants) {
-    let net = -1;
-    for (const tile of plant.tiles) {
-      if (tree.reached[tile] === 1) net = tree.network[tile] ?? -1;
-      else if (tree.reached[cells + tile] === 1) net = tree.network[cells + tile] ?? -1;
-      if (net >= 0) break;
-    }
-    if (net < 0) continue;
-    remaining.set(net, (remaining.get(net) ?? 0) + plant.production);
-  }
-
+  const remaining = Float64Array.from(delivered);
   for (const id of ids) {
     const building = world.buildings.get(id);
     if (!building) continue;
 
     const definition = catalogue.get(building.definitionId);
     const consumption = definition?.power?.consumption ?? 0;
-    const tiles = footprintTiles(world, building.x, building.y, definition?.footprint);
-    // Budova bere proud z nízkého napětí; vysoké nad ní nestačí.
-    const tile = tiles.find((t) => tree.reached[t] === 1);
+    const region = consumerRegion.get(id) ?? -1;
 
     let powered = false;
     // Ruina proud nebere ani nevede (T129).
-    if (tile !== undefined && !building.abandoned) {
-      const net = tree.network[tile] ?? -1;
-      const left = remaining.get(net) ?? 0;
+    if (region >= 0 && reached[region] === 1 && !building.abandoned) {
       if (consumption === 0) {
         powered = true; // elektrárny a budovy bez spotřeby
-      } else if (left >= consumption) {
+      } else if ((remaining[region] ?? 0) >= consumption - 1e-6) {
         powered = true;
-        remaining.set(net, left - consumption);
+        remaining[region] = (remaining[region] ?? 0) - consumption;
       }
     }
 

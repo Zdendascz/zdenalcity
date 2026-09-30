@@ -252,16 +252,42 @@ describe('kapacita vedení (T129)', () => {
     return { world, catalogue };
   }
 
-  it('přetížený úsek vypadne a oblast za ním zhasne', () => {
-    // Dva domy po 20 = 40 přes úsek s kapacitou 30.
+  it('plný úsek pustí, co unese, a zhasne jen dům navíc (T137)', () => {
+    // Dva domy po 20 = 40 přes úsek s kapacitou 30: projde 30, svítí starší dům.
     const { world, catalogue } = behindOneWire(WIRE.low);
     tickPower(world, catalogue, weak);
 
-    const houses = [...world.buildings.values()].filter((b) => b.definitionId === 'test:house');
-    expect(houses.every((b) => !b.powered)).toBe(true);
+    const houses = [...world.buildings.values()]
+      .filter((b) => b.definitionId === 'test:house')
+      .sort((a, b) => a.id - b.id);
+    expect(houses.map((b) => b.powered)).toEqual([true, false]);
     expect(world.wireOverloaded[index(7, 11, world.size)]).toBe(1);
+    expect(world.wireLoad[index(7, 11, world.size)]).toBe(30);
     // Elektrárna sama svítí dál.
     expect(at(world, 5, 11)).toBe(1);
+  });
+
+  it('souběžné přípojky do jednoho bloku se sčítají (T137)', () => {
+    // Hlášení autora: tři přípojky po 20 000 do bloku, a každá vypadla,
+    // protože celá spotřeba šla jedinou cestou. Tady: dva úseky po 30
+    // vedle sebe do bloku dvou domů (40) — dohromady unesou 60.
+    const catalogue = catalogueOf(PLANT, HOUSE);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    buildWire(world, 7, 11, WIRE.low);
+    buildWire(world, 7, 12, WIRE.low);
+    placeDefinition(world, catalogue, 'test:house', 8, 11);
+    placeDefinition(world, catalogue, 'test:house', 8, 12);
+    tickPower(world, catalogue, weak);
+
+    const houses = [...world.buildings.values()].filter((b) => b.definitionId === 'test:house');
+    expect(houses.every((b) => b.powered)).toBe(true);
+    // Nic neomezuje, takže nic není plné, a zátěž je rozložená.
+    expect(world.wireOverloaded[index(7, 11, world.size)]).toBe(0);
+    expect(world.wireOverloaded[index(7, 12, world.size)]).toBe(0);
+    expect(
+      (world.wireLoad[index(7, 11, world.size)] ?? 0) + (world.wireLoad[index(7, 12, world.size)] ?? 0),
+    ).toBeCloseTo(40, -0.5);
   });
 
   it('když úsek vypadne, proud zkusí jinou cestu', () => {
@@ -439,14 +465,16 @@ describe('vysoké a nízké napětí, trafostanice (T136)', () => {
     expect(world.transformerLoad.get(trafo!.id)).toEqual({ load: 20, capacity: 30, overloaded: false });
   });
 
-  it('přetížené trafo vypadne a blok za ním zhasne', () => {
+  it('plné trafo pustí, co unese, a zhasne jen dům navíc', () => {
     const { world, catalogue } = line(true);
     placeDefinition(world, catalogue, 'test:house', 12, 11); // 2 × 20 = 40 > 30
     tickPower(world, catalogue);
-    const houses = [...world.buildings.values()].filter((b) => b.definitionId === 'test:house');
-    expect(houses.every((b) => !b.powered)).toBe(true);
+    const houses = [...world.buildings.values()]
+      .filter((b) => b.definitionId === 'test:house')
+      .sort((a, b) => a.id - b.id);
+    expect(houses.map((b) => b.powered)).toEqual([true, false]);
     const trafo = [...world.buildings.values()].find((b) => b.definitionId === 'test:trafo');
-    expect(world.transformerLoad.get(trafo!.id)?.overloaded).toBe(true);
+    expect(world.transformerLoad.get(trafo!.id)).toEqual({ load: 30, capacity: 30, overloaded: true });
   });
 
   it('vysoké napětí přes zónu blok nenapojí', () => {
