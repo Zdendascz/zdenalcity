@@ -230,13 +230,13 @@ export class ChangeTracker {
 
   private snapshot(): void {
     const world = this.world;
-    this.terrain = Uint8Array.from(world.layers.terrain);
-    this.road = Uint8Array.from(world.layers.road);
-    this.wire = Uint8Array.from(world.layers.wire);
-    this.zone = Uint8Array.from(world.layers.zone);
-    this.buildingId = Uint32Array.from(world.layers.buildingId);
-    this.rubble = Uint8Array.from(world.rubble);
-    this.heights = Uint8Array.from(world.cornerHeight);
+    this.terrain = world.layers.terrain.slice();
+    this.road = world.layers.road.slice();
+    this.wire = world.layers.wire.slice();
+    this.zone = world.layers.zone.slice();
+    this.buildingId = world.layers.buildingId.slice();
+    this.rubble = world.rubble.slice();
+    this.heights = world.cornerHeight.slice();
     this.known.clear();
     for (const [id, building] of world.buildings) this.known.set(id, this.describe(id, building));
   }
