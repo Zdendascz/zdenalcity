@@ -4,7 +4,9 @@ import { tileCorners } from '@/sim/heights';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
 import { roadMask } from '@/sim/roads';
 import type { ReadonlyWorldView } from '@/sim/simHost';
-import type { DirtySet } from '@/sim/world';
+import type { FrameChanges } from './changes';
+import { CHUNK_MARGIN, CHUNK_SIZE, chunkBounds, expand, overlaps } from './chunkRenderer';
+import type { Viewport } from './chunkRenderer';
 import {
   BRIDGE_COLOR,
   BRIDGE_GIRDER_COLOR,
@@ -74,187 +76,266 @@ export const ROAD_FAMILIES: readonly (string | undefined)[] = [
  */
 const KERB = 0.08;
 
-/** Jak často se smí síť přestavět kvůli změně budov (chodníky), v ms. */
-const HOUSE_REBUILD_MS = 500;
+/** Silniční chunk: stejné dělení jako terén, ať se změna dotkne jednoho kusu. */
+interface RoadChunk {
+  readonly x0: number;
+  readonly y0: number;
+  readonly graphics: Graphics;
+  readonly bounds: Viewport;
+  /** Čeká na přepečení? Peče se, až na něj bude vidět. */
+  stale: boolean;
+}
 
 export class RoadRenderer {
   private readonly world: ReadonlyWorldView;
-  private readonly graphics = new Graphics();
+  private readonly container = new Container();
+  private readonly chunks: RoadChunk[] = [];
+  private readonly chunksPerAxis: number;
   private textures: ReadonlyMap<string, Texture> = new Map();
   private sidewalkTexture: Texture | undefined;
-  /** Čeká přestavba kvůli budovám? A kdy naposledy proběhla. */
-  private housesChanged = false;
-  private lastRebuild = 0;
+  /** Kolik chunků se od začátku upeklo. Pro měření. */
+  private bakes = 0;
 
   constructor(world: ReadonlyWorldView, parent: Container) {
     this.world = world;
-    parent.addChild(this.graphics);
+    /*
+     * Síť se kreslí **po chuncích 16 × 16** (T133), ne do jednoho `Graphics`.
+     *
+     * Jeden `Graphics` znamenal, že každá změna — nová silnice, dům, který
+     * povyrostl a dostal chodník, i požár, který jen označil dlaždici — smazala
+     * a znovu nakreslila celou síť: 81 387 instrukcí, 190 ms kreslení a 266 ms
+     * teselace na městě s 1 500 budovami. Teď se přepeče chunk se změnou
+     * a nanejvýš soused, přes jehož hranu vede změněné rameno.
+     *
+     * Řadí se podle `cx + cy` jako terén: most a zábradlí přečuhují do
+     * sousední dlaždice a musí ležet přes chunk za sebou, ne pod ním.
+     */
+    this.container.sortableChildren = true;
+    // Vlastní skupina vykreslování, stejně jako terén.
+    this.container.isRenderGroup = true;
+    parent.addChild(this.container);
+    this.chunksPerAxis = Math.ceil(world.size / CHUNK_SIZE);
+    for (let cy = 0; cy < this.chunksPerAxis; cy++) {
+      for (let cx = 0; cx < this.chunksPerAxis; cx++) {
+        const graphics = new Graphics();
+        graphics.zIndex = cx + cy;
+        this.container.addChild(graphics);
+        const x0 = cx * CHUNK_SIZE;
+        const y0 = cy * CHUNK_SIZE;
+        this.chunks.push({ x0, y0, graphics, bounds: chunkBounds(x0, y0), stale: true });
+      }
+    }
   }
 
   /** Podzemní pohled se dívá pod silnice, takže tam jen překážejí. */
   setVisible(visible: boolean): void {
-    this.graphics.visible = visible;
+    this.container.visible = visible;
   }
 
   /** Dlažba chodníku (T122). Bez ní se chodník kreslí barvou. */
   setSidewalkTexture(texture: Texture | undefined): void {
     this.sidewalkTexture = texture;
-    this.rebuild();
+    this.invalidateAll();
   }
 
   /** Nastaví materiály vozovky a překreslí. */
   setTextures(textures: ReadonlyMap<string, Texture>): void {
     this.textures = textures;
-    this.rebuild();
+    this.invalidateAll();
+  }
+
+  /** Kolik chunků se od začátku upeklo. Pro měření a testy. */
+  getBakeCount(): number {
+    return this.bakes;
+  }
+
+  private invalidateAll(): void {
+    for (const chunk of this.chunks) chunk.stale = true;
   }
 
   /**
-   * Překreslí, když se něco změnilo.
+   * Zaznamená, co se změnilo. **Nekreslí** — to dělá `cull()`, a jen to,
+   * na co je vidět.
    *
-   * Přestavuje se **celá síť, ne jen dotčená dlaždice**: postavením jedné
-   * silnice se změní tvar až čtyř sousedů a jejich indexy v `dirty` nejsou.
-   * Je to jeden `Graphics` a přestavba běží jen při stavbě nebo bourání.
+   * Tvar dlaždice závisí na sousedech (ramena, šířka ramene k širšímu
+   * sousedovi), takže se se změněnou dlaždicí značí i její čtyři sousedé —
+   * a s nimi případně sousední chunk.
    */
-  update(dirty: DirtySet): void {
-    if (dirty.fullRedraw || dirty.tiles.size > 0) {
-      this.rebuild();
+  update(changes: FrameChanges): void {
+    if (changes.full) {
+      this.invalidateAll();
       return;
     }
-    // Dům u silnice povyrostl → přibude chodník. Budovy se mění často (růst
-    // zón), takže se to sbírá a přestavuje nejvýš dvakrát za sekundu.
-    if (dirty.buildings.size > 0) this.housesChanged = true;
-    if (this.housesChanged && performance.now() - this.lastRebuild > HOUSE_REBUILD_MS) {
-      this.rebuild();
+    const size = this.world.size;
+    const road = this.world.layers.road;
+    for (const tile of changes.road) {
+      const x = tile % size;
+      const y = (tile - x) / size;
+      this.markTile(x, y);
+      this.markTile(x, y - 1);
+      this.markTile(x + 1, y);
+      this.markTile(x, y + 1);
+      this.markTile(x - 1, y);
+    }
+    // Svah a most (vozovka nad vodou) i chodník podle domů — jen tam, kde
+    // silnice je.
+    for (const list of [changes.surface, changes.streets]) {
+      for (const tile of list) {
+        if ((road[tile] ?? 0) === 0) continue;
+        const x = tile % size;
+        this.markTile(x, (tile - x) / size);
+      }
     }
   }
 
-  private rebuild(): void {
+  private markTile(x: number, y: number): void {
+    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return;
+    const chunk = this.chunks[Math.floor(y / CHUNK_SIZE) * this.chunksPerAxis + Math.floor(x / CHUNK_SIZE)];
+    if (chunk) chunk.stale = true;
+  }
+
+  /**
+   * Upeče zastaralé chunky, na které je vidět nebo které jsou hned za okrajem.
+   *
+   * Upečený chunk se neuvolňuje: na rozdíl od terénu je většina mapy bez
+   * silnic a prázdný `Graphics` nic nestojí. Zastaralý chunk mimo výřez
+   * počká, až na něj hráč najede — načtené město se tak nepeče celé naráz.
+   */
+  cull(view: Viewport): void {
+    const ring = expand(view, CHUNK_MARGIN);
+    for (const chunk of this.chunks) {
+      if (chunk.stale && overlaps(chunk.bounds, ring)) this.bake(chunk);
+    }
+  }
+
+  private bake(chunk: RoadChunk): void {
+    const g = chunk.graphics;
+    g.clear();
+    chunk.stale = false;
+    this.bakes++;
+    const size = this.world.size;
+    const road = this.world.layers.road;
+    const xEnd = Math.min(size, chunk.x0 + CHUNK_SIZE);
+    const yEnd = Math.min(size, chunk.y0 + CHUNK_SIZE);
+    for (let y = chunk.y0; y < yEnd; y++) {
+      for (let x = chunk.x0; x < xEnd; x++) {
+        if ((road[y * size + x] ?? ROAD.none) !== ROAD.none) this.drawRoadTile(g, x, y);
+      }
+    }
+  }
+
+  private drawRoadTile(g: Graphics, x: number, y: number): void {
     const { road, terrain } = this.world.layers;
-    this.graphics.clear();
-    this.housesChanged = false;
-    this.lastRebuild = performance.now();
+    const tile = y * this.world.size + x;
+    const type = road[tile] ?? ROAD.none;
+    const corners = tileCorners(this.world.cornerHeight, x, y);
+    const points = tileQuad(x, y, corners);
+    const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
+    const width = ROAD_WIDTHS[type] ?? 0.5;
+    // Šířka ramen na hraně: k širšímu sousedovi se rameno rozšíří (T124).
+    const edges = [
+      Math.max(width, ROAD_WIDTHS[this.roadType(x, y - 1)] ?? 0),
+      Math.max(width, ROAD_WIDTHS[this.roadType(x + 1, y)] ?? 0),
+      Math.max(width, ROAD_WIDTHS[this.roadType(x, y + 1)] ?? 0),
+      Math.max(width, ROAD_WIDTHS[this.roadType(x - 1, y)] ?? 0),
+    ];
 
-    for (let tile = 0; tile < road.length; tile++) {
-      const type = road[tile] ?? ROAD.none;
-      if (type === ROAD.none) continue;
+    // Most je konstrukce nad vodou, ne asfalt na zemi: kreslí se barvou, ať
+    // je poznat, kde silnice opouští břeh (§7 fáze 3).
+    const bridge = (terrain[tile] ?? 0) === TERRAIN.water;
+    const light = slopeLight(corners);
+    const circle = type === ROAD.avenue && mask === 15 && !bridge && hasRoundabout(x, y);
 
-      const x = tile % this.world.size;
-      const y = (tile - x) / this.world.size;
-      const corners = tileCorners(this.world.cornerHeight, x, y);
-      const points = tileQuad(x, y, corners);
-      const mask = roadMask((nx, ny) => this.isRoad(nx, ny), x, y);
-      const width = ROAD_WIDTHS[type] ?? 0.5;
-      // Šířka ramen na hraně: k širšímu sousedovi se rameno rozšíří (T124).
-      const edges = [
-        [0, -1],
-        [1, 0],
-        [0, 1],
-        [-1, 0],
-      ].map(([dx, dy]) => Math.max(width, ROAD_WIDTHS[this.roadType(x + dx!, y + dy!)] ?? 0));
+    // Most: stín na vodě a bočnice pod deskou jdou **pod** vozovku.
+    const parts = bridge ? bridgeParts(mask, width) : [];
+    for (const part of parts) {
+      if (part.kind === 'shadow') {
+        g.poly(project(points, part.points)).fill({ color: BRIDGE_SHADOW_COLOR, alpha: BRIDGE_SHADOW_ALPHA });
+      } else if (part.kind === 'girder') {
+        this.drawGirder(g, points, part.points, part.lift ?? -5, light);
+      }
+    }
 
-      // Most je konstrukce nad vodou, ne asfalt na zemi: kreslí se barvou, ať
-      // je poznat, kde silnice opouští břeh (§7 fáze 3).
-      const bridge = (terrain[tile] ?? 0) === TERRAIN.water;
-      const light = slopeLight(corners);
-      const circle = type === ROAD.avenue && mask === 15 && !bridge && hasRoundabout(x, y);
-
-      // Most: stín na vodě a bočnice pod deskou jdou **pod** vozovku.
-      const parts = bridge ? bridgeParts(mask, width) : [];
-      for (const part of parts) {
-        if (part.kind === 'shadow') {
-          this.graphics
-            .poly(project(points, part.points))
-            .fill({ color: BRIDGE_SHADOW_COLOR, alpha: BRIDGE_SHADOW_ALPHA });
-        } else if (part.kind === 'girder') {
-          this.drawGirder(points, part.points, part.lift ?? -5, light);
+    // Chodník a zelený pás u domů (T122). Leží mimo vozovku, takže pořadí
+    // vůči ní nehraje roli.
+    if (!bridge) {
+      const sides = houseSides(this.world, x, y);
+      for (const part of sidewalks(mask, sides, width, KERB)) {
+        const polygon = project(points, part.points);
+        if (part.kind === 'verge') {
+          g.poly(polygon).fill({ color: shade(VERGE_COLOR, light) });
+          continue;
+        }
+        g.poly(polygon).fill({ color: shade(SIDEWALK_COLOR, light) });
+        if (this.sidewalkTexture) {
+          g.poly(polygon).fill({
+            texture: this.sidewalkTexture,
+            matrix: tileMatrix(x, y, corners, this.sidewalkTexture.width || 1),
+            color: shade(0xffffff, light),
+            textureSpace: 'global',
+          });
         }
       }
+    }
 
-      // Chodník a zelený pás u domů (T122). Leží mimo vozovku, takže pořadí
-      // vůči ní nehraje roli.
-      if (!bridge) {
-        const sides = houseSides(this.world, x, y);
-        for (const part of sidewalks(mask, sides, width, KERB)) {
-          const polygon = project(points, part.points);
-          if (part.kind === 'verge') {
-            this.graphics.poly(polygon).fill({ color: shade(VERGE_COLOR, light) });
-            continue;
-          }
-          this.graphics.poly(polygon).fill({ color: shade(SIDEWALK_COLOR, light) });
-          if (this.sidewalkTexture) {
-            this.graphics.poly(polygon).fill({
-              texture: this.sidewalkTexture,
-              matrix: tileMatrix(x, y, corners, this.sidewalkTexture.width || 1),
-              color: shade(0xffffff, light),
-              textureSpace: 'global',
-            });
-          }
-        }
-      }
+    // Obruba nejdřív a **širší**, vozovka na ni. Tím vznikne pás kolem
+    // celého tvaru bez čar po vnitřních spárách. Most má obrubu taky —
+    // je to okraj betonové desky.
+    for (const polygon of roadPolygons(points, mask, Math.min(1, width + KERB), edges.map((edge) => Math.min(1, edge + KERB)))) {
+      g.poly(polygon).fill({ color: shade(KERB_COLOR, light) });
+    }
 
-      // Obruba nejdřív a **širší**, vozovka na ni. Tím vznikne pás kolem
-      // celého tvaru bez čar po vnitřních spárách. Most má obrubu taky —
-      // je to okraj betonové desky.
-      {
-        for (const polygon of roadPolygons(points, mask, Math.min(1, width + KERB), edges.map((edge) => Math.min(1, edge + KERB)))) {
-          this.graphics.poly(polygon).fill({ color: shade(KERB_COLOR, light) });
-        }
-      }
+    const texture = this.textureFor(type);
+    const surfaces = roadPolygons(points, mask, width, edges);
+    if (circle) {
+      const [ring, kerb] = roundabout();
+      // Obrubník kolem kruhu: kopie o kus větší, pod asfaltem — stejný
+      // trik jako u ramen.
+      if (kerb) g.poly(project(points, kerb.points)).fill({ color: shade(KERB_COLOR, light) });
+      if (ring) surfaces.push(project(points, ring.points));
+    }
+    // Matice stejná pro všechny kusy dlaždice — počítá se jednou.
+    const matrix = texture === undefined ? undefined : tileMatrix(x, y, corners, texture.width || 1);
+    for (const polygon of surfaces) {
+      // Barva se kreslí **vždycky, i pod obrázek**. Když materiál chybí
+      // nebo se nedokreslí, zůstane vozovka, ne díra.
+      g.poly(polygon).fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[type] ?? ROAD_COLOR) });
+      if (texture === undefined) continue;
+      g.poly(polygon).fill({
+        texture,
+        matrix,
+        // Tón je bílá ztlumená sklonem, ne barva vozovky: obrázek už šedý
+        // je a vynásobit ho šedou znamená bláto. Most je o kus světlejší
+        // — beton, ne asfalt na zemi.
+        color: shade(0xffffff, bridge ? Math.min(1.15, light * 1.12) : light),
+        textureSpace: 'global',
+      });
+    }
 
-      const texture = this.textureFor(type);
-      const surfaces = roadPolygons(points, mask, width, edges);
-      if (circle) {
-        const [ring, kerb] = roundabout();
-        // Obrubník kolem kruhu: kopie o kus větší, pod asfaltem — stejný
-        // trik jako u ramen.
-        if (kerb) this.graphics.poly(project(points, kerb.points)).fill({ color: shade(KERB_COLOR, light) });
-        if (ring) surfaces.push(project(points, ring.points));
+    if (circle) {
+      for (const part of roundabout().slice(2)) {
+        const color = part.kind === 'island' ? VERGE_COLOR : KERB_COLOR;
+        g.poly(project(points, part.points)).fill({ color: shade(color, light) });
       }
-      for (const polygon of surfaces) {
-        // Barva se kreslí **vždycky, i pod obrázek**. Když materiál chybí
-        // nebo se nedokreslí, zůstane vozovka, ne díra.
-        this.graphics
-          .poly(polygon)
-          .fill({ color: bridge ? BRIDGE_COLOR : (ROAD_COLORS[type] ?? ROAD_COLOR) });
-        if (texture === undefined) continue;
-        this.graphics.poly(polygon).fill({
-          texture,
-          matrix: tileMatrix(x, y, corners, texture.width || 1),
-          // Tón je bílá ztlumená sklonem, ne barva vozovky: obrázek už šedý
-          // je a vynásobit ho šedou znamená bláto. Most je o kus světlejší
-          // — beton, ne asfalt na zemi.
-          color: shade(0xffffff, bridge ? Math.min(1.15, light * 1.12) : light),
-          textureSpace: 'global',
-        });
+    } else {
+      // Vodorovné značení. Ulice má jen středovou, třída i krajnice,
+      // dálnice čtyři pruhy. Na křižovatce ulic a tříd přechod.
+      const arms = [ROAD_N, ROAD_E, ROAD_S, ROAD_W].filter((arm) => mask & arm).length;
+      const lines = roadMarkings(mask, {
+        width,
+        lanes: type === ROAD.highway ? 4 : 2,
+        edges: type !== ROAD.street,
+        ...(arms >= 3 && type !== ROAD.highway ? { zebraArms: mask } : {}),
+        armEdges: edges,
+      });
+      for (const line of lines) {
+        g.poly(project(points, line)).fill({ color: MARKING_COLOR, alpha: MARKING_ALPHA * light });
       }
+    }
 
-      if (circle) {
-        for (const part of roundabout().slice(2)) {
-          const color = part.kind === 'island' ? VERGE_COLOR : KERB_COLOR;
-          this.graphics.poly(project(points, part.points)).fill({ color: shade(color, light) });
-        }
-      } else {
-        // Vodorovné značení. Ulice má jen středovou, třída i krajnice,
-        // dálnice čtyři pruhy. Na křižovatce ulic a tříd přechod.
-        const arms = [ROAD_N, ROAD_E, ROAD_S, ROAD_W].filter((arm) => mask & arm).length;
-        const lines = roadMarkings(mask, {
-          width,
-          lanes: type === ROAD.highway ? 4 : 2,
-          edges: type !== ROAD.street,
-          ...(arms >= 3 && type !== ROAD.highway ? { zebraArms: mask } : {}),
-          armEdges: edges,
-        });
-        for (const line of lines) {
-          this.graphics
-            .poly(project(points, line))
-            .fill({ color: MARKING_COLOR, alpha: MARKING_ALPHA * light });
-        }
-      }
-
-      // Zábradlí mostu až úplně nahoře.
-      for (const part of parts) {
-        if (part.kind === 'railing') this.drawRailing(points, part.points, part.lift ?? 4);
-      }
+    // Zábradlí mostu až úplně nahoře.
+    for (const part of parts) {
+      if (part.kind === 'railing') this.drawRailing(g, points, part.points, part.lift ?? 4);
     }
   }
 
@@ -262,29 +343,29 @@ export class RoadRenderer {
    * Bočnice mostu: svislý pás pod hranou desky, na stranách k divákovi.
    * Uprostřed hrany k tomu kus pilíře, ať deska na vodě nevisí ve vzduchu.
    */
-  private drawGirder(quad: TileQuad, edge: readonly UV[], drop: number, light: number): void {
+  private drawGirder(g: Graphics, quad: TileQuad, edge: readonly UV[], drop: number, light: number): void {
     const [a, b] = edge;
     if (!a || !b) return;
     const p = inside(quad, a[0], a[1]);
     const q = inside(quad, b[0], b[1]);
     const down = -drop;
-    this.graphics
+    g
       .poly([p[0], p[1], q[0], q[1], q[0], q[1] + down, p[0], p[1] + down])
       .fill({ color: shade(BRIDGE_GIRDER_COLOR, light) });
     const mx = (p[0] + q[0]) / 2;
     const my = (p[1] + q[1]) / 2;
-    this.graphics
+    g
       .rect(mx - 1.5, my + down, 3, 6)
       .fill({ color: shade(BRIDGE_GIRDER_COLOR, light * 0.8) });
   }
 
   /** Zábradlí: madlo zvednuté nad desku a sloupky každou pětinu délky. */
-  private drawRailing(quad: TileQuad, edge: readonly UV[], lift: number): void {
+  private drawRailing(g: Graphics, quad: TileQuad, edge: readonly UV[], lift: number): void {
     const [a, b] = edge;
     if (!a || !b) return;
     const p = inside(quad, a[0], a[1]);
     const q = inside(quad, b[0], b[1]);
-    this.graphics
+    g
       .moveTo(p[0], p[1] - lift)
       .lineTo(q[0], q[1] - lift)
       .stroke({ width: 0.8, color: BRIDGE_RAIL_COLOR });
@@ -292,7 +373,7 @@ export class RoadRenderer {
       const t = i / 4;
       const x = p[0] + (q[0] - p[0]) * t;
       const y = p[1] + (q[1] - p[1]) * t;
-      this.graphics.moveTo(x, y).lineTo(x, y - lift).stroke({ width: 0.6, color: BRIDGE_RAIL_COLOR });
+      g.moveTo(x, y).lineTo(x, y - lift).stroke({ width: 0.6, color: BRIDGE_RAIL_COLOR });
     }
   }
 

@@ -31,6 +31,118 @@ import type { System } from './index';
 /** Pojistka proti nekonečnému kolu vyřazování. Každé kolo vyřadí aspoň úsek. */
 const MAX_ROUNDS = 64;
 
+/**
+ * Snímek toho, **co vede** — parcely a vedení (nebo potrubí) — z posledního
+ * úplného přepočtu sítě (T133).
+ *
+ * Každý nový dům spustil přepočet celé sítě elektřiny i vody (6,1 a 6,4 ms).
+ * Od T129 přitom zónovaná dlaždice vede sama, takže dům, který na zóně
+ * vyroste, **tvar sítě nemění** — mění jen spotřebu. Přepočet se proto ptá
+ * sem: když se vodivost nezměnila, vezme minulé vodiče a strom hledání
+ * a přepočítá jen rozdělení.
+ *
+ * Nerozhoduje o tom volající, ale **porovnání vstupů**: silnice, zóny, suť,
+ * povodeň, vedení a budovy. Vlajku `powerNetworkDirty` nastavuje přes deset
+ * míst a spoléhat na to, že každé řekne „jen spotřeba", by znamenalo, že
+ * jedno zapomenuté místo tiše rozbije síť. Porovnání je jeden průchod
+ * polem — zlomek toho, co stojí `parcelConducts` pro každou dlaždici.
+ *
+ * Výsledek je proto **bitově stejný** jako z úplného přepočtu; zrychlí se jen
+ * cesta k němu. Snímek žije mimo `WorldState` (ve `WeakMap`), do savu nepatří
+ * a načtený svět začne úplným přepočtem.
+ */
+export class ConductSnapshot {
+  private road = new Uint8Array(0);
+  private zone = new Uint8Array(0);
+  private rubble = new Uint8Array(0);
+  private flood = new Uint8Array(0);
+  private links = new Uint8Array(0);
+  private ids = new Uint32Array(0);
+  private readonly abandoned = new Map<number, boolean>();
+
+  /** Zapamatuje si vstupy. */
+  capture(world: WorldState, links: Uint8Array): void {
+    this.road = world.layers.road.slice();
+    this.zone = world.layers.zone.slice();
+    this.rubble = world.rubble.slice();
+    this.flood = world.flood.slice();
+    this.links = links.slice();
+    this.ids = world.layers.buildingId.slice();
+    this.rememberBuildings(world);
+  }
+
+  private rememberBuildings(world: WorldState): void {
+    this.abandoned.clear();
+    for (const [id, building] of world.buildings) this.abandoned.set(id, building.abandoned);
+  }
+
+  /**
+   * `parcelConducts` dlaždice **v okamžiku snímku** — složené ze snímku
+   * samého, stejnými pravidly. Počítá se jen pro dlaždice, kde se od té doby
+   * změnilo `buildingId`; celou mapu předem by to stálo tolik, kolik se
+   * šetří.
+   */
+  private parcelWas(tile: number): boolean {
+    if ((this.rubble[tile] ?? 0) !== 0 || (this.road[tile] ?? 0) !== 0) return false;
+    const id = this.ids[tile] ?? 0;
+    if (id !== 0) return this.abandoned.get(id) === false;
+    return (this.zone[tile] ?? 0) !== 0;
+  }
+
+  /**
+   * Vede všechno stejně jako při snímku? Změna `buildingId` nevadí, pokud
+   * dlaždice vede pořád stejně — to je právě dům vyrostlý na zóně. Při shodě
+   * se snímek srovná se světem, ať se příště porovnává jen nová změna.
+   */
+  matches(world: WorldState, links: Uint8Array): boolean {
+    const cells = this.ids.length;
+    const layers = world.layers;
+    if (layers.road.length !== cells || layers.buildingId.length !== cells || links.length !== cells) return false;
+    if (!same(layers.road, this.road) || !same(layers.zone, this.zone)) return false;
+    if (!same(world.rubble, this.rubble) || !same(world.flood, this.flood)) return false;
+    if (!same(links, this.links)) return false;
+    // Zchátrání mění vodivost bez změny `buildingId`.
+    for (const [id, building] of world.buildings) {
+      const was = this.abandoned.get(id);
+      if (was !== undefined && was !== building.abandoned) return false;
+    }
+    const ids = layers.buildingId;
+    for (let tile = 0; tile < cells; tile++) {
+      if (ids[tile] === this.ids[tile]) continue;
+      if (parcelConducts(world, tile) !== this.parcelWas(tile)) return false;
+    }
+    this.ids.set(ids);
+    this.rememberBuildings(world);
+    return true;
+  }
+}
+
+/** Jsou dvě pole stejně dlouhá a stejná? */
+function same(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/** Co zůstává z minulého úplného přepočtu elektřiny. */
+interface PowerCache {
+  readonly snapshot: ConductSnapshot;
+  /** Elektrárny (id, výkon, dlaždice) a odstavené — mění strom hledání. */
+  readonly plantsKey: string;
+  /** Vodiče před vyřazováním přetížených úseků. Kopíruje se, kola ho mění. */
+  readonly conducts: Uint8Array;
+  readonly limited: Uint8Array;
+  /** Strom prvního hledání; pořadí zdrojů je v `plantsKey`. */
+  readonly tree: Tree;
+}
+
+const powerCache = new WeakMap<WorldState, PowerCache>();
+
+/** Zapomene tvar sítě — příští přepočet bude úplný. Pro testy shody obou cest. */
+export function forgetPowerCache(world: WorldState): void {
+  powerCache.delete(world);
+}
+
 export function createPowerSystem(catalogue: BuildingCatalogue, balance?: Balance): System {
   // Bez balancu (starší testy) má vedení neomezenou kapacitu.
   const capacity = (type: number): number =>
@@ -85,31 +197,48 @@ function recompute(
     consumers.push({ id, consumption: definition.power?.consumption ?? 0, tiles });
   }
 
-  const conducts = new Uint8Array(cells);
-  // Vedení přes parcelu kapacitu nemá: vede tu blok sám a neomezeně. Kdyby
-  // se úsek počítal, jeho přetížení by zhaslo i parcelu pod ním — a s ní
-  // celý blok (audit, hlášení autora „i když mám napojeno").
-  const limited = new Uint8Array(cells);
-  for (let tile = 0; tile < cells; tile++) {
-    if (isFlooded(world, tile)) continue;
-    const parcel = parcelConducts(world, tile);
-    const wired = (world.layers.wire[tile] ?? 0) !== WIRE.none && (world.rubble[tile] ?? 0) === 0;
-    if (wired || parcel) conducts[tile] = 1;
-    if (wired && !parcel) limited[tile] = 1;
-  }
-  // Odpojená elektrárna nevede — kdyby vedla, vzdálená čtvrť by zůstala
-  // „připojená k ničemu" a hráč by na mapě viděl síť, která nefunguje.
-  for (const id of world.disasters.offlinePlants) {
-    const building = world.buildings.get(id);
-    const definition = building && catalogue.get(building.definitionId);
-    if (!building || !definition) continue;
-    for (const tile of footprintTiles(world, building.x, building.y, definition.footprint)) {
-      conducts[tile] = 0;
+  // Tvar sítě z minula, když se nezměnilo, co vede, ani kde jsou elektrárny
+  // (T133, viz `ConductSnapshot`).
+  const offline = [...world.disasters.offlinePlants].sort((a, b) => a - b).join(',');
+  const plantsKey = `${plants.map((plant) => `${plant.id}:${plant.production}:${plant.tiles.join(',')}`).join('|')}#${offline}`;
+  const cached = powerCache.get(world);
+  let conducts: Uint8Array;
+  let limited: Uint8Array;
+  let tree: Tree;
+  if (cached && cached.plantsKey === plantsKey && cached.snapshot.matches(world, world.layers.wire)) {
+    conducts = cached.conducts.slice();
+    limited = cached.limited;
+    tree = cached.tree;
+  } else {
+    conducts = new Uint8Array(cells);
+    // Vedení přes parcelu kapacitu nemá: vede tu blok sám a neomezeně. Kdyby
+    // se úsek počítal, jeho přetížení by zhaslo i parcelu pod ním — a s ní
+    // celý blok (audit, hlášení autora „i když mám napojeno").
+    limited = new Uint8Array(cells);
+    for (let tile = 0; tile < cells; tile++) {
+      if (isFlooded(world, tile)) continue;
+      const parcel = parcelConducts(world, tile);
+      const wired = (world.layers.wire[tile] ?? 0) !== WIRE.none && (world.rubble[tile] ?? 0) === 0;
+      if (wired || parcel) conducts[tile] = 1;
+      if (wired && !parcel) limited[tile] = 1;
     }
+    // Odpojená elektrárna nevede — kdyby vedla, vzdálená čtvrť by zůstala
+    // „připojená k ničemu" a hráč by na mapě viděl síť, která nefunguje.
+    for (const id of world.disasters.offlinePlants) {
+      const building = world.buildings.get(id);
+      const definition = building && catalogue.get(building.definitionId);
+      if (!building || !definition) continue;
+      for (const tile of footprintTiles(world, building.x, building.y, definition.footprint)) {
+        conducts[tile] = 0;
+      }
+    }
+    tree = spread(world, conducts, plants);
+    const snapshot = cached?.snapshot ?? new ConductSnapshot();
+    snapshot.capture(world, world.layers.wire);
+    powerCache.set(world, { snapshot, plantsKey, conducts: conducts.slice(), limited, tree });
   }
 
   const overloaded = new Uint8Array(cells);
-  let tree = spread(world, conducts, plants);
   let load = loads(tree, consumers);
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const cut = overloadedWires(world, tree, load, capacity, limited);

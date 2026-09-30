@@ -1,6 +1,6 @@
 import { Container, Graphics, Matrix, Sprite, Texture } from 'pixi.js';
 import type { ReadonlyWorldView } from '@/sim/simHost';
-import type { DirtySet } from '@/sim/world';
+import type { FrameChanges } from './changes';
 import { iconShape } from './icons';
 import { assignSpriteTexture } from './spriteResolution';
 import {
@@ -17,7 +17,7 @@ import {
 } from './palette';
 import { placedFootprint } from '@/sim/buildings';
 import { areaHeightRange, groundHeightAt } from '@/sim/heights';
-import { depthOrder } from './depth';
+import { depthOrder, insertIntoOrder } from './depth';
 import type { DepthBox } from './depth';
 import { decorDensity, decorHere, decorPick, decorShift, decorTiles, rubbleSlope } from './decor';
 import type { RubbleSlope, TerrainDecor } from './decor';
@@ -28,6 +28,8 @@ import { ROAD_E, ROAD_N, ROAD_S, ROAD_W } from './roads';
 import { cuboidFaces, gridToScreen, LEVEL_H, skirtFaces } from './projection';
 import { POP_MS, popScale } from './effects';
 import type { DustArea } from './effects';
+import { CHUNK_SIZE, chunkBounds, overlaps } from './chunkRenderer';
+import type { Viewport } from './chunkRenderer';
 
 /** Na kolik dlaždic je nakreslená zpustlá budova. Viz `DECOR` ve `fit-sprites.py`. */
 const DERELICT_TILES = 2;
@@ -108,6 +110,37 @@ function roadArms(road: ArrayLike<number>, size: number, x: number, y: number): 
     (at(x - 1, y) ? ROAD_W : 0)
   );
 }
+
+/**
+ * Kde na dlaždici silnice stojí lampa podle strany s chodníkem: strana, poloha
+ * a zda zrcadlit (obrázek má rameno vlevo). Na kraji pásu u obrubníku, ať
+ * chodec na chodníku lampou neprochází.
+ */
+const LAMP_SPOTS: readonly (readonly [number, number, number, boolean])[] = [
+  [ROAD_N, 0.5, SIDEWALK + VERGE, false],
+  [ROAD_S, 0.5, 1 - (SIDEWALK + VERGE), true],
+  [ROAD_W, SIDEWALK + VERGE, 0.5, true],
+  [ROAD_E, 1 - (SIDEWALK + VERGE), 0.5, false],
+];
+
+/**
+ * O kolik se výřez pro ořez uzlů rozšíří, v px světa (T133).
+ *
+ * Uzel patří do chunku podle rohu svého půdorysu, ale kreslí se dál: přední
+ * roh parcely 5 × 5 je o 192 px níž a stranou, obrázek sahá až 302 px nad
+ * kotvu (jaderná elektrárna) a je 384 px široký. Rezerva je s přídavkem, ať
+ * vyšší obrázek z modu neusekne okraj obrazovky.
+ */
+const CULL_SIDE = 448;
+const CULL_UP = 512;
+const CULL_DOWN = 256;
+
+/**
+ * Kolik změněných uzlů se ještě vkládá do hotového pořadí (T133). Každé
+ * vložení projde celé pořadí, takže nad touhle hranicí je levnější seřadit
+ * všechno znovu.
+ */
+const INSERT_LIMIT = 48;
 
 /** Pod tímhle zoomem je strom pár pixelů a houpání by jen zrnilo. */
 const SWAY_MIN_ZOOM = 0.6;
@@ -255,10 +288,32 @@ export class BuildingRenderer {
   private pylon: LoadedPart | undefined;
   /** Obrázek lampy (T122). Bez něj se lampy nestaví. */
   private lamp: LoadedPart | undefined;
-  private lampsStale = false;
-  private lampsBuilt = 0;
-  /** Stromy, které se houpou ve větru (T119), s vlastní fází kmitu. */
-  private trees: { sprite: Sprite; phase: number }[] = [];
+  /**
+   * Musí se uzly přeřadit (T133)?
+   *
+   * Řazení běželo **každý snímek** přes všech 9 442 uzlů autorova města —
+   * 35 až 65 ms, 41 % času snímku — a pokaždé smazalo `depthCache`, takže
+   * si auta a lidé počítali hloubku znovu. Pořadí se přitom mění jen tehdy,
+   * když uzel přibude, zmizí nebo se mu změní půdorys. Příznak nastavuje
+   * `setBox` a `remove`, jinudy se do `boxes` nesahá.
+   */
+  private orderDirty = true;
+  /** Poslední pořadí kreslení a uzly, které od něj přibyly nebo se pohnuly. */
+  private order: number[] = [];
+  private readonly changedBoxes = new Set<number>();
+  /**
+   * Uzly podle druhu (T133). Místní přestavba jde po id dlaždice, úplná
+   * po téhle množině — dřív se kvůli ní procházelo `[...views.keys()]`
+   * přes devět tisíc klíčů.
+   */
+  private readonly decorIds = new Set<number>();
+  private readonly rubbleIds = new Set<number>();
+  private readonly lampIds = new Set<number>();
+  private readonly wireIds = new Set<number>();
+  /** Jak daleko od stromu smí být voda, aby tam nestál. Viz `nearWater`. */
+  private decorReach = 1;
+  /** Stromy, které se houpou ve větru (T119), s vlastní fází kmitu. Klíč je id uzlu. */
+  private readonly trees = new Map<number, { sprite: Sprite; phase: number }>();
   /** Hodiny větru v ms. Běží i na pauze — pauza zastavuje město, ne vítr. */
   private wind = 0;
   /** Houpaly se stromy minulý snímek? Po vypnutí se jednou srovnají. */
@@ -274,12 +329,82 @@ export class BuildingRenderer {
   /** Budova zmizela z mapy. Dostane půdorys, nad kterým se má zaprášit. */
   onVanished: ((area: DustArea) => void) | null = null;
 
+  /**
+   * Ořez po chuncích (T133): uzly podle chunku, ve kterém mají roh půdorysu.
+   *
+   * Vrstva nese přes devět tisíc uzlů a na obrazovce jich je kolem šesti set.
+   * Pixi je přesto procházel všechny, a protože auta každý snímek mění
+   * `zIndex`, stavěl z nich znovu seznam instrukcí — `render` 13,6 ms, se
+   * skrytými uzly mimo obraz 3,4 ms. Viditelnost se přepíná **jen když
+   * kamera přejde přes hranici chunku**, ne každý snímek.
+   */
+  private readonly chunkNodes: Set<number>[] = [];
+  private readonly chunkOf = new Map<number, number>();
+  private chunkShown: Uint8Array;
+  private readonly chunkBoundsCache: Viewport[] = [];
+  private readonly chunksPerAxis: number;
+
   constructor(world: ReadonlyWorldView, parent: Container, appearance: AppearanceLookup) {
     this.world = world;
     this.appearance = appearance;
     this.container = new Container();
     this.container.sortableChildren = true;
+    // Vlastní skupina vykreslování (T133): auta a lidé tu každý snímek mění
+    // pořadí a Pixi pak staví seznam instrukcí znovu. Bez vlastní skupiny by
+    // s nimi znovu stavěl i terén, silnice a všechno ostatní ve světě.
+    this.container.isRenderGroup = true;
     parent.addChild(this.container);
+    this.chunksPerAxis = Math.ceil(world.size / CHUNK_SIZE);
+    const count = this.chunksPerAxis * this.chunksPerAxis;
+    // Do prvního `cull` je všechno vidět — jinak by testy a první snímek
+    // neviděly nic.
+    this.chunkShown = new Uint8Array(count).fill(1);
+    for (let cy = 0; cy < this.chunksPerAxis; cy++) {
+      for (let cx = 0; cx < this.chunksPerAxis; cx++) {
+        this.chunkNodes.push(new Set());
+        this.chunkBoundsCache.push(chunkBounds(cx * CHUNK_SIZE, cy * CHUNK_SIZE));
+      }
+    }
+  }
+
+  /**
+   * Skryje uzly v chuncích mimo výřez a ukáže ty, které do něj vjely.
+   * Sahá jen na chunky, kterým se stav změnil.
+   */
+  cull(view: Viewport): void {
+    const wide = {
+      minX: view.minX - CULL_SIDE,
+      maxX: view.maxX + CULL_SIDE,
+      minY: view.minY - CULL_DOWN,
+      maxY: view.maxY + CULL_UP,
+    };
+    for (let i = 0; i < this.chunkNodes.length; i++) {
+      const shown = overlaps(this.chunkBoundsCache[i]!, wide) ? 1 : 0;
+      if (this.chunkShown[i] === shown) continue;
+      this.chunkShown[i] = shown;
+      for (const id of this.chunkNodes[i]!) this.applyShown(id, shown === 1);
+    }
+  }
+
+  private applyShown(id: number, shown: boolean): void {
+    const view = this.views.get(id);
+    if (view) view.visible = shown;
+    const skirt = this.skirts.get(id);
+    if (skirt) skirt.visible = shown;
+  }
+
+  /** Zařadí uzel do chunku podle rohu půdorysu a nastaví mu viditelnost. */
+  private assignChunk(id: number, box: DepthBox): void {
+    const cx = Math.min(this.chunksPerAxis - 1, Math.max(0, Math.floor(box.x / CHUNK_SIZE)));
+    const cy = Math.min(this.chunksPerAxis - 1, Math.max(0, Math.floor(box.y / CHUNK_SIZE)));
+    const chunk = cy * this.chunksPerAxis + cx;
+    const previous = this.chunkOf.get(id);
+    if (previous !== chunk) {
+      if (previous !== undefined) this.chunkNodes[previous]?.delete(id);
+      this.chunkNodes[chunk]?.add(id);
+      this.chunkOf.set(id, chunk);
+    }
+    this.applyShown(id, this.chunkShown[chunk] === 1);
   }
 
   /**
@@ -331,7 +456,7 @@ export class BuildingRenderer {
   sway(deltaMS: number, view: { minX: number; maxX: number; minY: number; maxY: number }, zoom: number): void {
     const active = this.motion && this.decorVisible && zoom >= SWAY_MIN_ZOOM;
     if (!active) {
-      if (this.swayed) for (const tree of this.trees) tree.sprite.skew.x = 0;
+      if (this.swayed) for (const tree of this.trees.values()) tree.sprite.skew.x = 0;
       this.swayed = false;
       return;
     }
@@ -339,8 +464,8 @@ export class BuildingRenderer {
     this.wind += deltaMS;
     const t = this.wind / 1000;
     const margin = 80;
-    for (const tree of this.trees) {
-      if (tree.sprite.destroyed) continue;
+    for (const tree of this.trees.values()) {
+      if (tree.sprite.destroyed || !tree.sprite.visible) continue;
       const { x, y } = tree.sprite.position;
       if (x < view.minX - margin || x > view.maxX + margin || y < view.minY || y > view.maxY + margin * 3) {
         continue;
@@ -423,10 +548,9 @@ export class BuildingRenderer {
   }
 
   /** Odkud právě stoupá kouř. `Effects` z toho dělá obláčky. */
-  smokeSources(): Iterable<SmokeSource> {
-    const all: SmokeSource[] = [];
-    for (const list of this.chimneys.values()) all.push(...list);
-    return all;
+  *smokeSources(): Iterable<SmokeSource> {
+    // Generátor, ne nové pole každý snímek (T133).
+    for (const list of this.chimneys.values()) yield* list;
   }
 
   /** Posune vyrůstající budovy a rotory o snímek. Volá se každý snímek. */
@@ -479,28 +603,89 @@ export class BuildingRenderer {
     view.scale.set(sx, sy);
   }
 
-  update(dirty: DirtySet): void {
-    this.refreshAll(dirty);
-    // Terén se mění zřídka (terraforming, kácení), ale když se změní, musí se
-    // stromy přepočítat celé: mizí i přibývají a jejich id nejsou v `dirty`.
-    if (dirty.fullRedraw || dirty.tiles.size > 0) {
+  /**
+   * Promítne změny ze simulace (T133).
+   *
+   * Dřív přestavěla **každá** špinavá dlaždice všechny stromy, suť, lampy
+   * i vedení na mapě — 5 189 stromů zničit a znovu založit stálo 90–130 ms
+   * a oheň značí hořící dlaždice každé dva tiky. Teď se přestaví jen to, čeho
+   * se změna týká, a jen když se změnilo, na čem to stojí:
+   *
+   * - **stromy** podle terénu a výšky, v okolí na dosah `nearWater`;
+   * - **suť** podle vrstvy trosek a výšky, dlaždice po dlaždici;
+   * - **lampy** podle silnice, sousedů a chodníku (`changes.streets`);
+   * - **vedení** celé, ale jen když se změnilo vedení nebo něco hned vedle něj
+   *   — rozpětí vede přes celý rovný úsek, místní přestavba by ho přetrhla.
+   */
+  update(changes: FrameChanges): void {
+    if (changes.full) {
+      this.refreshAll();
       this.rebuildDecor();
-      // Suť přibývá i mizí po jedné dlaždici a její id v `dirty.buildings`
-      // nejsou. Průchod mapou je levný a děje se jen při stavbě nebo bourání.
       this.rebuildRubble();
       this.rebuildLamps();
       this.rebuildWires();
-    } else if (dirty.buildings.size > 0) {
-      // Dům povyrostl → u silnice přibude chodník a s ním lampa. Sbírá se
-      // to stejně jako u vozovky, nejvýš dvakrát za sekundu.
-      this.lampsStale = true;
+    } else {
+      for (const id of changes.buildings) this.refresh(id, true);
+      if (changes.surface.length > 0) this.rebuildDecorAround(changes.surface);
+      if (changes.rubble.length > 0 || changes.surface.length > 0) {
+        this.rebuildRubbleAt(changes.rubble);
+        this.rebuildRubbleAt(changes.surface);
+      }
+      const lampTiles = this.lampTilesOf(changes);
+      if (lampTiles.size > 0) this.rebuildLampsAt(lampTiles);
+      if (this.touchesWires(changes)) this.rebuildWires();
     }
-    if (this.lampsStale && performance.now() - this.lampsBuilt > 500) {
-      this.rebuildLamps();
-      // Dráty nízkého napětí se chytají domů a zón — nový dům je přesměruje.
-      this.rebuildWires();
+    if (this.orderDirty) this.reorder();
+  }
+
+  /** Silnice, kterým se mohla změnit lampa: změněná silnice a její sousedé, chodník, svah. */
+  private lampTilesOf(changes: FrameChanges): Set<number> {
+    const tiles = new Set<number>();
+    if (this.lamp === undefined || !this.decorVisible) return tiles;
+    const size = this.world.size;
+    const road = this.world.layers.road;
+    const add = (x: number, y: number): void => {
+      if (x < 0 || y < 0 || x >= size || y >= size) return;
+      tiles.add(y * size + x);
+    };
+    for (const tile of changes.road) {
+      const x = tile % size;
+      const y = (tile - x) / size;
+      add(x, y);
+      add(x, y - 1);
+      add(x + 1, y);
+      add(x, y + 1);
+      add(x - 1, y);
     }
-    this.reorder();
+    for (const tile of changes.streets) tiles.add(tile);
+    for (const tile of changes.surface) if ((road[tile] ?? 0) !== 0) tiles.add(tile);
+    return tiles;
+  }
+
+  /**
+   * Dotkla se změna vedení? Kotvy a přípojky čtou vedení, silnici, budovy,
+   * zóny a vodu na své dlaždici a u sousedů — stačí tedy hlídat dlaždice
+   * vedení a jejich čtyři sousedy.
+   */
+  private touchesWires(changes: FrameChanges): boolean {
+    if (changes.wire.length > 0) return true;
+    const size = this.world.size;
+    const wire = this.world.layers.wire;
+    const near = (tile: number): boolean => {
+      const x = tile % size;
+      const y = (tile - x) / size;
+      return (
+        (wire[tile] ?? 0) !== 0 ||
+        (y > 0 && (wire[tile - size] ?? 0) !== 0) ||
+        (y < size - 1 && (wire[tile + size] ?? 0) !== 0) ||
+        (x > 0 && (wire[tile - 1] ?? 0) !== 0) ||
+        (x < size - 1 && (wire[tile + 1] ?? 0) !== 0)
+      );
+    };
+    for (const list of [changes.road, changes.parcel, changes.surface]) {
+      for (const tile of list) if (near(tile)) return true;
+    }
+    return false;
   }
 
   /** Obrázky sloupů vedení (T129). Bez nich se vedení kreslí jen dráty. */
@@ -530,9 +715,7 @@ export class BuildingRenderer {
     const size = this.world.size;
     const cells = size * size;
     const floor = -6 * cells;
-    for (const id of [...this.views.keys()]) {
-      if (id <= floor && id > floor - cells - 1) this.remove(id);
-    }
+    for (const id of [...this.wireIds]) this.remove(id);
     const wire = this.world.layers.wire;
     const road = this.world.layers.road;
     const ids = this.world.layers.buildingId;
@@ -642,10 +825,7 @@ export class BuildingRenderer {
           };
           span(end(a), end(b));
           node.addChild(cables);
-          const id = floor - anchor.tile - 1;
-          this.container.addChild(node);
-          this.views.set(id, node as unknown as Sprite);
-          this.boxes.set(id, { x: anchor.x, y: anchor.y, width: 1, depth: 1, base });
+          this.place(floor - anchor.tile - 1, node, { x: anchor.x, y: anchor.y, width: 1, depth: 1, base }, this.wireIds);
           continue;
         }
       }
@@ -704,13 +884,41 @@ export class BuildingRenderer {
       }
       node.addChild(cables);
 
-      const id = floor - anchor.tile - 1;
-      this.container.addChild(node);
       // Uzel je `Container`, ne `Sprite` ani `Graphics`; mapa pohledů ho nese
       // jen kvůli řazení a úklidu, žádná jiná cesta na něj nesahá.
-      this.views.set(id, node as unknown as Sprite);
-      this.boxes.set(id, { x: anchor.x, y: anchor.y, width: 1, depth: 1, base });
+      this.place(floor - anchor.tile - 1, node, { x: anchor.x, y: anchor.y, width: 1, depth: 1, base }, this.wireIds);
     }
+  }
+
+  /**
+   * Přidá uzel do vrstvy a zapíše jeho půdorys. Jediné místo, kudy do vrstvy
+   * přibývají uzly s vlastním pořadím — proto tu stačí nastavit `orderDirty`.
+   */
+  private place(id: number, view: Container, box: DepthBox, kind?: Set<number>): void {
+    this.container.addChild(view);
+    // Mapa pohledů nese i kontejnery vedení; ty se jen řadí a uklízejí.
+    this.views.set(id, view as Sprite);
+    this.setBox(id, box);
+    kind?.add(id);
+  }
+
+  /** Zapíše půdorys. Pořadí se přepočítá jen tehdy, když se opravdu změnil. */
+  private setBox(id: number, box: DepthBox): void {
+    this.assignChunk(id, box);
+    const old = this.boxes.get(id);
+    if (
+      old !== undefined &&
+      old.x === box.x &&
+      old.y === box.y &&
+      old.width === box.width &&
+      old.depth === box.depth &&
+      old.base === box.base
+    ) {
+      return;
+    }
+    this.boxes.set(id, box);
+    this.changedBoxes.add(id);
+    this.orderDirty = true;
   }
 
   /** Nastaví obrázek lampy (T122) a rozestaví lampy znovu. */
@@ -730,66 +938,73 @@ export class BuildingRenderer {
    * Id jsou záporná a posunutá o dvě velikosti mapy, za stromy i suť.
    */
   private rebuildLamps(): void {
+    for (const id of [...this.lampIds]) this.remove(id);
+    if (this.lamp === undefined || !this.decorVisible) return;
+    const road = this.world.layers.road;
+    for (let tile = 0; tile < road.length; tile++) {
+      if ((road[tile] ?? ROAD.none) !== ROAD.none) this.placeLampAt(tile);
+    }
+  }
+
+  /**
+   * Přestaví lampy jen na daných dlaždicích (T133). Lampa, která by vyšla
+   * stejně, zůstane stát — nový uzel by znamenal přeřadit celou vrstvu.
+   */
+  private rebuildLampsAt(tiles: Iterable<number>): void {
+    for (const tile of tiles) this.placeLampAt(tile);
+  }
+
+  /** Postaví (nebo nechá stát, nebo odebere) lampu na jedné dlaždici. */
+  private placeLampAt(tile: number): void {
     const size = this.world.size;
     const offset = 2 * size * size;
-    for (const id of [...this.views.keys()]) {
-      // Jen pásmo lamp — za ním bydlí vedení (T129).
-      if (id <= -offset && id > -6 * size * size) this.remove(id);
-    }
-    this.lampsStale = false;
-    this.lampsBuilt = performance.now();
     const lamp = this.lamp;
-    if (lamp === undefined || !this.decorVisible) return;
-
-    const road = this.world.layers.road;
-    // Na kraji pásu u obrubníku, ať chodec na chodníku lampou neprochází.
-    const place = SIDEWALK + VERGE;
-    // Strana → poloha na dlaždici a zda zrcadlit (obrázek má rameno vlevo).
-    const spots: [number, number, number, boolean][] = [
-      [ROAD_N, 0.5, place, false],
-      [ROAD_S, 0.5, 1 - place, true],
-      [ROAD_W, place, 0.5, true],
-      [ROAD_E, 1 - place, 0.5, false],
-    ];
-    for (let tile = 0; tile < road.length; tile++) {
-      const type = road[tile] ?? ROAD.none;
-      if (type === ROAD.none || type === ROAD.highway) continue;
-      const x = tile % size;
-      const y = (tile - x) / size;
-      if ((x + y) % 2 !== 0) continue;
-      const sides = houseSides(this.world, x, y);
-      if (sides === 0) continue;
-      const arms = roadArms(road, size, x, y);
-      for (const [side, u, v, flip] of spots) {
-        if (!(sides & side) || arms & side) continue;
-        const gx = x + u;
-        const gy = y + v;
-        const base = groundHeightAt(this.world.cornerHeight, gx, gy);
-        const at = gridToScreen(gx, gy, base);
-        const sprite = new Sprite(lamp.texture);
-        sprite.anchor.set(lamp.anchor[0] / lamp.texture.width, lamp.anchor[1] / lamp.texture.height);
-        sprite.scale.set((flip ? -1 : 1) / PART_SCALE, 1 / PART_SCALE);
-        sprite.position.set(at.x, at.y);
-        const id = -(offset + tile * 4 + ARM_INDEX[side]! + 1);
-        this.container.addChild(sprite);
-        this.views.set(id, sprite);
-        this.boxes.set(id, { x, y, width: 1, depth: 1, base });
-        break;
-      }
+    const wanted = lamp === undefined || !this.decorVisible ? undefined : this.lampSpot(tile);
+    for (let side = 0; side < 4; side++) {
+      const id = -(offset + tile * 4 + side + 1);
+      if (!this.lampIds.has(id)) continue;
+      const box = this.boxes.get(id);
+      if (wanted && wanted.id === id && box?.base === wanted.base) return;
+      this.remove(id);
     }
+    if (!wanted || !lamp) return;
+    const sprite = new Sprite(lamp.texture);
+    sprite.anchor.set(lamp.anchor[0] / lamp.texture.width, lamp.anchor[1] / lamp.texture.height);
+    sprite.scale.set((wanted.flip ? -1 : 1) / PART_SCALE, 1 / PART_SCALE);
+    const at = gridToScreen(wanted.gx, wanted.gy, wanted.base);
+    sprite.position.set(at.x, at.y);
+    const x = tile % size;
+    const y = (tile - x) / size;
+    this.place(wanted.id, sprite, { x, y, width: 1, depth: 1, base: wanted.base }, this.lampIds);
+  }
+
+  /** Kam na dlaždici patří lampa, nebo nikam. */
+  private lampSpot(tile: number): { id: number; gx: number; gy: number; base: number; flip: boolean } | undefined {
+    const size = this.world.size;
+    const road = this.world.layers.road;
+    const type = road[tile] ?? ROAD.none;
+    if (type === ROAD.none || type === ROAD.highway) return undefined;
+    const x = tile % size;
+    const y = (tile - x) / size;
+    if ((x + y) % 2 !== 0) return undefined;
+    const sides = houseSides(this.world, x, y);
+    if (sides === 0) return undefined;
+    const arms = roadArms(road, size, x, y);
+    for (const [side, u, v, flip] of LAMP_SPOTS) {
+      if (!(sides & side) || arms & side) continue;
+      const gx = x + u;
+      const gy = y + v;
+      const base = groundHeightAt(this.world.cornerHeight, gx, gy);
+      return { id: -(2 * size * size + tile * 4 + ARM_INDEX[side]! + 1), gx, gy, base, flip };
+    }
+    return undefined;
   }
 
   /** Nastaví materiály podezdívek a překreslí je. */
   setSkirtTextures(textures: ReadonlyMap<string, Texture>): void {
     this.skirtTextures = textures;
     for (const skirt of this.skirts.values()) skirt.clear();
-    this.refreshAll({
-      tiles: new Set(),
-      buildings: new Set(),
-      fullRedraw: true,
-      coarseChanged: false,
-      heightsChanged: false,
-    });
+    this.refreshAll();
     this.reorder();
   }
 
@@ -817,6 +1032,12 @@ export class BuildingRenderer {
   /** Nastaví obrázky stromů a balvanů a postaví je znovu. */
   setDecor(decor: ReadonlyMap<number, TerrainDecor[]>): void {
     this.decorByTerrain = new Map(decor);
+    // Jak daleko od stromu se hledá voda — tak daleko sahá změna terénu.
+    let reach = 1;
+    for (const list of this.decorByTerrain.values()) {
+      for (const item of list) reach = Math.max(reach, decorTiles(item) - 1);
+    }
+    this.decorReach = reach;
     this.rebuildDecor();
     this.reorder();
   }
@@ -828,38 +1049,62 @@ export class BuildingRenderer {
    * Díky tomu je nese táž mapa a řadí je totéž porovnání.
    */
   private rebuildDecor(): void {
-    // Jen pásmo stromů a balvanů (`-(dlaždice + 1)`). Suť a lampy mají id
-    // dál a staví si je vlastní metody.
-    const decorFloor = -this.world.size * this.world.size;
-    for (const id of [...this.views.keys()]) {
-      if (id < 0 && id >= decorFloor) this.remove(id);
-    }
-    this.trees = [];
+    for (const id of [...this.decorIds]) this.remove(id);
+    this.trees.clear();
     // Vypnuté se nejen skryjí, ale ani nevzniknou: uzel, který nikdo nevidí,
     // nemá co dělat ani v řazení hloubky.
     if (!this.decorVisible || this.decorByTerrain.size === 0) return;
+    const cells = this.world.size * this.world.size;
+    for (let tile = 0; tile < cells; tile++) this.placeDecorAt(tile);
+  }
 
+  /**
+   * Přestaví stromy kolem změněných dlaždic (T133). Strom stojí jen tam, kde
+   * v dosahu není voda, takže změna terénu sahá o `decorReach` dál.
+   */
+  private rebuildDecorAround(tiles: readonly number[]): void {
+    if (!this.decorVisible || this.decorByTerrain.size === 0) return;
     const size = this.world.size;
-    const terrainLayer = this.world.layers.terrain;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const tile = index(x, y, size);
-        const choices = this.decorByTerrain.get(terrainLayer[tile] ?? 0);
-        if (choices === undefined || choices.length === 0) continue;
-
-        const decor = choices[decorPick(x, y) % choices.length];
-        if (decor === undefined || !decorHere(x, y, decorDensity(decor))) continue;
-        // Nad vodou strom nestojí. Je široký víc než dlaždici, takže by na
-        // břehu přečuhoval nad hladinu a vypadal, že letí — autor to nahlásil.
-        if (this.nearWater(x, y, decorTiles(decor))) continue;
-
-        this.placeDecor(-(tile + 1), x, y, decor);
-        // Houpe se les, ne skála (T119).
-        const placed = this.views.get(-(tile + 1));
-        if ((terrainLayer[tile] ?? 0) === TERRAIN.forest && placed instanceof Sprite) {
-          this.trees.push({ sprite: placed, phase: (decorPick(x, y) % 628) / 100 });
+    const reach = this.decorReach;
+    const seen = new Set<number>();
+    for (const tile of tiles) {
+      const x = tile % size;
+      const y = (tile - x) / size;
+      for (let ny = Math.max(0, y - reach); ny <= Math.min(size - 1, y + reach); ny++) {
+        for (let nx = Math.max(0, x - reach); nx <= Math.min(size - 1, x + reach); nx++) {
+          const near = ny * size + nx;
+          if (seen.has(near)) continue;
+          seen.add(near);
+          this.placeDecorAt(near);
         }
       }
+    }
+  }
+
+  /** Postaví (nebo odebere) strom či balvan na jedné dlaždici. */
+  private placeDecorAt(tile: number): void {
+    const id = -(tile + 1);
+    if (this.decorIds.has(id)) {
+      this.remove(id);
+      this.trees.delete(id);
+    }
+    const size = this.world.size;
+    const x = tile % size;
+    const y = (tile - x) / size;
+    const terrainLayer = this.world.layers.terrain;
+    const choices = this.decorByTerrain.get(terrainLayer[tile] ?? 0);
+    if (choices === undefined || choices.length === 0) return;
+
+    const decor = choices[decorPick(x, y) % choices.length];
+    if (decor === undefined || !decorHere(x, y, decorDensity(decor))) return;
+    // Nad vodou strom nestojí. Je široký víc než dlaždici, takže by na
+    // břehu přečuhoval nad hladinu a vypadal, že letí — autor to nahlásil.
+    if (this.nearWater(x, y, decorTiles(decor))) return;
+
+    const sprite = this.placeDecor(id, x, y, decor, false, this.decorIds);
+    // Houpe se les, ne skála (T119).
+    if ((terrainLayer[tile] ?? 0) === TERRAIN.forest) {
+      this.trees.set(id, { sprite, phase: (decorPick(x, y) % 628) / 100 });
     }
   }
 
@@ -870,39 +1115,44 @@ export class BuildingRenderer {
    * s nimi nesrazila: obojí bydlí v téže mapě uzlů a řadí je totéž porovnání.
    */
   private rebuildRubble(): void {
-    const size = this.world.size;
-    const offset = size * size;
-    for (const id of [...this.views.keys()]) {
-      if (id <= -offset && id > -2 * offset) this.remove(id);
-    }
+    for (const id of [...this.rubbleIds]) this.remove(id);
     if (this.rubblePiles.size === 0) return;
-
     const rubble = this.world.rubble;
-    // Lampy mají id za sutí; `id <= -offset` výš by je smazalo taky, a proto
-    // se maže jen pás suti.
     for (let tile = 0; tile < rubble.length; tile++) {
-      if ((rubble[tile] ?? 0) === 0) continue;
-      const x = tile % size;
-      const y = (tile - x) / size;
-
-      /*
-       * Podle sklonu dlaždice se vybere sada, teprve v ní varianta.
-       *
-       * Hromada kreslená do svahu má spodní hranu nakloněnou, takže sedne na
-       * výšku přesně pod svou patou jako strom. Rovná hromada takovou hranu
-       * nemá a musí na nejnižší roh, jinak jí polovina visí — o tom je celý
-       * `onGround`.
-       */
-      const slope = rubbleSlope(this.world.cornerHeight, x, y);
-      const set = this.rubblePiles.get(slope) ?? this.rubblePiles.get('flat') ?? [];
-      if (set.length === 0) continue;
-      // Varianta ze souřadnic, ne z `world.rng`: musí vyjít stejně při každém
-      // překreslení i po načtení savu, jinak by se suť při každém pohledu
-      // přeskládala.
-      const pile = set[decorPick(x, y) % set.length];
-      if (pile === undefined) continue;
-      this.placeDecor(-(tile + 1 + offset), x, y, pile, true);
+      if ((rubble[tile] ?? 0) !== 0) this.placeRubbleAt(tile);
     }
+  }
+
+  /** Přestaví suť jen na daných dlaždicích (T133). */
+  private rebuildRubbleAt(tiles: readonly number[]): void {
+    for (const tile of tiles) this.placeRubbleAt(tile);
+  }
+
+  private placeRubbleAt(tile: number): void {
+    const size = this.world.size;
+    const id = -(tile + 1 + size * size);
+    if (this.rubbleIds.has(id)) this.remove(id);
+    if (this.rubblePiles.size === 0 || (this.world.rubble[tile] ?? 0) === 0) return;
+    const x = tile % size;
+    const y = (tile - x) / size;
+
+    /*
+     * Podle sklonu dlaždice se vybere sada, teprve v ní varianta.
+     *
+     * Hromada kreslená do svahu má spodní hranu nakloněnou, takže sedne na
+     * výšku přesně pod svou patou jako strom. Rovná hromada takovou hranu
+     * nemá a musí na nejnižší roh, jinak jí polovina visí — o tom je celý
+     * `onGround`.
+     */
+    const slope = rubbleSlope(this.world.cornerHeight, x, y);
+    const set = this.rubblePiles.get(slope) ?? this.rubblePiles.get('flat') ?? [];
+    if (set.length === 0) return;
+    // Varianta ze souřadnic, ne z `world.rng`: musí vyjít stejně při každém
+    // překreslení i po načtení savu, jinak by se suť při každém pohledu
+    // přeskládala.
+    const pile = set[decorPick(x, y) % set.length];
+    if (pile === undefined) return;
+    this.placeDecor(id, x, y, pile, true, this.rubbleIds);
   }
 
   /** Je v dosahu předmětu voda? Nad ní se nestaví. */
@@ -937,7 +1187,8 @@ export class BuildingRenderer {
      * kopcem, ne na stráni" — a obojí bylo tímhle, ne sklonem terénu.
      */
     fillsTile = false,
-  ): void {
+    kind?: Set<number>,
+  ): Sprite {
     const sprite = new Sprite(decor.texture);
     sprite.anchor.set(decor.anchor[0] / decor.texture.width, decor.anchor[1] / decor.texture.height);
     sprite.scale.set(1 / decor.scale);
@@ -968,10 +1219,8 @@ export class BuildingRenderer {
       : groundHeightAt(this.world.cornerHeight, fx, fy);
     const at = gridToScreen(fx, fy, pad);
     sprite.position.set(at.x, at.y);
-
-    this.container.addChild(sprite);
-    this.views.set(id, sprite);
-    this.boxes.set(id, { x, y, width: 1, depth: 1, base: pad });
+    this.place(id, sprite, { x, y, width: 1, depth: 1, base: pad }, kind);
+    return sprite;
   }
 
   /**
@@ -985,8 +1234,18 @@ export class BuildingRenderer {
    * jinak by přes fasádu vedl pruh kamene.
    */
   private reorder(): void {
+    this.orderDirty = false;
     this.depthCache.clear();
-    const order = depthOrder(this.boxes);
+    // Pár nových uzlů se vloží do minulého pořadí (T133); celé přeřazení
+    // jen když jich je moc nebo když vložit nejdou. Viz `insertIntoOrder`.
+    let order: number[] | null = null;
+    if (this.order.length > 0 && this.changedBoxes.size <= INSERT_LIMIT) {
+      const kept = this.order.filter((id) => this.boxes.has(id) && !this.changedBoxes.has(id));
+      order = insertIntoOrder(kept, this.boxes, [...this.changedBoxes]);
+    }
+    order ??= depthOrder(this.boxes);
+    this.order = order;
+    this.changedBoxes.clear();
     for (let i = 0; i < order.length; i++) {
       const id = order[i]!;
       const view = this.views.get(id);
@@ -999,27 +1258,21 @@ export class BuildingRenderer {
     }
   }
 
-  private refreshAll(dirty: DirtySet): void {
-    if (dirty.fullRedraw) {
-      // Jen budovy (kladná id). Stromy a suť si přestaví `rebuildDecor`
-      // a `rebuildRubble` — při načtení savu je `update()` volá hned potom.
-      // Mazat je tady znamenalo, že je přepnutí materiálu podezdívek
-      // (`setSkirtTextures`) smazalo a už nikdo nepostavil.
-      for (const id of [...this.views.keys()]) {
-        if (id > 0) this.remove(id);
-      }
-      // Načtení savu ani přepnutí materiálů není stavba: nic nevyrůstá,
-      // jen se zapamatuje, co na mapě stojí.
-      this.known.clear();
-      this.growing.clear();
-      for (const id of this.world.buildings.keys()) {
-        this.refresh(id, false);
-      }
-      return;
+  /** Překreslí všechny budovy od nuly — načtení savu, jiné materiály. */
+  private refreshAll(): void {
+    // Jen budovy (kladná id). Stromy a suť si přestaví `rebuildDecor`
+    // a `rebuildRubble` — při načtení savu je `update()` volá hned potom.
+    // Mazat je tady znamenalo, že je přepnutí materiálu podezdívek
+    // (`setSkirtTextures`) smazalo a už nikdo nepostavil.
+    for (const id of [...this.views.keys()]) {
+      if (id > 0) this.remove(id);
     }
-
-    for (const id of dirty.buildings) {
-      this.refresh(id, true);
+    // Načtení savu ani přepnutí materiálů není stavba: nic nevyrůstá,
+    // jen se zapamatuje, co na mapě stojí.
+    this.known.clear();
+    this.growing.clear();
+    for (const id of this.world.buildings.keys()) {
+      this.refresh(id, false);
     }
   }
 
@@ -1194,7 +1447,7 @@ export class BuildingRenderer {
     // zIndex se **nepočítá tady**. Hloubka se v izometrii nedá vyjádřit jedním
     // číslem na budovu, jakmile mají různé půdorysy — viz `depth.ts`. Přiřadí
     // ji `reorder()` porovnáním po dvojicích.
-    this.boxes.set(id, { x: building.x, y: building.y, width, depth, base: min });
+    this.setBox(id, { x: building.x, y: building.y, width, depth, base: min });
     this.resumeGrowth(id);
   }
 
@@ -1263,7 +1516,7 @@ export class BuildingRenderer {
     const { min, max } = areaHeightRange(this.world.cornerHeight, x, y, width, depth);
     const front = gridToScreen(x + width, y + depth, max);
     sprite.position.set(front.x, front.y);
-    this.boxes.set(id, { x, y, width, depth, base: min });
+    this.setBox(id, { x, y, width, depth, base: min });
 
     // Podezdívka. Obrázek si nese **rovný** pozemek, jenže terén pod ním rovný
     // není — bez ní budova na svahu visí rohem ve vzduchu. Přesně to nahlásil
@@ -1319,6 +1572,12 @@ export class BuildingRenderer {
     let skirt = this.skirts.get(id);
     if (!skirt) {
       skirt = new Graphics();
+      // O krok před svou budovou, stejně jako v `reorder()`. Nová budova
+      // má `orderDirty` a přeřadí se celá; tady jde o podezdívku, která
+      // přibyla stávající budově, a kvůli ní se celá vrstva řadit nemusí.
+      skirt.zIndex = (this.views.get(id)?.zIndex ?? 1) - 1;
+      // Viditelná podle chunku své budovy (ořez, T133).
+      skirt.visible = this.views.get(id)?.visible ?? true;
       this.container.addChild(skirt);
       this.skirts.set(id, skirt);
     }
@@ -1432,6 +1691,9 @@ export class BuildingRenderer {
         blade.rotation = previous[spinners.length] ?? spread * Math.PI * 2;
         node.addChild(blade);
         node.visible = !this.growing.has(id);
+        // Hned za budovou, jako v `reorder()` — kvůli novému rotoru se
+        // nemusí přeřadit celá vrstva (T133).
+        node.zIndex = sprite.zIndex + 0.5;
         this.container.addChild(node);
         spinners.push({
           node,
@@ -1468,11 +1730,26 @@ export class BuildingRenderer {
     this.clearEffects(id);
     this.skirts.get(id)?.destroy();
     this.skirts.delete(id);
-    this.boxes.delete(id);
+    if (this.boxes.delete(id)) this.orderDirty = true;
+    this.changedBoxes.delete(id);
+    const chunk = this.chunkOf.get(id);
+    if (chunk !== undefined) {
+      this.chunkNodes[chunk]?.delete(id);
+      this.chunkOf.delete(id);
+    }
     const view = this.views.get(id);
     if (!view) return;
-    view.destroy();
+    // S dětmi: vedení je `Container` se sloupem a dráty. Bez `children`
+    // zůstal viset `GraphicsContext` drátů (T133).
+    view.destroy({ children: true });
     this.views.delete(id);
+    if (id < 0) {
+      this.decorIds.delete(id);
+      this.rubbleIds.delete(id);
+      this.lampIds.delete(id);
+      this.wireIds.delete(id);
+      this.trees.delete(id);
+    }
   }
 
   destroy(): void {

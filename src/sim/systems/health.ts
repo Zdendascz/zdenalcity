@@ -1,7 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
-import { coverageOf, markBuildingDirty } from '../world';
+import { coverageOf } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
 
@@ -56,8 +56,10 @@ export function createHealthSystem(catalogue: BuildingCatalogue, balance: Balanc
           : Math.max(floor, building.population - balance.health.declineStep);
 
         if (next === building.population) continue;
+        // Bez `markBuildingDirty`: počet obyvatel na budově není vidět a
+        // `dirty.buildings` čte jen renderer. Dřív tudy šlo ~670 domů každých
+        // 16 tiků a s nimi přestavba silnic, lamp i vedení (T133).
         building.population = next;
-        markBuildingDirty(world, building.id);
       }
     },
   };
