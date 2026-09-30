@@ -7,8 +7,8 @@ import { TICKS_PER_YEAR } from '@/sim/disasters/risk';
 import type { Building, WorldState } from '@/sim/world';
 import { ROAD, TERRAIN } from '@/sim/layers';
 import { iconSvg, sheetHeader } from './icons';
-import { el } from './dom';
-import { formatNumber, landValueTermKeys } from './format';
+import { cssUrl, el } from './dom';
+import { formatNumber, formatPercent, landValueTermKeys } from './format';
 import { dateParts } from './hud';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
@@ -439,7 +439,7 @@ export class BuildingInfo {
     const url = this.tileImage(terrain);
     if (url !== undefined) {
       const tile = el('div', 'sheet__surface-tile');
-      tile.style.backgroundImage = `url(${url})`;
+      tile.style.backgroundImage = cssUrl(url);
       row.appendChild(tile);
     }
     row.appendChild(el('span', 'sheet__surface-name', this.i18n.t(`ui.terrain.${key}`)));
@@ -498,7 +498,7 @@ export class BuildingInfo {
     parent.appendChild(
       meter(
         t('ui.overlay.happiness'),
-        `${Math.round((parcel.happiness / BYTE_MAX) * 100)} %`,
+        formatPercent(Math.round((parcel.happiness / BYTE_MAX) * 100)),
         parcel.happiness / BYTE_MAX,
       ),
     );
@@ -519,7 +519,7 @@ export class BuildingInfo {
     parent.appendChild(
       meter(
         t('ui.parcel.jobAccess'),
-        `${Math.round(parcel.jobAccessFactor * 100)} %`,
+        formatPercent(Math.round(parcel.jobAccessFactor * 100)),
         parcel.jobAccessFactor,
       ),
     );
@@ -641,7 +641,7 @@ export class BuildingInfo {
       track.appendChild(fill);
       row.appendChild(track);
 
-      row.appendChild(el('span', 'gauge__value', `${Math.round(share * 100)} %`));
+      row.appendChild(el('span', 'gauge__value', formatPercent(Math.round(share * 100))));
       list.appendChild(row);
     }
     parent.appendChild(list);

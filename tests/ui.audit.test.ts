@@ -10,11 +10,16 @@
  * - překlad hledal klíče přes prototyp, takže město „constructor" se v nabídce
  *   „Pokračovat v …" vypsalo jako zdroják funkce.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { SPEEDS } from '@/sim/simHost';
+import { cssUrl, setPressed, setText } from '@/ui/dom';
+import { formatDecimal1, formatNumber, formatPercent, setNumberLocale } from '@/ui/format';
 import { I18n } from '@/ui/i18n';
+import { showNewGameDialog } from '@/ui/newGameDialog';
+import { Notifications } from '@/ui/notifications';
+import { Popover } from '@/ui/popover';
 
 async function vanilla(): Promise<ContentRegistry> {
   const content = new ContentRegistry();
@@ -79,6 +84,95 @@ describe('překlad a zděděné klíče', () => {
     expect(document.documentElement.lang).toBe('en');
     i18n.setLanguage('cs');
     expect(document.documentElement.lang).toBe('cs');
+  });
+});
+
+describe('čísla a procenta podle jazyka', () => {
+  afterEach(() => setNumberLocale('cs-CZ'));
+
+  it('procenta: česky s mezerou, anglicky bez', () => {
+    setNumberLocale('cs-CZ');
+    expect(formatPercent(50)).toMatch(/^50\s%$/);
+    setNumberLocale('en-US');
+    expect(formatPercent(50)).toBe('50%');
+  });
+
+  it('přepnutí jazyka zahodí uložený formátovač', () => {
+    setNumberLocale('cs-CZ');
+    expect(formatDecimal1(1.5)).toBe('1,5');
+    setNumberLocale('en-US');
+    expect(formatDecimal1(1.5)).toBe('1.5');
+    expect(formatNumber(1234567)).toBe('1,234,567');
+  });
+
+  it('neplatná značka z překladu HUD neshodí', () => {
+    setNumberLocale('tohle-neni-jazyk!');
+    expect(formatNumber(12)).toBe('12');
+  });
+});
+
+describe('zápis do DOMu jen při změně', () => {
+  it('stejný text uzel nepřepíše', () => {
+    const node = document.createElement('span');
+    setText(node, 'a');
+    const first = node.firstChild;
+    setText(node, 'a');
+    expect(node.firstChild).toBe(first);
+    setText(node, 'b');
+    expect(node.textContent).toBe('b');
+  });
+
+  it('adresa v CSS je v uvozovkách a escapovaná', () => {
+    expect(cssUrl('a b(1).png')).toBe('url("a b(1).png")');
+    expect(cssUrl('x"y\\z')).toBe('url("x\\"y\\\\z")');
+  });
+});
+
+describe('přístupnost', () => {
+  it('přepínač nese stav v aria-pressed', () => {
+    const node = document.createElement('button');
+    setPressed(node, true);
+    expect(node.getAttribute('aria-pressed')).toBe('true');
+    expect(node.classList.contains('is-active')).toBe(true);
+    setPressed(node, false);
+    expect(node.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('roletka hlásí, jestli je otevřená', () => {
+    const popover = new Popover({ icon: 'save', label: 'Uložit' });
+    document.body.appendChild(popover.root);
+    expect(popover.trigger.getAttribute('aria-expanded')).toBe('false');
+    popover.show();
+    expect(popover.trigger.getAttribute('aria-expanded')).toBe('true');
+    popover.close();
+    expect(popover.trigger.getAttribute('aria-expanded')).toBe('false');
+    popover.root.remove();
+  });
+
+  it('hlášky jsou živá oblast', () => {
+    const host = document.createElement('div');
+    new Notifications(host).show('x');
+    const root = host.firstElementChild;
+    expect(root?.getAttribute('aria-live')).toBe('polite');
+    expect(root?.getAttribute('role')).toBe('status');
+  });
+
+  it('dialog nové hry je modální a má jméno', async () => {
+    const content = await vanilla();
+    const tables: Record<string, Record<string, string>> = {};
+    for (const lang of content.getLanguages()) tables[lang] = content.getLocaleTable(lang);
+    const i18n = new I18n(tables, 'cs');
+    const host = document.createElement('div');
+    void showNewGameDialog(host, i18n, content.getBalance());
+    const dialog = host.querySelector('[role="dialog"]');
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+    // Nadpis se hledá v hostiteli, ne v dokumentu: ten do stránky zavěšený není.
+    const titleId = dialog?.getAttribute('aria-labelledby') ?? '';
+    expect(host.querySelector(`#${titleId}`)?.textContent).toBe(i18n.t('ui.newGame.title'));
+    // Tlačítka mají ikonu i text.
+    const start = [...host.querySelectorAll('.dialog__actions button')].at(-1);
+    expect(start?.querySelector('.icon')).not.toBeNull();
+    expect(start?.textContent).toBe(i18n.t('ui.newGame.start'));
   });
 });
 

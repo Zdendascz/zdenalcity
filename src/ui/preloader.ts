@@ -1,4 +1,5 @@
 import { el } from './dom';
+import { formatPercent } from './format';
 
 /**
  * Ukazatel přednačítání grafiky (T121).
@@ -27,7 +28,7 @@ export class Preloader {
     const track = el('div', 'preloader__track');
     this.bar = el('div', 'preloader__bar');
     track.appendChild(this.bar);
-    this.label = el('div', 'preloader__label', `${text} 0 %`);
+    this.label = el('div', 'preloader__label', `${text} ${formatPercent(0)}`);
     this.root.append(this.label, track);
     parent.appendChild(this.root);
   }
@@ -36,7 +37,7 @@ export class Preloader {
   set(progress: number): void {
     const percent = Math.floor(Math.max(0, Math.min(1, progress)) * 100);
     this.bar.style.width = `${percent}%`;
-    this.label.textContent = `${this.text} ${percent} %`;
+    this.label.textContent = `${this.text} ${formatPercent(percent)}`;
     this.root.setAttribute('aria-valuenow', String(percent));
   }
 

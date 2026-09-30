@@ -6,8 +6,8 @@ import type { ReadonlyWorldView } from '@/sim/simHost';
 import { averageHappiness } from '@/sim/systems/happiness';
 import type { DemandBreakdown } from '@/sim/diagnostics';
 import { totalJobs, totalPopulation } from '@/sim/world';
-import { button, el } from './dom';
-import { formatNumber } from './format';
+import { button, el, setExpanded, setPressed, setStyle, setText, setTitle } from './dom';
+import { formatDecimal1, formatNumber, formatPercent } from './format';
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
 import type { LayoutMode } from './layout';
@@ -521,6 +521,7 @@ export class Hud {
     const open = !this.controlDrawer.classList.contains('is-hidden');
     const tool = this.overflowTool;
     node.classList.toggle('is-active', open || tool !== null);
+    setExpanded(node, open);
 
     const label = tool ? tool.label : this.i18n.t('ui.toolbar.more');
     node.title = label;
@@ -560,7 +561,7 @@ export class Hud {
     // problém bylo, že se do města nikdo nenastěhoval.
     this.setValue(
       'happiness',
-      population === 0 ? '–' : `${Math.round((averageHappiness(this.view) / 255) * 100)} %`,
+      population === 0 ? '–' : formatPercent(Math.round((averageHappiness(this.view) / 255) * 100)),
     );
     this.setValue(
       'balance',
@@ -568,10 +569,12 @@ export class Hud {
     );
     this.setValue('date', this.i18n.t('ui.hud.date', dateParts(tick)));
     if (this.autosaveNote) {
-      this.autosaveNote.textContent =
+      setText(
+        this.autosaveNote,
         state.autosaveMinutesAgo === null
           ? this.i18n.t('ui.save.autosaveNever')
-          : this.i18n.t('ui.save.autosaveAgo', { minutes: state.autosaveMinutesAgo });
+          : this.i18n.t('ui.save.autosaveAgo', { minutes: state.autosaveMinutesAgo }),
+      );
     }
     this.syncDisasters();
     // Zlomek sám o sobě neřekne, co s tím: „65/86" může znamenat chybějící
@@ -595,10 +598,10 @@ export class Hud {
       const value = demand[row.category];
       const bar = this.node(`demand-bar-${row.category}`);
       const label = this.node(`demand-value-${row.category}`);
-      if (label) label.textContent = String(value);
+      if (label) setText(label, String(value));
       if (bar) {
         // Poptávka je v <−100, 100>; sloupec roste nahoru pro kladnou, dolů pro zápornou.
-        bar.style.height = `${Math.min(100, Math.abs(value))}%`;
+        setStyle(bar, 'height', `${Math.min(100, Math.abs(value))}%`);
         bar.classList.toggle('is-negative', value < 0);
       }
 
@@ -609,16 +612,16 @@ export class Hud {
         const lines = breakdown.terms.map(
           (term) => `${this.i18n.t(term.key)}: ${term.value > 0 ? '+' : ''}${term.value}`,
         );
-        column.title = [`${this.i18n.t(row.nameKey)}: ${value}`, ...lines].join('\n');
+        setTitle(column, [`${this.i18n.t(row.nameKey)}: ${value}`, ...lines].join('\n'));
       }
     }
 
     for (const row of TAX_ROWS) {
-      this.setValue(`tax-${row.category}`, `${economy.taxRates[row.category]} %`);
+      this.setValue(`tax-${row.category}`, formatPercent(economy.taxRates[row.category]));
     }
 
     this.speedButtons.forEach((node, index) => {
-      node.classList.toggle('is-active', index === state.speedIndex);
+      setPressed(node, index === state.speedIndex);
     });
     // Kam se vrátit po odpauzování. Pamatuje se **poslední běžící** rychlost,
     // ne ta výchozí.
@@ -634,40 +637,37 @@ export class Hud {
       const percent = Math.round(level * 100);
       // Posuvník se nepřepisuje, když s ním hráč zrovna hýbe.
       if (document.activeElement !== input) input.value = String(percent);
-      this.setValue(`funding-${serviceClass}`, `${percent} %`);
+      this.setValue(`funding-${serviceClass}`, formatPercent(percent));
 
       const note = this.node(`funding-note-${serviceClass}`);
       if (!note) continue;
       note.classList.toggle('is-hidden', level <= 1);
       if (level > 1) {
-        note.textContent = this.i18n.t('ui.funding.over', {
+        setText(note, this.i18n.t('ui.funding.over', {
           effect: Math.round(this.fundingRules.effect(level) * 100),
           // Desetinná čárka, ne tečka: `toFixed` píše po anglicku a v české
-          // liště by to byl jediný takový údaj.
-          cost: this.fundingRules.cost(level).toLocaleString('cs-CZ', {
-            minimumFractionDigits: 1,
-            maximumFractionDigits: 1,
-          }),
-        });
+          // liště by to byl jediný takový údaj. Jazyk bere z překladu, dřív
+          // tu byla napevno čeština i pro anglickou verzi.
+          cost: formatDecimal1(this.fundingRules.cost(level)),
+        }));
       }
     }
 
-    for (const [id, node] of this.viewButtons) {
-      node.classList.toggle('is-active', id === state.view);
-    }
-    this.viewToggle?.classList.toggle('is-active', state.view === 'underground');
+    // Přepínače nesou stav i v `aria-pressed`, ne jen v rozsvícení.
+    for (const [id, node] of this.viewButtons) setPressed(node, id === state.view);
+    if (this.viewToggle) setPressed(this.viewToggle, state.view === 'underground');
     this.layerMenu?.setSelected(state.layer);
-    this.advisorButton?.classList.toggle('is-active', state.advisorVisible);
-    this.budgetButton?.classList.toggle('is-active', state.budgetVisible);
-    this.financeButton?.classList.toggle('is-active', state.financeVisible);
-    this.transitButton?.classList.toggle('is-active', state.transitVisible);
-    this.ghostButton?.classList.toggle('is-active', state.ghost);
+    if (this.advisorButton) setPressed(this.advisorButton, state.advisorVisible);
+    if (this.budgetButton) setPressed(this.budgetButton, state.budgetVisible);
+    if (this.financeButton) setPressed(this.financeButton, state.financeVisible);
+    if (this.transitButton) setPressed(this.transitButton, state.transitVisible);
+    if (this.ghostButton) setPressed(this.ghostButton, state.ghost);
     // Aktivní je tlačítko, když jsou stromy **schované** — svítí to, co hráč
     // zapnul, ne výchozí stav.
-    this.decorButton?.classList.toggle('is-active', !state.decor);
-    this.gridButton?.classList.toggle('is-active', state.grid);
+    if (this.decorButton) setPressed(this.decorButton, !state.decor);
+    if (this.gridButton) setPressed(this.gridButton, state.grid);
     // Stejně jako u stromů svítí, když je animace **vypnutá**.
-    this.motionButton?.classList.toggle('is-active', !state.motion);
+    if (this.motionButton) setPressed(this.motionButton, !state.motion);
 
     // Text přepínače závisí na stavu, který HUD sám nedrží — přijde ve `state`.
     if (state.disastersEnabled !== this.disastersShown) {
@@ -676,13 +676,13 @@ export class Hud {
     }
 
     if (this.messageNode) {
-      this.messageNode.textContent = state.message;
+      setText(this.messageNode, state.message);
       this.messageNode.classList.toggle('is-empty', state.message === '');
     }
   }
 
   private setValue(key: string, text: string): void {
-    for (const node of this.values.get(key) ?? []) node.textContent = text;
+    for (const node of this.values.get(key) ?? []) setText(node, text);
   }
 
   /** Příznak se přepne na všech místech, kde ten údaj visí. */
@@ -951,7 +951,7 @@ export class Hud {
       const node = this.disasterNodes.get(disaster.id);
       if (!node) continue;
       const done = disasterProgress(disaster);
-      node.style.setProperty('--disaster-progress', done === null ? '0%' : `${Math.round(done * 100)}%`);
+      setStyle(node, '--disaster-progress', done === null ? '0%' : `${Math.round(done * 100)}%`);
       const name = this.i18n.t(`ui.disaster.${disaster.kind}`);
       const head =
         done === null
@@ -961,7 +961,7 @@ export class Hud {
       // Oběti se lepí za odpočet, ne místo něj: hráč potřebuje obojí a
       // pohroma, která nikoho nezabila, o tom nemá co říkat.
       const dead = tollOf(disaster);
-      node.title = dead > 0 ? `${head} · ${this.i18n.t('ui.disaster.toll', { dead })}` : head;
+      setTitle(node, dead > 0 ? `${head} · ${this.i18n.t('ui.disaster.toll', { dead })}` : head);
     }
   }
 
@@ -1376,7 +1376,7 @@ export class Hud {
       });
       this.fundingInputs.set(serviceClass, slider);
 
-      const value = el('span', 'panel__value', '100 %');
+      const value = el('span', 'panel__value', formatPercent(100));
       this.register(`funding-${serviceClass}`, value);
 
       row.append(slider, value);
@@ -1499,7 +1499,7 @@ export class Hud {
       // nález 23). Jména jsou v překladu, takže mod si přidá své.
       const key = `ui.language.${language}`;
       node.textContent = this.i18n.has(key) ? this.i18n.t(key) : language;
-      node.classList.toggle('is-active', language === this.i18n.getLanguage());
+      setPressed(node, language === this.i18n.getLanguage());
       popover.panel.appendChild(node);
     }
 
