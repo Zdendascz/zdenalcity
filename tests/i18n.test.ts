@@ -71,7 +71,8 @@ describe('locale soubory vanilla obsahu', () => {
     await content.load(createVanillaSource());
 
     expect(content.getLanguages()).toEqual(['cs', 'en']);
-    expect(content.getLocaleTable('cs')['ui.tool.road']).toBe('Silnice');
+    // `ui.tool.road` samo už v obsahu není (nic ho nepoužívalo), jen podklíče.
+    expect(content.getLocaleTable('cs')['ui.tool.road.street']).toBe('Ulice');
   });
 
   it('čeština a angličtina mají stejnou sadu klíčů', async () => {
