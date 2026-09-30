@@ -10,7 +10,7 @@ import {
   createTransitLine,
   deleteTransitLine,
   levelArea,
-  placeDefinition,
+  placeDefinitionCommand,
   plantTrees,
   removePipe,
   buildWire,
@@ -153,7 +153,7 @@ class MainThreadSimHost implements SimHost {
       case 'zone':
         return zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone, this.balance);
       case 'place_building':
-        return placeDefinition(
+        return placeDefinitionCommand(
           this.world,
           this.catalogue,
           cmd.definitionId,
@@ -191,7 +191,7 @@ class MainThreadSimHost implements SimHost {
       case 'create_line':
         return createTransitLine(this.world, this.balance, cmd.mode);
       case 'delete_line':
-        return deleteTransitLine(this.world, cmd.lineId);
+        return deleteTransitLine(this.world, cmd.lineId, this.balance);
       case 'add_stop':
         return addTransitStop(this.world, this.catalogue, this.balance, cmd.lineId, cmd.buildingId);
       case 'remove_stop':
