@@ -545,6 +545,7 @@
   "ui.parcel.power": "Elektřina",
   "ui.parcel.powerYes": "ano",
   "ui.parcel.powerNo": "ne — chybí vedení, nebo je přetížené",
+  "ui.parcel.powerRuin": "ne — opuštěná budova ani suť proud nevedou, zbourej ji",
   "ui.notice.zonesWithoutWater": "Zóny nemají vodu, takže v nich nic nevyroste. Postav vodárnu u břehu a natáhni k zónám potrubí (nástroj Potrubí v nabídce Vodovod).",
   "ui.parcel.roadTooFar": "mimo dosah — tady nic nevyroste",
   "ui.parcel.jobAccess": "Dostupnost práce",

@@ -544,7 +544,7 @@ export class BuildingInfo {
       el(
         'span',
         `gauge__flag ${parcel.power ? 'is-high' : 'is-low'}`,
-        t(parcel.power ? 'ui.parcel.powerYes' : 'ui.parcel.powerNo'),
+        t(parcel.power ? 'ui.parcel.powerYes' : parcel.powerBlockedByRuin ? 'ui.parcel.powerRuin' : 'ui.parcel.powerNo'),
       ),
     );
     parent.appendChild(power);

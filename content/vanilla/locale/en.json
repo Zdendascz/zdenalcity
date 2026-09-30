@@ -545,6 +545,7 @@
   "ui.parcel.power": "Electricity",
   "ui.parcel.powerYes": "yes",
   "ui.parcel.powerNo": "no — no power line, or it is overloaded",
+  "ui.parcel.powerRuin": "no — abandoned buildings and rubble carry no power, demolish it",
   "ui.notice.zonesWithoutWater": "The zones have no water, so nothing will grow there. Build a water works on the shore and run pipes to the zones (the Pipe tool in the Water menu).",
   "ui.parcel.roadTooFar": "out of reach — nothing grows here",
   "ui.parcel.jobAccess": "Access to jobs",

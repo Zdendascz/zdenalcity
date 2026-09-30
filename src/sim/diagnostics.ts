@@ -318,6 +318,12 @@ export interface ParcelExplanation {
    * nebo s přetíženou přípojkou vypadá na mapě úplně stejně (hlásil autor).
    */
   power: boolean;
+  /**
+   * Parcela proud **nevede**, protože na ní stojí opuštěná budova nebo suť
+   * (T129). Hráč pak vidí vedení hned vedle a nechápe, proč tu proud není
+   * (hlásil autor) — je potřeba mu říct, že musí zbourat.
+   */
+  powerBlockedByRuin: boolean;
   pollution: number;
   crime: number;
   /** Spokojenost v této čtvrti, 0–255. Kdo ji nevidí, neví, co spravit (§12). */
@@ -480,6 +486,9 @@ export function explainParcel(
     cityJobAccessFactor: world.cityJobAccess,
     water: world.waterSupply[tile] === 1,
     power: world.layers.power[tile] === 1,
+    powerBlockedByRuin:
+      (world.rubble[tile] ?? 0) !== 0 ||
+      world.buildings.get(world.layers.buildingId[tile] ?? 0)?.abandoned === true,
     pollution: world.coarse.pollution[cell] ?? 0,
     crime: world.coarse.crime[cell] ?? 0,
     happiness: world.happiness[cell] ?? 0,
