@@ -2,22 +2,30 @@ import { Container, Graphics, Matrix } from 'pixi.js';
 import type { Texture } from 'pixi.js';
 import { MAX_HEIGHT, tileCorners } from '@/sim/heights';
 import { index, ROAD, TERRAIN } from '@/sim/layers';
-import { bandFor, bandShape, SIDES } from './terrainBands';
-import { inside } from './roads';
+import { BAND_STEPS, bandDepths, bandFor, bandU, bandV, SIDES } from './terrainBands';
 
 /** Mělčina u břehu (T130). */
 const SHALLOW_COLOR = 0x7fc4c0;
-/** Vrstvy pásu: šířka (násobek) a průhlednost — dohromady měkký přechod. */
+/**
+ * Vrstvy pásu: šířka (násobek) a průhlednost — dohromady měkký přechod.
+ *
+ * **Šest, ne devět** (T133, se souhlasem autora). Pečení chunku s devíti
+ * vrstvami stálo v mediánu 2,6–4,7 ms a v nejhorším přes 16 ms při rozpočtu
+ * 2 ms. Průhlednosti jsou přeladěné tak, aby součet v každém pásmu hloubky
+ * seděl na průměr původních devíti (u hranice 0,83, pak 0,72, 0,59, 0,46,
+ * 0,28 a na kraji 0,14) — stejný spád, jen v šesti krocích.
+ *
+ * Zkoušely se i čtyři: pečení vyšlo ještě o chlup levněji, ale na mělčině
+ * byly schody vidět jako vrstevnice. Šest je na snímku při přiblížení 3,5
+ * od devíti skoro nerozeznatelných a měřeně stojí zhruba polovinu.
+ */
 const BAND_LAYERS: readonly (readonly [number, number])[] = [
-  [0.15, 0.4],
-  [0.3, 0.22],
-  [0.45, 0.2],
-  [0.6, 0.2],
-  [0.75, 0.18],
-  [0.9, 0.16],
-  [1.05, 0.14],
-  [1.2, 0.12],
-  [1.35, 0.1],
+  [0.225, 0.385],
+  [0.45, 0.317],
+  [0.675, 0.242],
+  [0.9, 0.251],
+  [1.125, 0.169],
+  [1.35, 0.137],
 ];
 /** Poloměr zaoblení rohu dlaždice (T130), v podílu hrany. */
 const CORNER_RADIUS = 0.55;
@@ -29,6 +37,72 @@ const CORNERS: readonly (readonly [number, number, number, number])[] = [
   [1, 1, 2, 1],
   [0, 1, 2, 3],
 ];
+/**
+ * Zaoblení každého rohu v `(u, v)`, jako plochá dvojice čísel: roh a oblouk
+ * o devíti bodech. Je pro všechny dlaždice stejné, tak se počítá jednou.
+ */
+const CORNER_ARCS: readonly (readonly number[])[] = CORNERS.map(([cu, cv]) => {
+  const su = cu === 0 ? 1 : -1;
+  const sv = cv === 0 ? 1 : -1;
+  const centreU = cu + su * CORNER_RADIUS;
+  const centreV = cv + sv * CORNER_RADIUS;
+  const points = [cu, cv];
+  for (let i = 0; i <= 8; i++) {
+    const angle = (i / 8) * (Math.PI / 2);
+    points.push(centreU - su * CORNER_RADIUS * Math.cos(angle), centreV - sv * CORNER_RADIUS * Math.sin(angle));
+  }
+  return points;
+});
+/** Hloubky okraje pásu pro právě kreslenou stranu. Sdílené, kreslí se synchronně. */
+const BAND_DEPTHS = new Float64Array(BAND_STEPS + 1);
+
+/** Druh terénu, mimo mapu `fallback` — okraj mapy přechod nemá. */
+function terrainAt(layer: ArrayLike<number>, size: number, x: number, y: number, fallback: number): number {
+  return x < 0 || y < 0 || x >= size || y >= size ? fallback : (layer[y * size + x] ?? 0);
+}
+
+/**
+ * Body `(u, v)` (plochá dvojice) do obrazovky přes rohy dlaždice. Totéž co
+ * `inside` z `roads.ts`, jen bez pole na každý bod.
+ */
+function projectInto(quad: readonly number[], uv: readonly number[], out: number[]): number[] {
+  const nwX = quad[0] ?? 0;
+  const nwY = quad[1] ?? 0;
+  const neX = quad[2] ?? 0;
+  const neY = quad[3] ?? 0;
+  const seX = quad[4] ?? 0;
+  const seY = quad[5] ?? 0;
+  const swX = quad[6] ?? 0;
+  const swY = quad[7] ?? 0;
+  for (let i = 0; i < uv.length; i += 2) {
+    const u = uv[i]!;
+    const v = uv[i + 1]!;
+    const topX = (1 - u) * nwX + u * neX;
+    const bottomX = (1 - u) * swX + u * seX;
+    const topY = (1 - u) * nwY + u * neY;
+    const bottomY = (1 - u) * swY + u * seY;
+    out.push((1 - v) * topX + v * bottomX, (1 - v) * topY + v * bottomY);
+  }
+  return out;
+}
+
+/**
+ * Mnohoúhelník pásu na straně `side` v měřítku `scale`, z hloubek
+ * v `BAND_DEPTHS`. Stejné pořadí bodů jako `bandShape`: konec hrany, vnitřní
+ * okraj pozpátku, začátek hrany.
+ *
+ * Vrací **nové pole**: `Graphics.poly` si ho nekopíruje, jen uloží odkaz.
+ */
+function bandPolygon(quad: readonly number[], side: number, scale: number): number[] {
+  const uv: number[] = [bandU(side, 1, 0), bandV(side, 1, 0)];
+  for (let i = BAND_STEPS; i >= 0; i--) {
+    const t = i / BAND_STEPS;
+    const depth = BAND_DEPTHS[i]! * scale;
+    uv.push(bandU(side, t, depth), bandV(side, t, depth));
+  }
+  uv.push(bandU(side, 0, 0), bandV(side, 0, 0));
+  return projectInto(quad, uv, []);
+}
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import type { FrameChanges } from './changes';
@@ -606,27 +680,20 @@ export class ChunkRenderer {
     light: number,
   ): void {
     const size = this.world.size;
-    const terrainAt = (tx: number, ty: number): number =>
-      tx < 0 || ty < 0 || tx >= size || ty >= size ? terrain : (this.world.layers.terrain[index(tx, ty, size)] ?? 0);
-    for (const [cu, cv, a, b] of CORNERS) {
+    const layer = this.world.layers.terrain;
+    for (let c = 0; c < 4; c++) {
+      const [, , a, b] = CORNERS[c]!;
       const [adx, ady] = SIDES[a]!;
       const [bdx, bdy] = SIDES[b]!;
-      const other = terrainAt(x + adx, y + ady);
+      const other = terrainAt(layer, size, x + adx, y + ady, terrain);
       // Jen na rozhraní s vodou. Mezi souší to řeší pásy; zaoblený roh cizí
       // souše s jiným osvětlením a bez stromů vypadal jako vystřižený.
-      if (other === terrain || terrainAt(x + bdx, y + bdy) !== other) continue;
+      if (other === terrain || terrainAt(layer, size, x + bdx, y + bdy, terrain) !== other) continue;
       if (other !== TERRAIN.water && terrain !== TERRAIN.water) continue;
       const surface = this.surfaceFor(other, x, y);
-      // Oblouk se středem o poloměr dovnitř od rohu, vypouklý k rohu.
-      const su = cu === 0 ? 1 : -1;
-      const sv = cv === 0 ? 1 : -1;
-      const centre: [number, number] = [cu + su * CORNER_RADIUS, cv + sv * CORNER_RADIUS];
-      const arc: [number, number][] = [];
-      for (let i = 0; i <= 8; i++) {
-        const angle = (i / 8) * (Math.PI / 2);
-        arc.push([centre[0] - su * CORNER_RADIUS * Math.cos(angle), centre[1] - sv * CORNER_RADIUS * Math.sin(angle)]);
-      }
-      const polygon = [[cu, cv] as [number, number], ...arc].flatMap(([u, v]) => inside(quad, u, v));
+      // Oblouk je pro každý roh pořád stejný, v `(u, v)` spočítaný předem
+      // (`CORNER_ARCS`); tady se jen promítne do rohů dlaždice.
+      const polygon = projectInto(quad, CORNER_ARCS[c]!, []);
       g.poly(polygon).fill({ color: shade(TERRAIN_COLORS[other] ?? TERRAIN_COLORS[0], slopeLight(corners)) });
       if (surface) {
         const matrix = tileMatrix(x, y, corners, surface.turn, surface.texture.width || 1);
@@ -656,6 +723,11 @@ export class ChunkRenderer {
   /**
    * Přechodové pásy dlaždice (T130): na každé straně, kde soused je jiný
    * povrch, pás podle `bandFor`. Na vodě mělčina s pěnou.
+   *
+   * Šum okraje se počítá **jednou na stranu** (`bandDepths`) a vrstvy se
+   * z něj jen škálují (T133). Dřív si ho každá z devíti vrstev počítala
+   * znovu, přes uzávěry, `forEach` a `flatMap` — medián pečení chunku
+   * 4,7 ms proti rozpočtu 2 ms.
    */
   private drawBands(
     g: Graphics,
@@ -667,39 +739,45 @@ export class ChunkRenderer {
     light: number,
   ): void {
     const size = this.world.size;
-    const terrainAt = (tx: number, ty: number): number =>
-      tx < 0 || ty < 0 || tx >= size || ty >= size ? terrain : (this.world.layers.terrain[index(tx, ty, size)] ?? 0);
-    SIDES.forEach(([dx, dy], side) => {
-      const other = terrainAt(x + dx, y + dy);
+    const layer = this.world.layers.terrain;
+    for (let side = 0; side < 4; side++) {
+      const [dx, dy] = SIDES[side]!;
+      const other = terrainAt(layer, size, x + dx, y + dy, terrain);
       const material = bandFor(terrain, other);
-      if (material === null) return;
+      if (material === null) continue;
+      const texture = material === 'shallow' ? undefined : this.bandTextures.get(material);
+      if (material !== 'shallow' && !texture) continue;
       // Konce pásu: pokračuje, když i dlaždice vedle (podél hrany) má za
       // hranicí stejný cizí povrch. Jinak se zúží do ztracena.
-      const [ax, ay] = dx === 0 ? [1, 0] : [0, 1];
-      const continues = (s: number): boolean =>
-        terrainAt(x - ax * s, y - ay * s) === terrain && terrainAt(x - ax * s + dx, y - ay * s + dy) === other;
-      const start = !continues(1);
-      const end = !continues(-1);
-      const layer = (scale: number): number[] =>
-        bandShape(x, y, side, start, end, scale).polygon.flatMap(([u, v]) => inside(quad, u, v));
+      const ax = dx === 0 ? 1 : 0;
+      const ay = dx === 0 ? 0 : 1;
+      const start = !(
+        terrainAt(layer, size, x - ax, y - ay, terrain) === terrain &&
+        terrainAt(layer, size, x - ax + dx, y - ay + dy, terrain) === other
+      );
+      const end = !(
+        terrainAt(layer, size, x + ax, y + ay, terrain) === terrain &&
+        terrainAt(layer, size, x + ax + dx, y + ay + dy, terrain) === other
+      );
+      bandDepths(x, y, side, start, end, BAND_DEPTHS);
 
       if (material === 'shallow') {
         // Mělčina: světlejší voda u břehu, ztrácí se do hloubky, a pěna na
         // čáře vody.
-        for (const [scale, alpha] of BAND_LAYERS) g.poly(layer(scale * 0.8)).fill({ color: SHALLOW_COLOR, alpha: alpha * 0.9 });
-        g.poly(layer(0.12)).fill({ color: 0xf4f7f5, alpha: 0.3 });
-        return;
+        for (const [scale, alpha] of BAND_LAYERS) {
+          g.poly(bandPolygon(quad, side, scale * 0.8)).fill({ color: SHALLOW_COLOR, alpha: alpha * 0.9 });
+        }
+        g.poly(bandPolygon(quad, side, 0.12)).fill({ color: 0xf4f7f5, alpha: 0.3 });
+        continue;
       }
-      const texture = this.bandTextures.get(material);
-      if (!texture) return;
-      const matrix = tileMatrix(x, y, corners, 0, texture.width || 1);
+      const matrix = tileMatrix(x, y, corners, 0, texture!.width || 1);
       // Několik vrstev rostoucí šířky, každá průsvitná: u hranice se sečtou
       // do plného pásu, dovnitř dlaždice se pás ztrácí. Jeden ostrý okraj
       // vypadal jako nalepená záplata.
       for (const [scale, alpha] of BAND_LAYERS) {
-        g.poly(layer(scale)).fill({ texture, matrix, color: light, textureSpace: 'global', alpha });
+        g.poly(bandPolygon(quad, side, scale)).fill({ texture: texture!, matrix, color: light, textureSpace: 'global', alpha });
       }
-    });
+    }
   }
 
   /**

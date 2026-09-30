@@ -87,32 +87,59 @@ export function bandShape(
   taperEnd: boolean,
   widthScale = 1,
 ): { polygon: [number, number][]; inner: [number, number][] } {
-  // Přímka hranice ve světě a poloha podél ní — ať šum navazuje přes dlaždice.
-  const horizontal = side === 0 || side === 2;
-  const line = horizontal ? y + (side === 2 ? 1 : 0) : x + (side === 1 ? 1 : 0);
-  const base = horizontal ? x : y;
+  const depths = new Float64Array(BAND_STEPS + 1);
+  bandDepths(x, y, side, taperStart, taperEnd, depths);
   const inner: [number, number][] = [];
-  for (let i = 0; i <= STEPS; i++) {
-    const t = i / STEPS;
-    let depth = (DEPTH + WAVE * (edgeNoise(line, base + t, horizontal ? 11 : 23) - 0.5)) * widthScale;
-    if (taperStart) depth *= Math.min(1, t / 0.45);
-    if (taperEnd) depth *= Math.min(1, (1 - t) / 0.45);
-    inner.push(toUV(side, t, depth));
-  }
+  for (let i = 0; i <= STEPS; i++) inner.push(toUV(side, i / STEPS, depths[i]! * widthScale));
   const edge: [number, number][] = [toUV(side, 0, 0), toUV(side, 1, 0)];
   return { polygon: [edge[0]!, ...inner, edge[1]!].reverse(), inner };
 }
 
+/** Kolik úseků má vnitřní okraj pásu. Bodů je o jeden víc. */
+export const BAND_STEPS = STEPS;
+
+/**
+ * Hloubka vnitřního okraje pásu v `STEPS + 1` bodech podél strany, při
+ * měřítku 1 a i se zúžením na koncích. Zapisuje do `out`, nic nealokuje.
+ *
+ * Vrstvy pásu se liší jen měřítkem hloubky (T133), takže šum stačí spočítat
+ * jednou na stranu, ne jednou na každou vrstvu.
+ */
+export function bandDepths(
+  x: number,
+  y: number,
+  side: number,
+  taperStart: boolean,
+  taperEnd: boolean,
+  out: Float64Array,
+): void {
+  // Přímka hranice ve světě a poloha podél ní — ať šum navazuje přes dlaždice.
+  const horizontal = side === 0 || side === 2;
+  const line = horizontal ? y + (side === 2 ? 1 : 0) : x + (side === 1 ? 1 : 0);
+  const base = horizontal ? x : y;
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS;
+    let depth = DEPTH + WAVE * (edgeNoise(line, base + t, horizontal ? 11 : 23) - 0.5);
+    if (taperStart) depth *= Math.min(1, t / 0.45);
+    if (taperEnd) depth *= Math.min(1, (1 - t) / 0.45);
+    out[i] = depth;
+  }
+}
+
+/**
+ * `u` bodu na straně `side` v poloze `t` podél ní a hloubce `depth`.
+ * Rozepsané na dvě funkce, ať kreslení pásů nealokuje pole na každý bod.
+ */
+export function bandU(side: number, t: number, depth: number): number {
+  return side === 0 || side === 2 ? t : side === 1 ? 1 - depth : depth;
+}
+
+/** `v` bodu na straně `side`, viz `bandU`. */
+export function bandV(side: number, t: number, depth: number): number {
+  return side === 0 ? depth : side === 2 ? 1 - depth : t;
+}
+
 /** Bod na straně `side` v poloze `t` podél ní a hloubce `depth` do dlaždice. */
 function toUV(side: number, t: number, depth: number): [number, number] {
-  switch (side) {
-    case 0:
-      return [t, depth];
-    case 1:
-      return [1 - depth, t];
-    case 2:
-      return [t, 1 - depth];
-    default:
-      return [depth, t];
-  }
+  return [bandU(side, t, depth), bandV(side, t, depth)];
 }
