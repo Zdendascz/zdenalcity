@@ -1,7 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
 import { MAX_SAVE_FILE_BYTES } from '@/save/format';
-import { button, el } from './dom';
+import { button, el, markDialog } from './dom';
 import { iconSvg } from './icons';
 import { showHelp } from './help';
 import type { I18n } from './i18n';
@@ -462,6 +462,7 @@ function showLightbox(
   const caption = el('figcaption', 'lightbox__caption');
   figure.append(image, caption);
   overlay.appendChild(figure);
+  markDialog(overlay, caption);
 
   function draw(): void {
     const item = GALLERY[at];
@@ -646,7 +647,9 @@ function showAuthors(parent: HTMLElement, t: (key: string) => string): void {
   const overlay = el('div', 'home__overlay');
   const panel = el('div', 'home__panel');
 
-  panel.appendChild(el('h2', 'home__panel-title', t('ui.home.authors')));
+  const title = el('h2', 'home__panel-title', t('ui.home.authors'));
+  panel.appendChild(title);
+  markDialog(panel, title);
 
   for (const key of [
     'ui.authors.game',

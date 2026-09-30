@@ -5,7 +5,7 @@ import type { MapSize } from '@/sim/layers';
 import { balanceWithMap, generateTerrain } from '@/sim/mapgen';
 import type { MapChoice } from '@/sim/mapgen';
 import { MAX_HEIGHT } from '@/sim/heights';
-import { button, el } from './dom';
+import { button, el, markDialog, setPressed } from './dom';
 import type { I18n } from './i18n';
 import { iconSvg } from './icons';
 
@@ -153,7 +153,9 @@ export function showNewGameDialog(
   const dialog = el('div', 'dialog');
   overlay.appendChild(dialog);
 
-  dialog.appendChild(el('h1', 'dialog__title', t('ui.newGame.title')));
+  const title = el('h1', 'dialog__title', t('ui.newGame.title'));
+  dialog.appendChild(title);
+  markDialog(dialog, title);
 
   const form = el('div', 'dialog__form');
 
@@ -269,7 +271,7 @@ export function showNewGameDialog(
 
   function markChips(): void {
     for (const [option, chip] of chips) {
-      chip.classList.toggle('is-active', option === size);
+      setPressed(chip, option === size);
     }
   }
 

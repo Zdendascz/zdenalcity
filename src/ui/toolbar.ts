@@ -1,4 +1,4 @@
-import { button, el } from './dom';
+import { button, el, setPressed } from './dom';
 import { formatNumber } from './format';
 import { iconSvg } from './icons';
 import type { ToolbarOverflow } from './hud';
@@ -78,7 +78,7 @@ export class Toolbar {
       menu.setSelected(menu.has(this.activeId) ? this.activeId : null);
     }
     for (const [toolId, node] of this.singles) {
-      node.classList.toggle('is-active', toolId === this.activeId);
+      setPressed(node, toolId === this.activeId);
     }
 
     // Vybraný nástroj ze **schované** řady si přebírá trojtečka: jinak by
