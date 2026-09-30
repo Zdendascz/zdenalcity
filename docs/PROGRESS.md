@@ -4189,3 +4189,53 @@ Materiály `content/vanilla/parts/band_*` (zadání v `docs/18-DILY.md`).
 - Vedení přes parcelu kapacitu nemá (blok vede sám); dřív jeho přetížení
   zhaslo i parcelu pod ním a s ní celý blok. Vedení na troskách nevede.
 - Silnice nevede ani přes zónu, která pod ní zůstala (`parcelConducts`).
+
+## Audit: rozhraní, přístupnost, i18n (T135)
+
+Nálezy z auditu rozhraní, každý ověřený v kódu před opravou.
+
+- **Ikony rychlosti o stupeň vedle.** HUD skládá `speed-${násobek}` (1/2/4/8),
+  ale `tools/slice-icons.py` je pojmenoval podle pořadí karty (speed-1..4).
+  4× tak ukazovala čtyři šipky a 8× obrázek neměla vůbec. Soubory přejmenované
+  (tři šipky = `speed-4`, čtyři = `speed-8`), `speed-3` pryč, skript pojmenuje
+  stejně i nový řez (ověřeno: pixely shodné s přejmenovanými soubory).
+- **Nepoužité ikony.** `resume`, `start-city`, `reroll` jsou na tlačítkách
+  úvodní obrazovky a dialogu nové hry (ikona + text), `map-size` u nadpisu
+  volby velikosti mapy. `author` a `share` (nahrazené `home-*`) a `loan-repay`
+  (splátka úvěru ve hře není) jsou smazané i z řezu a ze zadání `09-IKONY.md`.
+- **Jazyk stránky.** `I18n.applyLocale()` nastavuje `<html lang>` podle jazyka
+  hry; `index.html` má `cs` jen jako výchozí stav před načtením.
+- **Přístupnost.** Přepínače v liště (pohled, mřížka, stromy, animace, panely,
+  rychlost, jazyk, nástroje, položky rolet, témata nápovědy, velikost mapy)
+  nesou stav v `aria-pressed` (`setPressed` v `ui/dom.ts`), rolety
+  `aria-expanded`. Dialog nové hry, nápověda, autoři, zvětšený obrázek a
+  hlášení pohromy (`alertdialog`) mají `role`, `aria-modal` a jméno z nadpisu.
+  Hlášky vpravo jsou `role=status` s `aria-live=polite`. Past na fokus
+  (focus trap) dialogy nemají — chování se neměnilo.
+- **HUD každý snímek.** `hud.update()` zapisuje jen změněné hodnoty
+  (`setText`/`setTitle`/`setStyle`/`setAttr`). `formatNumber` si už nestaví
+  `Intl.NumberFormat` při každém volání — formátovače jsou v mezipaměti a
+  zahodí se při přepnutí jazyka.
+- **Překlad přes prototyp.** `has('constructor')` bylo `true` a město
+  „constructor" se v „Pokračovat v …" vypsalo jako zdroják funkce. Tabulky
+  i parametry se čtou přes `Object.hasOwn` a parametr se překládá, jen když
+  má tvar klíče (aspoň dvě slova s tečkou). Test v `tests/ui.audit.test.ts`.
+- **Procenta.** `formatPercent()` místo napevno `"{n} %"` (preloader, HUD,
+  panel parcely): česky „50 %", anglicky „50%". V `en.json` totéž u všech
+  `{x} %`. Cena financování měla napevno `cs-CZ` i v angličtině.
+- **`url()` bez uvozovek** v panelu parcely → `cssUrl()` s escapem.
+  `home.ts` má totéž u obrázků hlavičky; ten kód patří jinému úkolu
+  (líné načítání), tak zůstal.
+- **Nepoužité klíče** (9): `ui.tool.road`, `ui.parcel.surface`,
+  `ui.parcel.roadDistance`, `ui.parcel.jobAccessFactors`, `ui.transit.stopGone`,
+  `ui.home.about`, `ui.home.authorsNote`, `ui.home.discordNote`,
+  `ui.home.shareNote` — ověřeno i proti dynamicky skládaným klíčům.
+- `vitest.config.ts` importuje `./vite.config.ts` s příponou (varování
+  nativního načítání konfigurace zmizelo).
+- Zastaralé komentáře: řeky „ve vanille nula" (`balance.ts`, `mapgen`), silnice
+  „nejdou přes tiles" (`registry.ts`); v tomhle souboru odstavec o
+  `ui.info.spriteFile` a odrážka o zóně mělčí než půdorys.
+
+Ověřeno ve vývojovém sestavení v headless Edge: tlačítka rychlosti ukazují
+1/2/3/4 šipky pro 1×/2×/4×/8×, dialog nové hry má ikony a `role=dialog`,
+anglická verze má `lang=en` a „7%".
