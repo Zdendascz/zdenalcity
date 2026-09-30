@@ -88,6 +88,9 @@ interface Vehicle {
   remaining: number;
 }
 
+/** Prázdný pruh — ať se nemusí pro každé chybějící vyrábět nové pole. */
+const NO_VEHICLES: readonly Vehicle[] = [];
+
 /** Rozsah dlaždic, které jsou vidět. */
 interface TileRange {
   x0: number;
@@ -119,6 +122,15 @@ export class Vehicles {
   private range: TileRange = { x0: 0, y0: 0, x1: -1, y1: -1 };
   /** Silnice ve výřezu z posledního přepočtu — z nich se losuje, kde auto vyjede. */
   private roads: number[] = [];
+  /**
+   * Auta podle pruhu, klíč `laneKey`. Mapa i pole se drží mezi snímky
+   * (T133) — dřív vznikaly každý snímek znovu i s řetězcovými klíči,
+   * pro čtyři sta aut.
+   */
+  private readonly lanes = new Map<number, Vehicle[]>();
+  /** Výsledek `gapAhead`: vzdálenost a zda je vepředu dlouhé vozidlo. */
+  private gapDistance = Infinity;
+  private gapLong = false;
 
   constructor(
     world: ReadonlyWorldView,
@@ -195,19 +207,23 @@ export class Vehicles {
 
     const seconds = (deltaMS / 1000) * speedFactor;
     const lanes = this.byLane();
+    let gapDistance: number;
+    let gapLong: boolean;
     for (let i = this.live.length - 1; i >= 0; i--) {
       const vehicle = this.live[i]!;
       if (seconds > 0) {
         // Rozestup: auto nevjede do auta před sebou. Na dálnici ho předjede
         // v druhém pruhu, jinak zpomalí a počká (autor: „vjíždějí do sebe").
         const step = vehicle.speed * seconds;
-        const gap = this.gapAhead(vehicle, lanes, vehicle.laneIndex);
-        const need = gap.long ? GAP_LONG : GAP_CAR;
+        this.gapAhead(vehicle, lanes, vehicle.laneIndex);
+        gapDistance = this.gapDistance;
+        gapLong = this.gapLong;
+        const need = gapLong ? GAP_LONG : GAP_CAR;
         let move = step;
-        if (gap.distance - step < need) {
+        if (gapDistance - step < need) {
           const other = this.freeLane(vehicle, lanes, need);
           if (other >= 0) vehicle.laneIndex = other;
-          else move = Math.max(0, gap.distance - need);
+          else move = Math.max(0, gapDistance - need);
         }
         const target = LANES[this.roadAt(vehicle.x, vehicle.y)]?.[vehicle.laneIndex] ?? vehicle.lane;
         vehicle.lane += (target - vehicle.lane) * Math.min(1, seconds * 3);
@@ -284,8 +300,13 @@ export class Vehicles {
   }
 
   private spawnAt(x: number, y: number, dir: number, look: VehicleLook, tiles: number): void {
-    const sprite = this.pool.pop() ?? new Sprite();
-    this.container.addChild(sprite);
+    // Sprite ze zásoby ve vrstvě zůstává, jen je schovaný (T133). Vyndat
+    // a vrátit ho znamenalo změnu stromu uzlů u každého auta.
+    let sprite = this.pool.pop();
+    if (!sprite) {
+      sprite = new Sprite();
+      this.container.addChild(sprite);
+    }
     sprite.visible = this.visible;
     const vehicle: Vehicle = {
       sprite,
@@ -332,27 +353,40 @@ export class Vehicles {
   }
 
   /** Auta podle dlaždice, směru a pruhu — pro hledání toho, kdo jede vepředu. */
-  private byLane(): Map<string, Vehicle[]> {
-    const out = new Map<string, Vehicle[]>();
+  private byLane(): Map<number, Vehicle[]> {
+    const out = this.lanes;
+    for (const list of out.values()) list.length = 0;
     for (const vehicle of this.live) {
-      const key = `${vehicle.x},${vehicle.y},${vehicle.dir},${vehicle.laneIndex}`;
+      const key = this.laneKey(vehicle.x, vehicle.y, vehicle.dir, vehicle.laneIndex);
       const list = out.get(key);
       if (list) list.push(vehicle);
       else out.set(key, [vehicle]);
     }
+    // Prázdné pruhy se občas vyhodí, ať mapa neroste s každou projetou dlaždicí.
+    if (out.size > this.live.length * 4 + 64) {
+      for (const [key, list] of out) if (list.length === 0) out.delete(key);
+    }
     return out;
   }
 
-  /** Jak daleko je nejbližší auto vepředu v daném pruhu (v dlaždicích). */
-  private gapAhead(
-    vehicle: Vehicle,
-    lanes: Map<string, Vehicle[]>,
-    lane: number,
-  ): { distance: number; long: boolean } {
+  /** Číselný klíč pruhu: dlaždice, směr (0–3) a pruh (0–3). */
+  private laneKey(x: number, y: number, dir: number, lane: number): number {
+    return ((y * this.world.size + x) * 4 + dir) * 4 + (lane & 3);
+  }
+
+  private laneAt(lanes: Map<number, Vehicle[]>, x: number, y: number, dir: number, lane: number): readonly Vehicle[] {
+    if (x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return NO_VEHICLES;
+    return lanes.get(this.laneKey(x, y, dir, lane)) ?? NO_VEHICLES;
+  }
+
+  /**
+   * Jak daleko je nejbližší auto vepředu v daném pruhu (v dlaždicích).
+   * Výsledek jde do `gapDistance` a `gapLong`, ne do nového objektu.
+   */
+  private gapAhead(vehicle: Vehicle, lanes: Map<number, Vehicle[]>, lane: number): void {
     let best = Infinity;
     let long = false;
-    const here = lanes.get(`${vehicle.x},${vehicle.y},${vehicle.dir},${lane}`) ?? [];
-    for (const other of here) {
+    for (const other of this.laneAt(lanes, vehicle.x, vehicle.y, vehicle.dir, lane)) {
       if (other === vehicle || other.progress <= vehicle.progress) continue;
       const distance = other.progress - vehicle.progress;
       if (distance < best) {
@@ -362,25 +396,27 @@ export class Vehicles {
     }
     const nx = vehicle.x + DX[vehicle.dir]!;
     const ny = vehicle.y + DY[vehicle.dir]!;
-    for (const other of lanes.get(`${nx},${ny},${vehicle.dir},${lane}`) ?? []) {
+    for (const other of this.laneAt(lanes, nx, ny, vehicle.dir, lane)) {
       const distance = 1 - vehicle.progress + other.progress;
       if (distance < best) {
         best = distance;
         long = other.look.weight < 1;
       }
     }
-    return { distance: best, long };
+    this.gapDistance = best;
+    this.gapLong = long;
   }
 
   /** Volný vedlejší pruh pro předjetí, nebo `-1`. */
-  private freeLane(vehicle: Vehicle, lanes: Map<string, Vehicle[]>, need: number): number {
+  private freeLane(vehicle: Vehicle, lanes: Map<number, Vehicle[]>, need: number): number {
     const count = LANES[this.roadAt(vehicle.x, vehicle.y)]?.length ?? 1;
     for (let lane = 0; lane < count; lane++) {
       if (lane === vehicle.laneIndex) continue;
-      const beside = lanes.get(`${vehicle.x},${vehicle.y},${vehicle.dir},${lane}`) ?? [];
+      const beside = this.laneAt(lanes, vehicle.x, vehicle.y, vehicle.dir, lane);
       // Pruh je volný, když v něm vedle nikdo nejede a vepředu je místo.
       if (beside.some((other) => Math.abs(other.progress - vehicle.progress) < need)) continue;
-      if (this.gapAhead(vehicle, lanes, lane).distance > need * 2) return lane;
+      this.gapAhead(vehicle, lanes, lane);
+      if (this.gapDistance > need * 2) return lane;
     }
     return -1;
   }
@@ -415,7 +451,7 @@ export class Vehicles {
     const vehicle = this.live[i]!;
     this.live[i] = this.live[this.live.length - 1]!;
     this.live.pop();
-    vehicle.sprite.removeFromParent();
+    vehicle.sprite.visible = false;
     this.pool.push(vehicle.sprite);
   }
 

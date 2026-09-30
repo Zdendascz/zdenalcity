@@ -51,6 +51,9 @@ export class WaterGlints {
     g.ellipse(0, 0, 3.5, 0.8).fill({ color: 0xffffff, alpha: 0.9 });
     this.texture = renderer.generateTexture({ target: g, resolution: 2 });
     g.destroy();
+    // Vlastní skupina vykreslování (T133): odlesky přibývají a mizí každý
+    // snímek a s nimi se staví znovu seznam instrukcí. Ať je to jen ten jejich.
+    this.container.isRenderGroup = true;
     parent.addChild(this.container);
   }
 

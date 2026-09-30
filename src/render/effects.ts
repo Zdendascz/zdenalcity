@@ -147,6 +147,9 @@ export class Effects {
     this.texture = softCircle(renderer);
     // Nad budovami: prach stoupá **před** fasádou, ne za ní.
     this.container.zIndex = 900_000;
+    // Vlastní skupina vykreslování (T133): obláčky vznikají a mizí každý
+    // snímek; přestavba instrukcí se tak týká jen jich, ne celého světa.
+    this.container.isRenderGroup = true;
     parent.addChild(this.container);
   }
 

@@ -105,6 +105,12 @@ export class People {
   private readonly benches = new Map<number, Bench>();
   private readonly clocks = new Map<number, number>();
   private enabled = true;
+  /**
+   * Odložené sprity (T133). Chodec, který zmizel ve vchodu, i ten, kdo vstal
+   * z lavičky, se jen schová a příště se použije znovu — nový `Sprite`
+   * a `destroy()` za každého krmily sběr odpadu a pokaždé měnily strom uzlů.
+   */
+  private readonly pool: Sprite[] = [];
 
   constructor(
     world: ReadonlyWorldView,
@@ -126,6 +132,28 @@ export class People {
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     if (!enabled) this.clear();
+  }
+
+  /** Sprite ze zásoby, nebo nový. Vrací se viditelný podle `setVisible`. */
+  private acquire(texture?: Texture): Sprite {
+    let sprite = this.pool.pop();
+    if (sprite) {
+      if (texture) sprite.texture = texture;
+      sprite.alpha = 1;
+      sprite.skew.set(0, 0);
+    } else {
+      sprite = new Sprite(texture);
+      this.container.addChild(sprite);
+    }
+    sprite.visible = this.visible;
+    return sprite;
+  }
+
+  /** Vrátí sprite do zásoby — jen ho schová, z vrstvy ho nevyndává. */
+  private releaseSprite(sprite: Sprite | null | undefined): void {
+    if (!sprite) return;
+    sprite.visible = false;
+    this.pool.push(sprite);
   }
 
   setVisible(visible: boolean): void {
@@ -161,7 +189,7 @@ export class People {
   ): void {
     for (const [id, bench] of this.benches) {
       if (seats.has(id)) continue;
-      for (const person of bench.sitting) person?.destroy();
+      for (const person of bench.sitting) this.releaseSprite(person);
       this.benches.delete(id);
     }
     if (this.looks.sit.length === 0) return;
@@ -186,7 +214,7 @@ export class People {
         // Přijel spoj: všichni nastoupí.
         bench.arrival = 20000 + this.random() * 25000;
         for (let i = 0; i < bench.sitting.length; i++) {
-          bench.sitting[i]?.destroy();
+          this.releaseSprite(bench.sitting[i]);
           bench.sitting[i] = null;
         }
         continue;
@@ -200,20 +228,18 @@ export class People {
       if (current) {
         // Vstát je méně časté než si sednout — lavička se pomalu plní.
         if (this.random() < 0.3) {
-          current.destroy();
+          this.releaseSprite(current);
           bench.sitting[i] = null;
         }
         continue;
       }
       const look = this.looks.sit[Math.floor(this.random() * this.looks.sit.length)]!;
-      const sprite = new Sprite(look.texture);
+      const sprite = this.acquire(look.texture);
       sprite.anchor.set(look.anchor[0] / look.texture.width, look.anchor[1] / look.texture.height);
       sprite.scale.set((this.random() < 0.5 ? -1 : 1) / SCALE, 1 / SCALE);
       sprite.position.set(spot.x, spot.y);
       // Hned za svou zastávkou: před přístřeškem, pod domy vepředu.
       sprite.zIndex = this.zIndexOf(id) + 0.6;
-      sprite.visible = this.visible;
-      this.container.addChild(sprite);
       bench.sitting[i] = sprite;
     }
   }
@@ -237,10 +263,12 @@ export class People {
       if (route === null) continue;
       const toward = this.random() < 0.6;
       const path = toward ? route.reverse() : route;
-      const image = Math.floor(this.random() * Math.min(this.looks.front.length, this.looks.rear.length));
-      const sprite = new Sprite();
-      sprite.visible = this.visible;
-      this.container.addChild(sprite);
+      // Bez obrázků zezadu jde chodec pořád zepředu (viz `moveWalkers`), takže
+      // se postava vybírá jen z nich.
+      const figures =
+        this.looks.rear.length > 0 ? Math.min(this.looks.front.length, this.looks.rear.length) : this.looks.front.length;
+      const image = Math.floor(this.random() * figures);
+      const sprite = this.acquire();
       this.walkers.push({ sprite, image, walked: this.random() * 4, path, leg: 0, progress: 0, fadeIn: !toward, fadeOut: toward });
     }
   }
@@ -324,7 +352,7 @@ export class People {
       const from = walker.path[walker.leg];
       const to = walker.path[walker.leg + 1];
       if (!from || !to) {
-        walker.sprite.destroy();
+        this.releaseSprite(walker.sprite);
         this.walkers.splice(i, 1);
         continue;
       }
@@ -347,9 +375,17 @@ export class People {
       const dx = to[0] - from[0];
       const dy = to[1] - from[1];
       const dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0;
-      const set = dir === 1 || dir === 2 ? this.looks.front : this.looks.rear;
-      const frames = set[walker.image % set.length]!;
-      const look = frames[Math.floor(walker.walked * FRAMES_PER_TILE) % frames.length]!;
+      // Obsah nemusí dodat obrázky zezadu (ani jednotlivou fázi). Dřív se pak
+      // bralo `set[0 % 0]` a každý snímek padala výjimka (T133) — chodec
+      // proto jde zepředu, a když chybí i ta fáze, schová se.
+      const rear = dir === 0 || dir === 3;
+      const set = rear && this.looks.rear.length > 0 ? this.looks.rear : this.looks.front;
+      const frames = set.length > 0 ? set[walker.image % set.length] : undefined;
+      const look = frames && frames.length > 0 ? frames[Math.floor(walker.walked * FRAMES_PER_TILE) % frames.length] : undefined;
+      if (!look) {
+        walker.sprite.alpha = 0;
+        continue;
+      }
       if (walker.sprite.texture !== look.texture) {
         walker.sprite.texture = look.texture;
         walker.sprite.anchor.set(look.anchor[0] / look.texture.width, look.anchor[1] / look.texture.height);
@@ -368,9 +404,9 @@ export class People {
   }
 
   private clear(): void {
-    for (const walker of this.walkers) walker.sprite.destroy();
+    for (const walker of this.walkers) this.releaseSprite(walker.sprite);
     this.walkers.length = 0;
-    for (const bench of this.benches.values()) for (const person of bench.sitting) person?.destroy();
+    for (const bench of this.benches.values()) for (const person of bench.sitting) this.releaseSprite(person);
     this.benches.clear();
   }
 }

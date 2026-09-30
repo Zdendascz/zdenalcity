@@ -98,6 +98,7 @@ import { BuildingRenderer } from './buildingRenderer';
 import type { AppearanceLookup, LoadedPart } from './buildingRenderer';
 import { clampCamera, createCamera, pan, viewportToWorld, zoomAt } from './camera';
 import { ChunkRenderer, viewportFor } from './chunkRenderer';
+import { ChangeTracker } from './changes';
 import { tilesIn } from './vehicles';
 import type { MotionView } from './effects';
 import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
@@ -1352,6 +1353,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     worldContainer,
     createAppearanceLookup(content),
   );
+  // Třídí změny ze simulace podle druhu, ať oheň nepřestavuje stromy (T133).
+  const changeTracker = new ChangeTracker(world);
+  // Svět je vlastní skupina vykreslování (T133). Kamera hýbe jen jejím
+  // kořenem: bez toho Pixi při každém posunu a zoomu přepočítal transformaci
+  // všech dvanácti tisíc uzlů pod ním, i těch mimo obrazovku.
+  worldContainer.isRenderGroup = true;
 
   // Auta (T115) se řadí **mezi budovy** (T124): ve vlastní vrstvě pod domy
   // je na svahu ořízla podezdívka domu za nimi.
@@ -3539,6 +3546,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       world,
       camera,
       setSpeed,
+      // Pro měření snímku (T133): skript si do tickeru přidá značky před
+      // a za `renderFrame` a za vykreslení.
+      app,
       load: (base64: string) =>
         loadFromBytes(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))),
       startDisaster: (kind: string, x: number, y: number) =>
@@ -3565,18 +3575,37 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    * nikdo neuvidí, se nepočítá.
    */
   const serviceClocks = new Map<number, number>();
-  function dispatchServiceVehicles(elapsed: number, view: MotionView): void {
-    if (elapsed <= 0 || serviceLooks.size === 0) return;
-    const range = tilesIn(view, world.size);
+  /**
+   * Budovy, odkud vyjíždějí vozidla služeb (T133). Dřív se každý snímek
+   * procházely všechny budovy a u každé se hledala definice; teď se seznam
+   * sestaví znovu jen tehdy, když budova vznikla, zmizela nebo změnila vzhled.
+   */
+  let serviceSites: { id: number; x: number; y: number; width: number; depth: number; service: string }[] = [];
+  let serviceSitesStale = true;
+  function refreshServiceSites(): void {
+    serviceSitesStale = false;
+    serviceSites = [];
     for (const [id, building] of world.buildings) {
       if (building.abandoned) continue;
-      if (building.x < range.x0 || building.x > range.x1 || building.y < range.y0 || building.y > range.y1) {
-        continue;
-      }
       const definition = content.get(building.definitionId);
       if (definition === undefined) continue;
       const service = WASTE_SITES.has(building.definitionId) ? 'waste' : definition.service?.class;
-      const look = service === undefined ? undefined : serviceLooks.get(service);
+      if (service === undefined) continue;
+      const [width, depth] = definition.footprint;
+      serviceSites.push({ id, x: building.x, y: building.y, width, depth, service });
+    }
+  }
+
+  function dispatchServiceVehicles(elapsed: number, view: MotionView): void {
+    if (elapsed <= 0 || serviceLooks.size === 0) return;
+    if (serviceSitesStale) refreshServiceSites();
+    const range = tilesIn(view, world.size);
+    for (const site of serviceSites) {
+      const { id } = site;
+      if (site.x < range.x0 || site.x > range.x1 || site.y < range.y0 || site.y > range.y1) {
+        continue;
+      }
+      const look = serviceLooks.get(site.service);
       if (look === undefined) continue;
       const spread = ((id * 0.618034) % 1 + 1) % 1;
       const left = (serviceClocks.get(id) ?? 4000 + spread * 20000) - elapsed;
@@ -3584,8 +3613,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         serviceClocks.set(id, left);
         continue;
       }
-      const [width, depth] = definition.footprint;
-      vehicles.dispatch(look, building.x, building.y, width, depth, 6 + Math.floor(spread * 10));
+      vehicles.dispatch(look, site.x, site.y, site.width, site.depth, 6 + Math.floor(spread * 10));
       serviceClocks.set(id, 18000 + spread * 30000);
     }
   }
@@ -3629,21 +3657,26 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       app.screen.width,
       app.screen.height,
     );
-    chunkRenderer.update(dirty);
+    const changes = changeTracker.collect(dirty);
+    if (changes.full || changes.buildings.length > 0) serviceSitesStale = true;
+    chunkRenderer.update(dirty, changes);
     // Peče se až tady a jen to, na co je vidět (R20). Musí to být po
     // `update()`, aby se změna z tohohle tiku promítla ještě v tomhle snímku.
     chunkRenderer.cull(viewport);
-    roadRenderer.update(dirty);
-    buildingRenderer.update(dirty);
+    roadRenderer.update(changes);
+    roadRenderer.cull(viewport);
+    buildingRenderer.update(changes);
+    buildingRenderer.cull(viewport);
     coarseOverlay.update(dirty.coarseChanged);
     // Síť se překresluje jen při změně terénu, posunu o blok nebo změně
     // měřítka — proto ten vlastní příznak vedle `tiles`.
     gridOverlay.update(dirty.heightsChanged, viewport, camera.zoom);
     // Značky se hýbou s budovami, ne s hrubou mřížkou.
-    serviceMarkers.update(dirty.fullRedraw || dirty.buildings.size > 0);
+    // Jen při změně vzhledu budov nebo suti — počet obyvatel je nezajímá.
+    serviceMarkers.update(changes.full || changes.buildings.length > 0 || changes.rubble.length > 0);
     disasterScenes.update();
     trafficOverlay.update();
-    wireOverlay.update(dirty.fullRedraw || dirty.tiles.size > 0);
+    wireOverlay.update(changes.full || changes.wire.length > 0 || dirty.heightsChanged);
     buildingRenderer.animate(deltaMS);
     buildingRenderer.sway(deltaMS, viewport, camera.zoom);
     placementGhost.animate(deltaMS);

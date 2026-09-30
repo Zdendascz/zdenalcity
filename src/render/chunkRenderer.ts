@@ -31,6 +31,7 @@ const CORNERS: readonly (readonly [number, number, number, number])[] = [
 ];
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
+import type { FrameChanges } from './changes';
 import {
   FIRE_COLORS,
   FIRE_MAX_ALPHA,
@@ -260,6 +261,14 @@ interface Chunk {
   baked: boolean;
   /** Změnilo se v něm něco od posledního upečení? */
   stale: boolean;
+  /**
+   * Musí se přepéct i povrch a pásy, nebo stačí překryvná vrstva (T133)?
+   *
+   * Oheň, povodeň, suť, zóny i proud se kreslí jen do `over`. Povrch s pásy
+   * je přitom to drahé — 9 vrstev na každé hranici — a hořící dlaždice se
+   * značí každé dva tiky. Bez rozlišení se kvůli plamenu přepékal celý chunk.
+   */
+  surfaceStale: boolean;
 }
 
 /**
@@ -342,6 +351,9 @@ export class ChunkRenderer {
     // nahlásil, že „diamanty se nezobrazují"; tohle byla ta příčina.
     this.container = new Container();
     this.container.sortableChildren = true;
+    // Vlastní skupina vykreslování (T133): chunky se mění zřídka, tak ať se
+    // jejich seznam instrukcí nestaví znovu kvůli autům a kouři.
+    this.container.isRenderGroup = true;
     parent.addChild(this.container);
 
     for (let cy = 0; cy < this.chunksPerAxis; cy++) {
@@ -370,6 +382,7 @@ export class ChunkRenderer {
           // Čerstvý chunk je prázdný a čeká, jestli na něj bude vidět.
           baked: false,
           stale: true,
+          surfaceStale: true,
         });
       }
     }
@@ -403,7 +416,10 @@ export class ChunkRenderer {
   }
 
   private invalidateAll(): void {
-    for (const chunk of this.chunks) chunk.stale = true;
+    for (const chunk of this.chunks) {
+      chunk.stale = true;
+      chunk.surfaceStale = true;
+    }
   }
 
   /**
@@ -466,25 +482,36 @@ export class ChunkRenderer {
    * okrajem obrazovky se tím neztratí: chunk zůstane označený a upeče se,
    * jakmile na něj hráč najede.
    */
-  update(dirty: DirtySet): void {
-    if (dirty.fullRedraw) {
+  update(dirty: DirtySet, changes?: FrameChanges): void {
+    if (dirty.fullRedraw || changes?.full === true) {
       this.invalidateAll();
       return;
     }
 
-    for (const tileIndex of dirty.tiles) {
+    // Bez roztřídění (testy, starší volající) se každá dlaždice bere jako
+    // změna povrchu — to je bezpečná strana.
+    const surface: Iterable<number> = changes ? changes.surface : dirty.tiles;
+    for (const tileIndex of surface) {
       const x = tileIndex % this.world.size;
       const y = (tileIndex - x) / this.world.size;
-      const chunk = this.chunks[this.chunkIndexFor(x, y)];
-      if (chunk) chunk.stale = true;
+      this.markStale(this.chunkIndexFor(x, y), true);
       // Přechodový pás sousední dlaždice záleží na téhle (T130) — soused
       // může ležet v jiném chunku.
       for (const [dx, dy] of SIDES) {
         const nx = x + dx;
         const ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= this.world.size || ny >= this.world.size) continue;
-        const near = this.chunks[this.chunkIndexFor(nx, ny)];
-        if (near) near.stale = true;
+        this.markStale(this.chunkIndexFor(nx, ny), true);
+      }
+    }
+    if (changes) {
+      // Zbytek se kreslí jen do překryvné vrstvy: zóna, suť, oheň, voda,
+      // proud a v podzemním pohledu i silnice a potrubí.
+      for (const list of [changes.road, changes.parcel, changes.rubble, changes.other]) {
+        for (const tileIndex of list) {
+          const x = tileIndex % this.world.size;
+          this.markStale(this.chunkIndexFor(x, (tileIndex - x) / this.world.size), false);
+        }
       }
     }
 
@@ -494,11 +521,13 @@ export class ChunkRenderer {
      * v `dirty.buildings`, ne v `dirty.tiles` — a pod domem pak zůstala
      * barva zóny a vykukovala po okrajích pozemku (hlásil autor). U zbourané
      * budovy už půdorys ve světě není, proto se pamatuje, kde stála.
+     *
+     * Stačí překryvná vrstva: zóna je v ní, povrch pod domem se nemění.
      */
-    for (const id of dirty.buildings) {
+    for (const id of changes ? changes.buildings : dirty.buildings) {
       const building = this.world.buildings.get(id);
       const previous = this.buildingChunks.get(id);
-      if (previous) for (const index of previous) this.markStale(index);
+      if (previous) for (const index of previous) this.markStale(index, false);
       if (!building) {
         this.buildingChunks.delete(id);
         continue;
@@ -510,14 +539,16 @@ export class ChunkRenderer {
           covered.add(this.chunkIndexFor(building.x + dx, building.y + dy));
         }
       }
-      for (const index of covered) this.markStale(index);
+      for (const index of covered) this.markStale(index, false);
       this.buildingChunks.set(id, [...covered]);
     }
   }
 
-  private markStale(chunkIndex: number): void {
+  private markStale(chunkIndex: number, surface: boolean): void {
     const chunk = this.chunks[chunkIndex];
-    if (chunk) chunk.stale = true;
+    if (!chunk) return;
+    chunk.stale = true;
+    if (surface) chunk.surfaceStale = true;
   }
 
   /** Půdorys budovy podle dlaždic, které opravdu drží (vrstva `buildingId`). */
@@ -536,20 +567,26 @@ export class ChunkRenderer {
     if (!chunk) return;
 
     const { x0, y0, graphics, bands, over } = chunk;
-    graphics.clear();
-    bands.clear();
+    // Jen překryvná vrstva, když povrch platí (T133). Uvolněný chunk nemá
+    // nic, takže ten se peče vždycky celý.
+    const surface = !chunk.baked || chunk.surfaceStale;
+    if (surface) {
+      graphics.clear();
+      bands.clear();
+    }
     over.clear();
     if (!chunk.baked) this.bakedCount++;
     this.bakes++;
     chunk.baked = true;
     chunk.stale = false;
+    chunk.surfaceStale = false;
 
     const last = CHUNK_SIZE - 1;
     // Kreslení vzestupně podle x + y (back-to-front). Na ploché mapě na pořadí
     // nezáleží, s převýšením a budovami ano — pravidlo platí od začátku.
     for (let sum = 0; sum <= last * 2; sum++) {
       for (let dy = Math.max(0, sum - last); dy <= Math.min(last, sum); dy++) {
-        this.drawTile(graphics, x0 + sum - dy, y0 + dy, bands, over);
+        this.drawTile(surface ? graphics : null, x0 + sum - dy, y0 + dy, bands, over);
       }
     }
   }
@@ -720,7 +757,11 @@ export class ChunkRenderer {
     return { texture, turn: (h >>> 8) & 3 };
   }
 
-  private drawTile(graphics: Graphics, x: number, y: number, bands?: Graphics, over?: Graphics): void {
+  /**
+   * Nakreslí dlaždici. S `graphics === null` jen překryvnou vrstvu — povrch
+   * a pásy chunku zůstávají z minula (T133).
+   */
+  private drawTile(surfaceGraphics: Graphics | null, x: number, y: number, bands?: Graphics, over?: Graphics): void {
     if (x >= this.world.size || y >= this.world.size) return;
 
     const tileIndex = index(x, y, this.world.size);
@@ -751,36 +792,40 @@ export class ChunkRenderer {
     // některých dlaždicích průhledná místa — projevilo se to jako černé klíny
     // u pobřeží a autor to nahlásil. Barva pod ní je zároveň to, co tam patří:
     // když obrázek chybí nebo se nedokreslí, zůstane terén, ne díra.
-    graphics.poly(points).fill({ color });
+    if (surfaceGraphics) {
+      const graphics = surfaceGraphics;
+      graphics.poly(points).fill({ color });
 
-    // Tón je **bílá ztlumená sklonem**, ne barva terénu: obrázek už zelený je
-    // a vynásobit ho zelenou znamená bahno. Zůstat musí jen světlo, jinak by
-    // ze svahu zmizel stín a kopec by vypadal jako rovina.
-    const light = shade(
-      0xffffff,
-      slopeLight(corners) * (underground ? UNDERGROUND_TERRAIN_SHADE : 1),
-    );
+      // Tón je **bílá ztlumená sklonem**, ne barva terénu: obrázek už zelený je
+      // a vynásobit ho zelenou znamená bahno. Zůstat musí jen světlo, jinak by
+      // ze svahu zmizel stín a kopec by vypadal jako rovina.
+      const light = shade(
+        0xffffff,
+        slopeLight(corners) * (underground ? UNDERGROUND_TERRAIN_SHADE : 1),
+      );
 
-    const surface = this.surfaceFor(terrain, x, y);
-    if (surface !== undefined) {
-      const matrix = tileMatrix(x, y, corners, surface.turn, surface.texture.width || 1);
-      graphics
-        .poly(points)
-        .fill({ texture: surface.texture, matrix, color: light, textureSpace: 'global' });
-    } else {
-      // Obrys jen u barevné dlaždice. Na obrázku by z něj byla světlá mřížka
-      // přes celou mapu — tvar terénu tam čte samo světlo a kresba povrchu.
-      graphics
-        .poly(points)
-        .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
+      const surface = this.surfaceFor(terrain, x, y);
+      if (surface !== undefined) {
+        const matrix = tileMatrix(x, y, corners, surface.turn, surface.texture.width || 1);
+        graphics
+          .poly(points)
+          .fill({ texture: surface.texture, matrix, color: light, textureSpace: 'global' });
+      } else {
+        // Obrys jen u barevné dlaždice. Na obrázku by z něj byla světlá mřížka
+        // přes celou mapu — tvar terénu tam čte samo světlo a kresba povrchu.
+        graphics
+          .poly(points)
+          .stroke({ color: shade(color, TILE_EDGE_SHADE), width: 1, alignment: 0.5 });
+      }
+
+      // Zaoblení až po pásech a do jejich vrstvy: jinak by ho pás břehu,
+      // kreslený až ke hraně, zase překryl a špičky by zůstaly.
+      if (bands && !underground) this.drawBands(bands, x, y, terrain, corners, points, light);
+      if (!underground) this.roundCorners(bands ?? graphics, x, y, terrain, corners, points, light);
     }
-
-    // Zaoblení až po pásech a do jejich vrstvy: jinak by ho pás břehu,
-    // kreslený až ke hraně, zase překryl a špičky by zůstaly.
-    if (bands && !underground) this.drawBands(bands, x, y, terrain, corners, points, light);
-    if (!underground) this.roundCorners(bands ?? graphics, x, y, terrain, corners, points, light);
     // Všechno od zón dál jde do vrstvy nad pásy.
-    if (over) graphics = over;
+    const graphics = over ?? surfaceGraphics;
+    if (!graphics) return;
 
     const zone = this.world.layers.zone[tileIndex] ?? 0;
     const zoneColor = ZONE_COLOR_BY_VALUE[zone];
@@ -1020,7 +1065,7 @@ export class ChunkRenderer {
  * občas se upeče chunk, na který ve skutečnosti vidět není. To je ta správná
  * strana chyby: opačná by znamenala díru v mapě.
  */
-function chunkBounds(x0: number, y0: number): Viewport {
+export function chunkBounds(x0: number, y0: number): Viewport {
   const n = CHUNK_SIZE;
   return {
     // x = (x − y) · TILE_W/2; nejmenší u jihozápadního rohu, největší u severovýchodního
@@ -1032,7 +1077,7 @@ function chunkBounds(x0: number, y0: number): Viewport {
   };
 }
 
-function overlaps(a: Viewport, b: Viewport): boolean {
+export function overlaps(a: Viewport, b: Viewport): boolean {
   return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
 }
 
@@ -1067,7 +1112,7 @@ export function viewportFor(
 }
 
 /** Roztáhne obdélník o `margin` chunků na každou stranu. */
-function expand(view: Viewport, margin: number): Viewport {
+export function expand(view: Viewport, margin: number): Viewport {
   const padX = margin * CHUNK_SIZE * (TILE_W / 2);
   const padY = margin * CHUNK_SIZE * (TILE_H / 2);
   return {

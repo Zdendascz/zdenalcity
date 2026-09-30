@@ -52,6 +52,8 @@ export class FireLayer {
     this.world = world;
     // Nad budovami: hoří dům, a plamen z okna má být před fasádou.
     this.container.zIndex = 800_000;
+    // Vlastní skupina vykreslování, stejně jako kouř (T133).
+    this.container.isRenderGroup = true;
     parent.addChild(this.container);
   }
 

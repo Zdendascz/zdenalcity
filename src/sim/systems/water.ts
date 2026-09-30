@@ -269,8 +269,9 @@ export function createWaterDecaySystem(catalogue: BuildingCatalogue, balance: Ba
         world.waterlessStreak.set(id, streak);
 
         if (building.population > 0) {
+          // Úbytek obyvatel není vidět — `markBuildingDirty` je jen pro
+          // renderer a ten by kvůli tomu přestavoval ulici (T133).
           building.population = Math.max(0, building.population - decayStep);
-          markBuildingDirty(world, id);
         } else if (streak >= abandonAfter) {
           // Prázdný dům se po čase vzdá. Ruinu musí zbourat hráč (§8 fáze 2).
           building.abandoned = true;
