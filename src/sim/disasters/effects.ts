@@ -1,5 +1,5 @@
 import { coarseIndex } from '../coarse';
-import { markCoverageDirty, markTileDirty, removeBuilding } from '../world';
+import { markCoverageDirty, markNetworksDirty, markTileDirty, removeBuilding } from '../world';
 import type { WorldState } from '../world';
 import { coarseCellsOfShape, tilesOf } from './shapes';
 import type { Shape, ShapeFilter } from './shapes';
@@ -81,10 +81,14 @@ export function floodArea(
   let flooded = 0;
   for (const tile of tilesOf(world, shape, filter)) {
     const value = Math.max(0, Math.min(255, Math.round(depth)));
-    if (value <= (flood[tile] ?? 0)) continue;
+    const before = flood[tile] ?? 0;
+    if (value <= before) continue;
     flood[tile] = value;
     markTileAt(world, tile);
     flooded++;
+    // Suchá dlaždice se stala mokrou: elektřina ani voda přes ni nevedou
+    // (`isFlooded`) a obě sítě se přepočítávají jen při změně (T132).
+    if (before === 0) markNetworksDirty(world);
   }
   return flooded;
 }
@@ -320,7 +324,11 @@ export function expireModifiers(world: WorldState): void {
   let write = 0;
   for (let read = 0; read < modifiers.length; read++) {
     const modifier = modifiers[read];
-    if (!modifier || modifier.until <= world.tick) continue;
+    if (!modifier) continue;
+    if (modifier.until <= world.tick) {
+      markLifted(world, modifier);
+      continue;
+    }
     modifiers[write++] = modifier;
   }
   modifiers.length = write;
@@ -332,10 +340,28 @@ export function clearModifiersOf(world: WorldState, source: number): void {
   let write = 0;
   for (let read = 0; read < modifiers.length; read++) {
     const modifier = modifiers[read];
-    if (!modifier || modifier.source === source) continue;
+    if (!modifier) continue;
+    if (modifier.source === source) {
+      markLifted(world, modifier);
+      continue;
+    }
     modifiers[write++] = modifier;
   }
   modifiers.length = write;
+}
+
+/**
+ * Postih zmizel — co se z něj počítá do keše, se musí přepočítat (audit T132).
+ *
+ * Většinu postihů si systémy čtou při každém běhu, ale pokrytí a vodovod se
+ * přepočítávají **jen při změně**. Zavedení postihu je špinilo, zrušení ne:
+ * vodárna po chemické havárii zůstala „zamořená" a stávka potlačovala hasiče,
+ * dokud hráč náhodou nesáhl na potrubí nebo nepostavil budovu. A po načtení
+ * savu, kde se obojí přepočítá vždy, se tak město chovalo jinak než bez něj.
+ */
+function markLifted(world: WorldState, modifier: Modifier): void {
+  if (modifier.kind === 'suppressService') markCoverageDirty(world);
+  if (modifier.kind === 'contaminateWater') world.waterNetworkDirty = true;
 }
 
 /**
