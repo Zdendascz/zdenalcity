@@ -86,9 +86,16 @@ function recompute(
   }
 
   const conducts = new Uint8Array(cells);
+  // Vedení přes parcelu kapacitu nemá: vede tu blok sám a neomezeně. Kdyby
+  // se úsek počítal, jeho přetížení by zhaslo i parcelu pod ním — a s ní
+  // celý blok (audit, hlášení autora „i když mám napojeno").
+  const limited = new Uint8Array(cells);
   for (let tile = 0; tile < cells; tile++) {
     if (isFlooded(world, tile)) continue;
-    if ((world.layers.wire[tile] ?? 0) !== WIRE.none || parcelConducts(world, tile)) conducts[tile] = 1;
+    const parcel = parcelConducts(world, tile);
+    const wired = (world.layers.wire[tile] ?? 0) !== WIRE.none && (world.rubble[tile] ?? 0) === 0;
+    if (wired || parcel) conducts[tile] = 1;
+    if (wired && !parcel) limited[tile] = 1;
   }
   // Odpojená elektrárna nevede — kdyby vedla, vzdálená čtvrť by zůstala
   // „připojená k ničemu" a hráč by na mapě viděl síť, která nefunguje.
@@ -105,7 +112,7 @@ function recompute(
   let tree = spread(world, conducts, plants);
   let load = loads(tree, consumers);
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const cut = overloadedWires(world, tree, load, capacity);
+    const cut = overloadedWires(world, tree, load, capacity, limited);
     if (cut.length === 0) break;
     for (const tile of cut) {
       overloaded[tile] = 1;
@@ -240,12 +247,13 @@ function overloadedWires(
   tree: Tree,
   load: Float64Array,
   capacity: (type: number) => number,
+  limited: Uint8Array,
 ): number[] {
   const carried = new Float64Array(load.length);
   const out: number[] = [];
   for (let i = tree.order.length - 1; i >= 0; i--) {
     const tile = tree.order[i]!;
-    const type = world.layers.wire[tile] ?? WIRE.none;
+    const type = limited[tile] === 1 ? (world.layers.wire[tile] ?? WIRE.none) : WIRE.none;
     // Zátěž bez vypadlých větví pod sebou.
     let own = load[tile] ?? 0;
     own -= carried[tile] ?? 0;

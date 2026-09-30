@@ -18,6 +18,9 @@ import type { WorldState } from './world';
 export function parcelConducts(world: WorldState, tile: number): boolean {
   // Suť je pobořená parcela — nevede, ať na ní zůstala zóna nebo ne.
   if ((world.rubble[tile] ?? 0) !== 0) return false;
+  // Silnice nevede nic, ani když pod ní zůstala zóna (buildRoad ji nemaže).
+  // Jinak by ulice protažená přes zónovanou čtvrť spojila bloky bez vedení.
+  if ((world.layers.road[tile] ?? 0) !== 0) return false;
   const id = world.layers.buildingId[tile] ?? 0;
   if (id !== 0) {
     const building = world.buildings.get(id);

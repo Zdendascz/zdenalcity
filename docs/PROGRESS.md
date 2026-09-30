@@ -3943,7 +3943,7 @@ souvislý blok vede sám (`src/sim/conduct.ts`). Hráč staví jen spojky mezi b
 a ke zdroji — **elektrické vedení** (nízké / vysoké napětí, nová vrstva `wire`)
 a potrubí. **Silnice nevede nic.** Zchátralá a pobořená parcela nevede.
 
-- Vedení má kapacitu (`balance.power.wires`: 3 000 a 40 000). Přetížený úsek
+- Vedení má kapacitu (`balance.power.wires`: 20 000 a 200 000; původních 3 000 a 40 000 nestačilo ani na průměrný blok). Přetížený úsek
   vypadne a oblast za ním zhasne; proud nejdřív zkusí jinou cestu.
 - Výroba se dělí po sítích, ne celoměstsky.
 - Voda: blok dosah nespotřebovává, dosah ubírá jen potrubí.
@@ -4176,3 +4176,15 @@ Materiály `content/vanilla/parts/band_*` (zadání v `docs/18-DILY.md`).
 - Rohy se zaoblují **jen u vody** (hvězdy z kosočtverců). Mezi souší to dělalo
   vystřižené klíny s jiným osvětlením a bez stromů, tam stačí pásy.
 - Zbývá: zubaté rohy souš–souš (písek/les) jsou zjemněné pásem, ne zaoblené.
+
+## Vedení: kapacita, voda, panel parcely (T131, hlášení autora)
+
+- „I když mám napojeno, parcely nemají elektřinu": přípojka nízkého napětí
+  (kapacita 3 000) nestačila na blok. Změřeno na savu autora: medián spotřeby
+  bloku 3 170, 75 % do 13 550, 90 % do 28 600, největší 110 620. Kapacity
+  zvednuty na 20 000 (nízké) a 200 000 (vysoké).
+- Vedení smí přes vodu. Nad vodou se sloup staví jen na zlomu a konci.
+- Panel parcely ukazuje Elektřinu ano/ne jako Vodu.
+- Vedení přes parcelu kapacitu nemá (blok vede sám); dřív jeho přetížení
+  zhaslo i parcelu pod ním a s ní celý blok. Vedení na troskách nevede.
+- Silnice nevede ani přes zónu, která pod ní zůstala (`parcelConducts`).

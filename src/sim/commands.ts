@@ -949,7 +949,8 @@ export function removePipe(
  * Položí elektrické vedení (T129), nebo stávající přestaví na jiný typ.
  *
  * Vedení smí vést přes silnici i budovu, stejně jako potrubí — spojuje bloky
- * a do cesty mu stojí jen voda a suť. Přestavba stojí cenu nového typu;
+ * a do cesty mu stojí jen suť. **Přes vodu smí** (autor: „vedení nejde udělat
+ * přes vodu"); nad vodou se natáhne rozpětí bez sloupů. Přestavba stojí cenu nového typu;
  * stejný typ podruhé se odmítne.
  */
 export function buildWire(
@@ -963,7 +964,6 @@ export function buildWire(
   if (wire !== WIRE.low && wire !== WIRE.high) return reject('error.unknownWire');
 
   const tile = index(x, y, world.size);
-  if (world.layers.terrain[tile] === TERRAIN.water) return reject('error.wireOnWater');
   if (world.layers.wire[tile] === wire) return reject('error.wireExists');
   if ((world.rubble[tile] ?? 0) !== 0) return reject('error.rubbleInTheWay');
 

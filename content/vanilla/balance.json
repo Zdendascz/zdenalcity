@@ -113,8 +113,8 @@
   },
   "power": {
     "wires": [
-      { "cost": 12, "capacity": 3000 },
-      { "cost": 60, "capacity": 40000 }
+      { "cost": 12, "capacity": 20000 },
+      { "cost": 60, "capacity": 200000 }
     ]
   },
   "water": {

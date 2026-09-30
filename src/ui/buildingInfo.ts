@@ -537,6 +537,18 @@ export class BuildingInfo {
     );
     parent.appendChild(water);
 
+    // Elektřina stejně: ano/ne.
+    const power = el('div', 'gauge gauge--flag');
+    power.appendChild(el('span', 'gauge__label', t('ui.parcel.power')));
+    power.appendChild(
+      el(
+        'span',
+        `gauge__flag ${parcel.power ? 'is-high' : 'is-low'}`,
+        t(parcel.power ? 'ui.parcel.powerYes' : 'ui.parcel.powerNo'),
+      ),
+    );
+    parent.appendChild(power);
+
     const rows: [string, string][] = [['ui.info.position', `${parcel.x}, ${parcel.y}`]];
     if (parcel.demand !== null) rows.push(['ui.hud.demand', formatNumber(parcel.demand)]);
     if (parcel.levels.nextThreshold !== null) {

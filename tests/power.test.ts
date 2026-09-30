@@ -6,7 +6,7 @@ import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '@/sim/catalogue';
 import { buildRoad, buildWire, placeDefinition, removeWire, zoneArea } from '@/sim/commands';
 import { spawnRubble } from '@/sim/disasters/rubble';
-import { index, WIRE, ZONE } from '@/sim/layers';
+import { index, TERRAIN, WIRE, ZONE } from '@/sim/layers';
 import { createGrowthSystem, createPowerSystem } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
@@ -283,6 +283,45 @@ describe('kapacita vedení (T129)', () => {
     tickPower(world, catalogue, weak);
     const houses = [...world.buildings.values()].filter((b) => b.definitionId === 'test:house');
     expect(houses.every((b) => b.powered)).toBe(true);
+  });
+
+  it('vedení přes parcelu nemá kapacitu a blok nezhasne (T131)', () => {
+    // Domy stojí hned u elektrárny, blok vede sám. Úsek nízkého napětí
+    // natažený přes první dům nesmí jako přetížený vypnout celý blok.
+    const catalogue = catalogueOf(PLANT, HOUSE);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    for (const x of [7, 8]) placeDefinition(world, catalogue, 'test:house', x, 11);
+    expect(buildWire(world, 7, 11, WIRE.low).ok).toBe(true);
+    tickPower(world, catalogue, weak);
+
+    const houses = [...world.buildings.values()].filter((b) => b.definitionId === 'test:house');
+    expect(houses.every((b) => b.powered)).toBe(true);
+    expect(world.wireOverloaded[index(7, 11, world.size)]).toBe(0);
+  });
+});
+
+describe('vedení přes vodu a silnice přes zónu (T131)', () => {
+  it('vedení smí přes vodu a vede', () => {
+    const catalogue = catalogueOf(PLANT);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    world.layers.terrain[index(7, 11, world.size)] = TERRAIN.water;
+    expect(buildWire(world, 7, 11, WIRE.high).ok).toBe(true);
+    buildWire(world, 8, 11, WIRE.high);
+    tickPower(world, catalogue);
+    expect(at(world, 8, 11)).toBe(1);
+  });
+
+  it('silnice přes zónu blok rozdělí', () => {
+    const catalogue = catalogueOf(PLANT);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    zoneArea(world, 7, 11, 6, 1, ZONE.residential);
+    buildRoad(world, 9, 11);
+    tickPower(world, catalogue);
+    expect(at(world, 8, 11)).toBe(1);
+    expect(at(world, 10, 11)).toBe(0);
   });
 });
 

@@ -573,7 +573,10 @@ export class BuildingRenderer {
         !foreign && ((links[0] && links[2] && !horizontal) || (links[1] && links[3] && !vertical));
       const free = (road[tile] ?? ROAD.none) === ROAD.none && (ids[tile] ?? 0) === 0;
       const step = type === WIRE.high ? 3 : 2;
-      const pole = free && (!straight || (vertical ? y : x) % step === 0);
+      // Nad vodou jen dlouhé rozpětí: sloup ve vodě stojí jen tam, kde se
+      // vedení láme nebo končí.
+      const overWater = this.world.layers.terrain[tile] === TERRAIN.water;
+      const pole = free && (!straight || (!overWater && (vertical ? y : x) % step === 0));
       // Kotvou je sloup, a taky každý konec a zlom, i bez sloupu (na silnici).
       if (!pole && straight) continue;
       // Ramena stožáru jsou na obrázku podél osy x, tedy napříč vedení podél
