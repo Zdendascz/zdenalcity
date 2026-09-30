@@ -489,6 +489,16 @@ const migrateV14ToV15: Migration = (save) => ({
   },
 });
 
+/**
+ * Verze 16: budovy v `entities.json` po sloupcích (audit T134). Mění se jen
+ * kódování souboru, ne data — tvar v paměti je stejný, takže migrace jen
+ * posune číslo verze a `packSave` pak zapíše sloupce.
+ */
+const migrateV15ToV16: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 16 },
+});
+
 function appendNeutralHappiness(coarse: Uint8Array, size: number): Uint8Array {
   const COARSE_LAYERS_V14 = 3;
   const NEUTRAL_HAPPINESS_V15 = 128;
@@ -516,6 +526,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   12: migrateV12ToV13,
   13: migrateV13ToV14,
   14: migrateV14ToV15,
+  15: migrateV15ToV16,
 };
 
 /**

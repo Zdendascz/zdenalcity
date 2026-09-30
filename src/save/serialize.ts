@@ -1,4 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
+import { encodeEntityColumns, ENTITY_COLUMNS_SINCE } from './entityColumns';
 import { coarseSizeOf } from '@/sim/coarse';
 import type { CoarseLayers } from '@/sim/coarse';
 import type { Layers } from '@/sim/layers';
@@ -341,7 +342,15 @@ export function packSave(save: SaveData, level: ZipLevel = 9): Uint8Array {
     [SAVE_FILES.heights]: [save.heights, { level, mtime }],
     [SAVE_FILES.disasters]: [save.disasters, { level, mtime }],
     [SAVE_FILES.terraform]: [save.terraform, { level, mtime }],
-    [SAVE_FILES.entities]: [strToU8(JSON.stringify(save.entities)), { level, mtime }],
+    [SAVE_FILES.entities]: [
+      strToU8(
+        JSON.stringify(
+          // Starší verze se balí po řádcích, jak je číst uměly (fixtury).
+          save.meta.formatVersion >= ENTITY_COLUMNS_SINCE ? encodeEntityColumns(save.entities) : save.entities,
+        ),
+      ),
+      { level, mtime },
+    ],
     [SAVE_FILES.state]: [strToU8(JSON.stringify(save.state)), { level, mtime }],
   });
 }

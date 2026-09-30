@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { unzipSync, zipSync } from 'fflate';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import {
@@ -374,6 +375,36 @@ describe('fixtury savů', () => {
     expect(after.layers).toEqual(before.layers);
     expect(after.entities).toEqual(before.entities);
     expect(after.state.economy).toEqual(before.state.economy);
+  });
+
+  it('migrace v15 → v16 mění jen kódování budov, ne data (T134)', () => {
+    const v15 = Object.entries(fixtures).find(([path]) => path.includes('v15.city'));
+    const v16 = Object.entries(fixtures).find(([path]) => path.includes('v16.city'));
+    expect(v15).toBeDefined();
+    expect(v16).toBeDefined();
+    if (!v15 || !v16) return;
+
+    const before = unpackSave(decode(v15[1] as string));
+    const after = migrate(before, MIGRATIONS, 16);
+    expect(after.meta.formatVersion).toBe(16);
+    expect(after.entities).toEqual(before.entities);
+    expect(after.layers).toEqual(before.layers);
+    expect(after.state).toEqual(before.state);
+
+    // Fixtura v16 má budovy po sloupcích a načte se na totéž.
+    const files = unzipSync(decode(v16[1] as string));
+    const raw = JSON.parse(new TextDecoder().decode(files['entities.json'])) as Record<string, unknown>;
+    expect(raw['columns']).toBeDefined();
+    expect(raw['buildings']).toBeUndefined();
+    expect(unpackSave(decode(v16[1] as string)).entities).toEqual(before.entities);
+
+    // Sloupce se hlídají jako cizí vstup: nesedící délka save odmítne.
+    const broken = { ...files };
+    const columns = (raw['columns'] as Record<string, unknown[]>);
+    broken['entities.json'] = new TextEncoder().encode(
+      JSON.stringify({ ...raw, columns: { ...columns, x: columns['x']!.slice(1) } }),
+    );
+    expect(() => unpackSave(zipSync(broken))).toThrow(/entities\.columns\.x/);
   });
 
   it('migrace v5 → v6 dopočítá populaci pro měření růstu z budov (T132)', () => {

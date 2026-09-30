@@ -4346,3 +4346,11 @@ počítá každý požadavek včetně těch z workerů Pixi; headless Edge, čis
   příponu skládá `src/ui/disasterAlert.ts`. `BuildingRenderer` přeřazuje
   budovy po každém setteru zvlášť (šestkrát při startu); spojit by to chtělo
   dávkové API v rendereru.
+
+## Save v16: budovy po sloupcích (audit, T134)
+
+`entities.json` ukládá budovy po sloupcích (`src/save/entityColumns.ts`),
+`id` a `builtAtTick` jako rozdíly. Na savu autora (1 520 budov) 20,3 kB →
+11,5 kB zkomprimovaného JSONu, celý save zhruba o pětinu menší.
+`definitionId` zůstává string (P6). Migrace 15→16 jen posune verzi — mění se
+kódování souboru, ne data; čtení umí oba tvary. Fixtura `v16.city.base64`.

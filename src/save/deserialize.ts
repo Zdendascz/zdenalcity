@@ -47,6 +47,7 @@ import { noLosses, repairUnsupportedRoads } from '@/sim/disasters/damage';
 import { countBurning } from '@/sim/disasters/fire';
 import { disasterStateProblem, MODIFIER_KINDS } from '@/sim/disasters/state';
 import type { Modifier } from '@/sim/disasters/state';
+import { decodeEntityColumns } from './entityColumns';
 
 function fail(message: string): never {
   throw new SaveFormatError(message);
@@ -447,7 +448,15 @@ export function parseMeta(raw: Record<string, unknown>): SaveMeta {
 }
 
 function parseEntities(raw: Record<string, unknown>): SaveEntities {
-  const rawBuildings = raw['buildings'];
+  // Verze 16 ukládá po sloupcích; oba tvary se validují stejně (řádky).
+  let rawBuildings: unknown = raw['buildings'];
+  if (raw['columns'] !== undefined) {
+    try {
+      rawBuildings = decodeEntityColumns(raw);
+    } catch (error) {
+      fail(error instanceof Error ? error.message : String(error));
+    }
+  }
   if (!Array.isArray(rawBuildings)) fail('entities.buildings musí být pole');
 
   const buildings: Building[] = rawBuildings.map((entry, i) => {
