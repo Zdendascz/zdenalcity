@@ -21,6 +21,12 @@ import { roadPolygons } from './roads';
 const WIDTH = [0, 0.14, 0.24] as const;
 const LOAD_COLORS = [0x3ecf5a, 0xb9d63a, 0xf1c232, 0xf08a24, 0xe23b2e] as const;
 const OVERLOAD_COLOR = 0x7a0d0d;
+/**
+ * Vedení, kam proud nedojde. Dřív bylo zelené jako „zátěž 0" — a hráč na
+ * mapě viděl zelenou čáru, i když vedení k žádné elektrárně nevedlo (hlásil
+ * autor: „jak je možné, že na té dlaždici není elektřina?").
+ */
+const DEAD_COLOR = 0x8a8f96;
 const OUTLINE_COLOR = 0x1b1f24;
 
 export class WireOverlay {
@@ -72,6 +78,8 @@ export class WireOverlay {
       let color: number;
       if ((world.wireOverloaded[tile] ?? 0) !== 0) {
         color = OVERLOAD_COLOR;
+      } else if ((world.layers.power[tile] ?? 0) === 0) {
+        color = DEAD_COLOR;
       } else {
         const ratio = Math.min(1, (world.wireLoad[tile] ?? 0) / Math.max(1, this.capacity(type)));
         color = LOAD_COLORS[Math.min(LOAD_COLORS.length - 1, Math.floor(ratio * LOAD_COLORS.length))] ?? LOAD_COLORS[0];
