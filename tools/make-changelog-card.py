@@ -97,7 +97,7 @@ def write(draw, xy, text, font, fill) -> None:
 
 def logo(height: int) -> Image.Image:
     """Značka hry oříznutá na svůj obsah a zmenšená na danou výšku."""
-    im = Image.open(os.path.join(ROOT, 'public', 'brand', 'logo.png')).convert('RGB')
+    im = Image.open(os.path.join(ROOT, 'art', 'brand', 'logo.png')).convert('RGB')
     box = im.convert('L').point(lambda v: 255 if v > 18 else 0).getbbox()
     if box:
         im = im.crop(box)

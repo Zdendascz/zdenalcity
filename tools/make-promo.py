@@ -5,8 +5,9 @@
 Vznikne `art/promo/` se třemi soubory: širokoúhlý 1200 × 630 na sdílení
 odkazu, čtverec 1080 × 1080 na příspěvek a stojatá story 1080 × 1920.
 
-Skládá se **z toho, co hra opravdu má** — snímky z hraní v `public/shots/`
-a kreslené detaily v `public/scenes/`. Nic se negeneruje: reklama, na které je
+Skládá se **z toho, co hra opravdu má** — snímky z hraní (`shots/…`, zdroj
+`art/screenshots/`) a kreslené detaily (`scenes/…`, zdroj `art/scenes/`).
+Od T134 jsou v `public/` jen zmenšené WebP, takže se bere rovnou podklad. Nic se negeneruje: reklama, na které je
 jiná grafika než ve hře, je lež, kterou první hráč odhalí.
 
 Pruhy jsou šikmé a oddělené tenkou jantarovou linkou, aby ze dvou různých
@@ -32,9 +33,18 @@ DIM = (168, 190, 199)
 URL = 'games.zdendas.cz/zdenalcity/'
 
 
+def source(path: str) -> str:
+    """Podklad v `art/` k obrázku, jak ho zná rozcestník (`shots/ctvrt.jpg`)."""
+    folder, name = path.split('/')
+    stem = os.path.splitext(name)[0]
+    if folder == 'shots':
+        return os.path.join('art', 'screenshots', f'{stem}.jpg')
+    return os.path.join('art', folder, f'{stem}.png')
+
+
 def cover(path: str, size: tuple[int, int]) -> Image.Image:
     """Obrázek roztažený na plochu tak, aby ji vyplnil a nezdeformoval se."""
-    im = Image.open(os.path.join('public', path)).convert('RGB')
+    im = Image.open(source(path)).convert('RGB')
     tw, th = size
     scale = max(tw / im.width, th / im.height)
     im = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))), Image.LANCZOS)
@@ -81,7 +91,7 @@ def line(canvas: Image.Image, top: tuple[float, float], bottom: tuple[float, flo
 
 def logo(height: int) -> Image.Image:
     """Značka hry oříznutá na svůj obsah a zmenšená na danou výšku."""
-    im = Image.open('public/brand/logo.png').convert('RGB')
+    im = Image.open('art/brand/logo.png').convert('RGB')
     # Logo má vlastní černé pozadí kvůli záři; na tmavém plakátu se hodí,
     # ale okraje se musí uříznout, aby kolem nebyl obdélník.
     box = im.convert('L').point(lambda v: 255 if v > 18 else 0).getbbox()

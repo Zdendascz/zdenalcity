@@ -22,15 +22,15 @@
   ],
   "screenshots": [
     {
-      "src": "shots/centrum.jpg",
+      "src": "shots/prehled.webp",
       "sizes": "1920x1080",
-      "type": "image/jpeg",
+      "type": "image/webp",
       "form_factor": "wide"
     },
     {
-      "src": "shots/nabrezi.jpg",
+      "src": "shots/nabrezi.webp",
       "sizes": "1920x1080",
-      "type": "image/jpeg",
+      "type": "image/webp",
       "form_factor": "wide"
     }
   ]
