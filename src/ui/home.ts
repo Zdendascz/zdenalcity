@@ -93,8 +93,8 @@ const SHARE_URL = 'https://games.zdendas.cz/zdenalcity/';
  * dostane bílou dlaždici; obrázek s vlastním papírem se položí, jak je.
  */
 const PROJECTS = [
-  { url: 'https://zeminarod.cz', logo: 'brand/zeminarod.jpg', label: 'zeminarod.cz', dark: true },
-  { url: 'https://rpgmagazin.cz', logo: 'brand/rpgmagazin.png', label: 'rpgmagazin.cz', dark: false },
+  { url: 'https://zeminarod.cz', logo: 'brand/zeminarod.webp', label: 'zeminarod.cz', dark: true },
+  { url: 'https://rpgmagazin.cz', logo: 'brand/rpgmagazin.webp', label: 'rpgmagazin.cz', dark: false },
 ] as const;
 
 /**
@@ -107,16 +107,16 @@ const PROJECTS = [
  * popisky pryč, rozhodnutí autora.
  */
 const GALLERY = [
-  { file: 'shots/prehled.jpg', titleKey: 'ui.home.shot.overview', game: true },
-  { file: 'scenes/ulice.jpg', titleKey: 'ui.home.scene.street', game: false },
-  { file: 'shots/ctvrt.jpg', titleKey: 'ui.home.shot.quarter', game: true },
-  { file: 'scenes/prucelu.jpg', titleKey: 'ui.home.scene.facade', game: false },
-  { file: 'shots/nabrezi.jpg', titleKey: 'ui.home.shot.waterfront', game: true },
-  { file: 'scenes/namesti.jpg', titleKey: 'ui.home.scene.square', game: false },
-  { file: 'shots/detail.jpg', titleKey: 'ui.home.shot.street', game: true },
-  { file: 'scenes/sidliste.jpg', titleKey: 'ui.home.scene.estate', game: false },
-  { file: 'scenes/zastavka.jpg', titleKey: 'ui.home.scene.stop', game: false },
-  { file: 'scenes/prumysl.jpg', titleKey: 'ui.home.scene.works', game: false },
+  { file: 'shots/prehled.webp', titleKey: 'ui.home.shot.overview', game: true },
+  { file: 'scenes/ulice.webp', titleKey: 'ui.home.scene.street', game: false },
+  { file: 'shots/ctvrt.webp', titleKey: 'ui.home.shot.quarter', game: true },
+  { file: 'scenes/prucelu.webp', titleKey: 'ui.home.scene.facade', game: false },
+  { file: 'shots/nabrezi.webp', titleKey: 'ui.home.shot.waterfront', game: true },
+  { file: 'scenes/namesti.webp', titleKey: 'ui.home.scene.square', game: false },
+  { file: 'shots/detail.webp', titleKey: 'ui.home.shot.street', game: true },
+  { file: 'scenes/sidliste.webp', titleKey: 'ui.home.scene.estate', game: false },
+  { file: 'scenes/zastavka.webp', titleKey: 'ui.home.scene.stop', game: false },
+  { file: 'scenes/prumysl.webp', titleKey: 'ui.home.scene.works', game: false },
 ] as const;
 
 /**
@@ -132,6 +132,9 @@ const SLIDE_MS = 4500;
 /** Jak dlouho zůstane jeden snímek v hlavičce, než se prolne do dalšího. */
 const HERO_MS = 7000;
 
+/** S jakým předstihem se začne stahovat další snímek hlavičky. */
+const HERO_PREFETCH_MS = 2500;
+
 export function showHome(
   parent: HTMLElement,
   i18n: I18n,
@@ -141,35 +144,59 @@ export function showHome(
   const t = (key: string, params?: Record<string, string | number>) => i18n.t(key, params);
   let resolveChoice: (choice: HomeChoice) => void = () => {};
   let timer: number | undefined;
+  /** Odložené stažení dalšího snímku hlavičky. Po odchodu se zruší. */
+  let heroPrefetch: number | undefined;
 
   const root = el('div', 'home');
 
   // --- hlavička -----------------------------------------------------------
 
   const hero = el('div', 'home__hero');
-  const layers = HERO.map((shot, order) => {
+  const layers = HERO.map((_, order) => {
     const layer = el('div', 'home__hero-shot');
-    layer.style.backgroundImage = `url(${shot.file})`;
     if (order === 0) layer.classList.add('is-visible');
     hero.appendChild(layer);
     return layer;
   });
   hero.appendChild(el('div', 'home__hero-veil'));
 
+  /*
+   * Obrázek dostane vrstva **až krátce před tím, než přijde na řadu** (T134).
+   * Dřív se všech šest nastavilo naráz a prohlížeč stahoval přes 3 MB snímků,
+   * zatímco hráč koukal na první — a o linku s nimi soupeřila grafika hry.
+   */
+  const prime = (order: number) => {
+    const layer = layers[order];
+    const shot = HERO[order];
+    if (layer && shot && layer.style.backgroundImage === '') {
+      layer.style.backgroundImage = `url(${shot.file})`;
+    }
+  };
+  prime(0);
+
   // Snímky se prolínají samy. Statická hlavička vypadá jako obrázek, tohle
   // jako hra — a ukáže to čtyři různá místa místo jednoho.
   let shown = 0;
   if (layers.length > 1) {
+    const primeNext = () => {
+      heroPrefetch = window.setTimeout(
+        () => prime((shown + 1) % layers.length),
+        HERO_MS - HERO_PREFETCH_MS,
+      );
+    };
+    primeNext();
     timer = window.setInterval(() => {
       layers[shown]?.classList.remove('is-visible');
       shown = (shown + 1) % layers.length;
+      prime(shown);
       layers[shown]?.classList.add('is-visible');
+      primeNext();
     }, HERO_MS);
   }
 
   const brand = el('div', 'home__brand');
   const logo = el('img', 'home__logo');
-  logo.src = 'brand/logo.png';
+  logo.src = 'brand/logo.webp';
   logo.alt = '';
   // Chybějící logo nesmí rozbít stránku — stejné pravidlo jako u spritů (P5).
   logo.addEventListener('error', () => logo.remove());
@@ -325,6 +352,7 @@ export function showHome(
 
   function finish(choice: HomeChoice): void {
     if (timer !== undefined) window.clearInterval(timer);
+    if (heroPrefetch !== undefined) window.clearTimeout(heroPrefetch);
     leaving.abort();
     root.remove();
     resolveChoice(choice);
@@ -356,7 +384,9 @@ function galleryRow(
   GALLERY.forEach((item, order) => {
     const card = button('home__card home__card--plain', () => showLightbox(root, t, order, leaving));
     const image = el('img', 'home__card-image');
-    image.src = item.file;
+    // Karta je nejvýš 340 px široká: náhled 640 px místo plného snímku
+    // (T134). Celý obrázek se stáhne, až ho hráč otevře.
+    image.src = item.file.replace(/\.webp$/, '-640.webp');
     image.alt = t(item.titleKey);
     // První dva se načtou hned, zbytek až se k němu doposouvá.
     image.loading = order < 2 ? 'eager' : 'lazy';

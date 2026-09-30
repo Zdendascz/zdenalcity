@@ -171,7 +171,7 @@ export class DisasterAlert {
     }
 
     this.picture.classList.remove('is-hidden');
-    this.image.src = `events/${kind}.jpg`;
+    this.image.src = `events/${kind}.webp`;
 
     this.show.textContent = this.i18n.t('ui.alert.show');
     this.ignore.textContent = this.i18n.t('ui.alert.ignore');

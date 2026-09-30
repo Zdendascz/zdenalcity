@@ -111,7 +111,15 @@ import { FireLayer } from './fireLayer';
 import { People } from './people';
 import type { Entrance } from './people';
 import { WaterGlints } from './water';
-import { imageUrls, preloadGraphics } from './preload';
+import {
+  backgroundUrls,
+  prefetchInBackground,
+  preloadGraphics,
+  spriteUrlOf,
+  startupUrls,
+  withTimeout,
+} from './preload';
+import { spriteResolution } from './spriteResolution';
 import { Preloader } from '@/ui/preloader';
 import { Vehicles } from './vehicles';
 import type { VehicleLook } from './vehicles';
@@ -889,7 +897,10 @@ async function loadObject(content: ContentRegistry, id: string): Promise<Terrain
     const sprite = content.getSprite(id, variant);
     if (sprite === undefined) continue;
     jobs.push(
-      Assets.load(sprite.url)
+      // Poloviční obrázek (T134): suť a scény katastrof se na mapě kreslí
+      // malé a plná velikost by jen zabírala paměť. Rozlišení 0,5 z přípony
+      // `@0.5x` drží logickou velikost, takže `scale` platí dál.
+      Assets.load(spriteUrlOf(sprite))
         .then((texture: Texture) => {
           sampleSmooth(texture);
           out.push({ texture, anchor: sprite.anchor, scale: sprite.scale });
@@ -943,7 +954,8 @@ async function loadDisasterScenes(
       const sprite = content.getSprite(id, variant);
       if (sprite === undefined) continue;
       jobs.push(
-        Assets.load(sprite.url)
+        // Poloviční obrázek, stejně jako u suti (`loadObject`, T134).
+        Assets.load(spriteUrlOf(sprite))
           .then((texture: Texture) => {
             sampleSmooth(texture);
             const list = out.get(kind) ?? [];
@@ -981,8 +993,44 @@ const SURFACE_VARIANT_LIMIT = 1;
  */
 const SCREENSHOT_RESOLUTION = 2;
 
+/**
+ * Komprese automatického uložení (T134).
+ *
+ * Změřeno na ukázkovém městě (dřív `public/demo/`): deflate na devítce 150–170 ms
+ * (47,4 kB), na trojce 21–23 ms (52,9 kB), na jedničce 25–28 ms (59,6 kB) —
+ * a to v obsluze snímku nebo při zavírání karty. Trojka je stejně rychlá jako
+ * jednička a o desetinu menší. Autosave žije jen v prohlížeči a za dvě minuty
+ * ho přepíše další, takže o 12 % větší soubor nevadí. Stažené město a rychlé
+ * uložení zůstávají na devítce.
+ */
+const AUTOSAVE_ZIP_LEVEL = 3;
+
+/**
+ * Jak dlouho nejvýš čeká periodický autosave na volnou chvíli prohlížeče
+ * (`requestIdleCallback`), než se provede i tak.
+ */
+const AUTOSAVE_IDLE_TIMEOUT_MS = 5000;
+
 /** Druhy terénu, ke kterým se hledá obrázek. Sedí na `TERRAIN` v `sim/layers.ts`. */
 const TERRAIN_NAMES = ['grass', 'water', 'sand', 'rock', 'forest', 'marsh'] as const;
+
+/**
+ * Obrázky budov, které stojí v načteném městě (T134) — přesně ty varianty,
+ * které si pak vybere `createAppearanceLookup`, v poloviční velikosti.
+ * Zpustlé budovy se nepočítají: dotáhnou se z pozadí.
+ */
+function savedSpriteUrls(
+  world: { readonly buildings: ReadonlyMap<number, { id: number; definitionId: string }> },
+  content: ContentRegistry,
+): string[] {
+  const lookup = createAppearanceLookup(content);
+  const urls = new Set<string>();
+  for (const building of world.buildings.values()) {
+    const sprite = lookup(building.definitionId, building.id)?.sprite;
+    if (sprite !== undefined) urls.add(spriteUrlOf(sprite));
+  }
+  return [...urls].sort();
+}
 
 
 export async function startApp(mount: HTMLElement): Promise<SimHost> {
@@ -1004,10 +1052,39 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Grafika se začne stahovat **hned**, zatímco hráč stojí na rozcestníku
   // (T121). Ukazatel visí na `body`, ne na `mount`: rozcestník si svůj
   // kontejner přestavuje a vzal by ukazatel s sebou.
-  const preloader = new Preloader(document.body, i18n.t('ui.preload.label'));
-  const preloading = preloadGraphics(imageUrls(content), (progress) => preloader.set(progress));
+  //
+  // Jen to, co ukáže první obrazovka (T134): povrchy, díly, podezdívky
+  // a budovy, které jdou postavit v novém městě. Zbytek jde na pozadí, až hra
+  // běží — viz `render/preload.ts`.
+  const firstScreen = startupUrls(content, {
+    surfaces: [
+      ...TERRAIN_NAMES,
+      ...ROAD_FAMILIES.flatMap((family) => (family === undefined ? [] : [`asphalt_${family}`])),
+      'rubble',
+    ],
+    surfaceVariants: SURFACE_VARIANT_LIMIT,
+    objects: TERRAIN_DECOR.map(([, id]) => [id, DECOR_VARIANT_LIMIT] as const),
+  });
+  let preloader: Preloader | null = new Preloader(document.body, i18n.t('ui.preload.label'));
+  /** Kolik z prvního balíku a kolik z města ze savu je hotovo — pro jeden proužek. */
+  const progress = { first: 0, saved: 1, savedCount: 0 };
+  const showProgress = () => {
+    const total = firstScreen.length + progress.savedCount;
+    preloader?.set(
+      total === 0 ? 1 : (progress.first * firstScreen.length + progress.saved * progress.savedCount) / total,
+    );
+  };
+  const preloading = preloadGraphics(firstScreen, (done) => {
+    progress.first = done;
+    showProgress();
+  });
+  let firstScreenReady = false;
   // Hotovo dřív, než si hráč vybral: proužek zmizí, na rozcestníku nemá co dělat.
-  void preloading.then(() => preloader.remove());
+  void preloading.then(() => {
+    firstScreenReady = true;
+    preloader?.remove();
+    preloader = null;
+  });
 
   // Hra začíná dialogem: hráč si vybere jméno města a seed a rovnou vidí, jakou
   // mapu dostane (§3 fáze 3). Teprve pak vzniká svět.
@@ -1081,12 +1158,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
               }
             : {}),
         });
-  // Hráč si vybral dřív, než se grafika načetla: počká se, ať budovy
-  // nenaskakují jedna po druhé. Ukazatel se roztáhne přes obrazovku.
-  preloader.block();
-  await preloading;
-  preloader.remove();
-
   const newGame =
     choice.kind === 'game'
       ? choice.game
@@ -1171,6 +1242,30 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Ze seedu jde tenhle terén kdykoli vygenerovat znovu, tak ať to save ví.
     simWorld.map = { seed: newGame.seed, generated: true };
   }
+
+  // Hráč si vybral dřív, než se grafika načetla: počká se, ať budovy
+  // nenaskakují jedna po druhé. Ukazatel se roztáhne přes obrazovku.
+  //
+  // Rozehrané město přidá **obrázky budov, které v něm stojí** (T134): na
+  // start se bere jen to, co jde postavit v novém městě, a čtvrť páté úrovně
+  // by jinak naskakovala po kouscích. Čeká se nejvýš `PRELOAD_TIMEOUT_MS` —
+  // visící požadavek hru nezastaví, obrázek si renderer dotáhne sám.
+  const firstScreenSet = new Set(firstScreen);
+  const savedUrls = restored ? savedSpriteUrls(simWorld, content).filter((url) => !firstScreenSet.has(url)) : [];
+  progress.savedCount = savedUrls.length;
+  progress.saved = savedUrls.length === 0 ? 1 : 0;
+  if (!firstScreenReady || savedUrls.length > 0) {
+    preloader ??= new Preloader(document.body, i18n.t('ui.preload.label'));
+    preloader.block();
+    showProgress();
+    const savedLoading = preloadGraphics(savedUrls, (done) => {
+      progress.saved = done;
+      showProgress();
+    });
+    await withTimeout(Promise.all([preloading, savedLoading]));
+    preloader?.remove();
+    preloader = null;
+  }
   const host = createSimHost(
     simWorld,
     createDefaultSystems(content, content.getBalance(), disasterRegistry, content.grants()),
@@ -1180,11 +1275,31 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const world = host.getSnapshot();
 
   const app = new Application();
-  await app.init({ background: BACKGROUND_COLOR, resizeTo: mount, antialias: true });
+  /*
+   * `manageImports: false` (T134): Pixi by si jinak při startu dotáhl celé
+   * prostředí prohlížeče — přístupnost, DOM kontejnery, vlastní systém událostí
+   * a filtry. Hra nic z toho nepoužívá: vstup čte z DOM událostí na plátně,
+   * text kreslí HTML a filtry ani masky nemá. Co potřebuje (grafika, sprity,
+   * ticker, `resizeTo`, načítání textur, `extract`), si Pixi registruje samo
+   * při importu tříd. `touch-action: none` na plátně, které jinak nastavuje
+   * systém událostí, drží `style.css`.
+   */
+  await app.init({
+    background: BACKGROUND_COLOR,
+    resizeTo: mount,
+    antialias: true,
+    manageImports: false,
+  });
   mount.appendChild(app.canvas);
 
   const worldContainer = new Container();
   app.stage.addChild(worldContainer);
+
+  // Plné obrázky budov jen při přiblížení (T134). Zoom a posun kamery se
+  // čtou z kontejneru světa, který nastavuje smyčka snímku.
+  app.ticker.add((ticker) => {
+    spriteResolution.update(worldContainer.scale.x, worldContainer.position, app.screen, ticker.lastTime);
+  });
 
   const serviceClasses = serviceClassesOf(content);
 
@@ -1222,52 +1337,74 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Hotové dlaždice na každý tvar v repu leží, ale 42 ze 64 má vozovku jinde,
   // než má — a hlavně by se jich tolik nevešlo do jedné dávky. Proč, viz
   // `docs/08-DLAZDICE.md`. Potrubí zatím zůstává procedurální.
-  void loadSurfaces(content).then((surfaces) => {
-    if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
-  });
-  void loadServiceIcons(content, serviceClasses).then((icons) => {
-    serviceMarkers.setTextures(icons);
-  });
-
-  // Trosky: jeden obrázek, kreslí se do polygonu dlaždice jako povrch.
-  void loadTile(content, 'rubble').then((texture) => {
-    chunkRenderer.setRubble(texture);
-  });
-
-  void loadDisasterScenes(content).then((scenes) => {
-    if (scenes.size > 0) disasterScenes.setScenes(scenes);
-  });
-
-  /*
+  //
+  // **Všechno se použije naráz, v jednom synchronním bloku** (T134). Dřív měl
+  // každý druh obrázků vlastní `.then()` a dobíhaly v různých snímcích:
+  // povrchy, trosky i pásy přechodů zvlášť zneplatnily celý terén, takže se
+  // upekl třikrát, a budovy se přeřadily šestkrát po sobě. Chunky se pečou
+  // líně v dalším snímku, takže jeden blok znamená jedno pečení.
+  //
+  // Nepovedené načtení nic neblokuje: každá funkce chyby spolkne sama
+  // a `allSettled` pokryje i to, co by přece jen vyhodilo (P5).
+  const rubbleSlopes = ['flat', 'ur', 'lr', 'll', 'ul'] as const;
+  void Promise.allSettled([
+    loadSurfaces(content),
+    loadServiceIcons(content, serviceClasses),
+    // Trosky: jeden obrázek, kreslí se do polygonu dlaždice jako povrch.
+    loadTile(content, 'rubble'),
+    loadDisasterScenes(content),
+    /*
    * Suť: hromada pro rovinu a čtyři hromady kreslené do svahu.
    *
    * Klíč je **směr, kterým na obrazovce klesá země** — `flat`, `ur`, `lr`,
    * `ll`, `ul`. Renderer si podle rohů dlaždice vybere, kterou sadu vzít;
    * chybějící sada nevadí, spadne zpátky na rovnou hromadu (P5, mod nemusí
-   * dodat všechny).
-   */
-  void Promise.all(
-    (['flat', 'ur', 'lr', 'll', 'ul'] as const).map((slope) =>
-      loadObject(content, slope === 'flat' ? 'rubble_pile' : `rubble_slope_${slope}`).then(
-        (piles) => [slope, piles] as const,
+     * dodat všechny).
+     */
+    Promise.all(
+      rubbleSlopes.map((slope) =>
+        loadObject(content, slope === 'flat' ? 'rubble_pile' : `rubble_slope_${slope}`).then(
+          (piles) => [slope, piles] as const,
+        ),
       ),
     ),
-  ).then((sets) => {
-    const piles = new Map(sets.filter(([, list]) => list.length > 0));
+    loadRoadMaterials(content),
+    loadDecor(content),
+    loadSkirts(content),
+    loadParts(content),
+  ]).then((results) => {
+    const [surfaces, icons, rubble, scenes, sets, materials, decor, skirts, parts] = results.map(
+      (result) => (result.status === 'fulfilled' ? result.value : undefined),
+    ) as [
+      Map<string, Texture> | undefined,
+      Map<string, Texture> | undefined,
+      Texture | undefined,
+      Map<string, TerrainDecor[]> | undefined,
+      (readonly (readonly [(typeof rubbleSlopes)[number], TerrainDecor[]])[]) | undefined,
+      Map<string, Texture> | undefined,
+      Map<number, TerrainDecor[]> | undefined,
+      Map<string, Texture> | undefined,
+      Map<string, LoadedPart> | undefined,
+    ];
+
+    if (surfaces && surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
+    if (icons) serviceMarkers.setTextures(icons);
+    chunkRenderer.setRubble(rubble);
+    if (scenes && scenes.size > 0) disasterScenes.setScenes(scenes);
+    const piles = new Map((sets ?? []).filter(([, list]) => list.length > 0));
     if (piles.size > 0) buildingRenderer.setRubblePiles(piles);
+    if (materials && materials.size > 0) roadRenderer.setTextures(materials);
+    if (decor && decor.size > 0) buildingRenderer.setDecor(decor);
+    if (skirts && skirts.size > 0) buildingRenderer.setSkirtTextures(skirts);
+    if (parts && parts.size > 0) applyParts(parts);
+
+    // Hra běží a první obrazovka je celá: teď může na pozadí dojít na zbytek
+    // grafiky. Ne dřív — soupeřil by o linku s tím, na co hráč čeká.
+    const ready = new Set([...firstScreen, ...savedUrls]);
+    prefetchInBackground(backgroundUrls(content, ready));
   });
 
-  void loadRoadMaterials(content).then((materials) => {
-    if (materials.size > 0) roadRenderer.setTextures(materials);
-  });
-  void loadDecor(content).then((decor) => {
-    if (decor.size > 0) buildingRenderer.setDecor(decor);
-  });
-  void loadSkirts(content).then((skirts) => {
-    if (skirts.size > 0) buildingRenderer.setSkirtTextures(skirts);
-  });
-  void loadParts(content).then((parts) => {
-    if (parts.size === 0) return;
+  function applyParts(parts: ReadonlyMap<string, LoadedPart>): void {
     buildingRenderer.setParts(parts);
     roadRenderer.setSidewalkTexture(parts.get('sidewalk')?.texture);
     // Přechody povrchů (T130): materiály pásů jdou do terénních chunků.
@@ -1334,7 +1471,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         .map((service, i) => [service, look('service', i, 0.5)] as const)
         .filter((entry): entry is readonly [typeof entry[0], VehicleLook] => entry[1] !== undefined),
     );
-  });
+  }
   // Silnice leží **mezi terénem a budovami**: kreslí se po chunku, ale pod
   // domy. Vlastní kontejner, ne řazení podle hloubky — vozovka je země.
   // Odlesky na vodě (T117): nad upečenou vodou, pod mosty a silnicemi.
@@ -1781,7 +1918,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   function autosaveNow(verify = true): void {
     if (restarting) return;
     try {
-      const bytes = serializeSave(simWorld, saveOptions());
+      const bytes = serializeSave(simWorld, saveOptions(), AUTOSAVE_ZIP_LEVEL);
       if (verify && !saveIsReadable(bytes)) return;
 
       // Bez `await`: na `pagehide` už není kam čekat. Zápis v prohlížeči běží
@@ -1806,6 +1943,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     } catch {
       // Rozehranou hru neshodí ani plné úložiště.
     }
+  }
+
+  /**
+   * Periodický autosave, až bude prohlížeč volný (T134). Serializace a zápis
+   * pak neukousnou snímek uprostřed posouvání mapy. Kde `requestIdleCallback`
+   * není (Safari), uloží se hned jako dřív. `pagehide` sem nechodí — tam se
+   * musí uložit synchronně.
+   */
+  function autosaveWhenIdle(verify: boolean): void {
+    if (typeof window.requestIdleCallback !== 'function') {
+      autosaveNow(verify);
+      return;
+    }
+    window.requestIdleCallback(() => autosaveNow(verify), { timeout: AUTOSAVE_IDLE_TIMEOUT_MS });
   }
 
   /**
@@ -3606,7 +3757,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (autosaveDue <= 0) {
       autosaveDue = AUTOSAVE_EVERY_MS;
       autosaveRuns++;
-      autosaveNow(autosaveRuns % AUTOSAVE_VERIFY_EVERY === 1);
+      autosaveWhenIdle(autosaveRuns % AUTOSAVE_VERIFY_EVERY === 1);
     }
 
     // Hlásí se **po kroku**: pohroma, která právě vznikla, se má ohlásit

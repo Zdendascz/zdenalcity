@@ -1,8 +1,8 @@
-import { Assets, Container, Graphics, Matrix, Sprite, Texture } from 'pixi.js';
+import { Container, Graphics, Matrix, Sprite, Texture } from 'pixi.js';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import type { DirtySet } from '@/sim/world';
 import { iconShape } from './icons';
-import { sampleSmooth } from './textures';
+import { assignSpriteTexture } from './spriteResolution';
 import {
   ABANDONED_COLOR,
   ICON_ALPHA,
@@ -39,6 +39,8 @@ export interface SpriteImage {
   readonly height: number;
   readonly anchor: readonly [number, number];
   readonly scale: number;
+  /** Poloviční obrázek (T134), viz `spriteResolution.ts`. */
+  readonly half?: string;
   /** Efekty z `sprites/effects.json` (T116). */
   readonly effects?: readonly SpriteEffectView[];
 }
@@ -1272,17 +1274,10 @@ export class BuildingRenderer {
     // ji jinak nepřekryl a byl by vidět pruh kamene přes fasádu.
     this.drawSkirt(id, x, y, width, depth, min, max);
 
-    const texture = sprite.texture;
-    if (texture === Texture.EMPTY || texture.label !== image.url) {
-      void Assets.load(image.url).then((loaded: Texture) => {
-        // Než se textura donačte, mohla budova zmizet nebo dostat jiný obrázek.
-        if (this.views.get(id) !== sprite) return;
-        // Mipmapy i tady: při odzoomování je budova na obrazovce menší než její
-        // obrázek a bez nich se z fasády stane zrno, stejně jako z povrchu.
-        sampleSmooth(loaded);
-        sprite.texture = loaded;
-      });
-    }
+    // Poloviční nebo plný obrázek podle zoomu (T134), s mipmapami. Než se
+    // textura donačte, mohla budova zmizet nebo dostat jiný obrázek.
+    const drawn = sprite;
+    assignSpriteTexture(drawn, image, () => this.views.get(id) === drawn);
   }
 
   /**

@@ -4300,3 +4300,49 @@ sazba daně, celé částky půjčky a dluhopisu a rozměr obdélníku zón a sr
 
 Zbývá (mimo `src/sim` a `src/save`): `has()` v `src/ui/i18n.ts` bere klíče
 i z prototypu, takže město pojmenované „constructor" se přeloží divně.
+
+## Audit: datový objem a načítání (T134)
+
+Měřeno na produkčním buildu (`vite build`), servírovaném lokálně serverem, který
+počítá každý požadavek včetně těch z workerů Pixi; headless Edge, čistý profil.
+
+| | před | po |
+|---|---|---|
+| Build celkem | 34,9 MB / 577 souborů | 34,2 MB / 879 (z toho 285 polovičních spritů, 5,9 MB) |
+| Hlavní skript `index-*.js` | 945 kB (346 kB gzip), 78 obrázků jako `data:` | 820 kB (229 kB gzip), 4 |
+| Tvarové dlaždice silnic a potrubí v buildu | 65 souborů, 2,1 MB | 0 |
+| Rozcestník po 10 s | 362 požadavků, 26,3 MB | 196 požadavků, 4,6 MB |
+| Do spuštění nového města | 469 požadavků, 28,7 MB | 341 požadavků, 5,3 MB (109 z nich ikony lišty po ~3 kB) |
+| Do spuštění uloženého města | 469 požadavků, 28,7 MB | 343 požadavků, 6,6 MB |
+| Po 30 s hry (dotaženo na pozadí) | 469, 28,7 MB | 535, 9,8 MB |
+| Sprity budov v paměti karty (všech 285) | 256 MB (341 s mipmapami) | 64 MB (85) do zoomu 2 |
+| Autosave (ukázkové město) | úroveň 9: 150–170 ms, 47 kB | úroveň 3: 21–23 ms, 53 kB |
+| Autosave v `localStorage` | base64, 1,33 znaku na bajt | 15 bitů na znak, 0,53 znaku na bajt |
+
+- **Start bere jen první obrazovku** (`render/preload.ts`): povrchy (jedna
+  varianta), díly, podezdívky, les a balvany, zóny první úrovně a služby po
+  jedné variantě — vše v polovině. Rozehrané město přidá varianty, které v něm
+  stojí. Na grafiku se čeká nejvýš 20 s. Zbytek spritů se po startu stahuje na
+  pozadí po dvou, s nízkou prioritou a jen do HTTP keše; při `saveData` vůbec.
+- **Dvě velikosti spritů** (`render/spriteResolution.ts`): `<jméno>@0.5x.webp`
+  z `tools/make-webp.py`, kvalita 88 beze změny. Pixi z přípony pozná rozlišení
+  0,5, takže kotvy a měřítko platí dál. Nad zoomem 2 se viditelným budovám
+  dotáhne plný obrázek (po čtyřech), pod 1,8 se vrátí polovina a plné textury
+  se uvolní. Suť a scény katastrof jsou jen v polovině. Háček v
+  `buildingRenderer.drawSprite` je jedno volání `assignSpriteTexture`.
+- Ikony WebP 64 px (2,9 MB → 0,35 MB), snímky a scény rozcestníku WebP q80
+  (5 MB JPG → 3,5 MB) a karty galerie náhledem 640 px; další snímek hlavičky se
+  stahuje až 2,5 s před prolnutím. Logo 256 px WebP (787 kB → 26 kB), loga
+  partnerů 260 px. Podklady v plné velikosti jsou v `art/brand/`
+  (`tools/make-public-webp.py`). `public/demo` smazán.
+- Obrázky obsahu se nevkládají do JS (`assetsInlineLimit`), Pixi bez
+  `manageImports` (nestahuje přístupnost, DOM, události, filtry).
+- Textury po startu se použijí v jednom bloku: terén se upeče jednou, ne třikrát.
+- `.htaccess`: `immutable` jen pro `assets/`, ostatní den; brotli/deflate pro
+  text; HSTS a `Permissions-Policy`. Viz `docs/DEPLOY.md`.
+- Když start spadne (bez WebGL, vadný obsah), hráč místo prázdné stránky vidí
+  zprávu česky i anglicky.
+- **Zbývá:** obrázky katastrof (`public/events/*.jpg`, 2 MB) jsou pořád JPG —
+  příponu skládá `src/ui/disasterAlert.ts`. `BuildingRenderer` přeřazuje
+  budovy po každém setteru zvlášť (šestkrát při startu); spojit by to chtělo
+  dávkové API v rendereru.

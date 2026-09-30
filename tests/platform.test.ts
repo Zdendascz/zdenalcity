@@ -4,7 +4,14 @@
  * Platform vrstva sahá na `localStorage` a `Blob`, takže potřebuje DOM.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBrowserPlatform, fromBase64, toBase64 } from '@/platform/browser';
+import {
+  createBrowserPlatform,
+  decodeStored,
+  fromBase64,
+  packBytes,
+  toBase64,
+  unpackBytes,
+} from '@/platform/browser';
 
 /**
  * Platform abstrakce (architektura §9, rozhodnutí autora).
@@ -107,6 +114,72 @@ describe('base64', () => {
     for (let i = 0; i < bytes.length; i++) bytes[i] = i % 256;
 
     expect([...fromBase64(toBase64(bytes))]).toEqual([...bytes]);
+  });
+});
+
+describe('hustý zápis do localStorage (T134)', () => {
+  /** Pseudonáhodné bajty — deterministicky, ať test vždycky vidí totéž. */
+  function noise(length: number, seed = 7): Uint8Array {
+    const bytes = new Uint8Array(length);
+    let state = seed;
+    for (let i = 0; i < length; i++) {
+      state = (Math.imul(state, 1103515245) + 12345) >>> 0;
+      bytes[i] = state >>> 24;
+    }
+    return bytes;
+  }
+
+  it('bajty projdou tam a zpátky pro každou délku kolem hranic 15 bitů', () => {
+    for (const length of [0, 1, 2, 3, 14, 15, 16, 29, 30, 31, 1000, 200_000]) {
+      const bytes = noise(length, length + 1);
+      expect([...unpackBytes(packBytes(bytes))], `délka ${length}`).toEqual([...bytes]);
+    }
+  });
+
+  it('je o víc než polovinu kratší než base64', () => {
+    // Kvóta localStorage se počítá ve znacích. Base64 dává 1,33 znaku na bajt,
+    // tenhle zápis 0,53 — o tolik větší město se vejde.
+    const bytes = noise(100_000);
+    expect(packBytes(bytes).length).toBeLessThan(toBase64(bytes).length * 0.45);
+  });
+
+  it('nepoužívá surogáty ani řídicí znaky', () => {
+    // Osamělý surogát není platné UTF-16 a prohlížeč ho smí při ukládání
+    // zahodit — save by pak nešel přečíst.
+    const text = packBytes(noise(50_000));
+    for (let i = 1; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      expect(code >= 0xd800 && code <= 0xdfff).toBe(false);
+    }
+    const data = text.slice(text.indexOf(':') + 1);
+    for (let i = 0; i < data.length; i++) expect(data.charCodeAt(i)).toBeGreaterThanOrEqual(0x100);
+  });
+
+  it('starý záznam v base64 se pořád přečte', async () => {
+    // Hráči mají v prohlížeči autosave z verze před T134. Kdyby ho nová verze
+    // nepřečetla, přišli by o rozehrané město jen tím, že si ji stáhli.
+    const bytes = noise(5000);
+    localStorage.setItem('citybuilder:autosave', toBase64(bytes));
+
+    expect([...(await createBrowserPlatform().storage.read('autosave') ?? [])]).toEqual([...bytes]);
+    expect([...decodeStored(toBase64(bytes))]).toEqual([...bytes]);
+  });
+
+  it('nový zápis se uloží hustě a přečte zpátky', async () => {
+    const bytes = noise(3000);
+    const platform = createBrowserPlatform();
+    await platform.storage.write('autosave', bytes);
+
+    const stored = localStorage.getItem('citybuilder:autosave') ?? '';
+    expect(stored.length).toBeLessThan(toBase64(bytes).length / 2);
+    expect([...(await platform.storage.read('autosave') ?? [])]).toEqual([...bytes]);
+  });
+
+  it('useknutý hustý záznam se chová jako žádný', async () => {
+    const text = packBytes(noise(3000));
+    localStorage.setItem('citybuilder:quicksave', text.slice(0, text.length - 10));
+
+    expect(await createBrowserPlatform().storage.read('quick')).toBeNull();
   });
 });
 

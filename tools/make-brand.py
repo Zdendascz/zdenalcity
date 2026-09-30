@@ -5,7 +5,8 @@
 Vstup:  art/icons/raw/logo.png   (vygenerovana znacka)
         art/screenshots/*.jpg    (snimky ze hry)
 
-Vystup: public/brand/logo.png            znacka s pruhlednym pozadim
+Vystup: art/brand/logo.png               znacka s pruhlednym pozadim v plne velikosti
+                                         (do hry ji zmensi make-public-webp.py na 256 px)
         public/brand/icon-192.png        ikona PWA
         public/brand/icon-512.png        ikona PWA
         public/brand/icon-maskable.png   ikona s rezervou na orez
@@ -151,7 +152,10 @@ def main() -> int:
 
     os.makedirs(BRAND, exist_ok=True)
     logo = transparent_logo()
-    logo.save(os.path.join(BRAND, 'logo.png'))
+    # Plna velikost jen jako podklad: hra ukazuje logo nejvys 112 px siroke
+    # a 787 kB PNG stahoval kazdy hrac (T134). Do `public/` jde WebP.
+    os.makedirs(os.path.join(ROOT, 'art', 'brand'), exist_ok=True)
+    logo.save(os.path.join(ROOT, 'art', 'brand', 'logo.png'))
     print(f'znacka {logo.size}')
 
     # Ikony aplikace. Maskovatelna ma vetsi rezervu, protoze systemy si z ni
