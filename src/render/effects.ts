@@ -230,13 +230,19 @@ export class Effects {
   }
 
   private spawn(x: number, y: number, color: number, puff: Omit<Puff, 'sprite'>): void {
-    const sprite = this.pool.pop() ?? new Sprite(this.texture);
+    // Odložený obláček zůstává ve vrstvě schovaný (T133), viz odlesky.
+    let sprite = this.pool.pop();
+    if (sprite) {
+      sprite.visible = true;
+    } else {
+      sprite = new Sprite(this.texture);
+      this.container.addChild(sprite);
+    }
     sprite.anchor.set(0.5);
     sprite.tint = color;
     sprite.position.set(x, y);
     sprite.scale.set(puff.grow);
     sprite.alpha = 0;
-    this.container.addChild(sprite);
     this.live.push({ sprite, ...puff });
     if (puff.smoke) this.smokeAlive++;
   }
@@ -266,7 +272,7 @@ export class Effects {
     this.live[i] = this.live[this.live.length - 1]!;
     this.live.pop();
     if (puff.smoke) this.smokeAlive--;
-    puff.sprite.removeFromParent();
+    puff.sprite.visible = false;
     this.pool.push(puff.sprite);
   }
 

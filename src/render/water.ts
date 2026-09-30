@@ -119,12 +119,19 @@ export class WaterGlints {
     const gx = x + 0.15 + this.random() * 0.7;
     const gy = y + 0.15 + this.random() * 0.7;
     const at = gridToScreen(gx, gy, tileBaseHeight(this.world.cornerHeight, x, y));
-    const sprite = this.pool.pop() ?? new Sprite(this.texture);
+    // Odložený odlesk zůstává ve vrstvě schovaný (T133) — vyndat a vrátit ho
+    // znamenalo změnu stromu uzlů u každého odlesku.
+    let sprite = this.pool.pop();
+    if (sprite) {
+      sprite.visible = true;
+    } else {
+      sprite = new Sprite(this.texture);
+      this.container.addChild(sprite);
+    }
     sprite.anchor.set(0.5);
     sprite.position.set(at.x, at.y);
     sprite.scale.set(0.6 + this.random() * 0.8, 1);
     sprite.alpha = 0;
-    this.container.addChild(sprite);
     this.live.push({
       sprite,
       age: 0,
@@ -138,7 +145,7 @@ export class WaterGlints {
     const glint = this.live[i]!;
     this.live[i] = this.live[this.live.length - 1]!;
     this.live.pop();
-    glint.sprite.removeFromParent();
+    glint.sprite.visible = false;
     this.pool.push(glint.sprite);
   }
 
