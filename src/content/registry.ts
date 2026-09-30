@@ -38,9 +38,11 @@ export interface ContentSource {
   /**
    * Obrázky povrchu. Klíč = `<druh terénu>|<varianta>`, tedy `grass|a`.
    *
-   * Zdroj je mít nemusí — hra pak kreslí terén barvou jako dřív. Silnice ani
-   * potrubí tudy zatím nejdou: jejich dlaždice sice existují, ale mají vadné
-   * spoje, takže by vozovka na každém styku uskakovala (viz `docs/08-DLAZDICE.md`).
+   * Zdroj je mít nemusí — hra pak kreslí terén barvou jako dřív. Tudy jde
+   * i **materiál vozovky** (`asphalt_street|a` a spol.): silnice má z obrázku
+   * jen povrch, tvar se počítá z rohů dlaždice (T72). Hotové dlaždice na každý
+   * tvar (`roads` níž) se zkoušely a renderer je nekreslí — mají vadné spoje,
+   * viz `docs/08-DLAZDICE.md`. Potrubí zůstává procedurální.
    */
   readonly tiles?: Readonly<Record<string, string>>;
   /**

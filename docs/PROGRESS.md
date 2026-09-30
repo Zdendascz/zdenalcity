@@ -3537,13 +3537,12 @@ U budovy, kterou autor ukázal (sídliště na 68, 13), je terén pod půdorysem
 dokonce **hřeben**, ne svah: rohy po řadách `1 1 1 1 / 2 2 2 2 / 1 1 2 2 /
 1 1 1 2`. Kaskádový obrázek by na něj nesedl v žádné orientaci.
 
-### Dočasné: jméno souboru v panelu budovy
+### ~~Dočasné: jméno souboru v panelu budovy~~ (odstraněno v 28daccd)
 
-Panel budovy ukazuje řádek „Obrázek (dočasné)" se jménem souboru, kterým se
-budova zrovna kreslí. Autor si podle něj kontroluje vygenerované varianty
-ručně. Počítá se stejnou cestou jako v rendereru přes `variantFor`, takže
-ukazuje opravdu ten obrázek, který je vidět na mapě. **Až kontrola skončí,
-řádek i klíč `ui.info.spriteFile` pryč.**
+Panel budovy ukazoval řádek „Obrázek (dočasné)" se jménem souboru, kterým se
+budova zrovna kreslila — autor si podle něj ručně kontroloval vygenerované
+varianty. Kontrola skončila a řádek i klíč `ui.info.spriteFile` jsou pryč
+(28daccd). Odstavec zůstává jen jako záznam.
 
 
 ## Terén pod budovou a park ve svahu
@@ -4126,9 +4125,10 @@ Mimo zadání fází, otevřené k rozhodnutí:
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
   nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
   z nich pravděpodobně zmizí.
-- **Zóna mělčí než půdorys budovy pořád mlčí.** Rámeček řeší ruční stavbu, ale
-  u zóny hráč nevidí, že se do ní zvolená budova nikdy nevejde. Zbývá z původní
-  dvojice problémů.
+- ~~**Zóna mělčí než půdorys budovy pořád mlčí.**~~ Vyřešeno: rozbor parcely
+  hlásí `ui.parcel.blocked.zoneTooSmall` (`src/sim/diagnostics.ts`), když se
+  do zóny žádná budova nevejde, a nápověda k tomu má odstavec. (Opraveno
+  v auditu T135, odrážka byla zastaralá.)
 - Starý Node 20.11.1 zůstal nainstalovaný v `C:\Program Files\nodejs\`, jen už není
   v PATH. Reinstalace Node.js z MSI by ho tam vrátila a konflikt by se obnovil —
   příznaky a oprava v `docs/SETUP.md`.
@@ -4157,7 +4157,8 @@ Co odsud zmizelo a kde se to vyřešilo:
 | Poptávka je vypínač, daně na růst nemají vliv, silnice se bere jako sousedství | T18 — přepis růstu na váhy, daňový faktor a dosah |
 | Konstanty fáze 1 zůstávají v kódu | balanc je v datech; naposledy prověřeno auditem kritéria 24 v T60 |
 
-Zóna mělčí než půdorys budovy zůstává — dvě odrážky o tomtéž se slily do jedné.
+Zóna mělčí než půdorys budovy zůstávala — dvě odrážky o tomtéž se slily do
+jedné. Dnes ji rozbor parcely hlásí (`ui.parcel.blocked.zoneTooSmall`).
 
 
 ## Přechody povrchů (T130, rozhodnutí autora)

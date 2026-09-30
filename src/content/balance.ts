@@ -653,9 +653,9 @@ export interface Balance {
      */
     heightCurve: number;
     /**
-     * Kolik řek generátor prokope. **Ve vanille zatím nula**: řeka rozdělí
-     * souš na dva břehy a most přijde až v T33, takže dokud tam není, byla by
-     * to jen nepřístupná polovina mapy.
+     * Kolik řek generátor prokope. Ve vanille dvě (R7): řeka rozdělí souš na
+     * dva břehy a přes ni vedou mosty (T33, vzhled T122). Nula je pořád
+     * platná volba pro mod, který mosty nechce.
      */
     rivers: number;
     /** Odkud řeka vyráží — nejmenší patro pramene. */

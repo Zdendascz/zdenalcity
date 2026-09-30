@@ -254,8 +254,8 @@ function buildCornerHeights(
  *
  * Koryto klesá monotónně a rohy se srovnají, takže voda neteče do kopce.
  *
- * **Pozor**: řeka rozdělí souš na dva břehy a most je až v T33. Proto je
- * `map.rivers` ve vanille zatím nula a tenhle kód čeká na mosty.
+ * Řeka rozdělí souš na dva břehy; přes vodu se staví mosty (T33). Vanilla
+ * má `map.rivers` zapnuté (R7), nula řeky vypne.
  */
 function carveRivers(rng: Rng, terrain: Uint8Array, heights: Uint8Array, balance: Balance): void {
   const { rivers, riverSourceHeight } = balance.map;
