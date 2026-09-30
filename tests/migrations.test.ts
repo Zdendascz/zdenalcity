@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { unzipSync, zipSync } from 'fflate';
 import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import {
@@ -6,7 +7,6 @@ import {
   collectLoadWarnings,
   expectedCoarseByteLength,
   expectedHeightsByteLength,
-  expectedLayersByteLength,
   readSaveMeta,
   unpackSave,
 } from '@/save/deserialize';
@@ -258,6 +258,170 @@ describe('fixtury savů', () => {
     expect(countViolations(world.cornerHeight)).toBe(0);
   });
 
+  it('migrace v12 → v13 přidá prázdnou vrstvu vedení a nic jiného nepohne (T129)', () => {
+    const v12 = Object.entries(fixtures).find(([path]) => path.includes('v12.city'));
+    expect(v12).toBeDefined();
+    if (!v12) return;
+
+    const before = unpackSave(decode(v12[1] as string));
+    const after = migrate(before, MIGRATIONS, 13);
+    const cells = MAP_SIZE * MAP_SIZE;
+
+    expect(after.meta.formatVersion).toBe(13);
+    expect(after.layers.byteLength).toBe(cells * 10);
+    expect([...after.layers.subarray(0, cells * 9)]).toEqual([...before.layers]);
+    // Autor: „města zhasnou a musí se to dodělat" — žádné vedení navíc.
+    expect(after.layers.subarray(cells * 9).every((value) => value === 0)).toBe(true);
+  });
+
+  it('migrace v13 → v14 smaže vedení pod silnicemi a jinde ho nechá (T129)', () => {
+    const v13 = Object.entries(fixtures).find(([path]) => path.includes('v13.city'));
+    expect(v13).toBeDefined();
+    if (!v13) return;
+
+    const before = unpackSave(decode(v13[1] as string));
+    expect(before.meta.formatVersion).toBe(13);
+    const cells = MAP_SIZE * MAP_SIZE;
+    // Fixtura v13 vznikla první verzí migrace, takže vedení pod silnicemi má.
+    const road = before.layers.subarray(cells * 2, cells * 3);
+    const wiresBefore = before.layers.subarray(cells * 9);
+    expect(wiresBefore.some((value, i) => value !== 0 && (road[i] ?? 0) !== 0)).toBe(true);
+
+    const after = migrate(before, MIGRATIONS, 14);
+    expect(after.meta.formatVersion).toBe(14);
+    expect([...after.layers.subarray(0, cells * 9)]).toEqual([...before.layers.subarray(0, cells * 9)]);
+    const wiresAfter = after.layers.subarray(cells * 9);
+    for (let i = 0; i < cells; i++) {
+      const expected = (road[i] ?? 0) !== 0 ? 0 : (wiresBefore[i] ?? 0);
+      expect(wiresAfter[i]).toBe(expected);
+    }
+  });
+
+  it('migrace v13 → v14 nechá hráčův přechod vedení přes ulici (T132)', () => {
+    const v13 = Object.entries(fixtures).find(([path]) => path.includes('v13.city'));
+    expect(v13).toBeDefined();
+    if (!v13) return;
+
+    const before = unpackSave(decode(v13[1] as string));
+    const cells = MAP_SIZE * MAP_SIZE;
+    const layers = before.layers.slice();
+    const road = layers.subarray(cells * 2, cells * 3);
+    const wire = layers.subarray(cells * 9);
+    const at = (x: number, y: number): number => y * MAP_SIZE + x;
+    const wiredRoad = (x: number, y: number): boolean =>
+      (road[at(x, y)] ?? 0) !== 0 && (wire[at(x, y)] ?? 0) !== 0;
+
+    // Najde se kus vodorovné ulice, kde vedení není ani na ní, ani vedle:
+    // parcela nad, ulice, parcela pod. Tam hráč natáhne přechod.
+    let crossing: [number, number] | null = null;
+    for (let y = 2; y < MAP_SIZE - 2 && !crossing; y++) {
+      for (let x = 2; x < MAP_SIZE - 2 && !crossing; x++) {
+        if (road[at(x, y)] === 0 || road[at(x, y - 1)] !== 0 || road[at(x, y + 1)] !== 0) continue;
+        const near = [
+          [x, y],
+          [x - 1, y],
+          [x + 1, y],
+        ] as const;
+        if (near.some(([nx, ny]) => wiredRoad(nx, ny))) continue;
+        crossing = [x, y];
+      }
+    }
+    expect(crossing).not.toBeNull();
+    if (!crossing) return;
+    const [cx, cy] = crossing;
+    wire[at(cx, cy - 1)] = 1;
+    wire[at(cx, cy)] = 1;
+    wire[at(cx, cy + 1)] = 1;
+
+    const after = migrate({ ...before, layers }, MIGRATIONS, 14);
+    const wiresAfter = after.layers.subarray(cells * 9);
+    // Přechod přežil celý…
+    expect(wiresAfter[at(cx, cy - 1)]).toBe(1);
+    expect(wiresAfter[at(cx, cy)]).toBe(1);
+    expect(wiresAfter[at(cx, cy + 1)]).toBe(1);
+    // …a vygenerované vedení podél silnic zmizelo jako dřív.
+    for (let i = 0; i < cells; i++) {
+      if (i === at(cx, cy)) continue;
+      if ((road[i] ?? 0) !== 0) expect(wiresAfter[i]).toBe(0);
+    }
+  });
+
+  it('migrace v14 → v15 doplní neutrální spokojenost a prázdný stav s pamětí (T132)', () => {
+    const v14 = Object.entries(fixtures).find(([path]) => path.includes('v14.city'));
+    expect(v14).toBeDefined();
+    if (!v14) return;
+
+    const before = unpackSave(decode(v14[1] as string));
+    expect(before.meta.formatVersion).toBe(14);
+    const coarseCells = COARSE_SIZE * COARSE_SIZE;
+    expect(before.coarse.byteLength).toBe(coarseCells * 3);
+
+    const after = migrate(before, MIGRATIONS, 15);
+    expect(after.meta.formatVersion).toBe(15);
+    expect(after.coarse.byteLength).toBe(coarseCells * 4);
+    expect([...after.coarse.subarray(0, coarseCells * 3)]).toEqual([...before.coarse]);
+    expect(after.coarse.subarray(coarseCells * 3).every((value) => value === 128)).toBe(true);
+    expect(after.state.derived).toEqual({
+      trafficLoad: [],
+      jobAccess: [],
+      lineStats: [],
+      transitRelief: [],
+      downgradeStreak: [],
+      waterlessStreak: [],
+      coverage: [],
+      watered: [],
+    });
+    // Nic jiného se nehne.
+    expect(after.layers).toEqual(before.layers);
+    expect(after.entities).toEqual(before.entities);
+    expect(after.state.economy).toEqual(before.state.economy);
+  });
+
+  it('migrace v15 → v16 mění jen kódování budov, ne data (T134)', () => {
+    const v15 = Object.entries(fixtures).find(([path]) => path.includes('v15.city'));
+    const v16 = Object.entries(fixtures).find(([path]) => path.includes('v16.city'));
+    expect(v15).toBeDefined();
+    expect(v16).toBeDefined();
+    if (!v15 || !v16) return;
+
+    const before = unpackSave(decode(v15[1] as string));
+    const after = migrate(before, MIGRATIONS, 16);
+    expect(after.meta.formatVersion).toBe(16);
+    expect(after.entities).toEqual(before.entities);
+    expect(after.layers).toEqual(before.layers);
+    expect(after.state).toEqual(before.state);
+
+    // Fixtura v16 má budovy po sloupcích a načte se na totéž.
+    const files = unzipSync(decode(v16[1] as string));
+    const raw = JSON.parse(new TextDecoder().decode(files['entities.json'])) as Record<string, unknown>;
+    expect(raw['columns']).toBeDefined();
+    expect(raw['buildings']).toBeUndefined();
+    expect(unpackSave(decode(v16[1] as string)).entities).toEqual(before.entities);
+
+    // Sloupce se hlídají jako cizí vstup: nesedící délka save odmítne.
+    const broken = { ...files };
+    const columns = (raw['columns'] as Record<string, unknown[]>);
+    broken['entities.json'] = new TextEncoder().encode(
+      JSON.stringify({ ...raw, columns: { ...columns, x: columns['x']!.slice(1) } }),
+    );
+    expect(() => unpackSave(zipSync(broken))).toThrow(/entities\.columns\.x/);
+  });
+
+  it('migrace v5 → v6 dopočítá populaci pro měření růstu z budov (T132)', () => {
+    const v5 = Object.entries(fixtures).find(([path]) => path.includes('v5.city'));
+    expect(v5).toBeDefined();
+    if (!v5) return;
+
+    const before = unpackSave(decode(v5[1] as string));
+    const after = migrate(before, MIGRATIONS, 6);
+    const population = before.entities.buildings.reduce(
+      (sum, building) => sum + (building.abandoned ? 0 : building.population),
+      0,
+    );
+    expect(population).toBeGreaterThan(0);
+    expect(after.state.economy.lastPopulation).toBe(population);
+  });
+
   it('migrace v11 → v12 rozšíří buildingId na čtyři bajty a nic jiného nepohne', () => {
     const v11 = Object.entries(fixtures).find(([path]) => path.includes('v11.city'));
     expect(v11).toBeDefined();
@@ -271,7 +435,8 @@ describe('fixtury savů', () => {
 
     expect(after.meta.formatVersion).toBe(12);
     expect(after.layers.byteLength - before.layers.byteLength).toBe(cells * 2);
-    expect(after.layers.byteLength).toBe(expectedLayersByteLength(MAP_SIZE));
+    // Verze 12 má devět bajtů na dlaždici (migrace popisuje minulost).
+    expect(after.layers.byteLength).toBe(cells * 9);
 
     // Vrstvy před a za `buildingId` bajt po bajtu tam, kde byly…
     expect([...after.layers.subarray(0, head)]).toEqual([...before.layers.subarray(0, head)]);

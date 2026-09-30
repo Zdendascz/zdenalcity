@@ -23,6 +23,15 @@ export class TrafficOverlay {
   private readonly world: ReadonlyWorldView;
   private readonly capacityOf: (roadType: number) => number;
   private visible = false;
+  /**
+   * Zátěž, podle které se naposledy kreslilo (T133). Overlay dřív mazal
+   * a znovu kreslil ~2 900 mnohoúhelníků **každý snímek**, i na pauze;
+   * zátěž se přitom mění jen při běhu dopravy, jednou za několik tiků.
+   * Kopie pole se porovná jednou za tik — to je zlomek jednoho překreslení.
+   */
+  private drawnLoad = new Float32Array(0);
+  private drawnTick = -1;
+  private stale = true;
 
   constructor(
     parent: Container,
@@ -42,13 +51,34 @@ export class TrafficOverlay {
     if (visible) this.redraw();
   }
 
-  /** Zátěž se mění každých osm tiků, takže se překresluje na vyžádání. */
-  update(): void {
-    if (this.visible) this.redraw();
+  /**
+   * Překreslí, když se změnila zátěž nebo silnice. `roadsChanged` hlásí
+   * volající — přibylá silnice či svah zátěž nezmění, ale tvar ano.
+   */
+  update(roadsChanged = false): void {
+    if (roadsChanged) this.stale = true;
+    if (!this.visible) return;
+    if (!this.stale && this.world.tick === this.drawnTick) return;
+    this.drawnTick = this.world.tick;
+    const load = this.world.trafficLoad;
+    if (!this.stale && load.length === this.drawnLoad.length) {
+      let same = true;
+      for (let i = 0; i < load.length; i++) {
+        if (load[i] !== this.drawnLoad[i]) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return;
+    }
+    this.redraw();
   }
 
   private redraw(): void {
     this.graphics.clear();
+    this.stale = false;
+    this.drawnTick = this.world.tick;
+    this.drawnLoad = Float32Array.from(this.world.trafficLoad);
 
     const size = this.world.size;
     for (let y = 0; y < size; y++) {

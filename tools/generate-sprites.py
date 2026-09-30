@@ -283,6 +283,8 @@ def request(
         try:
             with urllib.request.urlopen(req, timeout=300, context=TLS) as response:
                 payload = json.loads(response.read())
+            global LAST_USAGE
+            LAST_USAGE = payload.get('usage') or {}
             return base64.b64decode(payload['data'][0]['b64_json'])
         except urllib.error.HTTPError as error:
             # 429 je limit, 5xx je jejich strana — obojí má smysl zkusit znovu.
@@ -299,6 +301,27 @@ def request(
 # Jednou za běh, ne při každém požadavku — načítání seznamu certifikátů není
 # zadarmo a mezi obrázky se nemění.
 TLS = tls_context()
+
+# Útrata se od 2026-09-29 píše do téhož deníku jako díly pro animace
+# (`tools/generate-parts.py`), aby se rozpočet hlídal na jednom místě.
+LEDGER = ROOT / 'art' / 'parts' / 'spend.jsonl'
+LAST_USAGE: dict = {}
+
+
+def log_spend(name: str, size: str) -> float:
+    details = LAST_USAGE.get('input_tokens_details') or {}
+    text_in = details.get('text_tokens', LAST_USAGE.get('input_tokens', 0))
+    image_in = details.get('image_tokens', 0)
+    out = LAST_USAGE.get('output_tokens', 0)
+    # Ceník gpt-image-1, stejně jako v generate-parts.py: odhad spíš vyšší.
+    usd = (text_in * 5 + image_in * 10 + out * 40) / 1e6
+    LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    with LEDGER.open('a', encoding='utf-8') as ledger:
+        ledger.write(json.dumps({
+            'part': f'sprite:{name}', 'model': MODEL, 'size': size, 'usage': LAST_USAGE,
+            'usd': round(usd, 4), 'at': time.strftime('%Y-%m-%dT%H:%M:%S'),
+        }) + '\n')
+    return usd
 
 
 def main() -> int:
@@ -381,7 +404,8 @@ def main() -> int:
             canvas,
         )
         target.write_bytes(png)
-        print(f' {canvas}', flush=True)
+        usd = log_spend(f'{name}__{variant}', canvas)
+        print(f' {canvas}, {usd:.3f} USD', flush=True)
         done += 1
 
     print(f'\n{done} vygenerováno do {RAW.relative_to(ROOT)}.')

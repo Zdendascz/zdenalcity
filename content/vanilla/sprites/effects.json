@@ -1,0 +1,568 @@
+{
+  "formatVersion": 1,
+  "effects": {
+    "vanilla:coal_power_plant|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          461,
+          4
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          570,
+          104
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:coal_power_plant|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          935,
+          3
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:coal_power_plant|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          330,
+          227
+        ],
+        "rate": 1.8,
+        "color": "#eef0f2"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          795,
+          122
+        ],
+        "rate": 1.8,
+        "color": "#eef0f2"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          927,
+          3
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:gas_power_plant|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          598,
+          2
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:gas_power_plant|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          413,
+          2
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:gas_power_plant|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          266,
+          2
+        ],
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:incinerator|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          221,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:incinerator|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          182,
+          7
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:incinerator|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          557,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_chemical|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          338,
+          3
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_chemical|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          302,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_chemical|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          201,
+          5
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_complex|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          258,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_complex|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          694,
+          8
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_foundry|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          426,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_foundry|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          446,
+          15
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_foundry|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          309,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_hall|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          309,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_large|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          147,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_medium|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          126,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_refinery|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          572,
+          31
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_refinery|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          646,
+          113
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_smelter|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          381,
+          20
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_smelter|b": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          400,
+          70
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_smelter|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          108,
+          47
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          143,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      },
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          437,
+          93
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_works|a": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          252,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:industrial_works|c": [
+      {
+        "type": "vanilla:smoke",
+        "at": [
+          361,
+          2
+        ],
+        "when": "powered",
+        "rate": 1,
+        "color": "#7c7a78"
+      }
+    ],
+    "vanilla:tram_stop|a": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          125,
+          103
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          140,
+          110
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          152,
+          116
+        ]
+      }
+    ],
+    "vanilla:tram_stop|b": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          135,
+          90
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          148,
+          96
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          160,
+          102
+        ]
+      }
+    ],
+    "vanilla:tram_stop|c": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          95,
+          70
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          108,
+          76
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          58,
+          90
+        ]
+      }
+    ],
+    "vanilla:transit_stop|a": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          122,
+          80
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          137,
+          87
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          152,
+          94
+        ]
+      }
+    ],
+    "vanilla:transit_stop|b": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          118,
+          103
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          132,
+          110
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          146,
+          117
+        ]
+      }
+    ],
+    "vanilla:transit_stop|c": [
+      {
+        "type": "vanilla:seat",
+        "at": [
+          135,
+          100
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          150,
+          106
+        ]
+      },
+      {
+        "type": "vanilla:seat",
+        "at": [
+          165,
+          112
+        ]
+      }
+    ],
+    "vanilla:wind_turbine|a": [
+      {
+        "type": "vanilla:spin",
+        "part": "rotor",
+        "at": [
+          119.3,
+          29.2
+        ],
+        "axes": [
+          [
+            1.615,
+            80.44
+          ],
+          [
+            -87.946,
+            -18.458
+          ]
+        ]
+      }
+    ],
+    "vanilla:wind_turbine|b": [
+      {
+        "type": "vanilla:spin",
+        "part": "rotor",
+        "at": [
+          116.2,
+          32.1
+        ],
+        "axes": [
+          [
+            3.042,
+            65.258
+          ],
+          [
+            -76.501,
+            -24.32
+          ]
+        ]
+      }
+    ],
+    "vanilla:wind_turbine|c": [
+      {
+        "type": "vanilla:spin",
+        "part": "rotor",
+        "at": [
+          128.1,
+          38.4
+        ],
+        "axes": [
+          [
+            10.913,
+            89.549
+          ],
+          [
+            -109.073,
+            -13.862
+          ]
+        ]
+      }
+    ]
+  }
+}

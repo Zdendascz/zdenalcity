@@ -29,6 +29,8 @@ import { el } from './dom';
 export const ROUTINE_REASONS: ReadonlySet<string> = new Set([
   'error.roadExists',
   'error.pipeExists',
+  'error.wireExists',
+  'error.noWire',
   'error.roadInTheWay',
   'error.rubbleInTheWay',
   'error.occupied',
@@ -64,6 +66,12 @@ export class Notifications {
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'notifications');
+    // Hláška se objeví u okraje a za dvanáct vteřin zmizí; bez živé oblasti
+    // se o ní odečítačka nedozvěděla vůbec. Zdvořile, ne `alert`: při tažení
+    // štětcem jich chodí víc za sebou a každá by přerušila tu předchozí.
+    this.root.setAttribute('role', 'status');
+    this.root.setAttribute('aria-live', 'polite');
+    this.root.setAttribute('aria-relevant', 'additions text');
     parent.appendChild(this.root);
   }
 

@@ -1,6 +1,6 @@
 import type { Balance } from '@/content/balance';
 import { coarseCellsOf, coarseIndex } from './coarse';
-import { index, ROAD, TERRAIN, ZONE } from './layers';
+import { index, ROAD, TERRAIN, WIRE, ZONE } from './layers';
 import { coarseTerrainShare } from './terrain';
 import { floodPerCell } from './disasters/flood';
 import { hasRubble, rubblePerCell } from './disasters/rubble';
@@ -11,6 +11,7 @@ import type { BuildingCatalogue } from './catalogue';
 import { seedDefinitions } from './levels';
 import { roadReach } from './systems/growth';
 import { waterProximity } from './systems/landValue';
+import { roadTilesInOrder } from './world';
 import type { WorldState } from './world';
 import { roadCapacityFactor } from './transit';
 import { happinessDemandFactor } from './systems/happiness';
@@ -91,8 +92,9 @@ export function coarseCongestion(
 
   // Kolony jsou vlastnost silnic, tak se prochází seznam silnic (R20 fáze 4).
   // Průchod celou mapou tady byl nejdražší kus spokojenosti: ta se počítá
-  // z kolon a na 512 × 512 stála 8,9 ms na jeden běh.
-  for (const tile of world.roadTiles) {
+  // z kolon a na 512 × 512 stála 8,9 ms na jeden běh. V pořadí dlaždic,
+  // protože se sčítají desetinná čísla (T132, `roadTilesInOrder`).
+  for (const tile of roadTilesInOrder(world)) {
     const roadType = world.layers.road[tile] ?? ROAD.none;
     if (roadType === ROAD.none) continue;
 
@@ -311,6 +313,22 @@ export interface ParcelExplanation {
    * i poptávkou. Neviditelná podmínka, takže patří do panelu (§12).
    */
   water: boolean;
+  /**
+   * Dojde sem proud? Stejně neviditelná podmínka jako voda: blok bez vedení
+   * nebo s přetíženou přípojkou vypadá na mapě úplně stejně (hlásil autor).
+   */
+  power: boolean;
+  /**
+   * Parcela proud **nevede**, protože na ní stojí opuštěná budova nebo suť
+   * (T129). Hráč pak vidí vedení hned vedle a nechápe, proč tu proud není
+   * (hlásil autor) — je potřeba mu říct, že musí zbourat.
+   */
+  powerBlockedByRuin: boolean;
+  /**
+   * Vedení na dlaždici a jak je vytížené (T136): „ať člověk ví co a jak".
+   * `null`, když tu vedení není.
+   */
+  wire: ParcelWire | null;
   pollution: number;
   crime: number;
   /** Spokojenost v této čtvrti, 0–255. Kdo ji nevidí, neví, co spravit (§12). */
@@ -434,6 +452,29 @@ export function worstBlocker(reasons: Iterable<string>): string | null {
   return worst;
 }
 
+export interface ParcelWire {
+  /** `WIRE.low` nebo `WIRE.high`. */
+  type: number;
+  /** Kolik přes úsek teče (u přetíženého: kolik by teklo). */
+  load: number;
+  capacity: number;
+  /** Došel sem proud? */
+  live: boolean;
+  overloaded: boolean;
+}
+
+function parcelWire(world: WorldState, balance: Balance, tile: number): ParcelWire | null {
+  const type = world.layers.wire[tile] ?? WIRE.none;
+  if (type === WIRE.none) return null;
+  return {
+    type,
+    load: Math.round(world.wireLoad[tile] ?? 0),
+    capacity: balance.power.wires[type - 1]?.capacity ?? 0,
+    live: (world.wireLive[tile] ?? 0) === 1,
+    overloaded: (world.wireOverloaded[tile] ?? 0) === 1,
+  };
+}
+
 export function explainParcel(
   world: WorldState,
   balance: Balance,
@@ -472,6 +513,11 @@ export function explainParcel(
     jobAccessFactor: world.jobAccessCells[cell] ?? 1,
     cityJobAccessFactor: world.cityJobAccess,
     water: world.waterSupply[tile] === 1,
+    power: world.layers.power[tile] === 1,
+    wire: parcelWire(world, balance, tile),
+    powerBlockedByRuin:
+      (world.rubble[tile] ?? 0) !== 0 ||
+      world.buildings.get(world.layers.buildingId[tile] ?? 0)?.abandoned === true,
     pollution: world.coarse.pollution[cell] ?? 0,
     crime: world.coarse.crime[cell] ?? 0,
     happiness: world.happiness[cell] ?? 0,

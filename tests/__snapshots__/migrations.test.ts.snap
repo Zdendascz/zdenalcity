@@ -1,25 +1,33 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`fixtury savů > v1.city.base64 se načte do aktuální verze formátu 1`] = `"6e29aff9"`;
+exports[`fixtury savů > v1.city.base64 se načte do aktuální verze formátu 1`] = `"6a3f27bc"`;
 
-exports[`fixtury savů > v2.city.base64 se načte do aktuální verze formátu 1`] = `"aeabc14e"`;
+exports[`fixtury savů > v2.city.base64 se načte do aktuální verze formátu 1`] = `"87dea7ab"`;
 
-exports[`fixtury savů > v3.city.base64 se načte do aktuální verze formátu 1`] = `"cd2f37df"`;
+exports[`fixtury savů > v3.city.base64 se načte do aktuální verze formátu 1`] = `"a1b882b2"`;
 
-exports[`fixtury savů > v4.city.base64 se načte do aktuální verze formátu 1`] = `"8d305bfa"`;
+exports[`fixtury savů > v4.city.base64 se načte do aktuální verze formátu 1`] = `"cec6f987"`;
 
-exports[`fixtury savů > v5.city.base64 se načte do aktuální verze formátu 1`] = `"3eafcd07"`;
+exports[`fixtury savů > v5.city.base64 se načte do aktuální verze formátu 1`] = `"8bfd380a"`;
 
-exports[`fixtury savů > v6.city.base64 se načte do aktuální verze formátu 1`] = `"f78b4836"`;
+exports[`fixtury savů > v6.city.base64 se načte do aktuální verze formátu 1`] = `"61fa11c3"`;
 
-exports[`fixtury savů > v7.city.base64 se načte do aktuální verze formátu 1`] = `"c542deee"`;
+exports[`fixtury savů > v7.city.base64 se načte do aktuální verze formátu 1`] = `"aff7fc4b"`;
 
-exports[`fixtury savů > v8.city.base64 se načte do aktuální verze formátu 1`] = `"e26eaad5"`;
+exports[`fixtury savů > v8.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;
 
-exports[`fixtury savů > v9.city.base64 se načte do aktuální verze formátu 1`] = `"e26eaad5"`;
+exports[`fixtury savů > v9.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;
 
-exports[`fixtury savů > v10.city.base64 se načte do aktuální verze formátu 1`] = `"e26eaad5"`;
+exports[`fixtury savů > v10.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;
 
-exports[`fixtury savů > v11.city.base64 se načte do aktuální verze formátu 1`] = `"e26eaad5"`;
+exports[`fixtury savů > v11.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;
 
-exports[`fixtury savů > v12.city.base64 se načte do aktuální verze formátu 1`] = `"e26eaad5"`;
+exports[`fixtury savů > v12.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;
+
+exports[`fixtury savů > v13.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;
+
+exports[`fixtury savů > v14.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;
+
+exports[`fixtury savů > v15.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;
+
+exports[`fixtury savů > v16.city.base64 se načte do aktuální verze formátu 1`] = `"02e31da8"`;

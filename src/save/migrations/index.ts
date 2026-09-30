@@ -213,6 +213,18 @@ const migrateV5ToV6: Migration = (save) => ({
       grantsAwarded: [],
       grantProgress: [],
     },
+    // Populaci pro měření růstu nese až verze 6. Staršímu savu se dopočítá
+    // z budov, ať načtené město nezačíná falešným skokem růstu proti nule.
+    // Do T132 to dělalo `applySaveToWorld` u **každého** savu, a tím
+    // přepisovalo i uloženou hodnotu verze 6 a výš — první měsíční uzávěrka
+    // po načtení pak měřila růst proti jinému číslu než ve hře bez přerušení.
+    economy: {
+      ...save.state.economy,
+      lastPopulation: save.entities.buildings.reduce(
+        (sum, building) => sum + (building.abandoned ? 0 : building.population),
+        0,
+      ),
+    },
   },
 });
 
@@ -370,6 +382,134 @@ function widenBuildingIdLayer(layers: Uint8Array, size: number): Uint8Array {
   return out;
 }
 
+/**
+ * Verze 13: elektrické vedení (T129).
+ *
+ * Do verze 12 vedla proud silnice, od 13 nevede nic kromě bloků zón a budov
+ * a vedení, které hráč natáhne. Migrace **nepokládá žádné vedení**
+ * (rozhodnutí autora): první verze ho položila pod silnice a autor to
+ * zamítl — „města zhasnou a musí se to dodělat". Hráč se o tom dozví
+ * hláškou při načtení (`collectLoadWarnings`, `unwiredBuildings`).
+ */
+const migrateV12ToV13: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 13 },
+  layers: appendEmptyWireLayer(save.layers, save.meta.grid?.size ?? LEGACY_MAP_SIZE),
+});
+
+/**
+ * Připíše prázdnou vrstvu vedení. Rozložení verze 12 natvrdo: devět bajtů
+ * na dlaždici (`buildingId` čtyřbajtová).
+ */
+function appendEmptyWireLayer(layers: Uint8Array, size: number): Uint8Array {
+  const cells = size * size;
+  const BYTES_PER_TILE_V12 = 9;
+  if (layers.byteLength !== cells * BYTES_PER_TILE_V12) return layers; // délku ohlásí `checkSaveFits`
+  const out = new Uint8Array(cells * (BYTES_PER_TILE_V12 + 1));
+  out.set(layers, 0);
+  return out;
+}
+
+/**
+ * Verze 14: pryč s vedením pod silnicemi.
+ *
+ * Savy, které prošly první verzí migrace 12 → 13, mají vedení pod každou
+ * silnicí nebo spojky po silnicích. Autor je zamítl, takže se smaže vedení,
+ * které **vede podél silnice**. Rozložení verze 13 natvrdo: deset bajtů
+ * na dlaždici, silnice je třetí vrstva, vedení poslední.
+ *
+ * Do T132 se mazalo vedení na **každé** dlaždici se silnicí. Jenže úsek
+ * vedení přes ulici je jediný způsob, jak propojit dva bloky, a ten hráč
+ * postavil sám — migrace mu tak rozpojila město. Rozlišuje se podle tvaru:
+ * vygenerované vedení běží **po** silnici, takže má souseda, který je taky
+ * silnice s vedením. Přechod přes ulici takového souseda nemá: po obou
+ * stranách jsou parcely a podél ulice vedení nevede.
+ *
+ * Savy, které už verzí 14 prošly s původní migrací, přechody ztratily
+ * a vrátit je nejde — v savu po nich nezůstala stopa.
+ */
+const migrateV13ToV14: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 14 },
+  layers: clearWiresOnRoads(save.layers, save.meta.grid?.size ?? LEGACY_MAP_SIZE),
+});
+
+function clearWiresOnRoads(layers: Uint8Array, size: number): Uint8Array {
+  const cells = size * size;
+  const BYTES_PER_TILE_V13 = 10;
+  if (layers.byteLength !== cells * BYTES_PER_TILE_V13) return layers;
+  const out = layers.slice();
+  const road = cells * 2;
+  const wire = cells * 9;
+  const wiredRoad = (x: number, y: number): boolean => {
+    if (x < 0 || y < 0 || x >= size || y >= size) return false;
+    const at = y * size + x;
+    return (layers[road + at] ?? 0) !== 0 && (layers[wire + at] ?? 0) !== 0;
+  };
+  // Rozhoduje se podle **původních** vrstev (`layers`), ne podle `out`:
+  // jinak by na výsledku záleželo, v jakém pořadí se dlaždice mažou.
+  for (let i = 0; i < cells; i++) {
+    if (!wiredRoad(i % size, Math.floor(i / size))) continue;
+    const x = i % size;
+    const y = (i - x) / size;
+    const alongRoad =
+      wiredRoad(x + 1, y) || wiredRoad(x - 1, y) || wiredRoad(x, y + 1) || wiredRoad(x, y - 1);
+    if (alongRoad) out[wire + i] = 0;
+  }
+  return out;
+}
+
+/**
+ * Verze 15 (audit T132): stav s pamětí se ukládá.
+ *
+ * Starší save ho nemá, takže dostane přesně to, s čím se do verze 14
+ * načítal: spokojenost neutrální, doprava, dosažitelnost práce, statistiky
+ * linek a počítadla chátrání prázdné. Hráč tím o nic nepřijde — jen se jeho
+ * načtené město ještě naposledy rozjede od „čistého" stavu.
+ *
+ * Délky natvrdo: tři hrubé vrstvy verze 14, neutrál 128 (`NEUTRAL_HAPPINESS`
+ * v době verze 15). Migrace popisuje minulost.
+ */
+const migrateV14ToV15: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 15 },
+  coarse: appendNeutralHappiness(save.coarse, save.meta.grid?.size ?? LEGACY_MAP_SIZE),
+  state: {
+    ...save.state,
+    derived: {
+      trafficLoad: [],
+      jobAccess: [],
+      lineStats: [],
+      transitRelief: [],
+      downgradeStreak: [],
+      waterlessStreak: [],
+      coverage: [],
+      watered: [],
+    },
+  },
+});
+
+/**
+ * Verze 16: budovy v `entities.json` po sloupcích (audit T134). Mění se jen
+ * kódování souboru, ne data — tvar v paměti je stejný, takže migrace jen
+ * posune číslo verze a `packSave` pak zapíše sloupce.
+ */
+const migrateV15ToV16: Migration = (save) => ({
+  ...save,
+  meta: { ...save.meta, formatVersion: 16 },
+});
+
+function appendNeutralHappiness(coarse: Uint8Array, size: number): Uint8Array {
+  const COARSE_LAYERS_V14 = 3;
+  const NEUTRAL_HAPPINESS_V15 = 128;
+  const COARSE_FACTOR_V15 = 4; // hrubá buňka je 4 × 4 dlaždice
+  const cells = Math.ceil(size / COARSE_FACTOR_V15) ** 2;
+  if (coarse.byteLength !== cells * COARSE_LAYERS_V14) return coarse; // délku ohlásí `checkSaveFits`
+  const out = new Uint8Array(cells * (COARSE_LAYERS_V14 + 1)).fill(NEUTRAL_HAPPINESS_V15);
+  out.set(coarse, 0);
+  return out;
+}
+
 /** Klíč = verze, ze které se migruje. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1ToV2,
@@ -383,6 +523,10 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   9: migrateV9ToV10,
   10: migrateV10ToV11,
   11: migrateV11ToV12,
+  12: migrateV12ToV13,
+  13: migrateV13ToV14,
+  14: migrateV14ToV15,
+  15: migrateV15ToV16,
 };
 
 /**

@@ -151,6 +151,46 @@ dostane:
    je výchozí *Browser Cache TTL* Cloudflaru — ten hlavičku z originu u všeho,
    co považuje za kešovatelné, přepíše. `.htaccess` proti tomu nemá šanci.
 
+### Soubory bez hashe, komprese a HSTS (T134)
+
+Do T134 dávalo `.htaccess` rok s `immutable` **všem** `.png`/`.jpg`/`.webp`,
+i souborům z `public/`, které hash v názvu nemají (snímky rozcestníku, logo,
+obrázky katastrof, ikony aplikace). Vyměněný obrázek pak hráči zůstal v keši
+starý až rok. Teď:
+
+| Co | `Cache-Control` |
+|---|---|
+| `assets/*` (build, s hashem) | `public, max-age=31536000, immutable` |
+| ostatní obrázky, skripty, styly z `public/` | `public, max-age=86400` |
+| `index.html`, `service-worker.js`, `manifest.webmanifest` | `no-cache, must-revalidate` |
+
+Rozlišuje se přes `<If "%{REQUEST_URI} =~ m#/assets/#">`, což potřebuje
+Apache 2.4. Cloudflare svým Browser Cache TTL (čtyři hodiny) přepisuje jen
+kratší hodnoty než svoje, den z originu tedy nechá být — ověřit:
+
+```bash
+curl -sI "https://games.zdendas.cz/zdenalcity/brand/logo.webp" | grep -i "cache-control\|cf-cache-status"
+curl -sI "https://games.zdendas.cz/zdenalcity/assets/$(ls dist/assets | grep '^index-.*\.js$')" | grep -i "cache-control"
+```
+
+**Komprese.** `.htaccess` zapíná `mod_brotli` a `mod_deflate` pro HTML, JS,
+CSS, JSON, SVG a manifest (obojí v `<IfModule>`, bez modulu se nic nerozbije).
+Obrázky se nekomprimují, WebP a JPG už komprimované jsou. **Cloudflare
+komprimuje sám** a k prohlížeči si kódování volí podle sebe, takže na produkci
+rozhoduje on; `.htaccess` platí hlavně pro přímý přístup na origin. Ověřit, co
+opravdu chodí:
+
+```bash
+curl -sI -H "Accept-Encoding: br, gzip" "https://games.zdendas.cz/zdenalcity/" | grep -i "content-encoding"
+ssh zdendas@ORIGIN 'curl -sI -H "Host: games.zdendas.cz" -H "Accept-Encoding: gzip" http://127.0.0.1/zdenalcity/ | grep -i content-encoding'
+```
+
+**HSTS a Permissions-Policy.** Přibyly `Strict-Transport-Security:
+max-age=31536000` (bez `includeSubDomains` — na doméně jsou i jiné projekty)
+a `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(),
+usb=()`. Stejně jako ostatní bezpečnostní hlavičky je patří zopakovat
+v Cloudflare Transform Rule (viz níž).
+
 ### Rozcestník je náhrada jen za navigaci
 
 Service worker vracel při neúspěšném požadavku `index.html` **na cokoli**.
@@ -265,6 +305,8 @@ jednou ukázalo u keše. **Nastavit je patří do Cloudflare Transform Rules**
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Content-Security-Policy` | viz `public/.htaccess`, jedna dlouhá řádka |
+| `Strict-Transport-Security` | `max-age=31536000` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=()` |
 
 Pixi potřebuje `worker-src blob:` a `img-src 'self' blob: data:`, jinak se
 nevykreslí nic. Externí fonty hra nepoužívá, takže pro ně není co povolovat.

@@ -49,5 +49,46 @@ function registerServiceWorker(): void {
   void navigator.serviceWorker.register('./service-worker.js').catch(() => undefined);
 }
 
+/**
+ * Zpráva místo prázdné stránky (T134).
+ *
+ * `startApp` může spadnout dřív, než existují notifikace i překlady: vadný
+ * obsah (`content.load`), prohlížeč bez WebGL (`app.init`). Hráč pak dřív
+ * viděl černou plochu a nevěděl, jestli se čeká, nebo je konec. Text je
+ * natvrdo česky i anglicky — i18n se v tu chvíli nemusela vůbec načíst.
+ */
+function showStartupError(target: HTMLElement, error: unknown): void {
+  console.error('Hra se nespustila:', error);
+  const detail = error instanceof Error ? error.message : String(error);
+  const box = document.createElement('div');
+  box.setAttribute('role', 'alert');
+  box.style.cssText =
+    'max-width:36rem;margin:15vh auto;padding:1.5rem;font:16px/1.5 system-ui,sans-serif;' +
+    'color:#e8eef0;background:#0e2028;border-radius:8px';
+  const lines: [string, string][] = [
+    ['h1', 'Hru se nepodařilo spustit'],
+    ['p', 'Zkuste stránku obnovit. Pokud to nepomůže, použijte jiný prohlížeč nebo zapněte hardwarovou akceleraci (WebGL).'],
+    ['h1', 'The game could not start'],
+    ['p', 'Try reloading the page. If that does not help, use another browser or enable hardware acceleration (WebGL).'],
+  ];
+  for (const [tag, text] of lines) {
+    const node = document.createElement(tag);
+    node.textContent = text;
+    if (tag === 'h1') node.style.cssText = 'font-size:1.25rem;margin:0.5rem 0';
+    box.appendChild(node);
+  }
+  const code = document.createElement('pre');
+  code.textContent = detail;
+  code.style.cssText = 'white-space:pre-wrap;opacity:0.7;font-size:0.8rem';
+  box.appendChild(code);
+  // Ukazatel načítání visí na `body`, ne v `#app` — jinak by překryl zprávu.
+  for (const node of document.querySelectorAll('.preloader')) node.remove();
+  target.replaceChildren(box);
+}
+
 registerServiceWorker();
-await startApp(mount);
+try {
+  await startApp(mount);
+} catch (error) {
+  showStartupError(mount, error);
+}

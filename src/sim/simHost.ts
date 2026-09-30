@@ -9,10 +9,13 @@ import {
   bulldoze,
   createTransitLine,
   deleteTransitLine,
+  demolishRuins,
   levelArea,
-  placeDefinition,
+  placeDefinitionCommand,
   plantTrees,
   removePipe,
+  buildWire,
+  removeWire,
   issueBondCommand,
   requestLoan,
   removeTransitStop,
@@ -30,7 +33,7 @@ import { OK, reject } from './result';
 import type { CommandResult } from './result';
 import type { System } from './systems';
 import { createDirtySet, tickWorld } from './world';
-import type { Building, DemandState, DirtySet, EconomyState, WorldState } from './world';
+import type { Building, DemandState, DirtySet, EconomyState, TransformerLoad, WorldState } from './world';
 
 /**
  * Délka jednoho herního dne při rychlosti 1×.
@@ -71,6 +74,12 @@ export interface ReadonlyWorldView {
   readonly cornerHeight: Readonly<Uint8Array>;
   /** Kam došla voda. Podzemní pohled ji kreslí, jinak se nikde nezobrazuje (§8). */
   readonly waterSupply: Readonly<Uint8Array>;
+  /** Zátěž a přetížení vedení a číslo přepočtu sítě (T129). Runtime. */
+  readonly wireLoad: Readonly<Float32Array>;
+  readonly wireOverloaded: Readonly<Uint8Array>;
+  readonly wireLive: Readonly<Uint8Array>;
+  readonly transformerLoad: ReadonlyMap<number, TransformerLoad>;
+  readonly powerRevision: number;
   /** Spokojenost na hrubé mřížce — hlavní číslo HUDu a vlastní overlay (§9). */
   readonly happiness: Readonly<Uint8Array>;
   /**
@@ -146,8 +155,10 @@ class MainThreadSimHost implements SimHost {
         return bulldoze(this.world, cmd.x, cmd.y, this.balance);
       case 'zone':
         return zoneArea(this.world, cmd.x, cmd.y, cmd.w, cmd.h, cmd.zone, this.balance);
+      case 'demolish_ruins':
+        return demolishRuins(this.world, cmd.x, cmd.y, cmd.w, cmd.h, this.balance);
       case 'place_building':
-        return placeDefinition(
+        return placeDefinitionCommand(
           this.world,
           this.catalogue,
           cmd.definitionId,
@@ -161,6 +172,10 @@ class MainThreadSimHost implements SimHost {
         return buildPipe(this.world, cmd.x, cmd.y, this.balance);
       case 'remove_pipe':
         return removePipe(this.world, cmd.x, cmd.y);
+      case 'build_wire':
+        return buildWire(this.world, cmd.x, cmd.y, cmd.wire, this.balance);
+      case 'remove_wire':
+        return removeWire(this.world, cmd.x, cmd.y);
       case 'terraform_corner':
         return terraformCorner(this.world, cmd.x, cmd.y, cmd.delta, this.balance);
       case 'level_area':
@@ -181,7 +196,7 @@ class MainThreadSimHost implements SimHost {
       case 'create_line':
         return createTransitLine(this.world, this.balance, cmd.mode);
       case 'delete_line':
-        return deleteTransitLine(this.world, cmd.lineId);
+        return deleteTransitLine(this.world, cmd.lineId, this.balance);
       case 'add_stop':
         return addTransitStop(this.world, this.catalogue, this.balance, cmd.lineId, cmd.buildingId);
       case 'remove_stop':

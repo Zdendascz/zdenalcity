@@ -36,6 +36,20 @@
         "--strictPort"
       ],
       "port": 4180
+    },
+    {
+      "name": "citybuilder-devbuild",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--outDir",
+        "dist-dev",
+        "--port",
+        "4190",
+        "--strictPort"
+      ],
+      "port": 4190
     }
   ]
 }

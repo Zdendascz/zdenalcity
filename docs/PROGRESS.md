@@ -3537,13 +3537,12 @@ U budovy, kterou autor ukázal (sídliště na 68, 13), je terén pod půdorysem
 dokonce **hřeben**, ne svah: rohy po řadách `1 1 1 1 / 2 2 2 2 / 1 1 2 2 /
 1 1 1 2`. Kaskádový obrázek by na něj nesedl v žádné orientaci.
 
-### Dočasné: jméno souboru v panelu budovy
+### ~~Dočasné: jméno souboru v panelu budovy~~ (odstraněno v 28daccd)
 
-Panel budovy ukazuje řádek „Obrázek (dočasné)" se jménem souboru, kterým se
-budova zrovna kreslí. Autor si podle něj kontroluje vygenerované varianty
-ručně. Počítá se stejnou cestou jako v rendereru přes `variantFor`, takže
-ukazuje opravdu ten obrázek, který je vidět na mapě. **Až kontrola skončí,
-řádek i klíč `ui.info.spriteFile` pryč.**
+Panel budovy ukazoval řádek „Obrázek (dočasné)" se jménem souboru, kterým se
+budova zrovna kreslila — autor si podle něj ručně kontroloval vygenerované
+varianty. Kontrola skončila a řádek i klíč `ui.info.spriteFile` jsou pryč
+(28daccd). Odstavec zůstává jen jako záznam.
 
 
 ## Terén pod budovou a park ve svahu
@@ -3900,6 +3899,60 @@ doprostřed, dostaly objekty jako hlavičku větu o navazování vozovky. Teď s
 každý blok bere ze svého oddílu podle nadpisu.
 
 
+## Animace (T114, rozhodnutí autora)
+
+Zadání má sedm bodů a je v `docs/17-ANIMACE.md`: odezva na akce, auta na
+silnicích, emitory na budovách, voda, život u služeb, les ve větru
+a vizuálnější pohromy. **Hotová je první vrstva (T114):**
+
+- nová a povýšená budova vyroste od paty (`popScale`, 420 ms), po načtení
+  savu nevyrůstá nic;
+- zbouraná budova, silnice i les zvednou prach (`Effects`, strop 240
+  obláčků);
+- duch umísťování dýchá;
+- přepínač „Zastavit animace“ v liště, na telefonu ve vysunuté řadě,
+  výchozí stav podle `prefers-reduced-motion`.
+
+Animace mají vlastní generátor (`motionRandom`) a na `world.rng` nesahají.
+To je tvrdé pravidlo celé řady: jedno vytažené číslo by rozbilo determinismus.
+
+Ověřeno: `npm run check`, testy čistých funkcí v `tests/effects.test.ts`.
+
+**Noc 2026-09-29 (větev `animace-a-silnice`)**, hotové úkoly:
+
+- T115 auta na silnicích podle zátěže, T118 vozidla služeb vyjíždějí z budov;
+- T116 rotory větrníků (věže přegenerované bez lopatek) a kouř z 32 komínů;
+- T119 les ve větru; T120 plameny na hořících dlaždicích, tornádo se hýbe;
+- T121 přednačítání grafiky s procenty a WebP (104 MB → 20 MB);
+- T122 silnice: značení, 4 pruhy dálnice, chodníky u domů úrovně 2+,
+  lampy, kruhové objezdy, mosty se zábradlím;
+- T123 audit natočení spritů (`tools/audit-orientation.py`): 20 šikmých
+  přegenerováno, zbývají 3 mírné a 17 hraničních k rozhodnutí autora.
+
+Útrata OpenAI v `art/parts/spend.jsonl` (odhad podle ceníku gpt-image-1).
+Ověřováno v headless Edge přes ladicí přístup `window.__citybuilder` (jen vývoj).
+V prohlížeči je vidět prach po bourání lesa a postavená stanice sedí po
+vyrůstání ve správné velikosti i poloze. Samotný průběh vyrůstání se
+nasnímat nepodařilo, protože náhled byl skrytý a prohlížeč nekreslil snímky.
+
+## Elektřina a voda přes bloky a vedení (T129, rozhodnutí autora)
+
+Rozvod proudu i vody je automaticky pod každou parcelou se zónou nebo budovou:
+souvislý blok vede sám (`src/sim/conduct.ts`). Hráč staví jen spojky mezi bloky
+a ke zdroji — **elektrické vedení** (nízké / vysoké napětí, nová vrstva `wire`)
+a potrubí. **Silnice nevede nic.** Zchátralá a pobořená parcela nevede.
+
+- Vedení má kapacitu (`balance.power.wires`: 20 000 a 200 000; původních 3 000 a 40 000 nestačilo ani na průměrný blok). Přetížený úsek
+  vypadne a oblast za ním zhasne; proud nejdřív zkusí jinou cestu.
+- Výroba se dělí po sítích, ne celoměstsky.
+- Voda: blok dosah nespotřebovává, dosah ubírá jen potrubí.
+- Save verze 13: migrace položí **vysoké napětí pod každou silnici**, aby staré
+  město svítilo dál (nízké by se u elektrárny přetížilo).
+- UI: dva nástroje v nabídce Energetika (klávesa `j`), vedení s vytížením ve
+  vrstvě Elektřina (`render/wireOverlay.ts`), buldozer v té vrstvě bourá vedení.
+
+Otevřené: v golden městě vyšla kasa o 4 618 výš, růst beze změny — nerozebráno.
+
 ## Rozpracované
 
 **Fáze 4 je hotová.** 4a (T42–T45; T46 odpadl podle měření), 4b i 4c
@@ -4072,9 +4125,10 @@ Mimo zadání fází, otevřené k rozhodnutí:
   nezávislé údaje a nic nebrání nesmyslné kombinaci (vyžaduje proud, ale nic
   nespotřebovává). Až bude jasné, jak se má chovat budova bez proudu, jeden
   z nich pravděpodobně zmizí.
-- **Zóna mělčí než půdorys budovy pořád mlčí.** Rámeček řeší ruční stavbu, ale
-  u zóny hráč nevidí, že se do ní zvolená budova nikdy nevejde. Zbývá z původní
-  dvojice problémů.
+- ~~**Zóna mělčí než půdorys budovy pořád mlčí.**~~ Vyřešeno: rozbor parcely
+  hlásí `ui.parcel.blocked.zoneTooSmall` (`src/sim/diagnostics.ts`), když se
+  do zóny žádná budova nevejde, a nápověda k tomu má odstavec. (Opraveno
+  v auditu T135, odrážka byla zastaralá.)
 - Starý Node 20.11.1 zůstal nainstalovaný v `C:\Program Files\nodejs\`, jen už není
   v PATH. Reinstalace Node.js z MSI by ho tam vrátila a konflikt by se obnovil —
   příznaky a oprava v `docs/SETUP.md`.
@@ -4103,5 +4157,290 @@ Co odsud zmizelo a kde se to vyřešilo:
 | Poptávka je vypínač, daně na růst nemají vliv, silnice se bere jako sousedství | T18 — přepis růstu na váhy, daňový faktor a dosah |
 | Konstanty fáze 1 zůstávají v kódu | balanc je v datech; naposledy prověřeno auditem kritéria 24 v T60 |
 
-Zóna mělčí než půdorys budovy zůstává — dvě odrážky o tomtéž se slily do jedné.
+Zóna mělčí než půdorys budovy zůstávala — dvě odrážky o tomtéž se slily do
+jedné. Dnes ji rozbor parcely hlásí (`ui.parcel.blocked.zoneTooSmall`).
 
+
+## Přechody povrchů (T130, rozhodnutí autora)
+
+„Nejde jen o vodu a písek, ale o všechny přechody mezi všemi povrchy … všude
+přechodové parcely." Na hranici dvou povrchů leží pás přechodového materiálu
+(`src/render/terrainBands.ts`, `bandFor`): řídnoucí tráva v písku, okraj lesa,
+suť pod skálou, rákos u mokřadu, mokrý břeh u vody; na vodě mělčina s pěnou.
+Materiály `content/vanilla/parts/band_*` (zadání v `docs/18-DILY.md`).
+
+- Pás je z devíti (od T133 šesti) průsvitných vrstev rostoucí šířky, vnitřní okraj se vlní šumem
+  ze světových souřadnic, na koncích se zúží. Jeden ostrý okraj vypadal jako
+  nalepená záplata.
+- Pásy jsou v samostatném `Graphics` nad povrchem chunku (rozpočet textur na
+  dávku), zóny a oheň ve třetím nad nimi. Změna dlaždice zneplatní i chunk souseda.
+- Rohy se zaoblují **jen u vody** (hvězdy z kosočtverců). Mezi souší to dělalo
+  vystřižené klíny s jiným osvětlením a bez stromů, tam stačí pásy.
+- Zbývá: zubaté rohy souš–souš (písek/les) jsou zjemněné pásem, ne zaoblené.
+
+## Vedení: kapacita, voda, panel parcely (T131, hlášení autora)
+
+- „I když mám napojeno, parcely nemají elektřinu": přípojka nízkého napětí
+  (kapacita 3 000) nestačila na blok. Změřeno na savu autora: medián spotřeby
+  bloku 3 170, 75 % do 13 550, 90 % do 28 600, největší 110 620. Kapacity
+  zvednuty na 20 000 (nízké) a 200 000 (vysoké).
+- Vedení smí přes vodu. Nad vodou se sloup staví jen na zlomu a konci.
+- Panel parcely ukazuje Elektřinu ano/ne jako Vodu.
+- Vedení přes parcelu kapacitu nemá (blok vede sám); dřív jeho přetížení
+  zhaslo i parcelu pod ním a s ní celý blok. Vedení na troskách nevede.
+- Silnice nevede ani přes zónu, která pod ní zůstala (`parcelConducts`).
+
+## Audit: rozhraní, přístupnost, i18n (T135)
+
+Nálezy z auditu rozhraní, každý ověřený v kódu před opravou.
+
+- **Ikony rychlosti o stupeň vedle.** HUD skládá `speed-${násobek}` (1/2/4/8),
+  ale `tools/slice-icons.py` je pojmenoval podle pořadí karty (speed-1..4).
+  4× tak ukazovala čtyři šipky a 8× obrázek neměla vůbec. Soubory přejmenované
+  (tři šipky = `speed-4`, čtyři = `speed-8`), `speed-3` pryč, skript pojmenuje
+  stejně i nový řez (ověřeno: pixely shodné s přejmenovanými soubory).
+- **Nepoužité ikony.** `resume`, `start-city`, `reroll` jsou na tlačítkách
+  úvodní obrazovky a dialogu nové hry (ikona + text), `map-size` u nadpisu
+  volby velikosti mapy. `author` a `share` (nahrazené `home-*`) a `loan-repay`
+  (splátka úvěru ve hře není) jsou smazané i z řezu a ze zadání `09-IKONY.md`.
+- **Jazyk stránky.** `I18n.applyLocale()` nastavuje `<html lang>` podle jazyka
+  hry; `index.html` má `cs` jen jako výchozí stav před načtením.
+- **Přístupnost.** Přepínače v liště (pohled, mřížka, stromy, animace, panely,
+  rychlost, jazyk, nástroje, položky rolet, témata nápovědy, velikost mapy)
+  nesou stav v `aria-pressed` (`setPressed` v `ui/dom.ts`), rolety
+  `aria-expanded`. Dialog nové hry, nápověda, autoři, zvětšený obrázek a
+  hlášení pohromy (`alertdialog`) mají `role`, `aria-modal` a jméno z nadpisu.
+  Hlášky vpravo jsou `role=status` s `aria-live=polite`. Past na fokus
+  (focus trap) dialogy nemají — chování se neměnilo.
+- **HUD každý snímek.** `hud.update()` zapisuje jen změněné hodnoty
+  (`setText`/`setTitle`/`setStyle`/`setAttr`). `formatNumber` si už nestaví
+  `Intl.NumberFormat` při každém volání — formátovače jsou v mezipaměti a
+  zahodí se při přepnutí jazyka.
+- **Překlad přes prototyp.** `has('constructor')` bylo `true` a město
+  „constructor" se v „Pokračovat v …" vypsalo jako zdroják funkce. Tabulky
+  i parametry se čtou přes `Object.hasOwn` a parametr se překládá, jen když
+  má tvar klíče (aspoň dvě slova s tečkou). Test v `tests/ui.audit.test.ts`.
+- **Procenta.** `formatPercent()` místo napevno `"{n} %"` (preloader, HUD,
+  panel parcely): česky „50 %", anglicky „50%". V `en.json` totéž u všech
+  `{x} %`. Cena financování měla napevno `cs-CZ` i v angličtině.
+- **`url()` bez uvozovek** v panelu parcely → `cssUrl()` s escapem.
+  `home.ts` má totéž u obrázků hlavičky; ten kód patří jinému úkolu
+  (líné načítání), tak zůstal.
+- **Nepoužité klíče** (9): `ui.tool.road`, `ui.parcel.surface`,
+  `ui.parcel.roadDistance`, `ui.parcel.jobAccessFactors`, `ui.transit.stopGone`,
+  `ui.home.about`, `ui.home.authorsNote`, `ui.home.discordNote`,
+  `ui.home.shareNote` — ověřeno i proti dynamicky skládaným klíčům.
+- `vitest.config.ts` importuje `./vite.config.ts` s příponou (varování
+  nativního načítání konfigurace zmizelo).
+- Zastaralé komentáře: řeky „ve vanille nula" (`balance.ts`, `mapgen`), silnice
+  „nejdou přes tiles" (`registry.ts`); v tomhle souboru odstavec o
+  `ui.info.spriteFile` a odrážka o zóně mělčí než půdorys.
+
+Ověřeno ve vývojovém sestavení v headless Edge: tlačítka rychlosti ukazují
+1/2/3/4 šipky pro 1×/2×/4×/8×, dialog nové hry má ikony a `role=dialog`,
+anglická verze má `lang=en` a „7%".
+
+## Audit: simulace, save a bezpečnost (T132)
+
+Nálezy auditu ověřené proti kódu a opravené. Save je od teď **verze 15**.
+
+**„Ulož a načti" = „hraj dál".** Test `save.continuation.test.ts` staví město
+s vodárnou, elektrárnou, službami, linkou a všemi katastrofami, ukládá ho
+v tikách 1, 500, 929 (den před uzávěrkou) a 1200, načte do cizího světa
+a po 1 600 tikách porovná vrstvy, budovy, RNG, kasu i spokojenost s městem bez
+přerušení. Ručně prověřeno i uložení po každých 23 a 37 tikách až do 3 000,
+včetně uložení uprostřed požáru a blackoutu. Co se kvůli tomu změnilo:
+
+- Růst bere kandidáty v pořadí dlaždic, ne v pořadí množiny zón (ta si
+  pamatovala pořadí zónování, po načtení pořadí dlaždic).
+- Kolony a údržba silnic sčítají přes silnice v pořadí dlaždic
+  (`roadTilesInOrder`) — desetinný součet v jiném pořadí se lišil v posledním
+  bitu a po čase rozešel riziko nehod.
+- Save 15 ukládá stav s pamětí: spokojenost jako čtvrtou vrstvu `coarse.bin`,
+  v `state.derived` zátěž silnic, dosažitelnost práce, statistiky linek, úlevu
+  z MHD, počítadla chátrání, pokrytí službami a seznam zavodněných budov.
+  Pokrytí a voda se po načtení přepočítají stejně, ale katastrofy, oheň
+  a povodeň z nich čtou v prvním tiku dřív. Starším savům migrace doplní
+  neutrál a prázdno — to, s čím se načítaly dosud.
+- Neukládá se rozvedená voda ani elektrická síť (přepočítají se v prvním
+  tiku, než z nich kdo čte) a násobitele dostupnosti pro panel parcely
+  (výstup růstu, do dalšího běhu ukazuje panel jedničky).
+- Pokrytí třídy, která z města zmizela, se maže místo nulování.
+- `lastPopulation` se bere ze savu; savu staršímu verze 6 ji dopočítá migrace.
+
+**Sítě po katastrofách.** Konec zamoření vody a potlačení služby přepočítá
+vodovod a pokrytí. Zaplavení a opadnutí přepočítá elektřinu i vodovod (a zbytek
+odtoku pod půl tiku už nenechá na suché dlaždici hloubku). Katastrofy ničí
+i vedení, samotný úsek taky. Trosky a změny úrovně počítají s dlaždicemi, které
+budova opravdu drží (`ownedTiles`) — stará elektrárna 4 × 4 nechávala trosky
+u sousedů a snížení úrovně mazalo kus sousední budovy.
+
+**Migrace 13 → 14** maže jen vedení, které vede podél silnice; hráčův přechod
+přes ulici zůstane. Savy, které verzí 14 už prošly, přechody ztratily a vrátit
+je nejde.
+
+**Příkazy.** Zrušená linka proplatí vozidla (jako `set_vehicles` na nulu).
+Validuje se typ silnice, ruční stavba budovy zóny (`placeDefinitionCommand`),
+sazba daně, celé částky půjčky a dluhopisu a rozměr obdélníku zón a srovnání.
+**Balanc:** ceny jen celé koruny, typy silnic přesně tři.
+
+**Save jako cizí vstup** (sdílí se na Discordu):
+
+- ZIP se čte vlastním čtením adresáře (`readZipDirectory`): nejvýš 16 položek,
+  žádné jméno dvakrát, žádné šifrování ani ZIP64, komprimovaná data nesmí být
+  výrazně delší než výsledek, a rozbaluje se proudově po 4 kB s utnutím, jakmile
+  výstup přeroste délku z hlavičky. Do T132 se každá položka adresáře rozbalila
+  zvlášť a délka z hlavičky byla jen odhad: 256 kB zamrazilo kartu na 4,8 s.
+- Vlastní stav pohromy se kontroluje podle jména pole
+  (`disasterStateProblem`); nesmyslný stav nebo pohroma mimo mapu se při
+  načtení ukončí, save se kvůli ní neodmítá.
+- Meze pro tik, kasu, rating, kurzor dopravy, nákazu, postihy, jízdné,
+  ztracené zastávky, trosky, postup grantů, duplicitní id půjček a dluhopisů
+  a hodnoty ve vrstvách (silnice, vedení, terén, zóny, patra, trosky).
+
+Zbývá (mimo `src/sim` a `src/save`): `has()` v `src/ui/i18n.ts` bere klíče
+i z prototypu, takže město pojmenované „constructor" se přeloží divně.
+
+## Audit: datový objem a načítání (T134)
+
+Měřeno na produkčním buildu (`vite build`), servírovaném lokálně serverem, který
+počítá každý požadavek včetně těch z workerů Pixi; headless Edge, čistý profil.
+
+| | před | po |
+|---|---|---|
+| Build celkem | 34,9 MB / 577 souborů | 34,2 MB / 879 (z toho 285 polovičních spritů, 5,9 MB) |
+| Hlavní skript `index-*.js` | 945 kB (346 kB gzip), 78 obrázků jako `data:` | 820 kB (229 kB gzip), 4 |
+| Tvarové dlaždice silnic a potrubí v buildu | 65 souborů, 2,1 MB | 0 |
+| Rozcestník po 10 s | 362 požadavků, 26,3 MB | 196 požadavků, 4,6 MB |
+| Do spuštění nového města | 469 požadavků, 28,7 MB | 341 požadavků, 5,3 MB (109 z nich ikony lišty po ~3 kB) |
+| Do spuštění uloženého města | 469 požadavků, 28,7 MB | 343 požadavků, 6,6 MB |
+| Po 30 s hry (dotaženo na pozadí) | 469, 28,7 MB | 535, 9,8 MB |
+| Sprity budov v paměti karty (všech 285) | 256 MB (341 s mipmapami) | 64 MB (85) do zoomu 2 |
+| Autosave (ukázkové město) | úroveň 9: 150–170 ms, 47 kB | úroveň 3: 21–23 ms, 53 kB |
+| Autosave v `localStorage` | base64, 1,33 znaku na bajt | 15 bitů na znak, 0,53 znaku na bajt |
+
+- **Start bere jen první obrazovku** (`render/preload.ts`): povrchy (jedna
+  varianta), díly, podezdívky, les a balvany, zóny první úrovně a služby po
+  jedné variantě — vše v polovině. Rozehrané město přidá varianty, které v něm
+  stojí. Na grafiku se čeká nejvýš 20 s. Zbytek spritů se po startu stahuje na
+  pozadí po dvou, s nízkou prioritou a jen do HTTP keše; při `saveData` vůbec.
+- **Dvě velikosti spritů** (`render/spriteResolution.ts`): `<jméno>@0.5x.webp`
+  z `tools/make-webp.py`, kvalita 88 beze změny. Pixi z přípony pozná rozlišení
+  0,5, takže kotvy a měřítko platí dál. Nad zoomem 2 se viditelným budovám
+  dotáhne plný obrázek (po čtyřech), pod 1,8 se vrátí polovina a plné textury
+  se uvolní. Suť a scény katastrof jsou jen v polovině. Háček v
+  `buildingRenderer.drawSprite` je jedno volání `assignSpriteTexture`.
+- Ikony WebP 64 px (2,9 MB → 0,35 MB), snímky a scény rozcestníku WebP q80
+  (5 MB JPG → 3,5 MB) a karty galerie náhledem 640 px; další snímek hlavičky se
+  stahuje až 2,5 s před prolnutím. Logo 256 px WebP (787 kB → 26 kB), loga
+  partnerů 260 px. Podklady v plné velikosti jsou v `art/brand/`
+  (`tools/make-public-webp.py`). `public/demo` smazán.
+- Obrázky obsahu se nevkládají do JS (`assetsInlineLimit`), Pixi bez
+  `manageImports` (nestahuje přístupnost, DOM, události, filtry).
+- Textury po startu se použijí v jednom bloku: terén se upeče jednou, ne třikrát.
+- `.htaccess`: `immutable` jen pro `assets/`, ostatní den; brotli/deflate pro
+  text; HSTS a `Permissions-Policy`. Viz `docs/DEPLOY.md`.
+- Když start spadne (bez WebGL, vadný obsah), hráč místo prázdné stránky vidí
+  zprávu česky i anglicky.
+- **Zbývá:** obrázky katastrof (`public/events/*.jpg`, 2 MB) jsou pořád JPG —
+  příponu skládá `src/ui/disasterAlert.ts`. `BuildingRenderer` přeřazuje
+  budovy po každém setteru zvlášť (šestkrát při startu); spojit by to chtělo
+  dávkové API v rendereru.
+
+## Save v16: budovy po sloupcích (audit, T134)
+
+`entities.json` ukládá budovy po sloupcích (`src/save/entityColumns.ts`),
+`id` a `builtAtTick` jako rozdíly. Na savu autora (1 520 budov) 20,3 kB →
+11,5 kB zkomprimovaného JSONu, celý save zhruba o pětinu menší.
+`definitionId` zůstává string (P6). Migrace 15→16 jen posune verzi — mění se
+kódování souboru, ne data; čtení umí oba tvary. Fixtura `v16.city.base64`.
+
+## Audit: výkon vykreslování (T133)
+
+Měřeno na fixtuře `tests/fixtures/regressions/overfunded-services.city.base64`
+(192 × 192, 1 499 budov, 9 442 uzlů ve vrstvě budov), headless Edge s GPU,
+1920 × 1080, dev build, kamera na těžišti města. Snímek = interval mezi
+tiky, `renderFrame` = celá logika snímku, `render` = `renderer.render`.
+Mediány; stroj byl během měření vytížený jinými úlohami, rozptyl ±30 %.
+
+| Scéna | před: fps / renderFrame / render | po: fps / renderFrame / render |
+|---|---|---|
+| hra 1×, zoom 1 | 22–24 / 27–33 ms / 7–9 ms | 86–124 / 2,0 ms / 4,6–5,2 ms |
+| hra 1×, zoom 0,5 | 19–25 / 28–37 ms / 8–11 ms | 86–127 / 1,4–2,0 ms / 5,7–8,9 ms |
+| pauza, zoom 1 | 19–24 / 29–43 ms / 7–11 ms | 174–223 / 2,0–2,4 ms / 1,6–2,0 ms |
+| hra 3× | 13–26 / 28–57 ms / 7–14 ms | 140–213 / 1,9–2,6 ms / 1,7–2,3 ms |
+| požár, hra 3× | 8–22 / 30–65 ms (špičky 200–500 ms) | 71–131 / 1,7–3,0 ms (špičky 40–70 ms) |
+| posouvání kamery | 11–19 / 38–60 ms / 12–19 ms | 64–124 / 1,8–3,2 ms / 4,8–10 ms |
+
+Co se změnilo:
+
+1. **Přeřazení jen při změně.** `reorder()` běželo každý snímek přes všech
+   9 442 uzlů (35–65 ms) a mazalo `depthCache`. Teď ho spustí jen `setBox`
+   a `remove`, a pár nových uzlů se **vloží do hotového pořadí**
+   (`insertIntoOrder`, při konfliktu se přeřadí jen úsek mezi nimi): při
+   požáru 24–37 ms → 5–6 ms. `depthOrder` na typovaných polích, výsledek
+   totožný.
+2. **Změny podle druhu** (`src/render/changes.ts`). Renderer porovná špinavé
+   dlaždice se snímkem vrstev a rozliší povrch, silnici, vedení, parcelu, suť
+   a „ostatní" (oheň, povodeň, proud). Stromy, suť a lampy se přestaví jen
+   kolem změny, vedení jen když se změna dotkne vedení. Oheň a povodeň
+   přepečou u chunku jen překryvnou vrstvu. **Silnice po chuncích 16 × 16**
+   (dřív jeden `Graphics` s 81 387 instrukcemi) a peče se jen to, na co je
+   vidět.
+3. **Počet obyvatel budovu nešpiní** (`health.ts`, `water.ts`). Budova se
+   překreslí jen při změně vzhledu (definice, úroveň, zchátrání, proud,
+   půdorys); chodníky a lampy jen když se změní, zda dům chodník dává.
+4. **Ořez a skupiny vykreslování.** Uzly budov se skrývají po chuncích, jen
+   když kamera přejde přes hranici. Svět, terén, silnice, budovy, kouř,
+   odlesky a oheň jsou vlastní render group — posun kamery nepřepočítává
+   transformace všech uzlů a přidání obláčku nestaví znovu instrukce celého
+   světa. Lidé, auta, odlesky a kouř ze zásoby se jen schovávají.
+5. **Přechodové pásy** 9 → 6 vrstev (se souhlasem autora), šum jednou na
+   stranu, bez uzávěrů. Pečení chunku medián 2,6 → 1,0 ms, p90 6,7 → 2,0 ms;
+   teselace všech 144 chunků 417 → 332 ms. Čtyři vrstvy se zkoušely a na
+   mělčině byly vidět schody. Snímky před/po (zoom 1,8 a 3,5) jsou
+   v zadání T133.
+7. **Lišta** se přepočítává po tiku, po změně světa nebo nejvýš po 250 ms,
+   ne každý snímek.
+8. **Sítě:** když se nezměnilo, co vede (`ConductSnapshot`), elektřina
+   i voda vezmou minulý tvar sítě a přepočítají jen rozdělení. Rozhoduje
+   porovnání vstupů, ne volající. Elektřina 3,8 → 2,3 ms, voda 5,5 → 1,6 ms
+   na přepočet; `networkCache.test.ts` hlídá shodu s úplným přepočtem.
+9. **Overlay dopravy** se překreslí jen při změně zátěže nebo silnic.
+10. Auta bez alokací v pruzích, kouř z komínů bez nového pole, budovy služeb
+    v seznamu, který se obnoví jen při změně budov.
+11. Odhady ceny pod kurzorem jsou zapamatované (nástroj + dlaždice + tik).
+13. Vedení se ničí i s dětmi (únik `GraphicsContext`).
+14. Chybějící obrázky chodců zezadu už nehází výjimku každý snímek.
+
+Zbývá: špičky při požáru (40–70 ms) dělá hlavně simulace (`fire.ts`,
+bourání a přepočty sítí po něm) a přeřazení; `render` při plném oddálení
+(zoom 0,5) je kolem 9 ms, protože je vidět většina města. Body 6 a 12
+(start a `antialias`) řeší jiná úloha.
+
+## Vysoké a nízké napětí, trafostanice, bourání ruin (T136, rozhodnutí autora)
+
+„Vysoké napětí nejde napojit do budov, vyjma elektráren. Do budov a zón jde
+jen nízké napětí a mezi vysokým a nízkým musí být trafo. Vysoké napětí je
+také výrazně dražší na údržbu." A: „ve chvíli, kdy dojede k budově nebo do
+zóny, tak je elektřina v celé budově i celé zóně" (to platilo už od T129).
+
+- **Síť má dvě vrstvy** (`power.ts`): nízké napětí se vším, co odebírá,
+  a vysoké napětí. Potkají se jen v elektrárně (celým půdorysem, bez limitu;
+  elektrárna napájí obojí) a v trafostanici (jedna dlaždice, kapacita trafa,
+  oběma směry). Vysoké napětí vede přes blok, ale nenapojí ho.
+- **Trafostanice** `vanilla:transformer` 1×1, 40 000, 800, údržba 20;
+  **rozvodna** `vanilla:substation` 2×2, 100 000, 3 000, údržba 60. Definice mají
+  `power.transformer`. Jsou v nabídce Vedení. Sprity a/b/c vygenerované (0,40 USD).
+- **Údržba vedení** `balance.power.wires[].upkeep`: nízké 0,2, vysoké 3 za
+  dlaždici a měsíc. Vlastní řádek v rozpočtu a v knize (`upkeep.wires`).
+- **Kapacita je vidět:** v nabídce „unese …", v panelu parcely typ vedení
+  a zatížení / kapacita (nebo bez proudu, přetížené), v panelu trafa jeho
+  zatížení, v legendě vrstvy elektřiny barvy vedení. Mrtvé vedení je šedé
+  (`world.wireLive`).
+- **Rozehraná města** (rozhodnutí autora): nechat zhasnout, hláška
+  `ui.save.needsTransformers`, když má město vysoké napětí a žádné trafo.
+- **Hromadné bourání ruin:** vlastní nástroj v liště (tažení obdélníku),
+  příkaz `demolish_ruins` zbourá jen opuštěné budovy a uklidí suť; jde vrátit.
+- Golden město přemosťuje ulici nízkým napětím: kasa 35 209 → 35 257,
+  budovy, obyvatelé a práce beze změny.

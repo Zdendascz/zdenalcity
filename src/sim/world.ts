@@ -162,6 +162,13 @@ export function pushFinanceNotice(world: WorldState, notice: FinanceNotice): voi
   if (world.financeNotices.length > MAX_FINANCE_NOTICES) world.financeNotices.shift();
 }
 
+/** Zatížení trafostanice (T136): kolik přes ni teče, kolik unese, jestli vypadla. */
+export interface TransformerLoad {
+  load: number;
+  capacity: number;
+  overloaded: boolean;
+}
+
 export interface WorldState {
   readonly size: number;
   readonly seed: number;
@@ -274,6 +281,23 @@ export interface WorldState {
    * Runtime-only — po loadu se síť přepočítá znovu.
    */
   powerNetworkDirty: boolean;
+  /**
+   * Zátěž na úsecích vedení (T129): kolik spotřeby jde přes dlaždici vedení.
+   * **Neukládá se**, přepočítá se se sítí. Čte ji vrstva elektřiny, aby
+   * ukázala vytížení a přetížené úseky.
+   */
+  wireLoad: Float32Array;
+  /** Úsek vedení je přetížený a všechno za ním je bez proudu. Runtime. */
+  wireOverloaded: Uint8Array;
+  /**
+   * Došel na úsek vedení proud? Runtime. Vrstva `power` to neříká: vysoké
+   * napětí vede nad parcelou, která sama proud nemá (T136).
+   */
+  wireLive: Uint8Array;
+  /** Zatížení trafostanic podle id budovy (T136). Runtime, přepočítá se se sítí. */
+  transformerLoad: Map<number, TransformerLoad>;
+  /** Zvedne se při každém přepočtu sítě — podle toho se překreslí vedení. */
+  powerRevision: number;
 
   /**
    * Kam došla voda potrubím, 0/1 na dlaždici. **Neukládá se** — dá se spočítat
@@ -548,6 +572,11 @@ export function createWorld(
     map: { seed: seed >>> 0, generated: false },
     downgradeStreak: new Map(),
     powerNetworkDirty: false, // prázdná mapa nemá co propočítávat
+    wireLoad: new Float32Array(size * size),
+    wireOverloaded: new Uint8Array(size * size),
+    wireLive: new Uint8Array(size * size),
+    transformerLoad: new Map(),
+    powerRevision: 0,
     waterSupply: new Uint8Array(size * size),
     watered: new Set(),
     waterlessStreak: new Map(),
@@ -600,9 +629,21 @@ export function setRoadTile(world: WorldState, tile: number, type: number): void
 
 /** Zapíše zónu a udrží seznam. Stejný důvod jako u `setRoadTile`. */
 export function setZoneTile(world: WorldState, tile: number, zone: number): void {
+  const before = world.layers.zone[tile] ?? 0;
   world.layers.zone[tile] = zone;
   if (zone === 0) world.zonedTiles.delete(tile);
   else world.zonedTiles.add(tile);
+  // Zóna vede proud i vodu (T129), takže nová nebo zrušená zóna mění sítě.
+  if ((before === 0) !== (zone === 0)) markNetworksDirty(world);
+}
+
+/**
+ * Změnila se vodivost parcel (T129) — zóna, budova, zchátrání, suť. Obě sítě
+ * se pak musí přepočítat, protože obě se ptají na totéž (`sim/conduct.ts`).
+ */
+export function markNetworksDirty(world: WorldState): void {
+  world.powerNetworkDirty = true;
+  world.waterNetworkDirty = true;
 }
 
 /** Terén se změnil — co se z něj počítá, se musí zahodit. */
@@ -632,6 +673,19 @@ export function rebuildTileIndex(world: WorldState): void {
 }
 
 /**
+ * Silnice **v pořadí dlaždic**, ne v pořadí množiny (audit T132).
+ *
+ * `roadTiles` si pamatuje pořadí vkládání: za běhu je to pořadí, v jakém
+ * hráč stavěl, po načtení savu pořadí dlaždic. Kdo přes silnice sčítá
+ * desetinná čísla — kolony, údržbu — dostal v posledním bitu jiný součet
+ * a načtené město se od uloženého po čase rozešlo. Kdo jen počítá kusy nebo
+ * hledá vzdálenost, pořadí řešit nemusí.
+ */
+export function roadTilesInOrder(world: WorldState): number[] {
+  return [...world.roadTiles].sort((a, b) => a - b);
+}
+
+/**
  * Přestaví svět na jinou velikost mapy.
  *
  * Používá to načítání savu: renderer i UI drží `getSnapshot()` jako živý pohled
@@ -655,6 +709,10 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.trafficLoad = new Float32Array(size * size);
   world.financeNotices.length = 0;
   world.waterSupply = new Uint8Array(size * size);
+  world.wireLoad = new Float32Array(size * size);
+  world.wireOverloaded = new Uint8Array(size * size);
+  world.wireLive = new Uint8Array(size * size);
+  world.transformerLoad = new Map();
   world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
   world.happiness = new Uint8Array(coarseCellsOf(size)).fill(NEUTRAL_HAPPINESS);
   // Seznamy patří ke starým vrstvám; nové jsou prázdné.

@@ -4,9 +4,9 @@ exports[`golden: město po 1000 tikách > pevný seed a plná sestava systémů 
 {
   "buildings": 61,
   "coarse": "27cf8bdb",
-  "funds": 38874,
+  "funds": 35257,
   "jobs": 122,
-  "layers": "ab2b8cea",
+  "layers": "26f003a3",
   "population": 192,
 }
 `;

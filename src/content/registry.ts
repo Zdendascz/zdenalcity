@@ -38,13 +38,18 @@ export interface ContentSource {
   /**
    * Obrázky povrchu. Klíč = `<druh terénu>|<varianta>`, tedy `grass|a`.
    *
-   * Zdroj je mít nemusí — hra pak kreslí terén barvou jako dřív. Silnice ani
-   * potrubí tudy zatím nejdou: jejich dlaždice sice existují, ale mají vadné
-   * spoje, takže by vozovka na každém styku uskakovala (viz `docs/08-DLAZDICE.md`).
+   * Zdroj je mít nemusí — hra pak kreslí terén barvou jako dřív. Tudy jde
+   * i **materiál vozovky** (`asphalt_street|a` a spol.): silnice má z obrázku
+   * jen povrch, tvar se počítá z rohů dlaždice (T72). Hotové dlaždice na každý
+   * tvar (`roads` níž) se zkoušely a renderer je nekreslí — mají vadné spoje,
+   * viz `docs/08-DLAZDICE.md`. Potrubí zůstává procedurální.
    */
   readonly tiles?: Readonly<Record<string, string>>;
-  /** Dlaždice vozovky pod klíčem `rodina__tvar`. */
-  readonly roads?: Readonly<Record<string, string>>;
+  /**
+   * Díly pro animace a silnice (T116): rotor větrníku, auta, chodci, lampa.
+   * Klíč = jméno dílu. Zdroj je mít nemusí — co chybí, to se nekreslí.
+   */
+  readonly parts?: Readonly<Record<string, PartImage>>;
   /** Materiály podezdívek pod klíčem `kategorie__varianta`. */
   readonly skirts?: Readonly<Record<string, string>>;
   /**
@@ -69,6 +74,66 @@ export interface SpriteImage {
   readonly height: number;
   readonly anchor: readonly [number, number];
   readonly scale: number;
+  /**
+   * Týž obrázek v poloviční velikosti (T134), nebo nic. Rozměry, kotva
+   * a `scale` platí dál pro plný obrázek — renderer polovinu načte s rozlišením
+   * 0,5, takže na mapě sedí stejně. Plná velikost se dotahuje, až hráč
+   * přiblíží nad zoom 2 (`src/render/spriteResolution.ts`). Mod ji dodat
+   * nemusí; pak se kreslí rovnou plný obrázek.
+   */
+  readonly half?: string;
+  /**
+   * Co z obrázku vychází: kouř z komína, točící se rotor, blikající světlo
+   * (T116). Body jsou **v pixelech obrázku**, stejně jako `anchor`, takže
+   * sedí na tuhle variantu a na žádnou jinou.
+   */
+  readonly effects?: readonly SpriteEffect[];
+}
+
+/**
+ * Jeden efekt na obrázku budovy. Druh je string s namespace (P6), aby mod
+ * mohl přidat vlastní; neznámý druh renderer přeskočí.
+ */
+export interface SpriteEffect {
+  /** `vanilla:spin`, `vanilla:smoke`, `vanilla:blink`. */
+  readonly type: string;
+  /** Bod v pixelech obrázku. U rotoru náboj, u kouře ústí komína. */
+  readonly at: readonly [number, number];
+  /** Kdy běží. Výchozí `always`; `powered` jen s proudem. */
+  readonly when?: 'always' | 'powered';
+  /** Díl, který se kreslí (u `spin` rotor). */
+  readonly part?: string;
+  /**
+   * Rovina rotoru: dva vektory v pixelech obrázku, kam se promítne jednotková
+   * délka lopatky ve směru „vpravo“ a „nahoru“. Rotor kreslený šikmo je
+   * elipsa, a tahle matice ji popisuje přesně (změřeno ze špiček lopatek).
+   */
+  readonly axes?: readonly [readonly [number, number], readonly [number, number]];
+  /** Otáčky za sekundu u `spin`, hustota u `smoke`. */
+  readonly rate?: number;
+  /** Barva jako `#rrggbb` (světlo, kouř). */
+  readonly color?: string;
+}
+
+/**
+ * Díl pro animaci: obrázek s kotvou. `anchor` je bod, který sedne na místo
+ * (u rotoru náboj, u auta střed podvozku), `radius` u rotoru délka lopatky
+ * v pixelech obrázku.
+ */
+export interface PartImage {
+  readonly url: string;
+  readonly width: number;
+  readonly height: number;
+  readonly anchor: readonly [number, number];
+  readonly scale: number;
+  readonly radius?: number;
+  /**
+   * O kolik (radiány) obrázek zkosit, aby podélná osa vozidla ležela na
+   * izometrické ose. Generátor kreslí auta pod ~20° místo 26,6° (T124).
+   */
+  readonly skew?: number;
+  /** Úchyty vodičů v pixelech obrázku (sloupy vedení, T129). */
+  readonly attach?: readonly (readonly [number, number])[];
 }
 
 export interface SourceInfo {
@@ -101,8 +166,8 @@ export class ContentRegistry {
   /** jméno ikony → URL obrázku, slito přes všechny zdroje. */
   private readonly icons = new Map<string, string>();
   private readonly sprites = new Map<string, SpriteImage>();
+  private readonly parts = new Map<string, PartImage>();
   private readonly tiles = new Map<string, string>();
-  private readonly roads = new Map<string, string>();
   private readonly skirts = new Map<string, string>();
   private balance: Balance | null = null;
 
@@ -189,11 +254,11 @@ export class ContentRegistry {
     for (const [key, sprite] of Object.entries(source.sprites ?? {})) {
       this.sprites.set(key, sprite);
     }
+    for (const [key, part] of Object.entries(source.parts ?? {})) {
+      this.parts.set(key, part);
+    }
 
     // A povrchy. Mod smí přidat vlastní variantu trávy nebo přepsat vanilla.
-    for (const [key, url] of Object.entries(source.roads ?? {})) {
-      this.roads.set(key, url);
-    }
     for (const [key, url] of Object.entries(source.skirts ?? {})) {
       this.skirts.set(key, url);
     }
@@ -232,11 +297,6 @@ export class ContentRegistry {
    * URL obrázků ikon. Prázdné, když je žádný zdroj nedodal — rozhraní si pak
    * poradí polygony.
    */
-  /** Všechny dlaždice vozovky, které obsah dodal. Klíč je `rodina__tvar`. */
-  getRoads(): Record<string, string> {
-    return Object.fromEntries(this.roads);
-  }
-
   /** Všechny materiály podezdívek. Klíč je `kategorie__varianta`. */
   getSkirts(): Record<string, string> {
     return Object.fromEntries(this.skirts);
@@ -252,6 +312,24 @@ export class ContentRegistry {
    */
   getSprite(definitionId: string, variant: string): SpriteImage | undefined {
     return this.sprites.get(`${definitionId}|${variant}`);
+  }
+
+  /**
+   * Klíče všech spritů (`budova|varianta`), seřazené. Přednačítání podle nich
+   * rozdělí obrázky na ty, které potřebuje první obrazovka, a zbytek (T134).
+   */
+  getSpriteKeys(): string[] {
+    return [...this.sprites.keys()].sort();
+  }
+
+  /** Díl pro animaci, nebo `undefined`. Chybějící díl se nekreslí. */
+  getPart(name: string): PartImage | undefined {
+    return this.parts.get(name);
+  }
+
+  /** Jména všech dílů, seřazená. Přednačítání je stáhne předem. */
+  getPartNames(): string[] {
+    return [...this.parts.keys()].sort();
   }
 
   /** URL obrázku povrchu, nebo `undefined`, když ho obsah nedodal. */

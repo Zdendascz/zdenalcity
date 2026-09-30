@@ -11,10 +11,10 @@ import {
   planLevelArea,
 } from './heights';
 import { MAX_FUNDING } from './funding';
-import { inBounds, index, ROAD, TERRAIN, terrainNameKey, ZONE } from './layers';
+import { inBounds, index, ROAD, TERRAIN, terrainNameKey, WIRE, ZONE } from './layers';
 import type { ZoneType } from './layers';
 import { earn, spend } from './ledger';
-import { categoryForZone } from './rci';
+import { categoryForZone, isRciCategory } from './rci';
 import { gradeForRoads, planRoadGradeAround } from './roads';
 import { checkRequirements, presentDefinitions } from './requirements';
 import {
@@ -59,11 +59,16 @@ export type Command =
   | { type: 'build_road'; x: number; y: number; roadType?: number }
   | { type: 'bulldoze'; x: number; y: number }
   | { type: 'zone'; x: number; y: number; w: number; h: number; zone: ZoneType }
+  /** Zbourá v obdélníku jen opuštěné budovy a suť (T136). */
+  | { type: 'demolish_ruins'; x: number; y: number; w: number; h: number }
   | { type: 'place_building'; definitionId: string; x: number; y: number }
   | { type: 'set_tax_rate'; zone: ZoneType; rate: number }
   | { type: 'set_service_funding'; serviceClass: string; funding: number }
   | { type: 'build_pipe'; x: number; y: number }
   | { type: 'remove_pipe'; x: number; y: number }
+  /** Elektrické vedení (T129): `wire` je `WIRE.low` nebo `WIRE.high`. */
+  | { type: 'build_wire'; x: number; y: number; wire: number }
+  | { type: 'remove_wire'; x: number; y: number }
   | { type: 'terraform_corner'; x: number; y: number; delta: number }
   /**
    * Vysazení lesa (rozhodnutí autora).
@@ -181,6 +186,18 @@ export function buildRoad(
   balance?: Balance,
 ): CommandResult {
   if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+  // Typ silnice je index do vrstvy i do tabulky cen (audit T132). Příkaz umí
+  // přijít z konzole nebo z budoucího vstupu, ne jen z lišty: `1.5` nebo `9`
+  // by se do Uint8 zapsalo jako jiná silnice nebo nesmysl a cena by vyšla
+  // nulová, protože `roadTypes[8]` neexistuje.
+  if (
+    !Number.isInteger(type) ||
+    type < ROAD.street ||
+    type > ROAD.highway ||
+    (balance !== undefined && type > balance.traffic.roadTypes.length)
+  ) {
+    return reject('error.unknownRoadType', { roadType: String(type) });
+  }
 
   const tile = index(x, y, world.size);
   if (world.layers.buildingId[tile] !== 0) return reject('error.occupied');
@@ -266,7 +283,9 @@ export function buildRoad(
   // nová dlaždice už je, takže dřív by se ptalo na tvar, který ještě neplatí,
   // a odbočka by při stavbě zbořila ulici, do které se napojuje.
   if (grade && grade.size > 0) collapseUnsupportedRoads(world, grade, noLosses());
-  markPowerNetworkDirty(world); // silnice je vodič
+  // Silnice od T129 nic nevede, ale mohla přepsat zónu nebo suť pod sebou.
+  markPowerNetworkDirty(world);
+  markWaterNetworkDirty(world);
   return OK;
 }
 
@@ -515,6 +534,31 @@ export function placeDefinition(
 }
 
 /**
+ * Příkaz `place_building`, tedy ruční stavba **od hráče** (audit T132).
+ *
+ * Budovy zón (bydlení, obchod, průmysl) ručně stavět nejdou: rostou samy
+ * z poptávky, a kdo by si je postavil, obešel by poptávku, daně i cenu půdy
+ * — v menu nejsou, ale příkaz přijde i z konzole nebo z budoucího vstupu.
+ * Kontrola je tady, ne v `placeDefinition`: tu používají testy a nástroje,
+ * které si zónovou budovu na místo postavit potřebují, aby zkoumaly něco
+ * jiného než růst.
+ */
+export function placeDefinitionCommand(
+  world: WorldState,
+  catalogue: BuildingCatalogue,
+  definitionId: string,
+  x: number,
+  y: number,
+  balance?: Balance,
+): CommandResult {
+  const definition = catalogue.get(definitionId);
+  if (definition && isRciCategory(definition.category)) {
+    return reject('error.notPlaceable');
+  }
+  return placeDefinition(world, catalogue, definitionId, x, y, balance);
+}
+
+/**
  * Vyznačí obdélník zónou. Dlaždice, na které to nejde (voda, silnice, budova),
  * se přeskočí — hráč nemá důvod řešit, že mu výběr zasahuje do řeky. Když
  * neprojde ani jedna, je to odmítnutí i s důvodem.
@@ -530,6 +574,9 @@ export function zoneArea(
   zone: ZoneType,
   balance?: Balance,
 ): CommandResult {
+  // Obdélník větší než mapa nemá smysl a smyčka níž by kvůli `w = 1e9` běžela
+  // do zamrznutí karty (audit T132). Lišta takový nepošle, konzole ano.
+  if (!validArea(world, w, h)) return reject('error.outOfBounds');
   // Nejdřív se **jen sepíše**, co by se změnilo, a teprve pak se sahá na svět.
   // Srovnání terénu se od T68 platí a bez peněz se nezónuje; kdyby se značky
   // psaly průběžně, zůstala by po odmítnutí půlka čtvrti vyznačená.
@@ -699,6 +746,56 @@ export function estimateZoning(
 }
 
 /**
+ * Hromadné bourání ruin (T136, přání autora): v obdélníku zbourá **jen
+ * opuštěné budovy** a uklidí suť. Obydlené domy, silnice, zóny, vedení ani
+ * les nechá být — tažení přes celou čtvrť je bezpečné.
+ *
+ * Ruiny ve městě po změně pravidel elektřiny rozsekaly bloky (opuštěná budova
+ * proud nevede) a bourat je po jedné bylo k ničemu. Úklid suti stojí jako
+ * buldozerem; když na všechno nestačí peníze, nebourá se nic — půl uklizené
+ * čtvrti by hráč nečekal.
+ */
+export function demolishRuins(
+  world: WorldState,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  balance?: Balance,
+): CommandResult {
+  if (!validArea(world, w, h)) return reject('error.outOfBounds');
+  const ruins = new Set<number>();
+  const rubble: number[] = [];
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      if (!inBounds(x + dx, y + dy, world.size)) continue;
+      const tile = index(x + dx, y + dy, world.size);
+      const id = world.layers.buildingId[tile] ?? 0;
+      if (id !== 0) {
+        if (world.buildings.get(id)?.abandoned === true) ruins.add(id);
+        continue;
+      }
+      if ((world.rubble[tile] ?? 0) !== 0) rubble.push(tile);
+    }
+  }
+  if (ruins.size === 0 && rubble.length === 0) return reject('error.noRuins');
+
+  const cost = rubble.length * (balance?.disasters.rubble.clearCost ?? 0);
+  if (world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  }
+  // Pořadí podle id: stejné tažení dá vždycky stejný výsledek (P2).
+  for (const id of [...ruins].sort((a, b) => a - b)) removeBuilding(world, id);
+  if (cost > 0) spend(world, 'bulldoze', cost);
+  for (const tile of rubble) {
+    clearRubble(world, tile);
+    const tx = tile % world.size;
+    markTileDirty(world, tx, (tile - tx) / world.size);
+  }
+  return OK;
+}
+
+/**
  * Boura vždycky to nejvrchnější: budovu, jinak silnici, jinak trosky, jinak
  * terén.
  *
@@ -749,6 +846,15 @@ export function bulldoze(
     spend(world, 'bulldoze', cost);
     clearRubble(world, tile);
     markTileDirty(world, x, y);
+    return OK;
+  }
+
+  // Elektrické vedení (T129) bourá buldozer stejně jako potrubí: až když na
+  // dlaždici nic vyššího nestojí. Autorovi chybělo, jak dráty odstranit.
+  if ((world.layers.wire[tile] ?? WIRE.none) !== WIRE.none) {
+    world.layers.wire[tile] = WIRE.none;
+    markTileDirty(world, x, y);
+    markPowerNetworkDirty(world);
     return OK;
   }
 
@@ -868,6 +974,9 @@ export function setServiceFunding(
 export function setTaxRate(world: WorldState, zone: ZoneType, rate: number): CommandResult {
   const category = categoryForZone(zone);
   if (!category) return reject('error.notAZone');
+  // `NaN` by ořezáním prošel jako `NaN` a daně by od té chvíle nevybíraly
+  // nic; save s ním se pak odmítl načíst (audit T132).
+  if (!Number.isFinite(rate)) return reject('error.invalidTaxRate');
 
   world.economy.taxRates[category] = Math.max(
     MIN_TAX_RATE,
@@ -928,6 +1037,51 @@ export function removePipe(
   world.layers.pipe[tile] = 0;
   markTileDirty(world, x, y);
   markWaterNetworkDirty(world);
+  return OK;
+}
+
+/**
+ * Položí elektrické vedení (T129), nebo stávající přestaví na jiný typ.
+ *
+ * Vedení smí vést přes silnici i budovu, stejně jako potrubí — spojuje bloky
+ * a do cesty mu stojí jen suť. **Přes vodu smí** (autor: „vedení nejde udělat
+ * přes vodu"); nad vodou se natáhne rozpětí bez sloupů. Přestavba stojí cenu nového typu;
+ * stejný typ podruhé se odmítne.
+ */
+export function buildWire(
+  world: WorldState,
+  x: number,
+  y: number,
+  wire: number,
+  balance?: Balance,
+): CommandResult {
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+  if (wire !== WIRE.low && wire !== WIRE.high) return reject('error.unknownWire');
+
+  const tile = index(x, y, world.size);
+  if (world.layers.wire[tile] === wire) return reject('error.wireExists');
+  if ((world.rubble[tile] ?? 0) !== 0) return reject('error.rubbleInTheWay');
+
+  const cost = balance?.power.wires[wire - 1]?.cost ?? 0;
+  if (world.economy.funds < cost) {
+    return reject('error.notEnoughFunds', { cost, funds: world.economy.funds });
+  }
+
+  spend(world, 'wires', cost);
+  world.layers.wire[tile] = wire;
+  markTileDirty(world, x, y);
+  markPowerNetworkDirty(world);
+  return OK;
+}
+
+/** Odstraní vedení, a jen vedení — stejná úvaha jako u `removePipe`. */
+export function removeWire(world: WorldState, x: number, y: number): CommandResult {
+  if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+  const tile = index(x, y, world.size);
+  if ((world.layers.wire[tile] ?? WIRE.none) === WIRE.none) return reject('error.noWire');
+  world.layers.wire[tile] = WIRE.none;
+  markTileDirty(world, x, y);
+  markPowerNetworkDirty(world);
   return OK;
 }
 
@@ -1134,7 +1288,21 @@ export function levelArea(
   height?: number,
 ): CommandResult {
   if (!inBounds(x, y, world.size)) return reject('error.outOfBounds');
+  // Stejná mez jako u zón: plán srovnání prochází celý obdélník (T132).
+  if (!validArea(world, w, h)) return reject('error.outOfBounds');
   return commit(world, estimateLevelArea(world, x, y, w, h, balance, mode, height));
+}
+
+/**
+ * Rozměr obdélníku z příkazu: celé číslo od nuly do hrany mapy.
+ *
+ * Nula je platná (prázdný výběr, odmítne se až důvodem „nic se nezměnilo"),
+ * záporné, necelé nebo větší než mapa ne.
+ */
+function validArea(world: WorldState, w: number, h: number): boolean {
+  const fits = (side: number): boolean =>
+    Number.isInteger(side) && side >= 0 && side <= world.size;
+  return fits(w) && fits(h);
 }
 
 /* ------------------------------------------------------------------ MHD -- */
@@ -1163,8 +1331,29 @@ export function createTransitLine(
   return OK;
 }
 
-export function deleteTransitLine(world: WorldState, lineId: number): CommandResult {
-  if (!removeLine(world, lineId)) return reject('error.unknownLine', { id: lineId });
+/**
+ * Zruší linku a **proplatí její vozidla** (audit T132).
+ *
+ * Stejně jako `setLineVehicles` na nulu: plná cena vozidla, stejný řádek
+ * knihy. Do T132 se zrušením linky vozidla ztratila, takže hráč, který linku
+ * nejdřív vyprázdnil a pak smazal, dostal peníze zpátky, a ten, kdo ji smazal
+ * rovnou, ne — tentýž tah se dvěma cenami.
+ *
+ * Linka módu, který obsah nezná (mod zmizel), se smaže bez náhrady: cenu
+ * vozidla není odkud vzít.
+ */
+export function deleteTransitLine(
+  world: WorldState,
+  lineId: number,
+  balance?: Balance,
+): CommandResult {
+  const line = findLine(world, lineId);
+  if (!line) return reject('error.unknownLine', { id: lineId });
+
+  const mode = balance ? modeOf(balance, line.mode) : undefined;
+  const refund = mode ? line.vehicles * mode.vehicleCost : 0;
+  removeLine(world, lineId);
+  if (refund > 0) earn(world, 'refund', refund);
   return OK;
 }
 

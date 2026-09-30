@@ -1,4 +1,4 @@
-import { button, el } from './dom';
+import { button, el, setExpanded, setPressed } from './dom';
 import { iconSvg } from './icons';
 import { closeOtherSheets } from './sheets';
 
@@ -94,6 +94,8 @@ export class Popover {
     this.trigger = button('popover__trigger', () => this.toggle());
     this.trigger.title = options.label;
     this.trigger.setAttribute('aria-label', options.label);
+    // Otevřenost panelu byla vidět jen na třídě `is-open`.
+    setExpanded(this.trigger, false);
 
     this.iconSlot = el('span', 'popover__icon');
     this.iconName = options.icon;
@@ -144,6 +146,7 @@ export class Popover {
     open.add(this);
     this.panel.classList.remove('is-hidden');
     this.trigger.classList.add('is-open');
+    setExpanded(this.trigger, true);
     this.reposition();
   }
 
@@ -175,6 +178,7 @@ export class Popover {
     open.delete(this);
     this.panel.classList.add('is-hidden');
     this.trigger.classList.remove('is-open');
+    setExpanded(this.trigger, false);
   }
 
   isVisible(): boolean {
@@ -236,7 +240,7 @@ export class Menu extends Popover {
   /** `null` znamená „z téhle nabídky není vybráno nic". */
   setSelected(id: string | null): void {
     for (const [itemId, node] of this.items) {
-      node.classList.toggle('is-active', itemId === id);
+      setPressed(node, itemId === id);
     }
     this.setActive(id !== null && id !== this.neutralId);
     if (this.lockIcon) return;

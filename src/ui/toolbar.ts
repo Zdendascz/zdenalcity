@@ -1,4 +1,4 @@
-import { button, el } from './dom';
+import { button, el, setPressed } from './dom';
 import { formatNumber } from './format';
 import { iconSvg } from './icons';
 import type { ToolbarOverflow } from './hud';
@@ -78,7 +78,7 @@ export class Toolbar {
       menu.setSelected(menu.has(this.activeId) ? this.activeId : null);
     }
     for (const [toolId, node] of this.singles) {
-      node.classList.toggle('is-active', toolId === this.activeId);
+      setPressed(node, toolId === this.activeId);
     }
 
     // Vybraný nástroj ze **schované** řady si přebírá trojtečka: jinak by
@@ -168,6 +168,9 @@ export class Toolbar {
   /** Napravo od jména: cena, a když ji nástroj nemá, aspoň klávesa. */
   private hint(tool: ToolOption): string {
     const parts: string[] = [];
+    if (tool.capacity !== undefined) {
+      parts.push(this.i18n.t('ui.tool.capacity', { value: formatNumber(tool.capacity) }));
+    }
     if (tool.cost !== undefined && tool.cost > 0) parts.push(formatNumber(tool.cost));
     if (tool.hotkey) parts.push(tool.hotkey.toUpperCase());
     return parts.join(' · ');

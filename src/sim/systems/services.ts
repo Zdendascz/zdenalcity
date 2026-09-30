@@ -146,8 +146,14 @@ function addCoverage(
 }
 
 /**
- * Přepíše mapu pokrytí. Třídy, které ve městě zmizely, se vynulují — kdyby se
- * jen přeskočily, po zbourání poslední stanice by pokrytí zůstalo viset.
+ * Přepíše mapu pokrytí. Třídy, které ve městě zmizely, se **smažou** — kdyby
+ * se jen přeskočily, po zbourání poslední stanice by pokrytí zůstalo viset.
+ *
+ * Smazat, ne vynulovat (audit T132): vynulovaná třída zůstávala v mapě jako
+ * vrstva samých nul, kdežto po načtení savu, kde se pokrytí počítá znovu,
+ * v mapě nebyla vůbec. Chátrání průměruje přes třídy v mapě
+ * (`levels.ts`, `neglectPenalty`), takže stejné město chátralo jinak podle
+ * toho, jestli se mezitím uložilo a načetlo.
  */
 function writeCoverage(world: WorldState, accumulated: Map<string, Float32Array>): void {
   for (const [serviceClass, field] of accumulated) {
@@ -165,7 +171,7 @@ function writeCoverage(world: WorldState, accumulated: Map<string, Float32Array>
     }
   }
 
-  for (const [serviceClass, target] of world.coverage) {
-    if (!accumulated.has(serviceClass)) target.fill(0);
+  for (const serviceClass of [...world.coverage.keys()]) {
+    if (!accumulated.has(serviceClass)) world.coverage.delete(serviceClass);
   }
 }

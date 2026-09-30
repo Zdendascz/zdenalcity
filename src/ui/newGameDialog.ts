@@ -5,8 +5,9 @@ import type { MapSize } from '@/sim/layers';
 import { balanceWithMap, generateTerrain } from '@/sim/mapgen';
 import type { MapChoice } from '@/sim/mapgen';
 import { MAX_HEIGHT } from '@/sim/heights';
-import { button, el } from './dom';
+import { button, el, markDialog, setPressed } from './dom';
 import type { I18n } from './i18n';
+import { iconSvg } from './icons';
 
 /**
  * Dialog nové hry (§3 zadání fáze 3).
@@ -152,7 +153,9 @@ export function showNewGameDialog(
   const dialog = el('div', 'dialog');
   overlay.appendChild(dialog);
 
-  dialog.appendChild(el('h1', 'dialog__title', t('ui.newGame.title')));
+  const title = el('h1', 'dialog__title', t('ui.newGame.title'));
+  dialog.appendChild(title);
+  markDialog(dialog, title);
 
   const form = el('div', 'dialog__form');
 
@@ -167,7 +170,11 @@ export function showNewGameDialog(
   // Velikost mapy: čtyři pevné volby, ne posuvník. Mezivelikosti by nic
   // nepřinesly a save i mřížky se od nich odvozují (§2 fáze 4).
   const sizeLabel = el('div', 'dialog__field');
-  sizeLabel.appendChild(el('span', undefined, t('ui.newGame.size')));
+  // Ikona patří k nadpisu volby, ne ke čtyřem čipům: na každém by se jen
+  // opakovala a čísla velikostí by se do čipu nevešla.
+  const sizeHead = el('span', 'dialog__field-head');
+  sizeHead.append(iconSvg('map-size'), t('ui.newGame.size'));
+  sizeLabel.appendChild(sizeHead);
   const sizeChips = el('div', 'dialog__sizes');
   sizeLabel.appendChild(sizeChips);
   sizeLabel.appendChild(el('span', 'dialog__hint', t('ui.newGame.sizeHint')));
@@ -264,7 +271,7 @@ export function showNewGameDialog(
 
   function markChips(): void {
     for (const [option, chip] of chips) {
-      chip.classList.toggle('is-active', option === size);
+      setPressed(chip, option === size);
     }
   }
 
@@ -337,7 +344,7 @@ export function showNewGameDialog(
         resume: true,
       });
     });
-    resume.textContent = t('ui.newGame.resume');
+    resume.append(iconSvg('resume'), t('ui.newGame.resume'));
     actions.appendChild(resume);
   }
 
@@ -345,7 +352,7 @@ export function showNewGameDialog(
     seed = randomSeed();
     draw();
   });
-  reroll.textContent = t('ui.newGame.reroll');
+  reroll.append(iconSvg('reroll'), t('ui.newGame.reroll'));
   actions.appendChild(reroll);
 
   // Ručně zapsaný seed má platit — je to hlavní důvod, proč je pole editovatelné.
@@ -365,7 +372,7 @@ export function showNewGameDialog(
       map: { ...choice },
     });
   });
-  start.textContent = t('ui.newGame.start');
+  start.append(iconSvg('start-city'), t('ui.newGame.start'));
   actions.appendChild(start);
 
   dialog.appendChild(actions);

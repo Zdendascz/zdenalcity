@@ -24,6 +24,7 @@ import { createPowerSystem } from '@/sim/systems/power';
 import { createTrafficSystem } from '@/sim/systems/traffic';
 import { createWaterSystem } from '@/sim/systems/water';
 import { MAP_SIZE } from './support/grid';
+import { wireUnderRoads } from './support/power';
 
 /**
  * Povodeň (T49, §5 fáze 4).
@@ -109,6 +110,7 @@ function growCity(content: ContentRegistry): WorldState {
   zoneArea(world, 10, 13, 20, 3, ZONE.industrial);
   world.waterSupply.fill(1);
 
+  wireUnderRoads(world); // T129: proud vede vedení, ne silnice
   const systems = createDefaultSystems(content, balance);
   for (let tick = 0; tick < 400; tick++) {
     tickWorld(world, systems);
@@ -517,7 +519,8 @@ describe('zaplavená dlaždice nefunguje', () => {
       expect(
         placeDefinition(world, content, 'vanilla:coal_power_plant', 20, 19, balance).ok,
       ).toBe(true);
-      world.powerNetworkDirty = true;
+      // Od T129 vede proud vedení, ne ulice — položí se pod ni.
+      wireUnderRoads(world);
     }
     // Přehradíme vedení uprostřed ulice.
     for (let x = 14; x <= 16; x++) floodTile(wet, index(x, 24, MAP_SIZE), 2, 200);

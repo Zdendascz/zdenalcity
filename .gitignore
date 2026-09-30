@@ -31,6 +31,9 @@ art/sprites/raw/*.png
 art/tiles/raw/*.png
 art/tiles/rejected/*.png
 
+# Syrové díly pro animace (docs/18-DILY.md): totéž co u budov.
+art/parts/raw/*.png
+
 # Bajtkód Pythonu. Do repa se dostal omylem s nástroji na sprity.
 __pycache__/
 *.pyc
@@ -45,3 +48,10 @@ dist-csp/
 # varianty nedají přeložit do jednoho.
 tools/.build/
 tools/.b-*/
+art/parts/chimneys/
+art/sprites/archive/sejdrem/
+art/sprites/archive/strme/
+dist-dev/
+art/parts/templates/
+art/parts/archive/
+art/parts/preview/

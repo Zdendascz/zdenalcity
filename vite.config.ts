@@ -64,6 +64,18 @@ export default defineConfig({
   // (`games.zdendas.cz/zdenalcity/`) nebo na itch.io. S výchozím `/` by
   // prohlížeč hledal `/assets/...` v kořeni domény a nenašel nic.
   base: './',
+  build: {
+    /*
+     * Obrázky obsahu se **nevkládají do JS jako `data:`** (T134).
+     *
+     * Vite pod 4 kB vkládá, takže díly, podezdívky a ikony skončily v hlavním
+     * skriptu jako base64: 168 kB navíc, které se parsují při každém startu
+     * a nedají se kešovat zvlášť, i když se obrázky nemění. Jako soubory je
+     * prohlížeč stáhne jednou a drží pod otiskem natrvalo; HTTP/2 je pošle
+     * po jednom spojení. Ostatní assety se řídí výchozí mezí.
+     */
+    assetsInlineLimit: (filePath) => (/[\\/]content[\\/]vanilla[\\/]/.test(filePath) ? false : undefined),
+  },
   define: {
     __BUILD_COMMIT__: JSON.stringify(BUILD_COMMIT),
     // Ve vývoji je to čas spuštění `vite`, ne čas buildu. Je to tak správně:

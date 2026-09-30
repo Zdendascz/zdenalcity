@@ -1,6 +1,7 @@
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
-import { inBounds, index, ROAD, TERRAIN } from '../layers';
+import { ownedTiles } from '../buildings';
+import { inBounds, index, ROAD, TERRAIN, WIRE } from '../layers';
 import { roadFitsTerrain } from '../roads';
 import { markTileDirty, removeBuilding } from '../world';
 import type { WorldState } from '../world';
@@ -120,15 +121,11 @@ export function destroyTile(
   if (buildingId !== 0) {
     const building = world.buildings.get(buildingId);
     if (!building) return;
-    const [width, depth] = catalogue.get(building.definitionId)?.footprint ?? [1, 1];
-
-    for (let dy = 0; dy < depth; dy++) {
-      for (let dx = 0; dx < width; dx++) {
-        const x = building.x + dx;
-        const y = building.y + dy;
-        if (x >= world.size || y >= world.size) continue;
-        spawnRubble(world, index(x, y, world.size), building.definitionId);
-      }
+    // Trosky jen na dlaždicích, které budova **drží**, ne podle dnešní
+    // definice (T132) — viz `ownedTiles`.
+    const footprint = catalogue.get(building.definitionId)?.footprint ?? [1, 1];
+    for (const owned of ownedTiles(world, building, footprint)) {
+      spawnRubble(world, owned, building.definitionId);
     }
 
     // Obyvatelé se sečtou **před** odstraněním: potom se už nikoho nezeptáš.
@@ -144,7 +141,7 @@ export function destroyTile(
 }
 
 /**
- * Zničí silnici a potrubí na dlaždici. Budovy se netýká.
+ * Zničí silnici, potrubí a vedení na dlaždici. Budovy se netýká.
  *
  * Vlastní funkce, protože o ni nestojí jen katastrofy: silnici umí podhrabat
  * i terén, který se pod ní pohnul (`collapseUnsupportedRoads`), a ta se má
@@ -157,7 +154,8 @@ export function destroyInfrastructure(
 ): void {
   const hadRoad = (world.layers.road[tile] ?? ROAD.none) !== ROAD.none;
   const hadPipe = (world.layers.pipe[tile] ?? 0) !== 0;
-  if (!hadRoad && !hadPipe) return;
+  const hadWire = (world.layers.wire[tile] ?? WIRE.none) !== WIRE.none;
+  if (!hadRoad && !hadPipe && !hadWire) return;
 
   if (hadRoad) {
     world.layers.road[tile] = ROAD.none;
@@ -167,6 +165,14 @@ export function destroyInfrastructure(
   if (hadPipe) {
     world.layers.pipe[tile] = 0;
     world.waterNetworkDirty = true;
+  }
+  // Vedení padá s ostatní infrastrukturou (audit T132). Do té doby ho
+  // katastrofa minula vždycky: samotný úsek vedení se jí nezdál jako cíl
+  // a pod zbořenou silnicí zůstal stát. Na troskách sice proud nevede
+  // (`power.ts`), ale po jejich odklizení by se objevil zase, zadarmo.
+  if (hadWire) {
+    world.layers.wire[tile] = WIRE.none;
+    world.powerNetworkDirty = true;
   }
   spawnRubble(world, tile);
   markTileAt(world, tile);

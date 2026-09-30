@@ -96,7 +96,10 @@ SHEETS = [
         'community_centre', 'retirement_home',
     ]),
     ('ChatGPT Image 26. 8. 2026 13_31_20 (3).png', [
-        'speed-pause', 'speed-1', 'speed-2', 'speed-3', 'speed-4',
+        # Jmeno je nasobek rychlosti, ne poradi karty v archu: HUD sklada
+        # `speed-${nasobek}` a rychlosti jsou 1/2/4/8 (simHost.ts). Karta se
+        # tremi sipkami je proto 4x, se ctyrmi 8x.
+        'speed-pause', 'speed-1', 'speed-2', 'speed-4', 'speed-8',
         'view-surface', 'view-underground', 'view-ghost',
         'layers', 'disasters', 'taxes', 'funding', 'budget', 'save', 'language',
     ]),
@@ -116,7 +119,9 @@ SHEETS = [
         'tax-decrease', 'tax-increase', 'quicksave', 'quickload',
         'download', 'open-file', 'close',
         'map-size', 'reroll', 'start-city', 'resume',
-        'loan-take', 'loan-repay', 'bond-issue',
+        # Druha karta je splatka uveru. Ta ve hre neni, tak se ikona zahazuje
+        # (None) misto aby lezela v obsahu nepouzita.
+        'loan-take', None, 'bond-issue',
         'line-create', 'line-delete', 'stop-add', 'stop-remove',
         'vehicles', 'fare', 'disasters-toggle',
     ]),
@@ -281,6 +286,8 @@ def main(src):
         # median pres celou radu - jedna karta, kde stin premosti mezeru, tim
         # zbytek rady nerozhodi.
         for box, name in zip(boxes, names):
+            if name is None:
+                continue
             inner = (box[0] + INSET, box[1] + INSET, box[2] - INSET, box[3] - INSET)
             out = cut(sheet.crop(inner), OVERRIDES.get(name))
             if out is None:

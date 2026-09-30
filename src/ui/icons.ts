@@ -449,9 +449,21 @@ const TREE_TOGGLE: Shape = [
   bar(0.18, 0.86, 0.82, 0.92),
 ];
 
+/**
+ * Obláček s čarami za sebou — přepínač animací (T114). Čáry říkají „pohyb",
+ * obláček je prach a kouř, které animace přidávají.
+ */
+const MOTION: Shape = [
+  circle(0.64, 0.5, 0.24, 12),
+  bar(0.08, 0.3, 0.36, 0.38),
+  bar(0.02, 0.46, 0.34, 0.54),
+  bar(0.08, 0.62, 0.36, 0.7),
+];
+
 const UI_SHAPES: Readonly<Record<string, Shape>> = {
   hand: HAND,
   'view-decor': TREE_TOGGLE,
+  'view-motion': MOTION,
   raise: ARROW_UP,
   lower: ARROW_DOWN,
   level: LEVEL,

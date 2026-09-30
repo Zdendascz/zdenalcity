@@ -2,7 +2,9 @@
   "economy": {
     "taxableValuePerUnit": 70,
     "startingFunds": 60000,
-    "defaultTaxRate": 7
+    "defaultTaxRate": 7,
+    "residentialTaxShare": 0.5,
+    "serviceUpkeepMultiplier": 2
   },
   "services": {
     "costSlope": 20,
@@ -108,6 +110,12 @@
     "unemployment": 40,
     "abandoned": 30,
     "police": 0.3
+  },
+  "power": {
+    "wires": [
+      { "cost": 12, "capacity": 20000, "upkeep": 0.2 },
+      { "cost": 60, "capacity": 200000, "upkeep": 3 }
+    ]
   },
   "water": {
     "defaultRange": 24,

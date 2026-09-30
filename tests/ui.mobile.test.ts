@@ -64,6 +64,7 @@ function callbacks(): HudCallbacks & { zoomed: number[]; speeds: number[]; views
     onToggleGhost: () => {},
     onDisasterClick: () => {},
     onToggleDecor: () => {},
+    onToggleMotion: () => {},
     onToggleGrid: () => {},
     onHelp: () => {},
     onFundingChange: () => {},
@@ -89,6 +90,7 @@ const STATE: HudState = {
   disastersEnabled: true,
   ghost: false,
   decor: true,
+  motion: true,
   grid: false,
   poweredBuildings: 0,
   powerProduced: 0,
@@ -361,7 +363,7 @@ describe('střední velikost', () => {
    */
   it('schová nástroje a ovládání pod trojtečku, stejně jako telefon', async () => {
     const { root } = await hudFor('dense');
-    expect(widgets(root, DRAWER_CONTROLS)).toBe(10);
+    expect(widgets(root, DRAWER_CONTROLS)).toBe(11);
     expect(label(root, 'Další')).not.toBeNull();
   });
 
@@ -403,9 +405,9 @@ describe('přepínání režimu', () => {
     expect(widgets(root, DRAWER_CONTROLS)).toBe(0);
 
     hud.setLayout('compact');
-    // Vrstvy, katastrofy, daně, financování, poradce, rozpočet, půjčky, MHD,
-    // nápověda, jazyk.
-    expect(widgets(root, DRAWER_CONTROLS)).toBe(10);
+    // Animace, vrstvy, katastrofy, daně, financování, poradce, rozpočet,
+    // půjčky, MHD, nápověda, jazyk.
+    expect(widgets(root, DRAWER_CONTROLS)).toBe(11);
     expect(root.classList.contains('hud--compact')).toBe(true);
 
     hud.setLayout('full');

@@ -123,11 +123,21 @@ export interface Layers {
   buildingId: Uint32Array;
   power: Uint8Array;
   /**
-   * Vodovodní potrubí, 0/1 (§8 fáze 3). Na rozdíl od elektřiny **budovy vodu
-   * nevedou** — potrubí musí být pod nimi položené výslovně.
+   * Vodovodní potrubí, 0/1 (§8 fáze 3). Od T129 je to **spojka mezi bloky**:
+   * uvnitř souvislého bloku zón a budov vede vodu parcela sama
+   * (`sim/conduct.ts`), potrubí je potřeba jen mezi bloky a k vodárně.
    */
   pipe: Uint8Array;
+  /**
+   * Elektrické vedení (T129): 0 = nic, `WIRE.low` nízké napětí, `WIRE.high`
+   * vysoké. Stejně jako potrubí spojuje bloky zón a budov; silnice od T129
+   * proud nevede. Každý typ má kapacitu (`balance.power.wires`).
+   */
+  wire: Uint8Array;
 }
+
+/** Typy elektrického vedení. Hodnota vrstvy `wire` a index do `balance.power.wires`. */
+export const WIRE = { none: 0, low: 1, high: 2 } as const;
 
 /** Pohled na vrstvy pro renderer a UI — čtení ano, zápis chyba při typecheku. */
 export type ReadonlyLayers = { readonly [K in keyof Layers]: Readonly<Layers[K]> };
@@ -149,6 +159,7 @@ export const LAYER_ORDER = [
   'buildingId',
   'power',
   'pipe',
+  'wire',
 ] as const;
 
 export type LayerName = (typeof LAYER_ORDER)[number];
@@ -162,6 +173,7 @@ export function createLayers(size: number): Layers {
     buildingId: new Uint32Array(cells), // 0 = prázdná dlaždice
     power: new Uint8Array(cells),
     pipe: new Uint8Array(cells), // 0/1
+    wire: new Uint8Array(cells), // WIRE
   };
 }
 

@@ -1,12 +1,14 @@
+import { parcelConducts } from '../conduct';
 import type { Balance } from '@/content/balance';
 import type { BuildingCatalogue } from '../catalogue';
 import { coarseIndex } from '../coarse';
 import { strongestModifier } from '../disasters/effects';
 import { index } from '../layers';
 import { isFlooded } from '../disasters/flood';
-import { markBuildingDirty, markTileDirty } from '../world';
+import { markBuildingDirty, markNetworksDirty, markTileDirty } from '../world';
 import type { WorldState } from '../world';
 import type { System } from './index';
+import { ConductSnapshot } from './power';
 
 /**
  * Vodovod (§8 zadání fáze 3).
@@ -96,11 +98,59 @@ function recompute(world: WorldState, catalogue: BuildingCatalogue, balance: Bal
     });
   }
 
-  // Bez jediné vodárny nemá co téct ani nejdelší potrubí.
-  const pressure = production > 0 ? floodFill(world, sources, supply) : null;
+  /*
+   * Rozvod z minula, když se nezměnilo potrubí, parcely ani zdroje (T133).
+   *
+   * Dům vyrostlý na zóně tvar sítě nemění — voda k němu teče blokem, který
+   * vedl už předtím. Rozvod se pak nepouští znovu a přepočítá se jen, kdo
+   * se do kapacity vejde. Jak se to pozná, viz `ConductSnapshot`.
+   */
+  const sourcesKey = `${production > 0 ? 1 : 0}#${sources
+    .map((source) => `${source.produces ? 1 : 0}:${source.range}:${source.tiles.join(',')}`)
+    .join('|')}`;
+  const cached = waterCache.get(world);
+  let pressure: Int32Array | null;
+  if (
+    cached &&
+    cached.sourcesKey === sourcesKey &&
+    sameArray(before, cached.supply) &&
+    cached.snapshot.matches(world, world.layers.pipe)
+  ) {
+    supply.set(cached.supply);
+    pressure = cached.pressure;
+  } else {
+    // Bez jediné vodárny nemá co téct ani nejdelší potrubí.
+    pressure = production > 0 ? floodFill(world, sources, supply) : null;
+    const snapshot = cached?.snapshot ?? new ConductSnapshot();
+    snapshot.capture(world, world.layers.pipe);
+    waterCache.set(world, { snapshot, sourcesKey, supply: supply.slice(), pressure });
+    markChangedTiles(world, before, supply);
+  }
 
-  markChangedTiles(world, before, supply);
   markWateredBuildings(world, catalogue, ids, balance, production, pressure);
+}
+
+/** Co zůstává z minulého úplného rozvodu vody (T133). */
+interface WaterCache {
+  readonly snapshot: ConductSnapshot;
+  /** Zdroje: zda vyrábí, dosah, dlaždice — a zda je vůbec nějaká výroba. */
+  readonly sourcesKey: string;
+  readonly supply: Uint8Array;
+  /** Zbývající dosah po rozvodu. Jen se čte, nikdo ho nemění. */
+  readonly pressure: Int32Array | null;
+}
+
+const waterCache = new WeakMap<WorldState, WaterCache>();
+
+/** Zapomene rozvod — příští přepočet bude úplný. Pro testy shody obou cest. */
+export function forgetWaterCache(world: WorldState): void {
+  waterCache.delete(world);
+}
+
+function sameArray(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 /** Je vodárna v zamořené buňce? */
@@ -189,12 +239,18 @@ function floodFill(
         if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
 
         const at = index(nx, ny, size);
-        if (pipe[at] !== 1) continue;
+        // Vodu vede potrubí a od T129 i souvislý blok zón a budov sám.
+        // Blok dosah **nežere**: je to rozvod uvnitř parcel, hráč ho
+        // nestavěl a nemá platit za to, že má velkou čtvrť. Dosah ubírá
+        // jen potrubí, tedy spojky mezi bloky.
+        const parcel = parcelConducts(world, at);
+        if (pipe[at] !== 1 && !parcel) continue;
         // Zaplavené potrubí nevede vodu (§5 fáze 4).
         if (isFlooded(world, at)) continue;
-        if (budget - 1 <= (remaining[at] ?? -1)) continue;
+        const left = parcel && pipe[at] !== 1 ? budget : budget - 1;
+        if (left <= (remaining[at] ?? -1)) continue;
 
-        remaining[at] = budget - 1;
+        remaining[at] = left;
         next.push(at);
       }
     }
@@ -262,14 +318,17 @@ export function createWaterDecaySystem(catalogue: BuildingCatalogue, balance: Ba
         world.waterlessStreak.set(id, streak);
 
         if (building.population > 0) {
+          // Úbytek obyvatel není vidět — `markBuildingDirty` je jen pro
+          // renderer a ten by kvůli tomu přestavoval ulici (T133).
           building.population = Math.max(0, building.population - decayStep);
-          markBuildingDirty(world, id);
         } else if (streak >= abandonAfter) {
           // Prázdný dům se po čase vzdá. Ruinu musí zbourat hráč (§8 fáze 2).
           building.abandoned = true;
           building.jobs = 0;
           world.waterlessStreak.delete(id);
           markBuildingDirty(world, id);
+          // Ruina nevede proud ani vodu (T129).
+          markNetworksDirty(world);
         }
       }
     },

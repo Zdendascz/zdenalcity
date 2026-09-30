@@ -33,7 +33,7 @@ export type TileQuad = readonly number[];
  * Počítá se bilineárně ze čtyř rohů, takže vozovka jde **po ploše dlaždice**:
  * na svahu se zvedne s ní a od terénu se neodlepí.
  */
-function inside(quad: TileQuad, u: number, v: number): [number, number] {
+export function inside(quad: TileQuad, u: number, v: number): [number, number] {
   const nw: [number, number] = [quad[0] ?? 0, quad[1] ?? 0];
   const ne: [number, number] = [quad[2] ?? 0, quad[3] ?? 0];
   const se: [number, number] = [quad[4] ?? 0, quad[5] ?? 0];
@@ -67,10 +67,22 @@ export function roadPolygons(
   quad: TileQuad,
   mask: number,
   width: number = CORE_SCALE,
+  /**
+   * Šířka každého ramene **na hraně dlaždice** v pořadí sever, východ, jih,
+   * západ (T124). Když silnice navazuje na širší typ, rameno se k ní plynule
+   * rozšíří — do teď se šířka na hranici dlaždic změnila skokem a obruba
+   * udělala schod. Bez parametru má rameno po celé délce šířku vozovky.
+   */
+  edges?: readonly number[],
 ): number[][] {
-  const half = Math.max(0.02, Math.min(0.98, width)) / 2;
+  const clamp = (value: number): number => Math.max(0.02, Math.min(0.98, value)) / 2;
+  const half = clamp(width);
   const lo = 0.5 - half;
   const hi = 0.5 + half;
+  const edge = (side: number): [number, number] => {
+    const h = clamp(edges?.[side] ?? width);
+    return [0.5 - h, 0.5 + h];
+  };
 
   const at = (u: number, v: number): [number, number] => inside(quad, u, v);
   const polygon = (
@@ -90,42 +102,46 @@ export function roadPolygons(
   // Rameno vede od středového čtverce na hranu, kterou se jde k sousedovi.
   // Sever je `y - 1`, tedy `v = 0`; východ `x + 1`, tedy `u = 1`.
   if (mask & ROAD_N) {
+    const [a, b] = edge(0);
     polygons.push(
       polygon([
-        [lo, 0],
-        [hi, 0],
+        [a, 0],
+        [b, 0],
         [hi, lo],
         [lo, lo],
       ]),
     );
   }
   if (mask & ROAD_E) {
+    const [a, b] = edge(1);
     polygons.push(
       polygon([
         [hi, lo],
-        [1, lo],
-        [1, hi],
+        [1, a],
+        [1, b],
         [hi, hi],
       ]),
     );
   }
   if (mask & ROAD_S) {
+    const [a, b] = edge(2);
     polygons.push(
       polygon([
         [lo, hi],
         [hi, hi],
-        [hi, 1],
-        [lo, 1],
+        [b, 1],
+        [a, 1],
       ]),
     );
   }
   if (mask & ROAD_W) {
+    const [a, b] = edge(3);
     polygons.push(
       polygon([
-        [0, lo],
+        [0, a],
         [lo, lo],
         [lo, hi],
-        [0, hi],
+        [0, b],
       ]),
     );
   }

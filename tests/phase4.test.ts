@@ -31,6 +31,7 @@ import { createDefaultSystems } from '@/sim/systems';
 import { createWorld, tickWorld } from '@/sim/world';
 import type { WorldState } from '@/sim/world';
 import { MAP_SIZE } from './support/grid';
+import { wireUnderRoads } from './support/power';
 
 /**
  * Akceptační kritéria fáze 4 (§11), která nepokrývají testy jednotlivých úkolů.
@@ -103,6 +104,7 @@ describe('kritérium 22 — determinismus s katastrofami a linkami', () => {
     setLineVehicles(world, balance, line.id, 4);
     requestLoan(world, balance, 40000, 24);
 
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance, fullRegistry(), content.grants());
     for (let tick = 0; tick < TICKS; tick++) {
       tickWorld(world, systems);
@@ -175,6 +177,7 @@ describe('kritérium 11 — blackout je zesilovač', () => {
     expect(placeDefinition(world, content, 'vanilla:fire_station', 14, 21, balance).ok).toBe(true);
     zoneArea(world, 12, 17, 20, 3, ZONE.residential);
 
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 400; tick++) {
       tickWorld(world, systems);
@@ -252,6 +255,7 @@ describe('kritérium 6 — podfinancovaní hasiči hoří déle', () => {
       }
 
       world.serviceFunding.set('fire', funding);
+      wireUnderRoads(world); // T129: proud vede vedení, ne silnice
       const systems = createDefaultSystems(content, balance);
       for (let tick = 0; tick < 20; tick++) tickWorld(world, systems);
 
@@ -305,6 +309,7 @@ describe('kritérium 15 — dozvuk chemické havárie', () => {
       true,
     );
 
+    wireUnderRoads(world); // T129: proud vede vedení, ne silnice
     const systems = createDefaultSystems(content, balance);
     for (let tick = 0; tick < 30; tick++) tickWorld(world, systems);
     expect([...world.waterSupply].filter((value) => value !== 0).length).toBeGreaterThan(0);

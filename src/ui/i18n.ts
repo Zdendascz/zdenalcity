@@ -19,11 +19,32 @@ export type LocaleTables = Readonly<Record<string, LocaleTable>>;
 
 export type TranslateParams = Readonly<Record<string, string | number>>;
 
+/**
+ * Jak vypadá klíč: aspoň dvě tečkou oddělená slova (`ui.tool.bulldoze`).
+ * Dvojtečka smí, aby prošly i klíče s ID modu (`building.mod:xyz.name`).
+ *
+ * Parametr hlášky se překládá jen tehdy, když tak vypadá. Jméno města je
+ * obyčejný text a v tabulce se hledat nemá — dřív se hledalo, a tak se město
+ * „toString" vypsalo jako zdroják funkce.
+ */
+const KEY_SHAPE = /^[\w:-]+(\.[\w:-]+)+$/;
+
+/**
+ * Vlastní hodnota objektu, nikdy zděděná.
+ *
+ * Tabulky jsou obyčejné objekty z JSON, takže `table['constructor']` vracelo
+ * funkci z prototypu. Město pojmenované „constructor" se pak v „Pokračovat
+ * v …" vypsalo jako `function Object() { [native code] }`.
+ */
+function own<T>(table: Readonly<Record<string, T>> | undefined, key: string): T | undefined {
+  return table !== undefined && Object.hasOwn(table, key) ? table[key] : undefined;
+}
+
 /** Nahradí `{jméno}` hodnotou. Neznámý zástupný symbol zůstane, ať je vidět. */
 function interpolate(text: string, params?: TranslateParams): string {
   if (!params) return text;
   return text.replace(/\{(\w+)\}/g, (whole, name: string) => {
-    const value = params[name];
+    const value = own(params, name);
     return value === undefined ? whole : String(value);
   });
 }
@@ -64,6 +85,10 @@ export class I18n {
    */
   private applyLocale(): void {
     setNumberLocale(this.has('ui.locale.tag') ? this.t('ui.locale.tag') : this.language);
+    // Jazyk stránky podle jazyka hry. V `index.html` je napevno `cs`, jenže
+    // jazyk se vybírá z prohlížeče — anglickému hráči pak odečítačka četla
+    // angličtinu českou výslovností a prohlížeč nabízel překlad z češtiny.
+    if (typeof document !== 'undefined') document.documentElement.lang = this.language;
   }
 
   /** Zavolá se po přepnutí jazyka, aby si UI přepsalo popisky. */
@@ -86,7 +111,7 @@ export class I18n {
    * znamenal tolik variant hlášky, kolik má hra povrchů.
    */
   t(key: string, params?: TranslateParams): string {
-    const text = this.tables[this.language]?.[key] ?? this.tables[FALLBACK_LANGUAGE]?.[key];
+    const text = this.lookup(key);
     if (!params) return interpolate(text ?? key);
 
     const resolved: Record<string, string | number> = {};
@@ -101,18 +126,24 @@ export class I18n {
    * jak přišla — hlášky obsahují i obyčejný text, třeba jméno města.
    */
   private resolve(value: string): string {
-    if (this.has(value)) return this.t(value);
+    if (KEY_SHAPE.test(value)) return this.has(value) ? this.t(value) : value;
 
     const parts = value.split(LIST_SEPARATOR);
-    if (parts.length < 2 || !parts.every((part) => this.has(part))) return value;
+    if (parts.length < 2 || !parts.every((part) => KEY_SHAPE.test(part) && this.has(part))) {
+      return value;
+    }
     return parts.map((part) => this.t(part)).join(this.t('ui.list.join'));
   }
 
   /** Existuje pro klíč překlad, nebo by `t()` vrátilo jen klíč? */
   has(key: string): boolean {
+    return this.lookup(key) !== undefined;
+  }
+
+  /** Překlad v aktuálním jazyce, jinak v angličtině. Jen vlastní klíče tabulek. */
+  private lookup(key: string): string | undefined {
     return (
-      this.tables[this.language]?.[key] !== undefined ||
-      this.tables[FALLBACK_LANGUAGE]?.[key] !== undefined
+      own(own(this.tables, this.language), key) ?? own(own(this.tables, FALLBACK_LANGUAGE), key)
     );
   }
 }

@@ -1,4 +1,5 @@
 import { MAX_HEIGHT } from '@/sim/heights';
+import { ROAD } from '@/sim/layers';
 import type { ValidationIssue } from './schema';
 
 /**
@@ -555,7 +556,15 @@ export interface Balance {
    * Ekonomika. Původně konstanty fáze 1 v kódu — přesunuty sem, aby šel balanc
    * ladit bez zásahu do kódu.
    */
-  economy: { taxableValuePerUnit: number; startingFunds: number; defaultTaxRate: number };
+  economy: {
+    taxableValuePerUnit: number;
+    startingFunds: number;
+    defaultTaxRate: number;
+    /** Kolik z hodnoty jednotky daní bydlení (0–1). */
+    residentialTaxShare: number;
+    /** Násobek údržby budov služeb. */
+    serviceUpkeepMultiplier: number;
+  };
 
   demand: {
     workerRatio: number;
@@ -645,9 +654,9 @@ export interface Balance {
      */
     heightCurve: number;
     /**
-     * Kolik řek generátor prokope. **Ve vanille zatím nula**: řeka rozdělí
-     * souš na dva břehy a most přijde až v T33, takže dokud tam není, byla by
-     * to jen nepřístupná polovina mapy.
+     * Kolik řek generátor prokope. Ve vanille dvě (R7): řeka rozdělí souš na
+     * dva břehy a přes ni vedou mosty (T33, vzhled T122). Nula je pořád
+     * platná volba pro mod, který mosty nechce.
      */
     rivers: number;
     /** Odkud řeka vyráží — nejmenší patro pramene. */
@@ -755,6 +764,17 @@ export interface Balance {
   };
 
   /** Vodovod (§8 fáze 3). */
+  /** Elektrické vedení (T129). */
+  power: {
+    /**
+     * Typy vedení v pořadí `WIRE.low`, `WIRE.high`: cena za dlaždici
+     * a kapacita — kolik spotřeby smí úsek přenést, než vypadne všechno za ním.
+     * `upkeep` je měsíční údržba za dlaždici; smí být desetinná, součet se
+     * zaokrouhlí jednou (jako u silnic). Vysoké napětí je výrazně dražší
+     * (rozhodnutí autora, T136).
+     */
+    wires: { cost: number; capacity: number; upkeep: number }[];
+  };
   water: {
     /** Dosah sítě v dlaždicích potrubí, když ho definice neurčí sama. */
     defaultRange: number;
@@ -960,6 +980,34 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+/** Typy elektrického vedení (T129): nízké a vysoké napětí, v tomhle pořadí. */
+function validatePower(
+  issues: ValidationIssue[],
+  power: Record<string, unknown> | null,
+): Balance['power'] {
+  const wires = power?.['wires'];
+  if (!Array.isArray(wires) || wires.length !== 2) {
+    issues.push({ field: 'power.wires', message: 'musí být pole dvou typů vedení' });
+    return {
+      wires: [
+        { cost: 0, capacity: 0, upkeep: 0 },
+        { cost: 0, capacity: 0, upkeep: 0 },
+      ],
+    };
+  }
+  return {
+    wires: wires.map((raw, i) => {
+      const wire = asRecord(raw);
+      return {
+        cost: money(issues, wire, 'cost', `power.wires[${i}].cost`, 0, 100000),
+        capacity: num(issues, wire, 'capacity', `power.wires[${i}].capacity`, 1, 100000000),
+        // Starší mod údržbu vedení nezná — pak je zadarmo, jako do T136.
+        upkeep: wire?.['upkeep'] === undefined ? 0 : num(issues, wire, 'upkeep', `power.wires[${i}].upkeep`, 0, 10000),
+      };
+    }),
+  };
+}
+
 function section(
   issues: ValidationIssue[],
   root: Record<string, unknown>,
@@ -987,6 +1035,39 @@ function num(
   }
   return value;
 }
+
+/**
+ * Částka, která jde **rovnou do kasy**: celé číslo v mezích (audit T132).
+ *
+ * `num` pouští desetinná čísla, a to je u koeficientů správně. U cen ne:
+ * mod s vozovkou za 12,5 udělal z kasy necelé číslo, a save s necelou
+ * kasou hra odmítne načíst (`checkSaveFits`). Hráč by tak o město přišel
+ * při dalším spuštění kvůli jednomu desetinnému místu v cizím modu.
+ */
+function money(
+  issues: ValidationIssue[],
+  container: Record<string, unknown> | null,
+  key: string,
+  field: string,
+  min: number,
+  max: number,
+): number {
+  if (!container) return 0;
+  const value = container[key];
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    issues.push({ field, message: `musí být celé číslo v rozsahu ${min}–${max}` });
+    return 0;
+  }
+  return value;
+}
+
+/**
+ * Kolik typů silnic kód zná (`ROAD`: ulice, třída, dálnice). Typ je index do
+ * tabulky cen i hodnota ve vrstvě, takže mod jich nesmí dodat míň — dálnice
+ * by stála nulu a neměla kapacitu — ani víc, protože vrstva a save víc
+ * neunesou a stavět je nejde.
+ */
+export const ROAD_TYPE_COUNT = ROAD.highway;
 
 export function validateBalance(raw: unknown): {
   balance: Balance | null;
@@ -1084,8 +1165,11 @@ export function validateBalance(raw: unknown): {
 
   const roadTypes: RoadTypeBalance[] = [];
   const rawRoadTypes = traffic?.['roadTypes'];
-  if (!Array.isArray(rawRoadTypes) || rawRoadTypes.length === 0) {
-    issues.push({ field: 'traffic.roadTypes', message: 'musí být neprázdné pole typů silnic' });
+  if (!Array.isArray(rawRoadTypes) || rawRoadTypes.length !== ROAD_TYPE_COUNT) {
+    issues.push({
+      field: 'traffic.roadTypes',
+      message: `musí být pole právě ${ROAD_TYPE_COUNT} typů silnic (ulice, třída, dálnice)`,
+    });
   } else {
     rawRoadTypes.forEach((entry, i) => {
       const where = `traffic.roadTypes[${i}]`;
@@ -1102,7 +1186,9 @@ export function validateBalance(raw: unknown): {
       roadTypes.push({
         id,
         capacity: num(issues, record, 'capacity', `${where}.capacity`, 1, 10000),
-        cost: num(issues, record, 'cost', `${where}.cost`, 0, 100000),
+        cost: money(issues, record, 'cost', `${where}.cost`, 0, 100000),
+        // Údržba silnic smí být desetinná: sčítá se přes tisíce dlaždic
+        // a zaokrouhluje až součet (`computeBudget`).
         upkeep: num(issues, record, 'upkeep', `${where}.upkeep`, 0, 100000),
       });
     });
@@ -1181,7 +1267,7 @@ export function validateBalance(raw: unknown): {
         ),
       },
       rubble: {
-        clearCost: num(
+        clearCost: money(
           issues,
           disasters ? asRecord(disasters['rubble']) : null,
           'clearCost',
@@ -1230,8 +1316,17 @@ export function validateBalance(raw: unknown): {
         0,
         10000,
       ),
-      startingFunds: num(issues, economy, 'startingFunds', 'economy.startingFunds', 0, 100000000),
+      startingFunds: money(issues, economy, 'startingFunds', 'economy.startingFunds', 0, 100000000),
       defaultTaxRate: num(issues, economy, 'defaultTaxRate', 'economy.defaultTaxRate', 0, 100),
+      residentialTaxShare: num(issues, economy, 'residentialTaxShare', 'economy.residentialTaxShare', 0, 1),
+      serviceUpkeepMultiplier: num(
+        issues,
+        economy,
+        'serviceUpkeepMultiplier',
+        'economy.serviceUpkeepMultiplier',
+        0,
+        20,
+      ),
     },
     demand: {
       workerRatio: num(issues, demand, 'workerRatio', 'demand.workerRatio', 0, 1),
@@ -1267,8 +1362,8 @@ export function validateBalance(raw: unknown): {
       forestScale: num(issues, map, 'forestScale', 'map.forestScale', 1, 256),
       scrapIslandTiles: num(issues, map, 'scrapIslandTiles', 'map.scrapIslandTiles', 0, 4096),
       forestAbsorption: num(issues, map, 'forestAbsorption', 'map.forestAbsorption', 0, 1),
-      clearForestCost: num(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
-      plantTreesCost: num(issues, map, 'plantTreesCost', 'map.plantTreesCost', 0, 100000),
+      clearForestCost: money(issues, map, 'clearForestCost', 'map.clearForestCost', 0, 100000),
+      plantTreesCost: money(issues, map, 'plantTreesCost', 'map.plantTreesCost', 0, 100000),
       maxLevelledZoneTiles: num(
         issues,
         map,
@@ -1282,9 +1377,9 @@ export function validateBalance(raw: unknown): {
       heightCurve: num(issues, map, 'heightCurve', 'map.heightCurve', 0.1, 8),
       rivers: num(issues, map, 'rivers', 'map.rivers', 0, 16),
       riverSourceHeight: num(issues, map, 'riverSourceHeight', 'map.riverSourceHeight', 0, MAX_HEIGHT),
-      terraformCost: num(issues, map, 'terraformCost', 'map.terraformCost', 0, 100000),
-      clearRockCost: num(issues, map, 'clearRockCost', 'map.clearRockCost', 0, 100000),
-      fillMarshCost: num(issues, map, 'fillMarshCost', 'map.fillMarshCost', 0, 100000),
+      terraformCost: money(issues, map, 'terraformCost', 'map.terraformCost', 0, 100000),
+      clearRockCost: money(issues, map, 'clearRockCost', 'map.clearRockCost', 0, 100000),
+      fillMarshCost: money(issues, map, 'fillMarshCost', 'map.fillMarshCost', 0, 100000),
     },
     traffic: {
       roadTypes,
@@ -1300,7 +1395,7 @@ export function validateBalance(raw: unknown): {
       ),
       smoothing: num(issues, traffic, 'smoothing', 'traffic.smoothing', 0, 1),
       transitReduction: num(issues, traffic, 'transitReduction', 'traffic.transitReduction', 0, 1),
-      bridgeCost: num(issues, traffic, 'bridgeCost', 'traffic.bridgeCost', 0, 100000),
+      bridgeCost: money(issues, traffic, 'bridgeCost', 'traffic.bridgeCost', 0, 100000),
     },
     diffusion: {
       spread: num(issues, diffusion, 'spread', 'diffusion.spread', 0, 1),
@@ -1320,9 +1415,10 @@ export function validateBalance(raw: unknown): {
       abandoned: num(issues, crime, 'abandoned', 'crime.abandoned', 0, 255),
       police: num(issues, crime, 'police', 'crime.police', 0, 10),
     },
+    power: validatePower(issues, section(issues, root, 'power')),
     water: {
       defaultRange: num(issues, water, 'defaultRange', 'water.defaultRange', 1, 1000),
-      pipeCost: num(issues, water, 'pipeCost', 'water.pipeCost', 0, 100000),
+      pipeCost: money(issues, water, 'pipeCost', 'water.pipeCost', 0, 100000),
       decayStep: num(issues, water, 'decayStep', 'water.decayStep', 0, 1000),
       abandonAfter: num(issues, water, 'abandonAfter', 'water.abandonAfter', 1, 1000),
       perCitizen: num(issues, water, 'perCitizen', 'water.perCitizen', 0, 100),
@@ -2350,8 +2446,8 @@ function validateTransit(
 
     modes[name] = {
       capacity: num(issues, mode, 'capacity', `${where}.capacity`, 1, 100000),
-      vehicleCost: num(issues, mode, 'vehicleCost', `${where}.vehicleCost`, 0, 1000000),
-      vehicleUpkeep: num(issues, mode, 'vehicleUpkeep', `${where}.vehicleUpkeep`, 0, 100000),
+      vehicleCost: money(issues, mode, 'vehicleCost', `${where}.vehicleCost`, 0, 1000000),
+      vehicleUpkeep: money(issues, mode, 'vehicleUpkeep', `${where}.vehicleUpkeep`, 0, 100000),
       roadShare: num(issues, mode, 'roadShare', `${where}.roadShare`, 0, 0.9),
       needsPower: flag(issues, mode, 'needsPower', `${where}.needsPower`),
     };

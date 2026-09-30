@@ -120,8 +120,10 @@ describe('vanilla obsah', () => {
       'vanilla:residential_tower',
       'vanilla:retirement_home',
       'vanilla:school',
+      'vanilla:substation',
       'vanilla:theatre',
       'vanilla:tram_stop',
+      'vanilla:transformer',
       'vanilla:transit_depot',
       'vanilla:transit_stop',
       'vanilla:university',
@@ -154,14 +156,14 @@ describe('vanilla obsah', () => {
     expect(plant?.construction.allowedTerrain).toEqual([0, 2]);
   });
 
-  it('každá elektrárna vyrábí a žádná proud nebere', async () => {
+  it('každá elektrárna vyrábí a žádná proud nebere (trafa nevyrábí, jen přepojují)', async () => {
     // Elektrárna, které by proud omylem ubýval, by síť shodila sama sebou.
     const registry = new ContentRegistry();
     await registry.load(createVanillaSource());
 
     const plants = registry
       .getAll('building')
-      .filter((definition) => definition.menu === 'power');
+      .filter((definition) => definition.menu === 'power' && definition.power?.transformer === undefined);
 
     expect(plants.length).toBeGreaterThan(1);
     for (const plant of plants) {

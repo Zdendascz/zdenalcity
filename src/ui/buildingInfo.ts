@@ -7,8 +7,8 @@ import { TICKS_PER_YEAR } from '@/sim/disasters/risk';
 import type { Building, WorldState } from '@/sim/world';
 import { ROAD, TERRAIN } from '@/sim/layers';
 import { iconSvg, sheetHeader } from './icons';
-import { el } from './dom';
-import { formatNumber, landValueTermKeys } from './format';
+import { cssUrl, el } from './dom';
+import { formatNumber, formatPercent, landValueTermKeys } from './format';
 import { dateParts } from './hud';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
@@ -283,6 +283,21 @@ export class BuildingInfo {
       'ui.info.powered',
       building.powered ? t('ui.info.poweredYes') : t('ui.info.poweredNo'),
     ]);
+    // Trafostanice: kolik přes ni teče proti tomu, co unese (T136).
+    const transformer = world.transformerLoad.get(building.id);
+    if (transformer) {
+      rows.push([
+        'ui.info.transformerLoad',
+        transformer.overloaded
+          ? t('ui.info.transformerOverloaded', {
+              load: formatNumber(transformer.load),
+              capacity: formatNumber(transformer.capacity),
+            })
+          : `${formatNumber(transformer.load)} / ${formatNumber(transformer.capacity)}`,
+      ]);
+    } else if ((definition.power?.transformer ?? 0) > 0) {
+      rows.push(['ui.info.transformerLoad', `0 / ${formatNumber(definition.power?.transformer ?? 0)}`]);
+    }
 
     // Co budova zpracuje. Bez tohohle řádku byla spalovna k nerozeznání od
     // kůlny: karta o ní neřekla vůbec nic a hráč neměl jak zjistit, jestli mu
@@ -439,7 +454,7 @@ export class BuildingInfo {
     const url = this.tileImage(terrain);
     if (url !== undefined) {
       const tile = el('div', 'sheet__surface-tile');
-      tile.style.backgroundImage = `url(${url})`;
+      tile.style.backgroundImage = cssUrl(url);
       row.appendChild(tile);
     }
     row.appendChild(el('span', 'sheet__surface-name', this.i18n.t(`ui.terrain.${key}`)));
@@ -498,7 +513,7 @@ export class BuildingInfo {
     parent.appendChild(
       meter(
         t('ui.overlay.happiness'),
-        `${Math.round((parcel.happiness / BYTE_MAX) * 100)} %`,
+        formatPercent(Math.round((parcel.happiness / BYTE_MAX) * 100)),
         parcel.happiness / BYTE_MAX,
       ),
     );
@@ -519,7 +534,7 @@ export class BuildingInfo {
     parent.appendChild(
       meter(
         t('ui.parcel.jobAccess'),
-        `${Math.round(parcel.jobAccessFactor * 100)} %`,
+        formatPercent(Math.round(parcel.jobAccessFactor * 100)),
         parcel.jobAccessFactor,
       ),
     );
@@ -536,6 +551,32 @@ export class BuildingInfo {
       ),
     );
     parent.appendChild(water);
+
+    // Elektřina stejně: ano/ne.
+    const power = el('div', 'gauge gauge--flag');
+    power.appendChild(el('span', 'gauge__label', t('ui.parcel.power')));
+    power.appendChild(
+      el(
+        'span',
+        `gauge__flag ${parcel.power ? 'is-high' : 'is-low'}`,
+        t(parcel.power ? 'ui.parcel.powerYes' : parcel.powerBlockedByRuin ? 'ui.parcel.powerRuin' : 'ui.parcel.powerNo'),
+      ),
+    );
+    parent.appendChild(power);
+
+    // Vedení na dlaždici: typ a vytížení proti kapacitě (T136).
+    const wire = parcel.wire;
+    if (wire !== null) {
+      const kind = t(wire.type === 2 ? 'ui.tool.wire.high' : 'ui.tool.wire.low');
+      const state = wire.overloaded
+        ? t('ui.parcel.wireOverloaded', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
+        : wire.live
+          ? t('ui.parcel.wireLoad', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
+          : t('ui.parcel.wireDead', { capacity: formatNumber(wire.capacity) });
+      parent.appendChild(
+        meter(kind, state, wire.live ? Math.min(1, wire.load / Math.max(1, wire.capacity)) : 0),
+      );
+    }
 
     const rows: [string, string][] = [['ui.info.position', `${parcel.x}, ${parcel.y}`]];
     if (parcel.demand !== null) rows.push(['ui.hud.demand', formatNumber(parcel.demand)]);
@@ -629,7 +670,7 @@ export class BuildingInfo {
       track.appendChild(fill);
       row.appendChild(track);
 
-      row.appendChild(el('span', 'gauge__value', `${Math.round(share * 100)} %`));
+      row.appendChild(el('span', 'gauge__value', formatPercent(Math.round(share * 100))));
       list.appendChild(row);
     }
     parent.appendChild(list);

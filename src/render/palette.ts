@@ -53,7 +53,8 @@ export const ZONE_COLOR_BY_VALUE = [
  * barva navíc mění odstín podle toho, co je pod ní, takže se stejná zóna na
  * trávě a na písku nečetla stejně.
  */
-export const ZONE_OVERLAY_ALPHA = 1;
+// O 15 % průhlednější (přání autora, 2026-09-30): plná barva byla moc křiklavá.
+export const ZONE_OVERLAY_ALPHA = 0.85;
 
 /**
  * Overlay znečištění. Jedna barva, sílu nese průhlednost — ramp přes několik
@@ -226,6 +227,23 @@ export const ROAD_COLOR = ROAD_COLORS[1];
  */
 export const BRIDGE_COLOR = 0x8d8f99;
 
+/** Most (T122): bočnice desky, zábradlí a stín na vodě. */
+export const BRIDGE_GIRDER_COLOR = 0x7a7c82;
+export const BRIDGE_RAIL_COLOR = 0xdcded8;
+export const BRIDGE_SHADOW_COLOR = 0x0b2233;
+export const BRIDGE_SHADOW_ALPHA = 0.35;
+
+/**
+ * Vodorovné značení (T122). Bílá, ne čistá: stará barva na asfaltu je
+ * šedavá a průhledná tak, aby prosvítala spára.
+ */
+export const MARKING_COLOR = 0xeceae2;
+export const MARKING_ALPHA = 0.82;
+
+/** Chodník z betonových dlaždic a zelený pás mezi ním a obrubníkem. */
+export const SIDEWALK_COLOR = 0xa9a69c;
+export const VERGE_COLOR = 0x6c8b3a;
+
 /**
  * Podzemní pohled (§8 fáze 3). Terén se ztlumí na desetinu jasu, aby se
  * potrubí nemuselo prát s barvami trávy a vody — pod zemí je stejně tma.
@@ -311,8 +329,6 @@ export const PIPE_WIDTH = 0.24;
 /** Nádech na dlaždicích, kam voda opravdu dotekla. */
 export const WATER_SUPPLY_COLOR = 0x2f7fb8;
 export const WATER_SUPPLY_ALPHA = 0.4;
-/** Mantinel mostu. Kreslí se přes celou dlaždici, ať je konstrukce vidět. */
-export const BRIDGE_RAIL_COLOR = 0xb4b7c2;
 
 /** Pozadí mimo mapu. */
 /**
@@ -348,6 +364,12 @@ export const HOVER_BLOCKED_COLOR = 0xff6b52;
  * ruinu musí být poznat na první pohled, ne až z detailu.
  */
 export const ABANDONED_COLOR = 0x6a6a6a;
+
+/**
+ * Prach při bourání (T114). Teplá šedá omítky a cihel, ne bílá — bílý obláček
+ * se na zelené trávě čte jako kouř z požáru.
+ */
+export const DUST_COLOR = 0xb9ab96;
 
 /**
  * Ztmavení budovy, která bere proud a nedostává ho. Ke střeše k tomu přibude

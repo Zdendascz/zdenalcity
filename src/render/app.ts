@@ -39,11 +39,11 @@ import type { Command } from '@/sim/commands';
 import type { CommandResult } from '@/sim/result';
 import { MAX_FUNDING, fundingCost, fundingEffect } from '@/sim/funding';
 import { cornerIndex, tileBaseHeight, tileCorners } from '@/sim/heights';
-import { DEFAULT_MAP_SIZE, TERRAIN, ZONE, index } from '@/sim/layers';
+import { DEFAULT_MAP_SIZE, TERRAIN, WIRE, ZONE, index } from '@/sim/layers';
 import type { MapSize } from '@/sim/layers';
 import { applyGeneratedMap, balanceWithMap, generateTerrain } from '@/sim/mapgen';
 import type { ZoneType } from '@/sim/layers';
-import { createSimHost, SPEEDS } from '@/sim/simHost';
+import { createSimHost, SPEEDS, TICK_MS } from '@/sim/simHost';
 import type { SimHost } from '@/sim/simHost';
 import type { ReadonlyWorldView } from '@/sim/simHost';
 import { createDefaultSystems } from '@/sim/systems';
@@ -95,17 +95,38 @@ import { Legend } from '@/ui/legend';
 import { Toolbar } from '@/ui/toolbar';
 import type { ToolOption } from '@/ui/tools';
 import { BuildingRenderer } from './buildingRenderer';
-import type { AppearanceLookup } from './buildingRenderer';
+import type { AppearanceLookup, LoadedPart } from './buildingRenderer';
 import { clampCamera, createCamera, pan, viewportToWorld, zoomAt } from './camera';
 import { ChunkRenderer, viewportFor } from './chunkRenderer';
+import { ChangeTracker } from './changes';
+import { tilesIn } from './vehicles';
+import type { MotionView } from './effects';
 import { RoadRenderer, ROAD_FAMILIES } from './roadRenderer';
 import type { OverlayMode } from './chunkRenderer';
 import { CoarseOverlay } from './coarseOverlay';
 import { GridOverlay } from './gridOverlay';
 import { computeRiskMap, RISK_WARNING } from '@/sim/disasters/riskMap';
 import { DisasterScenes } from './disasterScenes';
+import { Effects } from './effects';
+import { FireLayer } from './fireLayer';
+import { People } from './people';
+import type { Entrance } from './people';
+import { WaterGlints } from './water';
+import {
+  backgroundUrls,
+  prefetchInBackground,
+  preloadGraphics,
+  spriteUrlOf,
+  startupUrls,
+  withTimeout,
+} from './preload';
+import { spriteResolution } from './spriteResolution';
+import { Preloader } from '@/ui/preloader';
+import { Vehicles } from './vehicles';
+import type { VehicleLook } from './vehicles';
 import { ServiceMarkers } from './serviceMarkers';
 import { TrafficOverlay } from './trafficOverlay';
+import { WireOverlay } from './wireOverlay';
 import { DebugOverlay } from './debugOverlay';
 import {
   BACKGROUND_COLOR,
@@ -337,6 +358,12 @@ export function createLayerOptions(content: ContentRegistry): OverlayOption[] {
  * buňka; uvnitř ní pak průměr, ať pohled neskáče po hranách buněk. Prázdný
  * svět nemá zástavbu, tam zůstává střed mapy.
  */
+/** Požádal hráč v systému o méně pohybu? Bez `matchMedia` (testy) ne. */
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 function cityCentre(world: ReadonlyWorldView): { x: number; y: number } {
   const cell = 16;
   const buckets = new Map<number, { x: number; y: number; count: number }>();
@@ -538,6 +565,17 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupIcon: 'bulldoze',
       action: { kind: 'bulldoze' },
     },
+    // Hromadné bourání ruin (T136): tažením přes čtvrť, sáhne jen na opuštěné
+    // budovy a suť. **Vlastní tlačítko**, ne roleta u buldozeru: ten má zůstat
+    // na jedno kliknutí.
+    {
+      id: 'bulldoze:ruins',
+      labelKey: 'ui.tool.demolishRuins',
+      icon: 'explosion',
+      groupKey: 'ui.tool.demolishRuins',
+      groupIcon: 'explosion',
+      action: { kind: 'demolishRuins' },
+    },
     // Rušení zón je **vlastní nástroj** (rozhodnutí autora, T62). Buldozer se
     // zóny nedotkne, takže probourat průsek proti ohni už nesmaže čtvrť pod
     // ním. Je to zóna s hodnotou „žádná", ne buldozer — dostane tím tažení
@@ -563,6 +601,39 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       cost: content.getBalance().water.pipeCost,
       action: { kind: 'pipe' },
     },
+    // Vedení (T129) má vlastní nabídku hned vedle Energetiky — do ní se tři
+    // nástroje navíc nevešly (roleta nejvýš šest položek). Nízké napětí
+    // rozvádí po čtvrti, vysoké nese proud od elektrárny.
+    {
+      id: 'wire:low',
+      labelKey: 'ui.tool.wire.low',
+      icon: 'bolt',
+      hotkey: 'j',
+      groupKey: 'ui.menu.wires',
+      groupIcon: 'bolt',
+      cost: content.getBalance().power.wires[0]?.cost ?? 0,
+      capacity: content.getBalance().power.wires[0]?.capacity ?? 0,
+      action: { kind: 'wire', wire: WIRE.low },
+    },
+    {
+      id: 'wire:high',
+      labelKey: 'ui.tool.wire.high',
+      icon: 'bolt',
+      groupKey: 'ui.menu.wires',
+      groupIcon: 'bolt',
+      cost: content.getBalance().power.wires[1]?.cost ?? 0,
+      capacity: content.getBalance().power.wires[1]?.capacity ?? 0,
+      action: { kind: 'wire', wire: WIRE.high },
+    },
+    // Odstranění vedení — tažením po trase, jen vedení, nic pod ním.
+    {
+      id: 'wire:remove',
+      labelKey: 'ui.tool.wire.remove',
+      icon: 'bulldoze',
+      groupKey: 'ui.menu.wires',
+      groupIcon: 'bolt',
+      action: { kind: 'wire', wire: WIRE.none },
+    },
   ];
 
   // Vše, co nevyroste ze zóny, staví hráč ručně. Nabídku i ikonu nese definice;
@@ -584,6 +655,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
       groupKey: `ui.menu.${menu}`,
       groupIcon: firstIcon.get(menu) ?? 'gear',
       cost: definition.construction.cost,
+      ...(definition.power?.transformer !== undefined ? { capacity: definition.power.transformer } : {}),
       action: { kind: 'place' as const, definitionId: definition.id },
     });
   });
@@ -744,6 +816,43 @@ async function loadSkirts(content: ContentRegistry): Promise<Map<string, Texture
   return out;
 }
 
+/** Měřítko dílů: obrázky jsou kreslené ve čtyřnásobku jako budovy. */
+const PART_SCALE = 4;
+
+/** Odkud jezdí popeláři. Odpady nemají třídu služby, poznají se podle id. */
+const WASTE_SITES = new Set(['vanilla:incinerator', 'vanilla:landfill']);
+
+/**
+ * Díly pro animace (T116): rotor, auta, chodci, plameny, lampa.
+ *
+ * Načtou se všechny naráz a hra je dostane najednou. Chybějící díl se
+ * nekreslí — efekt, který ho potřebuje, se prostě přeskočí.
+ */
+export async function loadParts(content: ContentRegistry): Promise<Map<string, LoadedPart>> {
+  const out = new Map<string, LoadedPart>();
+  const jobs: Promise<void>[] = [];
+  for (const name of content.getPartNames()) {
+    const part = content.getPart(name);
+    if (part === undefined) continue;
+    jobs.push(
+      Assets.load(part.url)
+        .then((texture: Texture) => {
+          sampleSmooth(texture);
+          out.set(name, {
+            texture,
+            anchor: part.anchor,
+            ...(part.radius === undefined ? {} : { radius: part.radius }),
+            ...(part.skew === undefined ? {} : { skew: part.skew }),
+            ...(part.attach === undefined ? {} : { attach: part.attach }),
+          });
+        })
+        .catch(() => undefined),
+    );
+  }
+  await Promise.all(jobs);
+  return out;
+}
+
 /**
  * Předměty, které stojí na terénu: strom na lese, balvan na skále.
  *
@@ -803,7 +912,10 @@ async function loadObject(content: ContentRegistry, id: string): Promise<Terrain
     const sprite = content.getSprite(id, variant);
     if (sprite === undefined) continue;
     jobs.push(
-      Assets.load(sprite.url)
+      // Poloviční obrázek (T134): suť a scény katastrof se na mapě kreslí
+      // malé a plná velikost by jen zabírala paměť. Rozlišení 0,5 z přípony
+      // `@0.5x` drží logickou velikost, takže `scale` platí dál.
+      Assets.load(spriteUrlOf(sprite))
         .then((texture: Texture) => {
           sampleSmooth(texture);
           out.push({ texture, anchor: sprite.anchor, scale: sprite.scale });
@@ -857,7 +969,8 @@ async function loadDisasterScenes(
       const sprite = content.getSprite(id, variant);
       if (sprite === undefined) continue;
       jobs.push(
-        Assets.load(sprite.url)
+        // Poloviční obrázek, stejně jako u suti (`loadObject`, T134).
+        Assets.load(spriteUrlOf(sprite))
           .then((texture: Texture) => {
             sampleSmooth(texture);
             const list = out.get(kind) ?? [];
@@ -895,8 +1008,44 @@ const SURFACE_VARIANT_LIMIT = 1;
  */
 const SCREENSHOT_RESOLUTION = 2;
 
+/**
+ * Komprese automatického uložení (T134).
+ *
+ * Změřeno na ukázkovém městě (dřív `public/demo/`): deflate na devítce 150–170 ms
+ * (47,4 kB), na trojce 21–23 ms (52,9 kB), na jedničce 25–28 ms (59,6 kB) —
+ * a to v obsluze snímku nebo při zavírání karty. Trojka je stejně rychlá jako
+ * jednička a o desetinu menší. Autosave žije jen v prohlížeči a za dvě minuty
+ * ho přepíše další, takže o 12 % větší soubor nevadí. Stažené město a rychlé
+ * uložení zůstávají na devítce.
+ */
+const AUTOSAVE_ZIP_LEVEL = 3;
+
+/**
+ * Jak dlouho nejvýš čeká periodický autosave na volnou chvíli prohlížeče
+ * (`requestIdleCallback`), než se provede i tak.
+ */
+const AUTOSAVE_IDLE_TIMEOUT_MS = 5000;
+
 /** Druhy terénu, ke kterým se hledá obrázek. Sedí na `TERRAIN` v `sim/layers.ts`. */
 const TERRAIN_NAMES = ['grass', 'water', 'sand', 'rock', 'forest', 'marsh'] as const;
+
+/**
+ * Obrázky budov, které stojí v načteném městě (T134) — přesně ty varianty,
+ * které si pak vybere `createAppearanceLookup`, v poloviční velikosti.
+ * Zpustlé budovy se nepočítají: dotáhnou se z pozadí.
+ */
+function savedSpriteUrls(
+  world: { readonly buildings: ReadonlyMap<number, { id: number; definitionId: string }> },
+  content: ContentRegistry,
+): string[] {
+  const lookup = createAppearanceLookup(content);
+  const urls = new Set<string>();
+  for (const building of world.buildings.values()) {
+    const sprite = lookup(building.definitionId, building.id)?.sprite;
+    if (sprite !== undefined) urls.add(spriteUrlOf(sprite));
+  }
+  return [...urls].sort();
+}
 
 
 export async function startApp(mount: HTMLElement): Promise<SimHost> {
@@ -914,6 +1063,43 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     tables as LocaleTables,
     pickLanguage([...navigator.languages], content.getLanguages()),
   );
+
+  // Grafika se začne stahovat **hned**, zatímco hráč stojí na rozcestníku
+  // (T121). Ukazatel visí na `body`, ne na `mount`: rozcestník si svůj
+  // kontejner přestavuje a vzal by ukazatel s sebou.
+  //
+  // Jen to, co ukáže první obrazovka (T134): povrchy, díly, podezdívky
+  // a budovy, které jdou postavit v novém městě. Zbytek jde na pozadí, až hra
+  // běží — viz `render/preload.ts`.
+  const firstScreen = startupUrls(content, {
+    surfaces: [
+      ...TERRAIN_NAMES,
+      ...ROAD_FAMILIES.flatMap((family) => (family === undefined ? [] : [`asphalt_${family}`])),
+      'rubble',
+    ],
+    surfaceVariants: SURFACE_VARIANT_LIMIT,
+    objects: TERRAIN_DECOR.map(([, id]) => [id, DECOR_VARIANT_LIMIT] as const),
+  });
+  let preloader: Preloader | null = new Preloader(document.body, i18n.t('ui.preload.label'));
+  /** Kolik z prvního balíku a kolik z města ze savu je hotovo — pro jeden proužek. */
+  const progress = { first: 0, saved: 1, savedCount: 0 };
+  const showProgress = () => {
+    const total = firstScreen.length + progress.savedCount;
+    preloader?.set(
+      total === 0 ? 1 : (progress.first * firstScreen.length + progress.saved * progress.savedCount) / total,
+    );
+  };
+  const preloading = preloadGraphics(firstScreen, (done) => {
+    progress.first = done;
+    showProgress();
+  });
+  let firstScreenReady = false;
+  // Hotovo dřív, než si hráč vybral: proužek zmizí, na rozcestníku nemá co dělat.
+  void preloading.then(() => {
+    firstScreenReady = true;
+    preloader?.remove();
+    preloader = null;
+  });
 
   // Hra začíná dialogem: hráč si vybere jméno města a seed a rovnou vidí, jakou
   // mapu dostane (§3 fáze 3). Teprve pak vzniká svět.
@@ -1071,6 +1257,30 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Ze seedu jde tenhle terén kdykoli vygenerovat znovu, tak ať to save ví.
     simWorld.map = { seed: newGame.seed, generated: true };
   }
+
+  // Hráč si vybral dřív, než se grafika načetla: počká se, ať budovy
+  // nenaskakují jedna po druhé. Ukazatel se roztáhne přes obrazovku.
+  //
+  // Rozehrané město přidá **obrázky budov, které v něm stojí** (T134): na
+  // start se bere jen to, co jde postavit v novém městě, a čtvrť páté úrovně
+  // by jinak naskakovala po kouscích. Čeká se nejvýš `PRELOAD_TIMEOUT_MS` —
+  // visící požadavek hru nezastaví, obrázek si renderer dotáhne sám.
+  const firstScreenSet = new Set(firstScreen);
+  const savedUrls = restored ? savedSpriteUrls(simWorld, content).filter((url) => !firstScreenSet.has(url)) : [];
+  progress.savedCount = savedUrls.length;
+  progress.saved = savedUrls.length === 0 ? 1 : 0;
+  if (!firstScreenReady || savedUrls.length > 0) {
+    preloader ??= new Preloader(document.body, i18n.t('ui.preload.label'));
+    preloader.block();
+    showProgress();
+    const savedLoading = preloadGraphics(savedUrls, (done) => {
+      progress.saved = done;
+      showProgress();
+    });
+    await withTimeout(Promise.all([preloading, savedLoading]));
+    preloader?.remove();
+    preloader = null;
+  }
   const host = createSimHost(
     simWorld,
     createDefaultSystems(content, content.getBalance(), disasterRegistry, content.grants()),
@@ -1080,11 +1290,31 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   const world = host.getSnapshot();
 
   const app = new Application();
-  await app.init({ background: BACKGROUND_COLOR, resizeTo: mount, antialias: true });
+  /*
+   * `manageImports: false` (T134): Pixi by si jinak při startu dotáhl celé
+   * prostředí prohlížeče — přístupnost, DOM kontejnery, vlastní systém událostí
+   * a filtry. Hra nic z toho nepoužívá: vstup čte z DOM událostí na plátně,
+   * text kreslí HTML a filtry ani masky nemá. Co potřebuje (grafika, sprity,
+   * ticker, `resizeTo`, načítání textur, `extract`), si Pixi registruje samo
+   * při importu tříd. `touch-action: none` na plátně, které jinak nastavuje
+   * systém událostí, drží `style.css`.
+   */
+  await app.init({
+    background: BACKGROUND_COLOR,
+    resizeTo: mount,
+    antialias: true,
+    manageImports: false,
+  });
   mount.appendChild(app.canvas);
 
   const worldContainer = new Container();
   app.stage.addChild(worldContainer);
+
+  // Plné obrázky budov jen při přiblížení (T134). Zoom a posun kamery se
+  // čtou z kontejneru světa, který nastavuje smyčka snímku.
+  app.ticker.add((ticker) => {
+    spriteResolution.update(worldContainer.scale.x, worldContainer.position, app.screen, ticker.lastTime);
+  });
 
   const serviceClasses = serviceClassesOf(content);
 
@@ -1122,53 +1352,147 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // Hotové dlaždice na každý tvar v repu leží, ale 42 ze 64 má vozovku jinde,
   // než má — a hlavně by se jich tolik nevešlo do jedné dávky. Proč, viz
   // `docs/08-DLAZDICE.md`. Potrubí zatím zůstává procedurální.
-  void loadSurfaces(content).then((surfaces) => {
-    if (surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
-  });
-  void loadServiceIcons(content, serviceClasses).then((icons) => {
-    serviceMarkers.setTextures(icons);
-  });
-
-  // Trosky: jeden obrázek, kreslí se do polygonu dlaždice jako povrch.
-  void loadTile(content, 'rubble').then((texture) => {
-    chunkRenderer.setRubble(texture);
-  });
-
-  void loadDisasterScenes(content).then((scenes) => {
-    if (scenes.size > 0) disasterScenes.setScenes(scenes);
-  });
-
-  /*
+  //
+  // **Všechno se použije naráz, v jednom synchronním bloku** (T134). Dřív měl
+  // každý druh obrázků vlastní `.then()` a dobíhaly v různých snímcích:
+  // povrchy, trosky i pásy přechodů zvlášť zneplatnily celý terén, takže se
+  // upekl třikrát, a budovy se přeřadily šestkrát po sobě. Chunky se pečou
+  // líně v dalším snímku, takže jeden blok znamená jedno pečení.
+  //
+  // Nepovedené načtení nic neblokuje: každá funkce chyby spolkne sama
+  // a `allSettled` pokryje i to, co by přece jen vyhodilo (P5).
+  const rubbleSlopes = ['flat', 'ur', 'lr', 'll', 'ul'] as const;
+  void Promise.allSettled([
+    loadSurfaces(content),
+    loadServiceIcons(content, serviceClasses),
+    // Trosky: jeden obrázek, kreslí se do polygonu dlaždice jako povrch.
+    loadTile(content, 'rubble'),
+    loadDisasterScenes(content),
+    /*
    * Suť: hromada pro rovinu a čtyři hromady kreslené do svahu.
    *
    * Klíč je **směr, kterým na obrazovce klesá země** — `flat`, `ur`, `lr`,
    * `ll`, `ul`. Renderer si podle rohů dlaždice vybere, kterou sadu vzít;
    * chybějící sada nevadí, spadne zpátky na rovnou hromadu (P5, mod nemusí
-   * dodat všechny).
-   */
-  void Promise.all(
-    (['flat', 'ur', 'lr', 'll', 'ul'] as const).map((slope) =>
-      loadObject(content, slope === 'flat' ? 'rubble_pile' : `rubble_slope_${slope}`).then(
-        (piles) => [slope, piles] as const,
+     * dodat všechny).
+     */
+    Promise.all(
+      rubbleSlopes.map((slope) =>
+        loadObject(content, slope === 'flat' ? 'rubble_pile' : `rubble_slope_${slope}`).then(
+          (piles) => [slope, piles] as const,
+        ),
       ),
     ),
-  ).then((sets) => {
-    const piles = new Map(sets.filter(([, list]) => list.length > 0));
+    loadRoadMaterials(content),
+    loadDecor(content),
+    loadSkirts(content),
+    loadParts(content),
+  ]).then((results) => {
+    const [surfaces, icons, rubble, scenes, sets, materials, decor, skirts, parts] = results.map(
+      (result) => (result.status === 'fulfilled' ? result.value : undefined),
+    ) as [
+      Map<string, Texture> | undefined,
+      Map<string, Texture> | undefined,
+      Texture | undefined,
+      Map<string, TerrainDecor[]> | undefined,
+      (readonly (readonly [(typeof rubbleSlopes)[number], TerrainDecor[]])[]) | undefined,
+      Map<string, Texture> | undefined,
+      Map<number, TerrainDecor[]> | undefined,
+      Map<string, Texture> | undefined,
+      Map<string, LoadedPart> | undefined,
+    ];
+
+    if (surfaces && surfaces.size > 0) chunkRenderer.setSurfaces(surfaces);
+    if (icons) serviceMarkers.setTextures(icons);
+    chunkRenderer.setRubble(rubble);
+    if (scenes && scenes.size > 0) disasterScenes.setScenes(scenes);
+    const piles = new Map((sets ?? []).filter(([, list]) => list.length > 0));
     if (piles.size > 0) buildingRenderer.setRubblePiles(piles);
+    if (materials && materials.size > 0) roadRenderer.setTextures(materials);
+    if (decor && decor.size > 0) buildingRenderer.setDecor(decor);
+    if (skirts && skirts.size > 0) buildingRenderer.setSkirtTextures(skirts);
+    if (parts && parts.size > 0) applyParts(parts);
+
+    // Hra běží a první obrazovka je celá: teď může na pozadí dojít na zbytek
+    // grafiky. Ne dřív — soupeřil by o linku s tím, na co hráč čeká.
+    const ready = new Set([...firstScreen, ...savedUrls]);
+    prefetchInBackground(backgroundUrls(content, ready));
   });
 
-  void loadRoadMaterials(content).then((materials) => {
-    if (materials.size > 0) roadRenderer.setTextures(materials);
-  });
-  void loadDecor(content).then((decor) => {
-    if (decor.size > 0) buildingRenderer.setDecor(decor);
-  });
-  void loadSkirts(content).then((skirts) => {
-    if (skirts.size > 0) buildingRenderer.setSkirtTextures(skirts);
-  });
+  function applyParts(parts: ReadonlyMap<string, LoadedPart>): void {
+    buildingRenderer.setParts(parts);
+    roadRenderer.setSidewalkTexture(parts.get('sidewalk')?.texture);
+    // Přechody povrchů (T130): materiály pásů jdou do terénních chunků.
+    chunkRenderer.setBands(
+      new Map(
+        [...parts.entries()]
+          .filter(([name]) => name.startsWith('band_'))
+          .map(([name, part]) => {
+            sampleSmooth(part.texture);
+            return [name, part.texture] as const;
+          }),
+      ),
+    );
+    const flames = [...parts.entries()]
+      .filter(([name]) => name.startsWith('flames_'))
+      .sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))
+      .map(([, part]) => part);
+    const person = (name: string) => {
+      const part = parts.get(name);
+      return part === undefined ? undefined : { texture: part.texture, anchor: part.anchor };
+    };
+    const range = (sheet: string, from: number, to: number) =>
+      Array.from({ length: to - from }, (_, i) => person(`${sheet}_${from + i}`)).filter(
+        (found): found is NonNullable<typeof found> => found !== undefined,
+      );
+    // Cyklus chůze (T126): tři postavy po čtyřech fázích. Bez něj staré
+    // nehybné postavy, každá jako „cyklus" o jedné fázi.
+    const cycles = (sheet: string) =>
+      [0, 1, 2].map((p) => range(sheet, p * 4, p * 4 + 4)).filter((frames) => frames.length === 4);
+    const walkFront = cycles('walk_front');
+    const walkRear = cycles('walk_rear');
+    people.setLooks({
+      front: walkFront.length > 0 ? walkFront : range('people_walk', 0, 6).map((look) => [look]),
+      rear: walkRear.length > 0 ? walkRear : range('people_walk', 6, 12).map((look) => [look]),
+      sit: range('people_sit', 0, 8),
+    });
+    fireLayer.setTextures(
+      flames.map((part) => part.texture),
+      flames.map((part) => part.anchor),
+      PART_SCALE,
+    );
+    buildingRenderer.setLamp(parts.get('street_lamp'));
+    buildingRenderer.setPoles(parts.get('wood_pole'), parts.get('pylon'));
+    const look = (sheet: string, i: number, weight: number): VehicleLook | undefined => {
+      const front = parts.get(`${sheet}_front_${i}`);
+      const rear = parts.get(`${sheet}_rear_${i}`);
+      if (front === undefined || rear === undefined) return undefined;
+      return {
+        front: { texture: front.texture, anchor: front.anchor, scale: PART_SCALE, skew: front.skew ?? 0 },
+        rear: { texture: rear.texture, anchor: rear.anchor, scale: PART_SCALE, skew: rear.skew ?? 0 },
+        weight,
+      };
+    };
+    // Škoda 105, 120, Trabant, Lada, Avia, Karosa. Nákladních a autobusů je
+    // ve městě míň — a váha pod jedna je zároveň o kus pomalejší.
+    const weights = [1, 1, 1, 1, 0.35, 0.2];
+    vehicles.setLooks(
+      weights
+        .map((weight, i) => look('cars', i, weight))
+        .filter((found): found is VehicleLook => found !== undefined),
+    );
+    serviceLooks = new Map(
+      (['police', 'fire', 'health', 'waste'] as const)
+        .map((service, i) => [service, look('service', i, 0.5)] as const)
+        .filter((entry): entry is readonly [typeof entry[0], VehicleLook] => entry[1] !== undefined),
+    );
+  }
   // Silnice leží **mezi terénem a budovami**: kreslí se po chunku, ale pod
   // domy. Vlastní kontejner, ne řazení podle hloubky — vozovka je země.
+  // Odlesky na vodě (T117): nad upečenou vodou, pod mosty a silnicemi.
+  const waterGlints = new WaterGlints(world, worldContainer, app.renderer);
   const roadRenderer = new RoadRenderer(world, worldContainer);
+
 
   // Čtvercová síť leží **nad zemí a pod domy**, ze stejného důvodu jako
   // vozovka: je to hranice pozemku, ne kresba přes město. V podzemním pohledu
@@ -1180,6 +1504,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     worldContainer,
     createAppearanceLookup(content),
   );
+  // Třídí změny ze simulace podle druhu, ať oheň nepřestavuje stromy (T133).
+  const changeTracker = new ChangeTracker(world);
+  // Svět je vlastní skupina vykreslování (T133). Kamera hýbe jen jejím
+  // kořenem: bez toho Pixi při každém posunu a zoomu přepočítal transformaci
+  // všech dvanácti tisíc uzlů pod ním, i těch mimo obrazovku.
+  worldContainer.isRenderGroup = true;
+
+  // Auta (T115) se řadí **mezi budovy** (T124): ve vlastní vrstvě pod domy
+  // je na svahu ořízla podezdívka domu za nimi.
+  const vehicles = new Vehicles(
+    world,
+    buildingRenderer.layer,
+    (roadType) => content.getBalance().traffic.roadTypes[roadType - 1]?.capacity ?? 0,
+    (x, y) => buildingRenderer.depthAt(x, y),
+  );
+  /** Vozidla služeb podle třídy (T118). Plní se, až se načtou díly. */
+  let serviceLooks = new Map<string, VehicleLook>();
 
   // Tepelné mapy: barva říká **jak je na tom čtvrť**, ne jak velké je číslo.
   // Směr se proto zadává u každé zvlášť — u znečištění je vysoká hodnota zlá,
@@ -1245,6 +1586,43 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   const disasterScenes = new DisasterScenes(world, worldContainer);
 
+  // Odezva na akce (T114): prach při bourání. Nad budovami, protože prach
+  // stoupá před fasádou.
+  const effects = new Effects(worldContainer, app.renderer);
+  buildingRenderer.onVanished = (area) => effects.dust(area);
+  // Plameny na každé hořící dlaždici (T120) a prach u paty tornáda.
+  const fireLayer = new FireLayer(world, worldContainer);
+  // Lidé u zastávek a metra (T118).
+  const people = new People(
+    world,
+    buildingRenderer.layer,
+    (x, y) => buildingRenderer.depthAt(x, y),
+    (id) => buildingRenderer.zIndexOf(id),
+  );
+  /** Vchody zastávek a metra. Přepočítává se jednou za vteřinu, ne za snímek. */
+  let entrances: Entrance[] = [];
+  let entrancesAge = Infinity;
+  function transitEntrances(): Entrance[] {
+    const out: Entrance[] = [];
+    for (const [id, building] of world.buildings) {
+      if (building.abandoned) continue;
+      const definition = content.get(building.definitionId);
+      if (definition?.service?.class !== 'transit') continue;
+      const [width, depth] = definition.footprint;
+      out.push({
+        id,
+        x: building.x,
+        y: building.y,
+        width,
+        depth,
+        busy: building.definitionId === 'vanilla:metro_station' ? 2.5 : 1,
+      });
+    }
+    return out;
+  }
+  disasterScenes.onDust = (x, y, base) =>
+    effects.dust({ x: x - 0.35, y: y - 0.35, width: 0.7, depth: 0.7, base });
+
   const serviceMarkers = new ServiceMarkers(world, worldContainer);
   serviceMarkers.setLookup(
     (definitionId) => {
@@ -1261,6 +1639,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     worldContainer,
     world,
     (roadType) => content.getBalance().traffic.roadTypes[roadType - 1]?.capacity ?? 0,
+  );
+
+  // Elektrické vedení (T129) s vytížením, jen ve vrstvě elektřiny.
+  const wireOverlay = new WireOverlay(
+    worldContainer,
+    world,
+    (type) => content.getBalance().power.wires[type - 1]?.capacity ?? 1,
   );
 
   const hover = new Graphics();
@@ -1311,6 +1696,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         i18n.t('ui.save.noWaterNetwork', { count: startupWarnings.waterlessBuildings }),
       );
     }
+    if (startupWarnings.unwiredBuildings > 0) {
+      notifications.show(
+        i18n.t('ui.save.noPowerLines', { count: startupWarnings.unwiredBuildings }),
+      );
+    }
+    if (startupWarnings.needsTransformers) notifications.show(i18n.t('ui.save.needsTransformers'));
   }
   const legend = new Legend(mount, i18n);
   const budgetPanel = new BudgetPanel(mount, i18n, content.getAll('building'));
@@ -1478,6 +1869,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           i18n.t('ui.save.noWaterNetwork', { count: warnings.waterlessBuildings }),
         );
       }
+      if (warnings.unwiredBuildings > 0) {
+        notifications.show(i18n.t('ui.save.noPowerLines', { count: warnings.unwiredBuildings }));
+      }
+      if (warnings.needsTransformers) notifications.show(i18n.t('ui.save.needsTransformers'));
     } catch (error) {
       message = {
         key: 'ui.save.failed',
@@ -1546,7 +1941,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   function autosaveNow(verify = true): void {
     if (restarting) return;
     try {
-      const bytes = serializeSave(simWorld, saveOptions());
+      const bytes = serializeSave(simWorld, saveOptions(), AUTOSAVE_ZIP_LEVEL);
       if (verify && !saveIsReadable(bytes)) return;
 
       // Bez `await`: na `pagehide` už není kam čekat. Zápis v prohlížeči běží
@@ -1571,6 +1966,20 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     } catch {
       // Rozehranou hru neshodí ani plné úložiště.
     }
+  }
+
+  /**
+   * Periodický autosave, až bude prohlížeč volný (T134). Serializace a zápis
+   * pak neukousnou snímek uprostřed posouvání mapy. Kde `requestIdleCallback`
+   * není (Safari), uloží se hned jako dřív. `pagehide` sem nechodí — tam se
+   * musí uložit synchronně.
+   */
+  function autosaveWhenIdle(verify: boolean): void {
+    if (typeof window.requestIdleCallback !== 'function') {
+      autosaveNow(verify);
+      return;
+    }
+    window.requestIdleCallback(() => autosaveNow(verify), { timeout: AUTOSAVE_IDLE_TIMEOUT_MS });
   }
 
   /**
@@ -1918,8 +2327,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
    */
   function dragKind(): 'area' | 'line' | null {
     const kind = activeTool.action.kind;
-    if (kind === 'zone') return 'area';
-    if (kind === 'road' || kind === 'pipe') return 'line';
+    if (kind === 'zone' || kind === 'demolishRuins') return 'area';
+    if (kind === 'road' || kind === 'pipe' || kind === 'wire') return 'line';
     return null;
   }
 
@@ -2054,6 +2463,12 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   let ghostBuildings = false;
   let decorVisible = true;
   let gridVisible = false;
+  /**
+   * Hýbe se něco jen pro parádu? Výchozí hodnota ctí `prefers-reduced-motion`:
+   * komu se z pohybu na obrazovce dělá zle, ten si to v systému už řekl
+   * a nemá to hledat v liště znovu.
+   */
+  let motionOn = !prefersReducedMotion();
 
   function applyViewAndLayer(): void {
     // Elektřina se zapéká do chunků, hrubé veličiny mají vlastní lehkou vrstvu
@@ -2064,6 +2479,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const coarseId = layerMode === 'power' || layerMode === 'traffic' ? 'none' : layerMode;
     coarseOverlay.setActive(coarseId);
     trafficOverlay.setVisible(layerMode === 'traffic');
+    wireOverlay.setVisible(layerMode === 'power' && viewMode !== 'underground');
     // Špendlíky jen u mapy dosahu: tam se hráč ptá „kde ta stanice je".
     // U tepelných map by ukazovaly na budovu, která s tou veličinou nesouvisí.
     serviceMarkers.setActive(
@@ -2076,6 +2492,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     disasterScenes.setVisible(viewMode !== 'underground');
     buildingRenderer.setGhost(ghostBuildings);
     buildingRenderer.setDecorVisible(decorVisible);
+    buildingRenderer.setMotion(motionOn);
+    placementGhost.setMotion(motionOn);
+    effects.setEnabled(motionOn);
+    effects.setVisible(viewMode !== 'underground');
+    vehicles.setEnabled(motionOn);
+    vehicles.setVisible(viewMode !== 'underground');
+    fireLayer.setEnabled(motionOn);
+    fireLayer.setVisible(viewMode !== 'underground');
+    people.setEnabled(motionOn);
+    people.setVisible(viewMode !== 'underground');
+    waterGlints.setEnabled(motionOn);
+    waterGlints.setVisible(viewMode !== 'underground');
     // Barva sítě se řídí pohledem, ne přepínačem: pod zemí bílá, nad zemí
     // černá. Přepnutí sítě naopak pohledem nehne — viz `gridOverlay.ts`.
     gridOverlay.setUnderground(viewMode === 'underground');
@@ -2113,6 +2541,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         ['power-on', 'ui.legend.power.on'],
         ['power-off', 'ui.legend.power.off'],
         ['power-none', 'ui.legend.power.none'],
+        // Vedení (T136): barva podle vytížení proti kapacitě.
+        ['wire-low', 'ui.legend.wire.low'],
+        ['wire-high', 'ui.legend.wire.high'],
+        ['wire-overloaded', 'ui.legend.wire.overloaded'],
+        ['wire-dead', 'ui.legend.wire.dead'],
       ]);
       return;
     }
@@ -2210,6 +2643,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       decorVisible = !decorVisible;
       applyViewAndLayer();
     },
+    onToggleMotion: () => {
+      motionOn = !motionOn;
+      applyViewAndLayer();
+    },
     onToggleGrid: () => {
       gridVisible = !gridVisible;
       gridOverlay.setVisible(gridVisible);
@@ -2248,6 +2685,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // mapu. Hlásil to autor.
     if (tool.action.kind === 'pipe') setView('underground');
     else if (tool.action.kind !== 'bulldoze' && tool.action.kind !== 'pan') setView('surface');
+    // Vedení je vidět ve vrstvě elektřiny (T129) — hráč ho má vidět, když ho
+    // staví, stejně jako potrubí v podzemí.
+    if (tool.action.kind === 'wire' && layerMode !== 'power') toggleLayer('power');
   }
 
   // Vysunutou řadu vlastní HUD: je společná pro schované nástroje i schované
@@ -2349,6 +2789,45 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   /** Totéž pro nedostatek proudu. */
   let hadPowerShortage = false;
+  /**
+   * Souhrny pro lištu z minulého přepočtu (T133). Počítají se čtyřmi až pěti
+   * průchody přes všechny budovy (proud, `cityUtilities`, `explainDemand` se
+   * spokojeností) a běžely každý snímek, i na pauze. Město se přitom mění jen
+   * tikem nebo příkazem hráče — přepočítá se tedy po tiku, po změně ve světě
+   * a pro jistotu (posuvníky financování změnu nehlásí) nejvýš po 250 ms.
+   */
+  let cityStats:
+    | {
+        poweredBuildings: number;
+        powerProduced: number;
+        powerNeeded: number;
+        powerOffline: number;
+        utilities: ReturnType<typeof cityUtilities>;
+        demandTerms: ReturnType<typeof explainDemand>;
+      }
+    | null = null;
+  let cityStatsTick = -1;
+  let cityStatsAt = 0;
+  /** Změnilo se v tomhle snímku něco ve světě? Nastavuje `renderFrame`. */
+  let worldTouched = true;
+  /** Počítadlo změn světa — kus klíče pro zapamatované odhady cen. */
+  let worldVersion = 0;
+
+  /**
+   * Odhady cen pod kurzorem (T133). Tažení silnice počítalo `estimateRoad`
+   * pro každou dlaždici, zóna plánovala srovnání terénu celé plochy, a to
+   * **každý snímek**, i když se kurzor ani svět nepohnuly. Výsledek se proto
+   * pamatuje pod klíčem z nástroje, dlaždic, tiku a verze světa.
+   */
+  const estimateMemo = new Map<string, { key: string; value: unknown }>();
+  function memoEstimate<T>(slot: string, key: string, compute: () => T): T {
+    const stamped = `${key}|${world.tick}|${worldVersion}`;
+    const found = estimateMemo.get(slot);
+    if (found !== undefined && found.key === stamped) return found.value as T;
+    const value = compute();
+    estimateMemo.set(slot, { key: stamped, value });
+    return value;
+  }
   /** Kolik kapacity drží dole běžící blackout. Hlásí se jen při změně. */
   let lastPowerOffline = 0;
 
@@ -2431,13 +2910,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       return;
     }
 
-    const plan = estimatePlacement(
-      simWorld,
-      content,
-      activeTool.action.definitionId,
-      tile.x,
-      tile.y,
-      content.getBalance(),
+    const definitionId = activeTool.action.definitionId;
+    const plan = memoEstimate('place', `${definitionId}|${tile.x},${tile.y}`, () =>
+      estimatePlacement(simWorld, content, definitionId, tile.x, tile.y, content.getBalance()),
     );
 
     const text =
@@ -2524,6 +2999,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       case 'pipe':
         dispatch({ type: 'build_pipe', x: tile.x, y: tile.y });
         break;
+      case 'wire':
+        dispatch(
+          action.wire === WIRE.none
+            ? { type: 'remove_wire', x: tile.x, y: tile.y }
+            : { type: 'build_wire', x: tile.x, y: tile.y, wire: action.wire },
+        );
+        break;
       case 'fill':
         dispatch({ type: 'level_area', x: tile.x, y: tile.y, w: 1, h: 1, mode: 'fill' });
         break;
@@ -2531,12 +3013,29 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         dispatch({ type: 'plant_trees', x: tile.x, y: tile.y });
         break;
       case 'bulldoze': {
-        // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi.
+        const buildingIdBefore =
+          world.layers.buildingId[tile.y * world.size + tile.x] ?? 0;
+        // A buldozer pod zemí bourá trubky, ne to, co stojí nad nimi. Ve vrstvě
+        // elektřiny bourá vedení (T129): hráč se na něj dívá a míří na něj.
+        const wireHere = (world.layers.wire[tile.y * world.size + tile.x] ?? 0) !== 0;
         const result =
           viewMode === 'underground'
             ? dispatch({ type: 'remove_pipe', x: tile.x, y: tile.y })
-            : dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
+            : layerMode === 'power' && wireHere
+              ? dispatch({ type: 'remove_wire', x: tile.x, y: tile.y })
+              : dispatch({ type: 'bulldoze', x: tile.x, y: tile.y });
         undone = result.ok;
+        // Silnice a stromy taky zvednou prach. Budova si svůj obláček zvedne
+        // sama, až zmizí z mapy, a větší — dvakrát ji prášit nemá smysl.
+        if (result.ok && viewMode !== 'underground' && buildingIdBefore === 0) {
+          effects.dust({
+            x: tile.x,
+            y: tile.y,
+            width: 1,
+            depth: 1,
+            base: tileBaseHeight(world.cornerHeight, tile.x, tile.y),
+          });
+        }
         break;
       }
       case 'zone':
@@ -2947,6 +3446,23 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (!anchor || tiles.length === 0) return;
 
     const action = activeTool.action;
+    if (action.kind === 'demolishRuins') {
+      const xs = tiles.map((tile) => tile.x);
+      const ys = tiles.map((tile) => tile.y);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      // Bourání jde vrátit jako buldozerem: snímek před, nabídka „Zpět" po.
+      const snapshot = undoSnapshotNow();
+      const result = dispatch({
+        type: 'demolish_ruins',
+        x,
+        y,
+        w: Math.max(...xs) - x + 1,
+        h: Math.max(...ys) - y + 1,
+      });
+      if (result.ok) undoBar.show('ui.undo.demolished', snapshot);
+      return;
+    }
     if (action.kind === 'zone') {
       const xs = tiles.map((tile) => tile.x);
       const ys = tiles.map((tile) => tile.y);
@@ -2965,7 +3481,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     // Silnice a potrubí: každá dlaždice je vlastní příkaz, ale hlásí se jen
     // první odmítnutí — jinak by most přes řeku vyplivl deset stejných hlášek.
-    if (action.kind !== 'road' && action.kind !== 'pipe') return;
+    if (action.kind !== 'road' && action.kind !== 'pipe' && action.kind !== 'wire') return;
 
     /*
      * Nejdřív se **sečte**, teprve pak staví (T-revize, nález 14).
@@ -3002,7 +3518,11 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       const command: Command =
         action.kind === 'pipe'
           ? { type: 'build_pipe', x: tile.x, y: tile.y }
-          : { type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType };
+          : action.kind === 'wire'
+            ? action.wire === WIRE.none
+              ? { type: 'remove_wire', x: tile.x, y: tile.y }
+              : { type: 'build_wire', x: tile.x, y: tile.y, wire: action.wire }
+            : { type: 'build_road', x: tile.x, y: tile.y, roadType: action.roadType };
       const result = host.dispatch(command);
       if (result.ok) built++;
       else if (!complained && !isRoutine(result.reason)) {
@@ -3240,6 +3760,26 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   // místě a nespoléhá na to, že se pole náhodou zakládají prázdná.
   resetRuntimeNotices();
 
+  // Ladicí přístup **jen ve vývoji** (T115): testovací skript v headless
+  // prohlížeči staví přes něj město a posouvá kameru, aby šlo animace
+  // nasnímat bez klikání do lišty. Do produkčního buildu se nedostane —
+  // Vite `import.meta.env.DEV` ve buildu nahradí `false` a větev vypadne.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __citybuilder?: unknown }).__citybuilder = {
+      dispatch: (command: Command) => host.dispatch(command),
+      world,
+      camera,
+      setSpeed,
+      // Pro měření snímku (T133): skript si do tickeru přidá značky před
+      // a za `renderFrame` a za vykreslení.
+      app,
+      load: (base64: string) =>
+        loadFromBytes(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))),
+      startDisaster: (kind: string, x: number, y: number) =>
+        startDisaster(simWorld, content, content.getBalance(), disasterRegistry, kind, x, y),
+    };
+  }
+
   app.ticker.add((ticker) => {
     try {
       renderFrame(ticker.deltaMS);
@@ -3249,6 +3789,97 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       reportCrash(error instanceof Error ? error.message : String(error));
     }
   });
+
+  /**
+   * Život u budov služeb (T118): policejní auto vyjede na obchůzku, sanitka
+   * a hasiči občas taky, od spalovny a skládky jezdí popeláři.
+   *
+   * Každá budova má vlastní odpočet, odvozený z id, takže se stanice
+   * nerozjedou všechny naráz. Jezdí jen budovy ve výřezu — auto, které
+   * nikdo neuvidí, se nepočítá.
+   */
+  const serviceClocks = new Map<number, number>();
+  /**
+   * Budovy, odkud vyjíždějí vozidla služeb (T133). Dřív se každý snímek
+   * procházely všechny budovy a u každé se hledala definice; teď se seznam
+   * sestaví znovu jen tehdy, když budova vznikla, zmizela nebo změnila vzhled.
+   */
+  let serviceSites: { id: number; x: number; y: number; width: number; depth: number; service: string }[] = [];
+  let serviceSitesStale = true;
+  function refreshServiceSites(): void {
+    serviceSitesStale = false;
+    serviceSites = [];
+    for (const [id, building] of world.buildings) {
+      if (building.abandoned) continue;
+      const definition = content.get(building.definitionId);
+      if (definition === undefined) continue;
+      const service = WASTE_SITES.has(building.definitionId) ? 'waste' : definition.service?.class;
+      if (service === undefined) continue;
+      const [width, depth] = definition.footprint;
+      serviceSites.push({ id, x: building.x, y: building.y, width, depth, service });
+    }
+  }
+
+  function dispatchServiceVehicles(elapsed: number, view: MotionView): void {
+    if (elapsed <= 0 || serviceLooks.size === 0) return;
+    if (serviceSitesStale) refreshServiceSites();
+    const range = tilesIn(view, world.size);
+    for (const site of serviceSites) {
+      const { id } = site;
+      if (site.x < range.x0 || site.x > range.x1 || site.y < range.y0 || site.y > range.y1) {
+        continue;
+      }
+      const look = serviceLooks.get(site.service);
+      if (look === undefined) continue;
+      const spread = ((id * 0.618034) % 1 + 1) % 1;
+      const left = (serviceClocks.get(id) ?? 4000 + spread * 20000) - elapsed;
+      if (left > 0) {
+        serviceClocks.set(id, left);
+        continue;
+      }
+      vehicles.dispatch(look, site.x, site.y, site.width, site.depth, 6 + Math.floor(spread * 10));
+      serviceClocks.set(id, 18000 + spread * 30000);
+    }
+  }
+
+  /** Souhrny pro lištu: proud, odpad, voda, poptávka. Viz `cityStats`. */
+  function computeCityStats(): NonNullable<typeof cityStats> {
+    let poweredBuildings = 0;
+    let powerProduced = 0;
+    let powerNeeded = 0;
+    // Odpad a kanalizace se do teď **nikde nezobrazovaly**, přestože rozhodují
+    // o znečištění celé mapy: nepokrytý zbytek se rozlije do každé buňky.
+    // Autor to popsal takhle: „odpady vůbec nikde nevidím, nevnímám, že by
+    // měly nějaký efekt." Čte se to stejně jako proud — kapacita / potřeba.
+    /*
+     * Odstavená elektrárna se do kapacity **nepočítá**.
+     *
+     * Autor poslal město, kde HUD hlásil 498 800 / 315 850 — tedy velkou
+     * rezervu — a přitom byla půlka města potmě a metro stálo. Kaskáda
+     * blackoutu měla dole 42 elektráren, jenže tenhle součet je bral jako
+     * kdyby jely. Číslo, které během výpadku tvrdí, že je proudu dost, je
+     * horší než žádné: hráč podle něj hledá chybu úplně jinde.
+     */
+    let powerOffline = 0;
+    for (const [id, building] of world.buildings) {
+      if (building.powered) poweredBuildings++;
+      if (building.abandoned) continue;
+      const definition = content.get(building.definitionId);
+      const produced = definition?.power?.production ?? 0;
+      if (produced > 0 && simWorld.disasters.offlinePlants.has(id)) powerOffline += produced;
+      else powerProduced += produced;
+      powerNeeded += definition?.power?.consumption ?? 0;
+    }
+    return {
+      poweredBuildings,
+      powerProduced,
+      powerNeeded,
+      powerOffline,
+      utilities: cityUtilities(simWorld, content, content.getBalance()),
+      // Rozpad poptávky se počítá tady, ne v HUD: potřebuje katalog i balanc.
+      demandTerms: explainDemand(simWorld, content, content.getBalance()),
+    };
+  }
 
   function renderFrame(deltaMS: number): void {
     host.step(deltaMS);
@@ -3266,7 +3897,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     if (autosaveDue <= 0) {
       autosaveDue = AUTOSAVE_EVERY_MS;
       autosaveRuns++;
-      autosaveNow(autosaveRuns % AUTOSAVE_VERIFY_EVERY === 1);
+      autosaveWhenIdle(autosaveRuns % AUTOSAVE_VERIFY_EVERY === 1);
     }
 
     // Hlásí se **po kroku**: pohroma, která právě vznikla, se má ohlásit
@@ -3289,20 +3920,52 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       app.screen.width,
       app.screen.height,
     );
-    chunkRenderer.update(dirty);
+    const changes = changeTracker.collect(dirty);
+    worldTouched = dirty.fullRedraw || dirty.tiles.size > 0 || dirty.buildings.size > 0;
+    if (worldTouched) worldVersion++;
+    if (changes.full || changes.buildings.length > 0) serviceSitesStale = true;
+    chunkRenderer.update(dirty, changes);
     // Peče se až tady a jen to, na co je vidět (R20). Musí to být po
     // `update()`, aby se změna z tohohle tiku promítla ještě v tomhle snímku.
     chunkRenderer.cull(viewport);
-    roadRenderer.update(dirty);
-    buildingRenderer.update(dirty);
+    roadRenderer.update(changes);
+    roadRenderer.cull(viewport);
+    buildingRenderer.update(changes);
+    buildingRenderer.cull(viewport);
     coarseOverlay.update(dirty.coarseChanged);
     // Síť se překresluje jen při změně terénu, posunu o blok nebo změně
     // měřítka — proto ten vlastní příznak vedle `tiles`.
     gridOverlay.update(dirty.heightsChanged, viewport, camera.zoom);
     // Značky se hýbou s budovami, ne s hrubou mřížkou.
-    serviceMarkers.update(dirty.fullRedraw || dirty.buildings.size > 0);
+    // Jen při změně vzhledu budov nebo suti — počet obyvatel je nezajímá.
+    serviceMarkers.update(changes.full || changes.buildings.length > 0 || changes.rubble.length > 0);
     disasterScenes.update();
-    trafficOverlay.update();
+    trafficOverlay.update(changes.full || changes.road.length > 0 || dirty.heightsChanged);
+    wireOverlay.update(changes.full || changes.wire.length > 0 || dirty.heightsChanged);
+    buildingRenderer.animate(deltaMS);
+    buildingRenderer.sway(deltaMS, viewport, camera.zoom);
+    placementGhost.animate(deltaMS);
+    // Kouř jen z komínů ve výřezu; `viewport` je spočítaný výš pro chunky.
+    if (viewMode !== 'underground') {
+      effects.smoke(buildingRenderer.smokeSources(), deltaMS, viewport);
+      fireLayer.update(deltaMS, viewport);
+      effects.smoke(fireLayer.smokeSources(), deltaMS, viewport);
+      // Kolik tiku uběhlo za tenhle snímek — tornádo mezi tiky dojíždí.
+      disasterScenes.animate(deltaMS, (deltaMS * (SPEEDS[speedIndex] ?? 0)) / TICK_MS, motionOn);
+    }
+    effects.update(deltaMS);
+    if (viewMode !== 'underground') {
+      const speedFactor = [0, 1, 1.5, 2, 2.5][speedIndex] ?? 1;
+      vehicles.update(deltaMS, speedFactor, viewport, camera.zoom);
+      dispatchServiceVehicles(deltaMS * speedFactor, viewport);
+      entrancesAge += deltaMS;
+      if (entrancesAge > 1000) {
+        entrancesAge = 0;
+        entrances = transitEntrances();
+      }
+      people.update(deltaMS, speedFactor, viewport, camera.zoom, buildingRenderer.seatSpots(), entrances);
+      waterGlints.update(deltaMS, viewport, camera.zoom);
+    }
 
     // Šipky posouvají **konstantní rychlostí na obrazovce**, ne v souřadnicích
     // světa: při oddálení by jinak mapa létala a při přiblížení se sotva hnula.
@@ -3355,9 +4018,15 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       let total = each * tiles.length;
 
       if (road !== null) {
-        total = tiles.reduce(
-          (sum, tile) => sum + estimateRoad(world, tile.x, tile.y, road, content.getBalance()).total,
-          0,
+        // Klíč nese celou trasu: tvar L se může lišit i při stejných koncích.
+        total = memoEstimate(
+          'road',
+          `${road}|${tiles.map((tile) => tile.y * world.size + tile.x).join(',')}`,
+          () =>
+            tiles.reduce(
+              (sum, tile) => sum + estimateRoad(world, tile.x, tile.y, road, content.getBalance()).total,
+              0,
+            ),
         );
       } else if (
         hoveredTile &&
@@ -3368,13 +4037,16 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         // Počítá se za celý obdélník naráz, ne po dlaždicích: srovnání je jeden
         // plán přes celou plochu a součet po jedné by vyšel úplně jinak.
         const corner = hoveredTile;
-        total = estimateZoning(
-          world,
-          Math.min(dragAnchor.x, corner.x),
-          Math.min(dragAnchor.y, corner.y),
-          Math.abs(corner.x - dragAnchor.x) + 1,
-          Math.abs(corner.y - dragAnchor.y) + 1,
-          content.getBalance(),
+        const anchor = dragAnchor;
+        total = memoEstimate('zone', `${anchor.x},${anchor.y}|${corner.x},${corner.y}`, () =>
+          estimateZoning(
+            world,
+            Math.min(anchor.x, corner.x),
+            Math.min(anchor.y, corner.y),
+            Math.abs(corner.x - anchor.x) + 1,
+            Math.abs(corner.y - anchor.y) + 1,
+            content.getBalance(),
+          ),
         );
       }
 
@@ -3407,7 +4079,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
        * rovnou nakreslí. Zasažené rohy slabě, ten pod kurzorem naplno.
        */
       const delta = activeTool.action.kind === 'terraform' ? activeTool.action.delta : 0;
-      const plan = estimateCornerHeight(simWorld, corner.x, corner.y, delta, content.getBalance());
+      const plan = memoEstimate('corner', `${corner.x},${corner.y}|${delta}`, () =>
+        estimateCornerHeight(simWorld, corner.x, corner.y, delta, content.getBalance()),
+      );
       const side = world.size + 1;
       for (const changed of plan.changes.keys()) {
         const cx = changed % side;
@@ -3504,32 +4178,18 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // Výroba a spotřeba proudu. Hráč do teď viděl jen zlomek „65/86" a neměl
     // jak zjistit, jestli mu chybí vedení, nebo elektrárna — dvě úplně jiné
     // opravy. Autor na to narazil s dvěma elektrárnami a dvaceti tmavými domy.
-    let poweredBuildings = 0;
-    let powerProduced = 0;
-    let powerNeeded = 0;
-    // Odpad a kanalizace se do teď **nikde nezobrazovaly**, přestože rozhodují
-    // o znečištění celé mapy: nepokrytý zbytek se rozlije do každé buňky.
-    // Autor to popsal takhle: „odpady vůbec nikde nevidím, nevnímám, že by
-    // měly nějaký efekt." Čte se to stejně jako proud — kapacita / potřeba.
-    /*
-     * Odstavená elektrárna se do kapacity **nepočítá**.
-     *
-     * Autor poslal město, kde HUD hlásil 498 800 / 315 850 — tedy velkou
-     * rezervu — a přitom byla půlka města potmě a metro stálo. Kaskáda
-     * blackoutu měla dole 42 elektráren, jenže tenhle součet je bral jako
-     * kdyby jely. Číslo, které během výpadku tvrdí, že je proudu dost, je
-     * horší než žádné: hráč podle něj hledá chybu úplně jinde.
-     */
-    let powerOffline = 0;
-    for (const [id, building] of world.buildings) {
-      if (building.powered) poweredBuildings++;
-      if (building.abandoned) continue;
-      const definition = content.get(building.definitionId);
-      const produced = definition?.power?.production ?? 0;
-      if (produced > 0 && simWorld.disasters.offlinePlants.has(id)) powerOffline += produced;
-      else powerProduced += produced;
-      powerNeeded += definition?.power?.consumption ?? 0;
+    const statsNow = performance.now();
+    if (
+      cityStats === null ||
+      worldTouched ||
+      world.tick !== cityStatsTick ||
+      statsNow - cityStatsAt > 250
+    ) {
+      cityStatsTick = world.tick;
+      cityStatsAt = statsNow;
+      cityStats = computeCityStats();
     }
+    const { poweredBuildings, powerProduced, powerNeeded, powerOffline, utilities } = cityStats;
 
     // Hlásí se při změně počtu odstavených elektráren, ne každý snímek: během
     // kaskády jich ubývá po jedné a hráč má vidět, že se to hýbe.
@@ -3541,7 +4201,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         );
       }
     }
-    const utilities = cityUtilities(simWorld, content, content.getBalance());
 
     /*
      * Hlášky o překročené kapacitě.
@@ -3593,7 +4252,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       waterCapacity: utilities.waterCapacity,
       waterNeeded: utilities.waterNeeded,
       // Rozpad poptávky se počítá tady, ne v HUD: potřebuje katalog i balanc.
-      demandTerms: explainDemand(simWorld, content, content.getBalance()),
+      demandTerms: cityStats.demandTerms,
       speedIndex,
       layer: layerMode,
       view: viewMode,
@@ -3604,6 +4263,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       disastersEnabled: simWorld.disasters.enabled,
       ghost: ghostBuildings,
       decor: decorVisible,
+      motion: motionOn,
       grid: gridVisible,
       poweredBuildings,
       funding: simWorld.serviceFunding,

@@ -1,5 +1,5 @@
 import type { Definition } from '@/content/schema';
-import { button, el } from './dom';
+import { button, el, markDialog, setPressed } from './dom';
 import { buildingFacts, HELP_PROBLEMS } from './helpData';
 import type { HelpFact } from './helpData';
 import { iconSvg } from './icons';
@@ -80,7 +80,9 @@ export function showHelp(
   const overlay = el('div', 'home__overlay');
   const panel = el('div', 'home__panel help');
 
-  panel.appendChild(el('h2', 'home__panel-title', t('ui.help.title')));
+  const title = el('h2', 'home__panel-title', t('ui.help.title'));
+  panel.appendChild(title);
+  markDialog(panel, title);
   panel.appendChild(el('p', 'help__lead', t('ui.help.lead')));
 
   const body = el('div', 'help__body');
@@ -92,7 +94,7 @@ export function showHelp(
   const buttons = new Map<string, HTMLButtonElement>();
 
   function open(topic: string): void {
-    for (const [id, node] of buttons) node.classList.toggle('is-active', id === topic);
+    for (const [id, node] of buttons) setPressed(node, id === topic);
     article.replaceChildren();
     article.appendChild(el('h3', 'help__topic-title', t(`ui.help.${topic}.title`)));
 

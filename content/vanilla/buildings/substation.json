@@ -1,0 +1,33 @@
+{
+  "id": "vanilla:substation",
+  "type": "building",
+  "category": "utility",
+  "menu": "wires",
+  "name": "building.substation.name",
+  "description": "building.substation.desc",
+  "footprint": [
+    2,
+    2
+  ],
+  "construction": {
+    "cost": 3000,
+    "requiresRoad": false,
+    "requiresPower": false,
+    "allowedTerrain": [
+      0,
+      2,
+      4
+    ]
+  },
+  "economy": {
+    "upkeep": 60
+  },
+  "power": {
+    "transformer": 100000
+  },
+  "graphics": {
+    "color": "#8a939b",
+    "heightLevels": 2,
+    "icon": "bolt"
+  }
+}

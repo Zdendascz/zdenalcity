@@ -254,24 +254,24 @@ describe('linky a závazky', () => {
     expect(restored.tramTiles.has(11)).toBe(false);
   });
 
-  it('statistiky linek se nepřebírají, dopočítají se', async () => {
-    // Odvozené do savu nepatří. Koridor se navíc musí označit k přepočtu,
-    // jinak by tramvaj po loadu neubírala kapacitu, dokud na ni hráč nesáhne.
+  it('statistiky linek přežijí, koridor se dopočítá (verze 15)', async () => {
+    // Statistiky se počítají jednou za měsíc a do té doby z nich čte rozpočet
+    // i doprava. Do T132 se po loadu zahodily a první uzávěrka po načtení
+    // účtovala jízdné a údržbu jinak než hra bez přerušení — proto se ukládají.
+    // Koridor je čistá funkce linek, takže se jen označí k přepočtu, jinak by
+    // tramvaj po loadu neubírala kapacitu, dokud na ni hráč nesáhne.
     const { world } = await city();
     createLine(world, 'tram');
-    world.lineStats.set(1, {
-      demand: 999,
-      capacity: 999,
-      transported: 999,
-      income: 999,
-      upkeep: 999,
-    });
-    world.transitRelief.set(10, 1);
+    const stats = { demand: 999, capacity: 999, transported: 998.5, income: 999, upkeep: 999 };
+    world.lineStats.set(1, stats);
+    // Statistika linky, která už neexistuje, se zahodí.
+    world.lineStats.set(77, stats);
+    world.transitRelief.set(10, 0.25);
     world.tramTiles.set(20, 0.5);
 
     const restored = roundTrip(world);
-    expect(restored.lineStats.size).toBe(0);
-    expect(restored.transitRelief.size).toBe(0);
+    expect([...restored.lineStats.entries()]).toEqual([[1, stats]]);
+    expect([...restored.transitRelief.entries()]).toEqual([[10, 0.25]]);
     expect(restored.tramTiles.size).toBe(0);
     expect(restored.transitDirty).toBe(true);
   });

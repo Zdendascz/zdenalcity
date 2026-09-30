@@ -179,6 +179,11 @@ design — ten nese styl, text nese obsah.
 ```
 Isometric city-builder building asset, seen from the south-east.
 
+Camera: the classic isometric game camera, looking down at about 30 degrees
+above the horizon — NOT from high above and NOT a bird's-eye view. The walls
+are clearly visible and tall; the plot diamond is about twice as wide as it
+is tall.
+
 Rendering style: a soft-shaded 3D render, not a drawing. Believable materials
 — rough render, brick, concrete, painted steel, glass with a faint warm
 interior glow. Smooth gradients across surfaces and gentle ambient occlusion
@@ -203,6 +208,10 @@ never drawn as an axis-aligned square — and those four corners touch the edges
 of the image. The paving, kerbs, planters and fences all stay inside it: they
 are part of the plot, not of the ground around it. Nothing except the roof may
 stick out past it, and nothing may be cut off.
+
+The building is squarely aligned with its plot: every wall, roof edge and
+fence runs exactly parallel to one of the four edges of the diamond. The
+building is NOT rotated or turned relative to the plot.
 
 Lighting is fixed: sunlight from the left. The left-facing wall is clearly
 brighter than the right-facing wall; the roof is the brightest surface.
@@ -734,6 +743,26 @@ ale i tak z osmdesátých let: betonové obruby, kovové prolézačky, mlatové 
 | **a** | A small precast pump kiosk: a plain flat-roofed concrete box, a steel door, a ventilation grille, thick pipes running out of the wall into the ground, a concrete bollard. |
 | **b** | A small brick pump house: a single-room hut with a pitched tile roof, one barred window, an iron door, exposed valves and a pipe emerging from the ground beside it. |
 | **c** | A small individually designed pump kiosk: an angular concrete box with a folded roof, a louvred steel panel, colour-coded pipework and valves outside on a concrete pad. |
+
+#### `transformer` — Trafostanice · 1 × 1, 1 patro
+
+*Jedna dlaždice. Mění vysoké napětí na nízké pro okolní zástavbu; nízká, technická, za plotem.*
+
+| | prompt |
+|---|---|
+| **a** | A small precast concrete kiosk transformer substation on a fenced gravel plot: a grey flat-roofed concrete box with two louvred steel doors painted grey-green, a small blank yellow warning plate, a low chain-link fence with concrete posts around the plot edge, a gravel yard. |
+| **b** | A small open-air pole-top style transformer station on a fenced gravel plot: one grey oil-filled transformer with cooling fins standing on a low concrete plinth, three white porcelain insulators on top, a short steel frame carrying the cable terminals, underground cables rising into it (no overhead wires, nothing leaves the plot), a small grey steel switch cabinet beside it, a low mesh fence around the plot edge. |
+| **c** | A small brick transformer house on a fenced gravel plot: a square single-storey brick hut with a low pitched tile roof, a louvred steel door, porcelain wall bushings with cables leaving under the eaves, and next to it one grey pad-mounted transformer with cooling fins on a concrete slab, a low mesh fence around the plot edge. |
+
+#### `substation` — Rozvodna · 2 × 2, 2 patra
+
+*Větší uzel sítě. Oplocený dvůr s transformátory a ocelovými portály, nízký, ale s mřížovými konstrukcemi nad sebou.*
+
+| | prompt |
+|---|---|
+| **a** | An electrical substation yard on a fenced gravel plot: two large grey power transformers with cooling radiators on concrete foundations, a row of galvanised steel lattice gantries carrying busbars and strain insulator strings, circuit breakers and disconnect switches on steel supports, a small flat-roofed rendered control building in one corner, a tall chain-link fence with concrete posts around the plot edge. The gantries are tall and clearly seen from the side; the busbars end at the gantries and no power line leaves the plot. Low isometric view exactly like the other buildings: the fenced plot is a flat diamond twice as wide as it is deep, never a square seen from above. |
+| **b** | An older electrical substation on a fenced gravel plot: a two-storey brick switch house with tall narrow windows and a flat roof, porcelain bushings on its wall, in the open yard beside it two grey oil-filled transformers with radiators, steel portal gantries with hanging insulator strings and horizontal busbars, a mesh fence around the plot edge. |
+| **c** | A compact modern-for-the-1980s substation on a fenced gravel plot: a low precast concrete panel control building with a row of louvred vents, three grey transformers with radiators in concrete bays separated by fire walls, a line of slender steel lattice gantries with busbars and insulators, gravel between concrete cable trenches, a mesh fence around the plot edge. |
 
 ---
 

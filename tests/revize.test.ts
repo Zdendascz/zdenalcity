@@ -93,7 +93,7 @@ describe('panely', () => {
     const budget = new BudgetPanel(mount, i18n, content.getAll('building'));
     budget.toggle();
     budget.update(
-      { lines: [], roads: { count: 0, upkeep: 0 }, transit: { lines: 0, vehicles: 0, income: 0, upkeep: 0 }, debt: { loans: 0, owed: 0, payment: 0, bonds: 0, bondOwed: 0, bondPayment: 0 }, income: 0, expenses: 0, valuePerUnit: 1 },
+      { lines: [], roads: { count: 0, upkeep: 0 }, wires: { count: 0, upkeep: 0 }, transit: { lines: 0, vehicles: 0, income: 0, upkeep: 0 }, debt: { loans: 0, owed: 0, payment: 0, bonds: 0, bondOwed: 0, bondPayment: 0 }, income: 0, expenses: 0, valuePerUnit: 1 },
       0,
     );
 

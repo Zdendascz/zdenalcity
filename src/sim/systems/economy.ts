@@ -2,14 +2,14 @@ import type { Balance } from '@/content/balance';
 import type { Definition } from '@/content/schema';
 import type { BuildingCatalogue } from '../catalogue';
 import { cellOfTile, strongestModifier } from '../disasters/effects';
-import { index, ROAD } from '../layers';
+import { index, ROAD, WIRE } from '../layers';
 import { isRciCategory } from '../rci';
 import type { RciCategory } from '../rci';
 import { closeYearIfDue } from '../ledger';
 import { annualCoupons, bondDebt, monthlyPayments, totalDebt } from '../finance';
 import { transitTotals } from '../transit';
 import { fundingCost } from '../funding';
-import { serviceFunding } from '../world';
+import { roadTilesInOrder, serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
 import type { System } from './index';
 
@@ -50,6 +50,8 @@ export interface BudgetLine {
   taxUnitKey: string | null;
   /** Sazba v procentech; `null` u budov, které se nedaní. */
   taxRate: number | null;
+  /** Hodnota jednoho obyvatele či místa pro daň — u bydlení snížená. */
+  valuePerUnit: number;
   /** Údržba jedné budovy podle definice. */
   upkeepEach: number;
   /** Kolik budov údržbu opravdu platí — temné jsou mimo provoz. */
@@ -84,6 +86,11 @@ export interface Budget {
   lines: BudgetLine[];
   /** Údržba silnic. Nejsou to budovy, takže mají vlastní řádek (§4 fáze 3). */
   roads: RoadBudget;
+  /**
+   * Údržba elektrického vedení (T136): dlaždice vedení obou typů dohromady.
+   * Vysoké napětí je výrazně dražší (rozhodnutí autora).
+   */
+  wires: RoadBudget;
   /**
    * MHD. Taky vlastní řádek: vozidlo není budova a jízdné není daň, takže
    * do rozpisu po definicích nepatří ani jedno.
@@ -121,7 +128,19 @@ export function buildingMonthlyTax(
   if (!isRciCategory(category) || !building.powered || building.abandoned) return 0;
 
   const taxable = category === 'residential' ? building.population : building.jobs;
-  return taxFrom(taxable, world.economy.taxRates[category], balance.economy.taxableValuePerUnit);
+  return taxFrom(taxable, world.economy.taxRates[category], taxValuePerUnit(balance, category));
+}
+
+/**
+ * Hodnota jednotky pro daň podle kategorie.
+ *
+ * Bydlení vynáší jen část (`residentialTaxShare`, 2026-09-30: polovina).
+ * Autor: vyúčtování „strašně nesedí" — město mělo přebytek 4,5 milionu ročně
+ * a daň z bydlení tvořila většinu příjmů.
+ */
+export function taxValuePerUnit(balance: Balance, category: string): number {
+  const base = balance.economy.taxableValuePerUnit;
+  return category === 'residential' ? base * balance.economy.residentialTaxShare : base;
 }
 
 /**
@@ -145,7 +164,11 @@ export function buildingMonthlyUpkeep(
   // služby stojí dvanáctinásobek údržby, ne dvojnásobek. Křivka je jedna
   // a bydlí v `sim/funding.ts`, ať se cena nemůže rozejít s posuvníkem.
   const funding = serviceClass === undefined ? 1 : serviceFunding(world, serviceClass);
-  return Math.round(definition.economy.upkeep * fundingCost(balance, funding));
+  // Služby stojí násobek údržby z definice (`serviceUpkeepMultiplier`,
+  // 2026-09-30: dvojnásobek). Násobí se tady, ne v definicích, ať se dá
+  // ladit jedním číslem a mod s vlastní službou ho dostane zadarmo.
+  const multiplier = serviceClass === undefined ? 1 : balance.economy.serviceUpkeepMultiplier;
+  return Math.round(definition.economy.upkeep * multiplier * fundingCost(balance, funding));
 }
 
 /**
@@ -200,6 +223,7 @@ export function computeBudget(
               ? 'ui.budget.unit.population'
               : 'ui.budget.unit.jobs',
         taxRate: taxedAs === null ? null : world.economy.taxRates[taxedAs],
+        valuePerUnit: taxedAs === null ? 0 : taxValuePerUnit(balance, taxedAs),
         upkeepEach: definition.economy.upkeep,
         upkeepCount: 0,
       };
@@ -233,9 +257,10 @@ export function computeBudget(
   // Prochází se seznam silnic, ne celá mapa (R20 fáze 4). Rozpočet se počítá
   // jednou za herní měsíc, ale i tak: na 512 × 512 to byla čtvrt milionu
   // porovnání pro pár tisíc dlaždic, a rozpočet si o něj řekne i panel
-  // pokaždé, když ho hráč otevře.
+  // pokaždé, když ho hráč otevře. V pořadí dlaždic: údržba z modu smí být
+  // desetinná a součet se zaokrouhluje až na konci (T132, `roadTilesInOrder`).
   const roads: RoadBudget = { count: 0, upkeep: 0 };
-  for (const tile of world.roadTiles) {
+  for (const tile of roadTilesInOrder(world)) {
     const value = world.layers.road[tile] ?? ROAD.none;
     if (value === ROAD.none) continue;
     roads.count++;
@@ -243,6 +268,19 @@ export function computeBudget(
   }
   roads.upkeep = Math.round(roads.upkeep);
   expenses += roads.upkeep;
+
+  // Vedení po celé mapě, jednou za měsíc. Údržba smí být desetinná
+  // (dlaždice nízkého napětí stojí zlomek), zaokrouhluje se až součet.
+  const wires: RoadBudget = { count: 0, upkeep: 0 };
+  const wireLayer = world.layers.wire;
+  for (let tile = 0; tile < wireLayer.length; tile++) {
+    const value = wireLayer[tile] ?? WIRE.none;
+    if (value === WIRE.none) continue;
+    wires.count++;
+    wires.upkeep += balance.power.wires[value - 1]?.upkeep ?? 0;
+  }
+  wires.upkeep = Math.round(wires.upkeep);
+  expenses += wires.upkeep;
 
   // Jízdné a údržba vozidel. Obojí je měsíční a počítá ho `transitSystem`,
   // rozpočet jen sečte — jinak by se výpis a skutečnost rozešly.
@@ -274,7 +312,7 @@ export function computeBudget(
   // v UI tvrdil něco jiného, než kolik ve sloupci opravdu stojí.
   for (const line of byDefinition.values()) {
     if (line.taxRate === null) continue;
-    line.income = taxFrom(line.taxBase, line.taxRate, balance.economy.taxableValuePerUnit);
+    line.income = taxFrom(line.taxBase, line.taxRate, line.valuePerUnit);
     income += line.income;
   }
 
@@ -282,6 +320,7 @@ export function computeBudget(
     // Stabilní pořadí, ať tabulka neposkakuje.
     lines: [...byDefinition.values()].sort((a, b) => a.definitionId.localeCompare(b.definitionId)),
     roads,
+    wires,
     transit,
     debt,
     income,
@@ -323,6 +362,7 @@ export function createEconomySystem(catalogue: BuildingCatalogue, balance: Balan
         record(world.economy.ledger.expenses, 'upkeep.buildings', line.upkeep);
       }
       record(world.economy.ledger.expenses, 'upkeep.roads', budget.roads.upkeep);
+      record(world.economy.ledger.expenses, 'upkeep.wires', budget.wires.upkeep);
       record(world.economy.ledger.expenses, 'upkeep.transit', budget.transit.upkeep);
       record(world.economy.ledger.income, 'fare', budget.transit.income);
 

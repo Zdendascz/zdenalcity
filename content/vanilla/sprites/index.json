@@ -73,10 +73,10 @@
       "variant": "a",
       "file": "cinema__a.png",
       "width": 512,
-      "height": 315,
+      "height": 352,
       "anchor": [
-        245,
-        315
+        257,
+        352
       ]
     },
     {
@@ -84,10 +84,10 @@
       "variant": "b",
       "file": "cinema__b.png",
       "width": 512,
-      "height": 313,
+      "height": 355,
       "anchor": [
-        257,
-        313
+        271,
+        355
       ]
     },
     {
@@ -106,10 +106,10 @@
       "variant": "a",
       "file": "city_park__a.png",
       "width": 768,
-      "height": 452,
+      "height": 424,
       "anchor": [
-        377,
-        452
+        378,
+        424
       ]
     },
     {
@@ -117,10 +117,10 @@
       "variant": "b",
       "file": "city_park__b.png",
       "width": 768,
-      "height": 441,
+      "height": 433,
       "anchor": [
-        381,
-        441
+        382,
+        433
       ]
     },
     {
@@ -128,10 +128,10 @@
       "variant": "c",
       "file": "city_park__c.png",
       "width": 768,
-      "height": 416,
+      "height": 487,
       "anchor": [
-        383,
-        416
+        374,
+        487
       ]
     },
     {
@@ -139,10 +139,10 @@
       "variant": "a",
       "file": "clinic__a.png",
       "width": 512,
-      "height": 300,
+      "height": 348,
       "anchor": [
-        255,
-        300
+        254,
+        348
       ]
     },
     {
@@ -150,10 +150,10 @@
       "variant": "b",
       "file": "clinic__b.png",
       "width": 512,
-      "height": 293,
+      "height": 342,
       "anchor": [
-        259,
-        293
+        252,
+        342
       ]
     },
     {
@@ -161,10 +161,10 @@
       "variant": "c",
       "file": "clinic__c.png",
       "width": 512,
-      "height": 274,
+      "height": 314,
       "anchor": [
-        274,
-        274
+        276,
+        314
       ]
     },
     {
@@ -172,10 +172,10 @@
       "variant": "a",
       "file": "coal_power_plant__a.png",
       "width": 1280,
-      "height": 808,
+      "height": 974,
       "anchor": [
-        594,
-        808
+        640,
+        974
       ]
     },
     {
@@ -194,10 +194,10 @@
       "variant": "c",
       "file": "coal_power_plant__c.png",
       "width": 1280,
-      "height": 708,
+      "height": 889,
       "anchor": [
-        603,
-        708
+        634,
+        889
       ]
     },
     {
@@ -216,21 +216,21 @@
       "variant": "b",
       "file": "commercial_arcade__b.png",
       "width": 384,
-      "height": 251,
+      "height": 264,
       "anchor": [
-        256,
-        251
+        241,
+        264
       ]
     },
     {
       "building": "vanilla:commercial_arcade",
       "variant": "c",
       "file": "commercial_arcade__c.png",
-      "width": 384,
-      "height": 218,
+      "width": 315,
+      "height": 222,
       "anchor": [
-        253,
-        218
+        210,
+        222
       ]
     },
     {
@@ -303,11 +303,11 @@
       "building": "vanilla:commercial_gallery",
       "variant": "a",
       "file": "commercial_gallery__a.png",
-      "width": 640,
-      "height": 363,
+      "width": 533,
+      "height": 333,
       "anchor": [
-        414,
-        363
+        342,
+        333
       ]
     },
     {
@@ -315,10 +315,10 @@
       "variant": "b",
       "file": "commercial_gallery__b.png",
       "width": 640,
-      "height": 387,
+      "height": 451,
       "anchor": [
-        384,
-        387
+        380,
+        451
       ]
     },
     {
@@ -370,10 +370,10 @@
       "variant": "a",
       "file": "commercial_large__a.png",
       "width": 256,
-      "height": 165,
+      "height": 214,
       "anchor": [
-        124,
-        165
+        118,
+        214
       ]
     },
     {
@@ -381,10 +381,10 @@
       "variant": "b",
       "file": "commercial_large__b.png",
       "width": 256,
-      "height": 169,
+      "height": 189,
       "anchor": [
-        126,
-        169
+        128,
+        189
       ]
     },
     {
@@ -546,10 +546,10 @@
       "variant": "b",
       "file": "commercial_row__b.png",
       "width": 384,
-      "height": 202,
+      "height": 228,
       "anchor": [
-        256,
-        202
+        252,
+        228
       ]
     },
     {
@@ -557,10 +557,10 @@
       "variant": "c",
       "file": "commercial_row__c.png",
       "width": 384,
-      "height": 207,
+      "height": 247,
       "anchor": [
-        256,
-        207
+        273,
+        247
       ]
     },
     {
@@ -612,10 +612,10 @@
       "variant": "b",
       "file": "commercial_tower__b.png",
       "width": 512,
-      "height": 353,
+      "height": 433,
       "anchor": [
-        227,
-        353
+        253,
+        433
       ]
     },
     {
@@ -634,10 +634,10 @@
       "variant": "a",
       "file": "community_centre__a.png",
       "width": 512,
-      "height": 258,
+      "height": 352,
       "anchor": [
-        255,
-        258
+        280,
+        352
       ]
     },
     {
@@ -656,10 +656,10 @@
       "variant": "c",
       "file": "community_centre__c.png",
       "width": 512,
-      "height": 307,
+      "height": 340,
       "anchor": [
-        259,
-        307
+        253,
+        340
       ]
     },
     {
@@ -832,10 +832,10 @@
       "variant": "a",
       "file": "fire_station__a.png",
       "width": 512,
-      "height": 331,
+      "height": 421,
       "anchor": [
-        252,
-        331
+        259,
+        421
       ]
     },
     {
@@ -854,10 +854,10 @@
       "variant": "c",
       "file": "fire_station__c.png",
       "width": 512,
-      "height": 319,
+      "height": 325,
       "anchor": [
-        254,
-        319
+        281,
+        325
       ]
     },
     {
@@ -865,10 +865,10 @@
       "variant": "a",
       "file": "fire_station_large__a.png",
       "width": 512,
-      "height": 271,
+      "height": 392,
       "anchor": [
-        251,
-        271
+        264,
+        392
       ]
     },
     {
@@ -876,10 +876,10 @@
       "variant": "b",
       "file": "fire_station_large__b.png",
       "width": 512,
-      "height": 278,
+      "height": 377,
       "anchor": [
-        255,
-        278
+        251,
+        377
       ]
     },
     {
@@ -887,10 +887,10 @@
       "variant": "c",
       "file": "fire_station_large__c.png",
       "width": 512,
-      "height": 311,
+      "height": 369,
       "anchor": [
-        255,
-        311
+        254,
+        369
       ]
     },
     {
@@ -942,10 +942,10 @@
       "variant": "b",
       "file": "gallery__b.png",
       "width": 256,
-      "height": 157,
+      "height": 195,
       "anchor": [
-        133,
-        157
+        129,
+        195
       ]
     },
     {
@@ -953,10 +953,10 @@
       "variant": "c",
       "file": "gallery__c.png",
       "width": 256,
-      "height": 163,
+      "height": 173,
       "anchor": [
-        125,
-        163
+        127,
+        173
       ]
     },
     {
@@ -975,10 +975,10 @@
       "variant": "b",
       "file": "gas_power_plant__b.png",
       "width": 768,
-      "height": 469,
+      "height": 671,
       "anchor": [
-        378,
-        469
+        381,
+        671
       ]
     },
     {
@@ -1008,10 +1008,10 @@
       "variant": "b",
       "file": "high_school__b.png",
       "width": 512,
-      "height": 317,
+      "height": 364,
       "anchor": [
-        257,
-        317
+        272,
+        364
       ]
     },
     {
@@ -1019,10 +1019,10 @@
       "variant": "c",
       "file": "high_school__c.png",
       "width": 512,
-      "height": 276,
+      "height": 392,
       "anchor": [
-        255,
-        276
+        272,
+        392
       ]
     },
     {
@@ -1030,10 +1030,10 @@
       "variant": "a",
       "file": "hospital__a.png",
       "width": 768,
-      "height": 480,
+      "height": 628,
       "anchor": [
-        381,
-        480
+        384,
+        628
       ]
     },
     {
@@ -1041,10 +1041,10 @@
       "variant": "b",
       "file": "hospital__b.png",
       "width": 768,
-      "height": 414,
+      "height": 466,
       "anchor": [
-        370,
-        414
+        376,
+        466
       ]
     },
     {
@@ -1074,10 +1074,10 @@
       "variant": "b",
       "file": "incinerator__b.png",
       "width": 768,
-      "height": 688,
+      "height": 647,
       "anchor": [
-        360,
-        688
+        387,
+        647
       ]
     },
     {
@@ -1129,10 +1129,10 @@
       "variant": "a",
       "file": "industrial_complex__a.png",
       "width": 768,
-      "height": 458,
+      "height": 704,
       "anchor": [
-        371,
-        458
+        378,
+        704
       ]
     },
     {
@@ -1140,10 +1140,10 @@
       "variant": "b",
       "file": "industrial_complex__b.png",
       "width": 768,
-      "height": 386,
+      "height": 714,
       "anchor": [
-        377,
-        386
+        381,
+        714
       ]
     },
     {
@@ -1151,10 +1151,10 @@
       "variant": "c",
       "file": "industrial_complex__c.png",
       "width": 768,
-      "height": 411,
+      "height": 475,
       "anchor": [
-        387,
-        411
+        390,
+        475
       ]
     },
     {
@@ -1173,10 +1173,10 @@
       "variant": "b",
       "file": "industrial_foundry__b.png",
       "width": 512,
-      "height": 327,
+      "height": 427,
       "anchor": [
-        255,
-        327
+        256,
+        427
       ]
     },
     {
@@ -1195,10 +1195,10 @@
       "variant": "a",
       "file": "industrial_hall__a.png",
       "width": 640,
-      "height": 309,
+      "height": 410,
       "anchor": [
-        384,
-        309
+        370,
+        410
       ]
     },
     {
@@ -1216,11 +1216,11 @@
       "building": "vanilla:industrial_hall",
       "variant": "c",
       "file": "industrial_hall__c.png",
-      "width": 640,
-      "height": 329,
+      "width": 512,
+      "height": 430,
       "anchor": [
-        396,
-        329
+        307,
+        430
       ]
     },
     {
@@ -1272,10 +1272,10 @@
       "variant": "b",
       "file": "industrial_medium__b.png",
       "width": 256,
-      "height": 143,
+      "height": 174,
       "anchor": [
-        127,
-        143
+        128,
+        174
       ]
     },
     {
@@ -1294,10 +1294,10 @@
       "variant": "a",
       "file": "industrial_park__a.png",
       "width": 768,
-      "height": 437,
+      "height": 685,
       "anchor": [
-        374,
-        437
+        370,
+        685
       ]
     },
     {
@@ -1305,10 +1305,10 @@
       "variant": "b",
       "file": "industrial_park__b.png",
       "width": 768,
-      "height": 520,
+      "height": 687,
       "anchor": [
-        397,
-        520
+        384,
+        687
       ]
     },
     {
@@ -1316,10 +1316,10 @@
       "variant": "c",
       "file": "industrial_park__c.png",
       "width": 768,
-      "height": 479,
+      "height": 663,
       "anchor": [
-        380,
-        479
+        384,
+        663
       ]
     },
     {
@@ -1349,10 +1349,10 @@
       "variant": "c",
       "file": "industrial_refinery__c.png",
       "width": 768,
-      "height": 464,
+      "height": 620,
       "anchor": [
-        386,
-        464
+        379,
+        620
       ]
     },
     {
@@ -1370,11 +1370,11 @@
       "building": "vanilla:industrial_row",
       "variant": "b",
       "file": "industrial_row__b.png",
-      "width": 384,
-      "height": 254,
+      "width": 304,
+      "height": 181,
       "anchor": [
-        256,
-        254
+        203,
+        181
       ]
     },
     {
@@ -1404,10 +1404,10 @@
       "variant": "b",
       "file": "industrial_small__b.png",
       "width": 256,
-      "height": 161,
+      "height": 160,
       "anchor": [
-        128,
-        161
+        127,
+        160
       ]
     },
     {
@@ -1415,10 +1415,10 @@
       "variant": "c",
       "file": "industrial_small__c.png",
       "width": 256,
-      "height": 152,
+      "height": 160,
       "anchor": [
-        128,
-        152
+        126,
+        160
       ]
     },
     {
@@ -1459,10 +1459,10 @@
       "variant": "a",
       "file": "industrial_works__a.png",
       "width": 512,
-      "height": 299,
+      "height": 365,
       "anchor": [
         255,
-        299
+        365
       ]
     },
     {
@@ -1470,10 +1470,10 @@
       "variant": "b",
       "file": "industrial_works__b.png",
       "width": 512,
-      "height": 331,
+      "height": 360,
       "anchor": [
-        253,
-        331
+        257,
+        360
       ]
     },
     {
@@ -1481,10 +1481,10 @@
       "variant": "c",
       "file": "industrial_works__c.png",
       "width": 512,
-      "height": 292,
+      "height": 438,
       "anchor": [
-        253,
-        292
+        254,
+        438
       ]
     },
     {
@@ -1503,10 +1503,10 @@
       "variant": "b",
       "file": "industrial_yard__b.png",
       "width": 384,
-      "height": 179,
+      "height": 223,
       "anchor": [
-        256,
-        179
+        253,
+        223
       ]
     },
     {
@@ -1525,10 +1525,10 @@
       "variant": "a",
       "file": "landfill__a.png",
       "width": 768,
-      "height": 375,
+      "height": 408,
       "anchor": [
-        384,
-        375
+        383,
+        408
       ]
     },
     {
@@ -1536,10 +1536,10 @@
       "variant": "b",
       "file": "landfill__b.png",
       "width": 768,
-      "height": 413,
+      "height": 560,
       "anchor": [
-        376,
-        413
+        366,
+        560
       ]
     },
     {
@@ -1547,10 +1547,10 @@
       "variant": "c",
       "file": "landfill__c.png",
       "width": 768,
-      "height": 375,
+      "height": 408,
       "anchor": [
-        382,
-        375
+        381,
+        408
       ]
     },
     {
@@ -1602,10 +1602,10 @@
       "variant": "b",
       "file": "metro_station__b.png",
       "width": 512,
-      "height": 295,
+      "height": 307,
       "anchor": [
-        242,
-        295
+        255,
+        307
       ]
     },
     {
@@ -1613,10 +1613,10 @@
       "variant": "c",
       "file": "metro_station__c.png",
       "width": 512,
-      "height": 298,
+      "height": 366,
       "anchor": [
         253,
-        298
+        366
       ]
     },
     {
@@ -1635,10 +1635,10 @@
       "variant": "b",
       "file": "museum__b.png",
       "width": 768,
-      "height": 465,
+      "height": 557,
       "anchor": [
-        384,
-        465
+        382,
+        557
       ]
     },
     {
@@ -1646,10 +1646,10 @@
       "variant": "c",
       "file": "museum__c.png",
       "width": 768,
-      "height": 478,
+      "height": 608,
       "anchor": [
-        385,
-        478
+        388,
+        608
       ]
     },
     {
@@ -1668,10 +1668,10 @@
       "variant": "b",
       "file": "nuclear_power_plant__b.png",
       "width": 1536,
-      "height": 995,
+      "height": 1207,
       "anchor": [
-        773,
-        995
+        833,
+        1207
       ]
     },
     {
@@ -1679,10 +1679,10 @@
       "variant": "c",
       "file": "nuclear_power_plant__c.png",
       "width": 1536,
-      "height": 812,
+      "height": 1080,
       "anchor": [
-        767,
-        812
+        782,
+        1080
       ]
     },
     {
@@ -1701,10 +1701,10 @@
       "variant": "b",
       "file": "park_large__b.png",
       "width": 512,
-      "height": 270,
+      "height": 294,
       "anchor": [
-        248,
-        270
+        251,
+        294
       ]
     },
     {
@@ -1712,10 +1712,10 @@
       "variant": "c",
       "file": "park_large__c.png",
       "width": 512,
-      "height": 265,
+      "height": 354,
       "anchor": [
-        247,
-        265
+        255,
+        354
       ]
     },
     {
@@ -1734,10 +1734,10 @@
       "variant": "b",
       "file": "park_small__b.png",
       "width": 256,
-      "height": 149,
+      "height": 141,
       "anchor": [
-        128,
-        149
+        126,
+        141
       ]
     },
     {
@@ -1747,7 +1747,7 @@
       "width": 256,
       "height": 135,
       "anchor": [
-        128,
+        127,
         135
       ]
     },
@@ -1789,10 +1789,10 @@
       "variant": "a",
       "file": "plaza__a.png",
       "width": 256,
-      "height": 143,
+      "height": 150,
       "anchor": [
-        128,
-        143
+        130,
+        150
       ]
     },
     {
@@ -1800,10 +1800,10 @@
       "variant": "b",
       "file": "plaza__b.png",
       "width": 256,
-      "height": 131,
+      "height": 140,
       "anchor": [
-        124,
-        131
+        127,
+        140
       ]
     },
     {
@@ -1811,10 +1811,10 @@
       "variant": "c",
       "file": "plaza__c.png",
       "width": 256,
-      "height": 129,
+      "height": 150,
       "anchor": [
-        128,
-        129
+        127,
+        150
       ]
     },
     {
@@ -1888,10 +1888,10 @@
       "variant": "a",
       "file": "prison__a.png",
       "width": 768,
-      "height": 463,
+      "height": 471,
       "anchor": [
-        385,
-        463
+        382,
+        471
       ]
     },
     {
@@ -1899,10 +1899,10 @@
       "variant": "b",
       "file": "prison__b.png",
       "width": 768,
-      "height": 441,
+      "height": 468,
       "anchor": [
-        383,
-        441
+        404,
+        468
       ]
     },
     {
@@ -1910,10 +1910,10 @@
       "variant": "c",
       "file": "prison__c.png",
       "width": 768,
-      "height": 383,
+      "height": 447,
       "anchor": [
-        369,
-        383
+        377,
+        447
       ]
     },
     {
@@ -1943,10 +1943,10 @@
       "variant": "c",
       "file": "pump_station__c.png",
       "width": 256,
-      "height": 162,
+      "height": 157,
       "anchor": [
-        127,
-        162
+        130,
+        157
       ]
     },
     {
@@ -1954,10 +1954,10 @@
       "variant": "a",
       "file": "residential_court__a.png",
       "width": 512,
-      "height": 287,
+      "height": 332,
       "anchor": [
-        230,
-        287
+        255,
+        332
       ]
     },
     {
@@ -1965,10 +1965,10 @@
       "variant": "b",
       "file": "residential_court__b.png",
       "width": 512,
-      "height": 297,
+      "height": 324,
       "anchor": [
-        245,
-        297
+        251,
+        324
       ]
     },
     {
@@ -1998,10 +1998,10 @@
       "variant": "b",
       "file": "residential_estate__b.png",
       "width": 768,
-      "height": 556,
+      "height": 616,
       "anchor": [
-        391,
-        556
+        406,
+        616
       ]
     },
     {
@@ -2075,10 +2075,10 @@
       "variant": "c",
       "file": "residential_large__c.png",
       "width": 256,
-      "height": 178,
+      "height": 203,
       "anchor": [
-        129,
-        178
+        127,
+        203
       ]
     },
     {
@@ -2086,10 +2086,10 @@
       "variant": "a",
       "file": "residential_medium__a.png",
       "width": 256,
-      "height": 158,
+      "height": 204,
       "anchor": [
-        126,
-        158
+        135,
+        204
       ]
     },
     {
@@ -2119,10 +2119,10 @@
       "variant": "a",
       "file": "residential_quarter__a.png",
       "width": 768,
-      "height": 432,
+      "height": 476,
       "anchor": [
-        416,
-        432
+        385,
+        476
       ]
     },
     {
@@ -2218,10 +2218,10 @@
       "variant": "a",
       "file": "residential_small__a.png",
       "width": 256,
-      "height": 129,
+      "height": 160,
       "anchor": [
-        130,
-        129
+        128,
+        160
       ]
     },
     {
@@ -2284,10 +2284,10 @@
       "variant": "a",
       "file": "residential_terrace__a.png",
       "width": 384,
-      "height": 211,
+      "height": 290,
       "anchor": [
-        259,
-        211
+        262,
+        290
       ]
     },
     {
@@ -2306,21 +2306,21 @@
       "variant": "c",
       "file": "residential_terrace__c.png",
       "width": 384,
-      "height": 217,
+      "height": 231,
       "anchor": [
-        244,
-        217
+        256,
+        231
       ]
     },
     {
       "building": "vanilla:residential_terraces",
       "variant": "a",
       "file": "residential_terraces__a.png",
-      "width": 640,
-      "height": 396,
+      "width": 522,
+      "height": 363,
       "anchor": [
-        394,
-        396
+        313,
+        363
       ]
     },
     {
@@ -2328,10 +2328,10 @@
       "variant": "b",
       "file": "residential_terraces__b.png",
       "width": 640,
-      "height": 408,
+      "height": 505,
       "anchor": [
-        386,
-        408
+        384,
+        505
       ]
     },
     {
@@ -2394,10 +2394,10 @@
       "variant": "b",
       "file": "retirement_home__b.png",
       "width": 768,
-      "height": 454,
+      "height": 557,
       "anchor": [
-        382,
-        454
+        383,
+        557
       ]
     },
     {
@@ -2405,10 +2405,10 @@
       "variant": "c",
       "file": "retirement_home__c.png",
       "width": 768,
-      "height": 422,
+      "height": 450,
       "anchor": [
-        383,
-        422
+        367,
+        450
       ]
     },
     {
@@ -2757,10 +2757,10 @@
       "variant": "b",
       "file": "school__b.png",
       "width": 768,
-      "height": 393,
+      "height": 476,
       "anchor": [
-        420,
-        393
+        385,
+        476
       ]
     },
     {
@@ -2768,10 +2768,10 @@
       "variant": "c",
       "file": "school__c.png",
       "width": 768,
-      "height": 388,
+      "height": 506,
       "anchor": [
-        382,
-        388
+        371,
+        506
       ]
     },
     {
@@ -2838,6 +2838,39 @@
       "anchor": [
         109,
         233
+      ]
+    },
+    {
+      "building": "vanilla:substation",
+      "variant": "a",
+      "file": "substation__a.png",
+      "width": 512,
+      "height": 292,
+      "anchor": [
+        274,
+        292
+      ]
+    },
+    {
+      "building": "vanilla:substation",
+      "variant": "b",
+      "file": "substation__b.png",
+      "width": 512,
+      "height": 342,
+      "anchor": [
+        269,
+        342
+      ]
+    },
+    {
+      "building": "vanilla:substation",
+      "variant": "c",
+      "file": "substation__c.png",
+      "width": 512,
+      "height": 312,
+      "anchor": [
+        253,
+        312
       ]
     },
     {
@@ -2940,14 +2973,47 @@
       ]
     },
     {
+      "building": "vanilla:transformer",
+      "variant": "a",
+      "file": "transformer__a.png",
+      "width": 256,
+      "height": 173,
+      "anchor": [
+        134,
+        173
+      ]
+    },
+    {
+      "building": "vanilla:transformer",
+      "variant": "b",
+      "file": "transformer__b.png",
+      "width": 256,
+      "height": 179,
+      "anchor": [
+        126,
+        179
+      ]
+    },
+    {
+      "building": "vanilla:transformer",
+      "variant": "c",
+      "file": "transformer__c.png",
+      "width": 256,
+      "height": 163,
+      "anchor": [
+        128,
+        163
+      ]
+    },
+    {
       "building": "vanilla:transit_depot",
       "variant": "a",
       "file": "transit_depot__a.png",
       "width": 768,
-      "height": 414,
+      "height": 441,
       "anchor": [
-        383,
-        414
+        370,
+        441
       ]
     },
     {
@@ -2955,10 +3021,10 @@
       "variant": "b",
       "file": "transit_depot__b.png",
       "width": 768,
-      "height": 406,
+      "height": 473,
       "anchor": [
-        382,
-        406
+        374,
+        473
       ]
     },
     {
@@ -2966,10 +3032,10 @@
       "variant": "c",
       "file": "transit_depot__c.png",
       "width": 768,
-      "height": 427,
+      "height": 494,
       "anchor": [
-        370,
-        427
+        398,
+        494
       ]
     },
     {
@@ -3021,10 +3087,10 @@
       "variant": "b",
       "file": "university__b.png",
       "width": 768,
-      "height": 441,
+      "height": 513,
       "anchor": [
-        371,
-        441
+        379,
+        513
       ]
     },
     {
@@ -3043,10 +3109,10 @@
       "variant": "a",
       "file": "water_treatment__a.png",
       "width": 768,
-      "height": 392,
+      "height": 379,
       "anchor": [
-        374,
-        392
+        372,
+        379
       ]
     },
     {
@@ -3054,10 +3120,10 @@
       "variant": "b",
       "file": "water_treatment__b.png",
       "width": 768,
-      "height": 359,
+      "height": 461,
       "anchor": [
-        374,
-        359
+        356,
+        461
       ]
     },
     {
@@ -3065,10 +3131,10 @@
       "variant": "c",
       "file": "water_treatment__c.png",
       "width": 768,
-      "height": 370,
+      "height": 404,
       "anchor": [
-        379,
-        370
+        383,
+        404
       ]
     },
     {
@@ -3076,10 +3142,10 @@
       "variant": "a",
       "file": "water_works__a.png",
       "width": 768,
-      "height": 429,
+      "height": 414,
       "anchor": [
-        378,
-        429
+        389,
+        414
       ]
     },
     {
@@ -3098,10 +3164,10 @@
       "variant": "c",
       "file": "water_works__c.png",
       "width": 768,
-      "height": 460,
+      "height": 578,
       "anchor": [
-        399,
-        460
+        395,
+        578
       ]
     },
     {
@@ -3109,10 +3175,10 @@
       "variant": "a",
       "file": "wind_turbine__a.png",
       "width": 256,
-      "height": 290,
+      "height": 233,
       "anchor": [
-        127,
-        290
+        128,
+        233
       ]
     },
     {
@@ -3120,10 +3186,10 @@
       "variant": "b",
       "file": "wind_turbine__b.png",
       "width": 256,
-      "height": 293,
+      "height": 250,
       "anchor": [
-        128,
-        293
+        127,
+        250
       ]
     },
     {
@@ -3131,10 +3197,10 @@
       "variant": "c",
       "file": "wind_turbine__c.png",
       "width": 256,
-      "height": 308,
+      "height": 254,
       "anchor": [
         127,
-        308
+        254
       ]
     }
   ]

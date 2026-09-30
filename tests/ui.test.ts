@@ -106,6 +106,14 @@ describe('paleta nástrojů', () => {
     expect(byKey.get('ui.menu.water')?.tools.map((tool) => tool.action.kind)).toContain('pipe');
     // Uhelná, plynová, jaderná a větrná.
     expect(byKey.get('ui.menu.power')?.tools).toHaveLength(4);
+    // Vedení (T129): nízké, vysoké a odstranění; od T136 i trafostanice a rozvodna.
+    expect(byKey.get('ui.menu.wires')?.tools.map((tool) => tool.action.kind)).toEqual([
+      'wire',
+      'wire',
+      'wire',
+      'place',
+      'place',
+    ]);
     expect(byKey.get('ui.menu.culture')?.tools).toHaveLength(4);
     expect(byKey.get('ui.menu.waste')?.tools).toHaveLength(2);
     // Silnice mají vlastní roletu, ne společnou se stavbou.

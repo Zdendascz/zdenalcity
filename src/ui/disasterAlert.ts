@@ -1,4 +1,4 @@
-import { button, el } from './dom';
+import { button, el, markDialog } from './dom';
 
 /** Prázdný řádek dělí odstavce v překladu. Text se píše jako text. */
 const PARAGRAPH_BREAK = /\n{2,}/;
@@ -99,8 +99,13 @@ export class DisasterAlert {
     this.icon = el('span', 'alert__icon');
     this.title = el('h1', 'dialog__title alert__title');
     head.append(this.icon, this.title);
+    // Hlášení pohromy přeruší hru a čeká na odpověď — `alertdialog`, ne jen
+    // `dialog`: odečítačka ho má ohlásit hned, ne až na něj hráč narazí.
+    markDialog(panel, this.title, 'alertdialog');
 
     this.body = el('p', 'alert__body');
+    this.body.id = `${this.title.id}-body`;
+    panel.setAttribute('aria-describedby', this.body.id);
     this.story = el('div', 'alert__story');
 
     const actions = el('div', 'alert__actions');
@@ -166,7 +171,7 @@ export class DisasterAlert {
     }
 
     this.picture.classList.remove('is-hidden');
-    this.image.src = `events/${kind}.jpg`;
+    this.image.src = `events/${kind}.webp`;
 
     this.show.textContent = this.i18n.t('ui.alert.show');
     this.ignore.textContent = this.i18n.t('ui.alert.ignore');
