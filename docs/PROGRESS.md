@@ -4168,7 +4168,7 @@ přechodové parcely." Na hranici dvou povrchů leží pás přechodového mater
 suť pod skálou, rákos u mokřadu, mokrý břeh u vody; na vodě mělčina s pěnou.
 Materiály `content/vanilla/parts/band_*` (zadání v `docs/18-DILY.md`).
 
-- Pás je z devíti průsvitných vrstev rostoucí šířky, vnitřní okraj se vlní šumem
+- Pás je z devíti (od T133 šesti) průsvitných vrstev rostoucí šířky, vnitřní okraj se vlní šumem
   ze světových souřadnic, na koncích se zúží. Jeden ostrý okraj vypadal jako
   nalepená záplata.
 - Pásy jsou v samostatném `Graphics` nad povrchem chunku (rozpočet textur na
@@ -4188,3 +4188,66 @@ Materiály `content/vanilla/parts/band_*` (zadání v `docs/18-DILY.md`).
 - Vedení přes parcelu kapacitu nemá (blok vede sám); dřív jeho přetížení
   zhaslo i parcelu pod ním a s ní celý blok. Vedení na troskách nevede.
 - Silnice nevede ani přes zónu, která pod ní zůstala (`parcelConducts`).
+
+## Audit: výkon vykreslování (T133)
+
+Měřeno na fixtuře `tests/fixtures/regressions/overfunded-services.city.base64`
+(192 × 192, 1 499 budov, 9 442 uzlů ve vrstvě budov), headless Edge s GPU,
+1920 × 1080, dev build, kamera na těžišti města. Snímek = interval mezi
+tiky, `renderFrame` = celá logika snímku, `render` = `renderer.render`.
+Mediány; stroj byl během měření vytížený jinými úlohami, rozptyl ±30 %.
+
+| Scéna | před: fps / renderFrame / render | po: fps / renderFrame / render |
+|---|---|---|
+| hra 1×, zoom 1 | 22–24 / 27–33 ms / 7–9 ms | 86–124 / 2,0 ms / 4,6–5,2 ms |
+| hra 1×, zoom 0,5 | 19–25 / 28–37 ms / 8–11 ms | 86–127 / 1,4–2,0 ms / 5,7–8,9 ms |
+| pauza, zoom 1 | 19–24 / 29–43 ms / 7–11 ms | 174–223 / 2,0–2,4 ms / 1,6–2,0 ms |
+| hra 3× | 13–26 / 28–57 ms / 7–14 ms | 140–213 / 1,9–2,6 ms / 1,7–2,3 ms |
+| požár, hra 3× | 8–22 / 30–65 ms (špičky 200–500 ms) | 71–131 / 1,7–3,0 ms (špičky 40–70 ms) |
+| posouvání kamery | 11–19 / 38–60 ms / 12–19 ms | 64–124 / 1,8–3,2 ms / 4,8–10 ms |
+
+Co se změnilo:
+
+1. **Přeřazení jen při změně.** `reorder()` běželo každý snímek přes všech
+   9 442 uzlů (35–65 ms) a mazalo `depthCache`. Teď ho spustí jen `setBox`
+   a `remove`, a pár nových uzlů se **vloží do hotového pořadí**
+   (`insertIntoOrder`, při konfliktu se přeřadí jen úsek mezi nimi): při
+   požáru 24–37 ms → 5–6 ms. `depthOrder` na typovaných polích, výsledek
+   totožný.
+2. **Změny podle druhu** (`src/render/changes.ts`). Renderer porovná špinavé
+   dlaždice se snímkem vrstev a rozliší povrch, silnici, vedení, parcelu, suť
+   a „ostatní" (oheň, povodeň, proud). Stromy, suť a lampy se přestaví jen
+   kolem změny, vedení jen když se změna dotkne vedení. Oheň a povodeň
+   přepečou u chunku jen překryvnou vrstvu. **Silnice po chuncích 16 × 16**
+   (dřív jeden `Graphics` s 81 387 instrukcemi) a peče se jen to, na co je
+   vidět.
+3. **Počet obyvatel budovu nešpiní** (`health.ts`, `water.ts`). Budova se
+   překreslí jen při změně vzhledu (definice, úroveň, zchátrání, proud,
+   půdorys); chodníky a lampy jen když se změní, zda dům chodník dává.
+4. **Ořez a skupiny vykreslování.** Uzly budov se skrývají po chuncích, jen
+   když kamera přejde přes hranici. Svět, terén, silnice, budovy, kouř,
+   odlesky a oheň jsou vlastní render group — posun kamery nepřepočítává
+   transformace všech uzlů a přidání obláčku nestaví znovu instrukce celého
+   světa. Lidé, auta, odlesky a kouř ze zásoby se jen schovávají.
+5. **Přechodové pásy** 9 → 6 vrstev (se souhlasem autora), šum jednou na
+   stranu, bez uzávěrů. Pečení chunku medián 2,6 → 1,0 ms, p90 6,7 → 2,0 ms;
+   teselace všech 144 chunků 417 → 332 ms. Čtyři vrstvy se zkoušely a na
+   mělčině byly vidět schody. Snímky před/po (zoom 1,8 a 3,5) jsou
+   v zadání T133.
+7. **Lišta** se přepočítává po tiku, po změně světa nebo nejvýš po 250 ms,
+   ne každý snímek.
+8. **Sítě:** když se nezměnilo, co vede (`ConductSnapshot`), elektřina
+   i voda vezmou minulý tvar sítě a přepočítají jen rozdělení. Rozhoduje
+   porovnání vstupů, ne volající. Elektřina 3,8 → 2,3 ms, voda 5,5 → 1,6 ms
+   na přepočet; `networkCache.test.ts` hlídá shodu s úplným přepočtem.
+9. **Overlay dopravy** se překreslí jen při změně zátěže nebo silnic.
+10. Auta bez alokací v pruzích, kouř z komínů bez nového pole, budovy služeb
+    v seznamu, který se obnoví jen při změně budov.
+11. Odhady ceny pod kurzorem jsou zapamatované (nástroj + dlaždice + tik).
+13. Vedení se ničí i s dětmi (únik `GraphicsContext`).
+14. Chybějící obrázky chodců zezadu už nehází výjimku každý snímek.
+
+Zbývá: špičky při požáru (40–70 ms) dělá hlavně simulace (`fire.ts`,
+bourání a přepočty sítí po něm) a přeřazení; `render` při plném oddálení
+(zoom 0,5) je kolem 9 ms, protože je vidět většina města. Body 6 a 12
+(start a `antialias`) řeší jiná úloha.
