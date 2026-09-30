@@ -25,14 +25,17 @@ export function createVanillaSource(): ContentSource {
   // Ikony jsou binární, takže se neimportují jako data, ale jako URL. Vite je
   // v produkci opatří otiskem a nakopíruje do buildu; za běhu je stáhne
   // prohlížeč sám, až se objeví v `<img>`.
-  const iconFiles = import.meta.glob('../../content/vanilla/icons/*.png', {
+  //
+  // Jen WebP po 64 px (T134). PNG 128 × 128 zůstávají jako zdroj pro nástroje,
+  // na obrazovce mají ikony 18 až 35 px a v PNG vážily 2,9 MB.
+  const iconFiles = import.meta.glob('../../content/vanilla/icons/*.webp', {
     eager: true,
     query: '?url',
     import: 'default',
   });
   const icons: Record<string, string> = {};
   for (const absolute of Object.keys(iconFiles).sort()) {
-    const name = relativePath(absolute).slice('icons/'.length).replace(/\.png$/, '');
+    const name = relativePath(absolute).slice('icons/'.length).replace(/\.webp$/, '');
     icons[name] = iconFiles[absolute] as string;
   }
 
@@ -43,15 +46,31 @@ export function createVanillaSource(): ContentSource {
   // Totéž pro sprity budov. Rozměry a kotvy k nim nese `sprites/index.json`,
   // který vyrábí `tools/fit-sprites.py` — bez něj jsou obrázky jen soubory
   // a renderer by nevěděl, kam je posadit.
-  const spriteFiles = import.meta.glob('../../content/vanilla/sprites/*.webp', {
-    eager: true,
-    query: '?url',
-    import: 'default',
-  });
+  const spriteFiles = import.meta.glob(
+    ['../../content/vanilla/sprites/*.webp', '!../../content/vanilla/sprites/*@0.5x.webp'],
+    { eager: true, query: '?url', import: 'default' },
+  );
   const spriteUrls: Record<string, string> = {};
   for (const absolute of Object.keys(spriteFiles).sort()) {
     const name = relativePath(absolute).slice('sprites/'.length).replace(/\.webp$/, '');
     spriteUrls[name] = spriteFiles[absolute] as string;
+  }
+
+  // Poloviční sprity (T134): hra je kreslí při výchozím zoomu a plnou velikost
+  // si dotáhne až při přiblížení. Klíč je jméno plného obrázku.
+  //
+  // Přípona `@0.5x` je **konvence Pixi**: `Assets.load` z ní pozná rozlišení
+  // 0,5, takže poloviční textura má stejnou logickou velikost jako plná a na
+  // mapě sedí bez přepočtu měřítka — ať ji načte kdokoli.
+  const halfFiles = import.meta.glob('../../content/vanilla/sprites/*@0.5x.webp', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  });
+  const halfUrls: Record<string, string> = {};
+  for (const absolute of Object.keys(halfFiles).sort()) {
+    const name = relativePath(absolute).slice('sprites/'.length).replace(/@0\.5x\.webp$/, '');
+    halfUrls[name] = halfFiles[absolute] as string;
   }
 
   // Povrchy. Jméno souboru je `<druh>__<varianta>.png` a klíč `<druh>|<varianta>`,
@@ -63,43 +82,21 @@ export function createVanillaSource(): ContentSource {
   // 42 ze 64 má vozovku jinde, než má, a hlavně by se jich tolik nevešlo do
   // jedné kreslicí dávky (`docs/08-DLAZDICE.md`). Asfalt je něco jiného: je to
   // **materiál**, jeden obrázek na typ silnice, a tvar vozovky se počítá.
-  const SURFACES = new Set([
-    'grass',
-    'water',
-    'sand',
-    'rock',
-    'forest',
-    'marsh',
-    'asphalt_street',
-    'asphalt_avenue',
-    'asphalt_highway',
-    // Trosky nejsou terén, ale kreslí se stejně — jako výplň polygonu dlaždice.
-    'rubble',
-  ]);
-  const tileFiles = import.meta.glob('../../content/vanilla/tiles/*.webp', {
-    eager: true,
-    query: '?url',
-    import: 'default',
-  });
+  //
+  // Bílá listina je **přímo ve vzoru globu** (T134), ne až ve filtru za ním:
+  // eager glob s `?url` vydá do buildu každý soubor, který najde, i když ho
+  // kód pak zahodí — a tvarových dlaždic silnic a potrubí bylo 65 po 2,1 MB.
+  // Trosky nejsou terén, ale kreslí se stejně — jako výplň polygonu dlaždice.
+  const tileFiles = import.meta.glob(
+    '../../content/vanilla/tiles/{grass,water,sand,rock,forest,marsh,asphalt_street,asphalt_avenue,asphalt_highway,rubble}__*.webp',
+    { eager: true, query: '?url', import: 'default' },
+  );
   const tiles: Record<string, string> = {};
   for (const absolute of Object.keys(tileFiles).sort()) {
     const name = relativePath(absolute).slice('tiles/'.length).replace(/\.webp$/, '');
     const [terrain, variant] = name.split('__');
-    if (terrain === undefined || variant === undefined || !SURFACES.has(terrain)) continue;
+    if (terrain === undefined || variant === undefined) continue;
     tiles[`${terrain}|${variant}`] = tileFiles[absolute] as string;
-  }
-
-  // Dlaždice vozovky. Sedm tvarů na typ, zbytek vznikne překlopením
-  // v rendereru — klíč je `rodina__tvar`, jak je pojmenoval `fit-roads.py`.
-  const roadFiles = import.meta.glob('../../content/vanilla/roads/*.png', {
-    eager: true,
-    query: '?url',
-    import: 'default',
-  });
-  const roads: Record<string, string> = {};
-  for (const absolute of Object.keys(roadFiles).sort()) {
-    const name = relativePath(absolute).slice('roads/'.length).replace(/\.png$/, '');
-    roads[name] = roadFiles[absolute] as string;
   }
 
   // Díly pro animace (T116). Rozměry a kotvy nese `parts/index.json`, který
@@ -164,10 +161,9 @@ export function createVanillaSource(): ContentSource {
     definitions,
     locales,
     icons,
-    sprites: buildSprites(spriteIndex, spriteUrls, spriteEffects),
+    sprites: buildSprites(spriteIndex, spriteUrls, spriteEffects, halfUrls),
     parts: buildParts(partIndex, partUrls),
     tiles,
-    roads,
     skirts,
   };
 }
@@ -183,6 +179,8 @@ export function buildSprites(
   index: unknown,
   urls: Record<string, string>,
   effects?: unknown,
+  /** Poloviční obrázky pod týmž klíčem jako `urls` (T134). Nepovinné. */
+  halves: Record<string, string> = {},
 ): Record<string, SpriteImage> {
   const effectsByKey = readEffects(effects);
   const out: Record<string, SpriteImage> = {};
@@ -200,8 +198,10 @@ export function buildSprites(
     if (typeof file !== 'string' || typeof building !== 'string' || typeof variant !== 'string') {
       continue;
     }
-    const url = urls[file.replace(/\.png$/, '')];
+    const name = file.replace(/\.png$/, '');
+    const url = urls[name];
     if (url === undefined) continue;
+    const half = halves[name];
     if (!Array.isArray(anchor) || anchor.length !== 2) continue;
     if (typeof entry['width'] !== 'number' || typeof entry['height'] !== 'number') continue;
 
@@ -213,6 +213,7 @@ export function buildSprites(
       height: entry['height'],
       anchor: [Number(anchor[0]), Number(anchor[1])],
       scale,
+      ...(half === undefined ? {} : { half }),
       ...(extra === undefined ? {} : { effects: extra }),
     };
   }

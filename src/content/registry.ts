@@ -48,8 +48,6 @@ export interface ContentSource {
    * Klíč = jméno dílu. Zdroj je mít nemusí — co chybí, to se nekreslí.
    */
   readonly parts?: Readonly<Record<string, PartImage>>;
-  /** Dlaždice vozovky pod klíčem `rodina__tvar`. */
-  readonly roads?: Readonly<Record<string, string>>;
   /** Materiály podezdívek pod klíčem `kategorie__varianta`. */
   readonly skirts?: Readonly<Record<string, string>>;
   /**
@@ -74,6 +72,14 @@ export interface SpriteImage {
   readonly height: number;
   readonly anchor: readonly [number, number];
   readonly scale: number;
+  /**
+   * Týž obrázek v poloviční velikosti (T134), nebo nic. Rozměry, kotva
+   * a `scale` platí dál pro plný obrázek — renderer polovinu načte s rozlišením
+   * 0,5, takže na mapě sedí stejně. Plná velikost se dotahuje, až hráč
+   * přiblíží nad zoom 2 (`src/render/spriteResolution.ts`). Mod ji dodat
+   * nemusí; pak se kreslí rovnou plný obrázek.
+   */
+  readonly half?: string;
   /**
    * Co z obrázku vychází: kouř z komína, točící se rotor, blikající světlo
    * (T116). Body jsou **v pixelech obrázku**, stejně jako `anchor`, takže
@@ -160,7 +166,6 @@ export class ContentRegistry {
   private readonly sprites = new Map<string, SpriteImage>();
   private readonly parts = new Map<string, PartImage>();
   private readonly tiles = new Map<string, string>();
-  private readonly roads = new Map<string, string>();
   private readonly skirts = new Map<string, string>();
   private balance: Balance | null = null;
 
@@ -252,9 +257,6 @@ export class ContentRegistry {
     }
 
     // A povrchy. Mod smí přidat vlastní variantu trávy nebo přepsat vanilla.
-    for (const [key, url] of Object.entries(source.roads ?? {})) {
-      this.roads.set(key, url);
-    }
     for (const [key, url] of Object.entries(source.skirts ?? {})) {
       this.skirts.set(key, url);
     }
@@ -293,11 +295,6 @@ export class ContentRegistry {
    * URL obrázků ikon. Prázdné, když je žádný zdroj nedodal — rozhraní si pak
    * poradí polygony.
    */
-  /** Všechny dlaždice vozovky, které obsah dodal. Klíč je `rodina__tvar`. */
-  getRoads(): Record<string, string> {
-    return Object.fromEntries(this.roads);
-  }
-
   /** Všechny materiály podezdívek. Klíč je `kategorie__varianta`. */
   getSkirts(): Record<string, string> {
     return Object.fromEntries(this.skirts);
@@ -316,13 +313,24 @@ export class ContentRegistry {
   }
 
   /**
+   * Klíče všech spritů (`budova|varianta`), seřazené. Přednačítání podle nich
+   * rozdělí obrázky na ty, které potřebuje první obrazovka, a zbytek (T134).
+   */
+  getSpriteKeys(): string[] {
+    return [...this.sprites.keys()].sort();
+  }
+
+  /**
    * Všechny obrázky, které hra na mapě kreslí (T121): sprity budov, povrchy,
    * díly, podezdívky. Podle toho se přednačítá při startu. Ikony rozhraní ne —
    * ty jsou malé a načte si je `<img>` sám.
+   *
+   * Od spritu se bere **ten, který se kreslí při výchozím zoomu**: poloviční,
+   * když ho obsah má (T134).
    */
   getImageUrls(): string[] {
     return [
-      ...[...this.sprites.values()].map((sprite) => sprite.url),
+      ...[...this.sprites.values()].map((sprite) => sprite.half ?? sprite.url),
       ...[...this.parts.values()].map((part) => part.url),
       ...this.tiles.values(),
       ...this.skirts.values(),
