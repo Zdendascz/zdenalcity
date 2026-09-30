@@ -14,7 +14,6 @@ import { MAX_LINE_VEHICLES } from '@/sim/transit';
 import {
   MAX_TAX_RATE,
   MIN_TAX_RATE,
-  NEUTRAL_HAPPINESS,
   rebuildTileIndex,
   resizeWorld,
 } from '@/sim/world';
@@ -26,6 +25,7 @@ import type {
 } from '@/sim/world';
 import {
   MAX_SAVE_FILE_BYTES,
+  SAVE_COARSE_BYTES_PER_CELL,
   SAVE_COARSE_LAYER_ORDER,
   SAVE_DISASTER_LAYER_ORDER,
   SAVE_FILES,
@@ -34,6 +34,7 @@ import {
 } from './format';
 import type {
   SaveData,
+  SaveDerivedState,
   SaveDisasterState,
   SaveEntities,
   SaveFinanceState,
@@ -42,7 +43,6 @@ import type {
   SaveState,
   SaveTransitState,
 } from './format';
-import { rememberPopulation } from '@/sim/finance';
 import { noLosses, repairUnsupportedRoads } from '@/sim/disasters/damage';
 import { countBurning } from '@/sim/disasters/fire';
 import type { Modifier } from '@/sim/disasters/state';
@@ -216,6 +216,58 @@ function parseTransit(raw: Record<string, unknown>): SaveTransitState {
   };
 }
 
+/** Prázdný stav s pamětí — to, s čím se načítal save do verze 14. */
+function emptyDerived(): SaveDerivedState {
+  return {
+    trafficLoad: [],
+    jobAccess: [],
+    lineStats: [],
+    transitRelief: [],
+    downgradeStreak: [],
+    waterlessStreak: [],
+    coverage: [],
+    watered: [],
+  };
+}
+
+/**
+ * Stav s pamětí (verze 15). Tady se kontroluje **tvar**; meze proti velikosti
+ * mapy a proti zdravému rozumu hlídá `checkSaveFits`.
+ */
+function parseDerived(raw: Record<string, unknown>): SaveDerivedState {
+  const what = 'state.derived';
+  return {
+    trafficLoad: pairArray(raw['trafficLoad'], `${what}.trafficLoad`),
+    jobAccess: pairArray(raw['jobAccess'], `${what}.jobAccess`),
+    lineStats: asArray(raw['lineStats'], `${what}.lineStats`).map((value, i) => {
+      const where = `${what}.lineStats[${i}]`;
+      const [id, rawStats] = asArray(value, where);
+      if (typeof id !== 'number' || !Number.isInteger(id)) fail(`${where}[0] musí být id linky`);
+      const stats = asRecord(rawStats, `${where}[1]`);
+      return [
+        id,
+        {
+          demand: num(stats, 'demand', `${where}[1]`),
+          capacity: num(stats, 'capacity', `${where}[1]`),
+          transported: num(stats, 'transported', `${where}[1]`),
+          income: num(stats, 'income', `${where}[1]`),
+          upkeep: num(stats, 'upkeep', `${where}[1]`),
+        },
+      ];
+    }),
+    transitRelief: pairArray(raw['transitRelief'], `${what}.transitRelief`),
+    downgradeStreak: pairArray(raw['downgradeStreak'], `${what}.downgradeStreak`),
+    waterlessStreak: pairArray(raw['waterlessStreak'], `${what}.waterlessStreak`),
+    coverage: asArray(raw['coverage'], `${what}.coverage`).map((value, i) => {
+      const where = `${what}.coverage[${i}]`;
+      const [serviceClass, cells] = asArray(value, where);
+      if (typeof serviceClass !== 'string') fail(`${where}[0] musí být třída služby`);
+      return [serviceClass, numberArray(cells, `${where}[1]`)];
+    }),
+    watered: numberArray(raw['watered'], `${what}.watered`),
+  };
+}
+
 function parseFinance(raw: Record<string, unknown>): SaveFinanceState {
   const what = 'state.finance';
   return {
@@ -306,7 +358,9 @@ function pairArray(value: unknown, what: string): [number, number][] {
   return asArray(value, what).map((item, i) => {
     const pair = asArray(item, `${what}[${i}]`);
     const [a, b] = pair;
-    if (typeof a !== 'number' || typeof b !== 'number') {
+    // `Number.isFinite`, ne jen `typeof`: JSON umí `1e400`, a to se přečte
+    // jako nekonečno (audit T132).
+    if (typeof a !== 'number' || typeof b !== 'number' || !Number.isFinite(a) || !Number.isFinite(b)) {
       fail(`${what}[${i}] musí být dvojice čísel`);
     }
     return [a, b] as [number, number];
@@ -454,6 +508,8 @@ function emptyFinance(): SaveFinanceState {
  * sám o sobě neví, jak je starý.
  */
 const PHASE_FOUR_VERSION = 6;
+/** Od téhle verze nese save stav s pamětí (`state.derived`, audit T132). */
+const DERIVED_VERSION = 15;
 
 function parseState(
   raw: Record<string, unknown>,
@@ -513,6 +569,12 @@ function parseState(
     finance: hasPhaseFour
       ? parseFinance(asRecord(raw['finance'], 'state.finance'))
       : emptyFinance(),
+    // Stav s pamětí nese až verze 15 (T132). Stejná úvaha jako u fáze 4:
+    // u starších se nevyžaduje, u novějších chybějící sekce znamená vadný soubor.
+    derived:
+      formatVersion >= DERIVED_VERSION
+        ? parseDerived(asRecord(raw['derived'], 'state.derived'))
+        : emptyDerived(),
     economy: {
       funds: int(economyRaw, 'funds', 'state.economy'),
       taxRates,
@@ -560,18 +622,21 @@ export function saveMapSize(meta: SaveMeta): number {
 }
 
 /**
- * Očekávaná délka `coarse.bin`: tři jednobajtové vrstvy na hrubé mřížce.
+ * Očekávaná délka `coarse.bin`: tři jednobajtové vrstvy na hrubé mřížce a od
+ * verze 15 za nimi spokojenost.
  *
  * `size` je hrana **mapy**, ne hrubé mřížky — od T42 ji nese `meta.grid.size`
  * a save z mapy 512 × 512 je jinak dlouhý než ze 128 × 128.
  */
 export function expectedCoarseByteLength(size: number): number {
-  return coarseCellsOf(size) * SAVE_COARSE_LAYER_ORDER.length;
+  return coarseCellsOf(size) * SAVE_COARSE_BYTES_PER_CELL;
 }
 
+/** Hrubé vrstvy a za nimi spokojenost (verze 15). */
 export function unpackCoarseInto(
   bytes: Uint8Array,
   coarse: CoarseLayers,
+  happiness: Uint8Array,
   size: number,
 ): void {
   const cells = coarseCellsOf(size);
@@ -586,6 +651,7 @@ export function unpackCoarseInto(
     coarse[name].set(bytes.subarray(offset, offset + cells));
     offset += cells;
   }
+  happiness.set(bytes.subarray(offset, offset + cells));
 }
 
 /** Očekávaná délka `heights.bin`: jeden bajt na roh mřížky. */
@@ -944,6 +1010,69 @@ export function checkSaveFits(save: SaveData): void {
       `state.economy.taxRates.${category}`,
     );
   }
+
+  checkDerivedFits(save, size);
+}
+
+/** Desetinné číslo v mezích. Nekonečno ani NaN neprojde. */
+function inRealRange(value: number, low: number, high: number, what: string): void {
+  if (!Number.isFinite(value) || value < low || value > high) {
+    fail(`${what} je ${value}, čeká se číslo mezi ${low} a ${high}`);
+  }
+}
+
+/**
+ * Stav s pamětí (verze 15). Save sdílený na Discordu je cizí vstup, takže se
+ * meze hlídají i tady: dlaždice mimo mapu by zapsala za konec vrstvy
+ * a necelé jízdné by udělalo necelou kasu, kterou pak hra odmítne uložit.
+ */
+function checkDerivedFits(save: SaveData, size: number): void {
+  const derived = save.state.derived;
+  const cells = size * size;
+  const coarseCells = coarseCellsOf(size);
+  const what = 'state.derived';
+
+  derived.trafficLoad.forEach(([tile, load], i) => {
+    inRange(tile, 0, cells - 1, `${what}.trafficLoad[${i}][0]`);
+    inRealRange(load, 0, 1e9, `${what}.trafficLoad[${i}][1]`);
+  });
+  derived.jobAccess.forEach(([id, access], i) => {
+    inRange(id, 1, MAX_BUILDING_ID, `${what}.jobAccess[${i}][0]`);
+    inRealRange(access, 0, 1, `${what}.jobAccess[${i}][1]`);
+  });
+  derived.lineStats.forEach(([id, stats], i) => {
+    const where = `${what}.lineStats[${i}]`;
+    inRange(id, 1, Number.MAX_SAFE_INTEGER, `${where}[0]`);
+    inRealRange(stats.demand, 0, 1e12, `${where}.demand`);
+    inRealRange(stats.capacity, 0, 1e12, `${where}.capacity`);
+    inRealRange(stats.transported, 0, 1e12, `${where}.transported`);
+    // Příjem a údržba jdou rovnou do kasy, a ta musí zůstat celá.
+    inRange(stats.income, 0, 1e12, `${where}.income`);
+    inRange(stats.upkeep, 0, 1e12, `${where}.upkeep`);
+  });
+  derived.transitRelief.forEach(([cell, relief], i) => {
+    inRange(cell, 0, coarseCells - 1, `${what}.transitRelief[${i}][0]`);
+    // Součet podílů nepřekročí jedničku jen v přesné aritmetice; v plovoucí
+    // čárce může vyjít o zaokrouhlení výš.
+    inRealRange(relief, 0, 1 + 1e-9, `${what}.transitRelief[${i}][1]`);
+  });
+  for (const key of ['downgradeStreak', 'waterlessStreak'] as const) {
+    derived[key].forEach(([id, streak], i) => {
+      inRange(id, 1, MAX_BUILDING_ID, `${what}.${key}[${i}][0]`);
+      inRange(streak, 0, 1e6, `${what}.${key}[${i}][1]`);
+    });
+  }
+  const classes = new Set<string>();
+  derived.coverage.forEach(([serviceClass, values], i) => {
+    const where = `${what}.coverage[${i}]`;
+    if (classes.has(serviceClass)) fail(`${where}: třída ${serviceClass} se opakuje`);
+    classes.add(serviceClass);
+    if (values.length !== coarseCells) {
+      fail(`${where} má ${values.length} buněk, k mapě ${size} × ${size} patří ${coarseCells}`);
+    }
+    values.forEach((value, cell) => inRange(value, 0, 255, `${where}[${cell}]`));
+  });
+  derived.watered.forEach((id, i) => inRange(id, 1, MAX_BUILDING_ID, `${what}.watered[${i}]`));
 }
 
 /**
@@ -983,14 +1112,15 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
     world.buildings.set(building.id, { ...building });
   }
   world.nextBuildingId = save.entities.nextBuildingId;
-  // Populace pro měření růstu je **odvozená** z budov, které save nese —
-  // dopočítá se, místo aby se ukládala. Načtené město tak startuje s nulovým
-  // růstem, ne s falešným skokem proti nule.
-  rememberPopulation(world);
+  // `lastPopulation` se bere **ze savu** (audit T132). Do T132 se tady
+  // dopočítávala z budov u každého savu, takže první měsíční uzávěrka po
+  // načtení měřila růst proti jinému číslu než hra bez přerušení. Savu
+  // starší verze 6, který ji nenese, ji z budov dopočítá migrace.
 
   // Hrubé vrstvy nese formát verze 2. Starší save jimi projde s vynulovaným
-  // `coarse.bin`, který mu doplnila migrace.
-  unpackCoarseInto(save.coarse, world.coarse, size);
+  // `coarse.bin`, který mu doplnila migrace. Za nimi od verze 15 spokojenost;
+  // starším ji migrace doplnila neutrální.
+  unpackCoarseInto(save.coarse, world.coarse, world.happiness, size);
   // Patra nese verze 4; starším je migrace doplnila jako rovinu.
   unpackHeightsInto(save.heights, world.cornerHeight, size);
 
@@ -998,35 +1128,55 @@ export function applySaveToWorld(world: WorldState, save: SaveData): void {
   // Pokrytí se **musí** označit za špinavé: bez toho by ho `serviceSystem`
   // nikdy nepřepočítal a všechny služby by po loadu přestaly fungovat —
   // žádný bonus k ceně půdy, žádné srážení kriminality, žádné zdravotnictví.
+  //
+  // Od verze 15 se ale nejdřív převezme pokrytí ze savu (T132): katastrofy,
+  // oheň a povodeň z něj čtou v prvním tiku dřív, než se přepočítá. Přepočet
+  // pak dá totéž, co by dala hra bez přerušení — pokrytí je čistá funkce města.
   world.coverage.clear();
+  for (const [serviceClass, values] of save.state.derived.coverage) {
+    world.coverage.set(serviceClass, Uint8Array.from(values));
+  }
   world.coverageDirty = true;
   world.serviceFunding.clear();
   for (const [serviceClass, funding] of Object.entries(save.state.serviceFunding)) {
     world.serviceFunding.set(serviceClass, funding);
   }
+  const derived = save.state.derived;
+  // Počítadla chátrání jsou hystereze, tedy paměť — od verze 15 se ukládají
+  // (T132). Starší save je nemá a začne od nuly, jako do té doby každý.
   world.downgradeStreak.clear();
+  for (const [id, streak] of derived.downgradeStreak) {
+    if (world.buildings.has(id)) world.downgradeStreak.set(id, streak);
+  }
 
-  // Doprava se neukládá (R10) — a právě proto se musí **vynulovat**. Zátěž ani
-  // dosažitelnost práce z předchozího města nesmí přetéct do načteného: silnice
-  // jsou jinde, budovy mají jiná id a chvíli by hra počítala s dopravou, která
-  // v tomhle městě nikdy nebyla. Kurzor je jediné, co se přenáší ze savu.
+  // Zátěž silnic a dosažitelnost práce se **vyhlazují** přes mnoho běhů
+  // vzorkování, takže se od verze 15 ukládají (T132). Co přijde odjinud než
+  // ze savu, se vynuluje: z předchozího města nesmí přetéct nic.
   world.trafficLoad.fill(0);
+  for (const [tile, load] of derived.trafficLoad) world.trafficLoad[tile] = load;
   world.jobAccess.clear();
+  for (const [id, access] of derived.jobAccess) {
+    if (world.buildings.has(id)) world.jobAccess.set(id, access);
+  }
+  // Násobitele dostupnosti jsou **výstup** růstu, ne paměť: růst je přepíše
+  // dřív, než je kdokoli kromě panelu parcely použije.
   world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
   world.cityJobAccess = 1;
   world.trafficCursor = save.state.trafficCursor;
 
-  // Spokojenost se taky neukládá (R10). Nulou začít nesmí — načtené město
-  // by na první pohled vypadalo jako zoufalé — proto výchozí neutrál.
-  world.happiness.fill(NEUTRAL_HAPPINESS);
-
-  // Voda je odvozená z potrubí a zdrojů, takže se stejně jako doprava musí
-  // **vynulovat**, ne nechat přetéct: zavodněné budovy minulého města mají
-  // jiná id a počítadlo chátrání by načtenému městu strhlo obyvatele za
-  // sucho, které se stalo někde jinde.
+  // Voda je odvozená z potrubí a zdrojů, takže se musí **vynulovat**, ne
+  // nechat přetéct, a v prvním tiku se přepočítá. Seznam zavodněných budov se
+  // ale převezme ze savu (verze 15): epidemie a los katastrof se na něj ptají
+  // ještě před vodovodem.
   world.waterSupply.fill(0);
   world.watered.clear();
+  for (const id of save.state.derived.watered) {
+    if (world.buildings.has(id)) world.watered.add(id);
+  }
   world.waterlessStreak.clear();
+  for (const [id, streak] of derived.waterlessStreak) {
+    if (world.buildings.has(id)) world.waterlessStreak.set(id, streak);
+  }
   world.waterNetworkDirty = true;
 
   // Původ mapy: co save neví, bereme jako ruční mapu (migrace to doplňuje stejně).
@@ -1116,9 +1266,8 @@ function applyDisastersToWorld(world: WorldState, save: SaveData, size: number):
 /**
  * Linky do světa (verze 6).
  *
- * Statistiky přepravy se **nepřebírají**: jsou odvozené z linek a města
- * a přepočítají se při první měsíční uzávěrce. Koridor tramvají se označí za
- * špinavý, aby se dopočítal hned.
+ * Koridor tramvají se označí za špinavý, aby se dopočítal hned — je to čistá
+ * funkce linek a silnic.
  */
 function applyTransitToWorld(world: WorldState, save: SaveData): void {
   // Zastávka, kterou svět nezná, z linky **vypadne**. Za běhu to dělá
@@ -1142,8 +1291,18 @@ function applyTransitToWorld(world: WorldState, save: SaveData): void {
     );
   }
 
+  // Statistiky přepravy se počítají **jednou za měsíc** a do té doby z nich
+  // čte rozpočet i doprava. Dopočítat je hned po načtení by znamenalo počítat
+  // z jiného města, než ze kterého je spočítala hra bez přerušení — proto se
+  // od verze 15 ukládají (T132). Linka, která ze savu nevzešla, statistiku
+  // nedostane; zbytek vyřeší příští uzávěrka.
+  const derived = save.state.derived;
   world.lineStats.clear();
+  for (const [id, stats] of derived.lineStats) {
+    if (world.lines.some((line) => line.id === id)) world.lineStats.set(id, { ...stats });
+  }
   world.transitRelief.clear();
+  for (const [cell, relief] of derived.transitRelief) world.transitRelief.set(cell, relief);
   world.tramTiles.clear();
   world.transitDirty = true;
 }

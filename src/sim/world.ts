@@ -657,6 +657,19 @@ export function rebuildTileIndex(world: WorldState): void {
 }
 
 /**
+ * Silnice **v pořadí dlaždic**, ne v pořadí množiny (audit T132).
+ *
+ * `roadTiles` si pamatuje pořadí vkládání: za běhu je to pořadí, v jakém
+ * hráč stavěl, po načtení savu pořadí dlaždic. Kdo přes silnice sčítá
+ * desetinná čísla — kolony, údržbu — dostal v posledním bitu jiný součet
+ * a načtené město se od uloženého po čase rozešlo. Kdo jen počítá kusy nebo
+ * hledá vzdálenost, pořadí řešit nemusí.
+ */
+export function roadTilesInOrder(world: WorldState): number[] {
+  return [...world.roadTiles].sort((a, b) => a - b);
+}
+
+/**
  * Přestaví svět na jinou velikost mapy.
  *
  * Používá to načítání savu: renderer i UI drží `getSnapshot()` jako živý pohled

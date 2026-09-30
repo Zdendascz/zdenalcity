@@ -10,7 +10,7 @@ import type { Building, DemandState, EconomyState } from '@/sim/world';
  * znamená novou verzi a migraci.
  */
 
-export const CURRENT_FORMAT_VERSION = 14;
+export const CURRENT_FORMAT_VERSION = 15;
 
 /** Musí odpovídat `version` v package.json; hlídá to test. */
 export const GAME_VERSION = '0.1.0';
@@ -59,6 +59,22 @@ export const SAVE_COARSE_LAYER_ORDER = [
   'landValue',
   'crime',
 ] as const satisfies readonly (keyof CoarseLayers)[];
+
+/**
+ * Kolik bajtů na buňku hrubé mřížky má `coarse.bin`.
+ *
+ * Od verze 15 leží **za** hrubými vrstvami ještě spokojenost (audit T132).
+ * Není v `SAVE_COARSE_LAYER_ORDER`, protože nebydlí ve `world.coarse`, ale ve
+ * `world.happiness` — a ten seznam je typovaný na klíče hrubých vrstev.
+ * Starší migrace s ním počítají jako se třemi vrstvami a tak to má zůstat:
+ * popisují minulost.
+ *
+ * Proč se spokojenost ukládá, ač je „odvozená": není. Každý běh se k surové
+ * hodnotě jen **přibližuje**, takže nese paměť. Neutrál po načtení znamenal,
+ * že načtené město mělo jinou poptávku než to, které se uložilo, a do pár
+ * měsíců vyrostlo jinak (T132).
+ */
+export const SAVE_COARSE_BYTES_PER_CELL = SAVE_COARSE_LAYER_ORDER.length + 1;
 
 /**
  * Pořadí vrstev katastrof v `disasters.bin` (verze 6).
@@ -164,6 +180,57 @@ export interface SaveState {
   transit: SaveTransitState;
   /** Závazky a rating (verze 6). */
   finance: SaveFinanceState;
+  /** Stav s pamětí, který se dřív „dopočítával" (verze 15, audit T132). */
+  derived: SaveDerivedState;
+}
+
+/**
+ * Stav, který vypadá odvozeně, ale **nese paměť** (verze 15, audit T132).
+ *
+ * Do verze 14 se po načtení nuloval s odůvodněním, že se do pár běhů
+ * dopočítá (R10). Dopočítá se, ale **jinak**: zátěž silnic i dosažitelnost
+ * práce se vyhlazují přes mnoho běhů vzorkování, statistiky linek se počítají
+ * jednou za měsíc a počítadla chátrání jsou hystereze. Načtené město proto
+ * mělo jiné kolony, jiné příjmy z jízdného a jinou poptávku než to uložené
+ * a vyrostlo jinak — „ulož a načti" nebylo totéž co „hraj dál".
+ *
+ * Všechno je řídké a setříděné podle klíče, ať je save bajtově stabilní.
+ */
+export interface SaveDerivedState {
+  /** Zátěž silnic, jen nenulové dlaždice: `[dlaždice, zátěž]`. */
+  trafficLoad: [number, number][];
+  /** Vyhlazená dosažitelnost práce: `[id budovy, 0..1]`. */
+  jobAccess: [number, number][];
+  /** Měsíční statistiky linek: `[id linky, statistika]`. */
+  lineStats: [number, SaveLineStats][];
+  /** Kolik cest v buňce vezme MHD: `[buňka, 0..1]`. */
+  transitRelief: [number, number][];
+  /** Kolikrát po sobě vyšla budově cena půdy pod prahem: `[id budovy, počet]`. */
+  downgradeStreak: [number, number][];
+  /** Kolikrát po sobě byla budova bez vody: `[id budovy, počet]`. */
+  waterlessStreak: [number, number][];
+  /**
+   * Pokrytí službami po třídách, hodnota na buňku hrubé mřížky.
+   *
+   * Je to čistá funkce města a po načtení se stejně přepočítá — jenže až
+   * v pořadí systémů za katastrofami, ohněm a povodní, které z něj čtou už
+   * v prvním tiku. Prázdné pokrytí tam znamenalo, že požár uložený za běhu
+   * hořel po načtení jinak.
+   */
+  coverage: [string, number[]][];
+  /**
+   * Budovy, ke kterým došla voda. Totéž co pokrytí: přepočítá se v prvním
+   * tiku, ale epidemie a los katastrof se na ni ptají dřív.
+   */
+  watered: number[];
+}
+
+export interface SaveLineStats {
+  demand: number;
+  capacity: number;
+  transported: number;
+  income: number;
+  upkeep: number;
 }
 
 /**
@@ -281,7 +348,10 @@ export interface SaveData {
   meta: SaveMeta;
   /** Obsah `layers.bin` — konkatenace vrstev v `SAVE_LAYER_ORDER`. */
   layers: Uint8Array;
-  /** Obsah `coarse.bin` — konkatenace vrstev v `SAVE_COARSE_LAYER_ORDER`. */
+  /**
+   * Obsah `coarse.bin` — konkatenace vrstev v `SAVE_COARSE_LAYER_ORDER`, od
+   * verze 15 za nimi spokojenost (`SAVE_COARSE_BYTES_PER_CELL`).
+   */
   coarse: Uint8Array;
   /** Obsah `heights.bin` — patra v rozích, po jednom bajtu (verze 4). */
   heights: Uint8Array;

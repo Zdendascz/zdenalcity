@@ -9,7 +9,7 @@ import { closeYearIfDue } from '../ledger';
 import { annualCoupons, bondDebt, monthlyPayments, totalDebt } from '../finance';
 import { transitTotals } from '../transit';
 import { fundingCost } from '../funding';
-import { serviceFunding } from '../world';
+import { roadTilesInOrder, serviceFunding } from '../world';
 import type { Building, WorldState } from '../world';
 import type { System } from './index';
 
@@ -252,9 +252,10 @@ export function computeBudget(
   // Prochází se seznam silnic, ne celá mapa (R20 fáze 4). Rozpočet se počítá
   // jednou za herní měsíc, ale i tak: na 512 × 512 to byla čtvrt milionu
   // porovnání pro pár tisíc dlaždic, a rozpočet si o něj řekne i panel
-  // pokaždé, když ho hráč otevře.
+  // pokaždé, když ho hráč otevře. V pořadí dlaždic: údržba z modu smí být
+  // desetinná a součet se zaokrouhluje až na konci (T132, `roadTilesInOrder`).
   const roads: RoadBudget = { count: 0, upkeep: 0 };
-  for (const tile of world.roadTiles) {
+  for (const tile of roadTilesInOrder(world)) {
     const value = world.layers.road[tile] ?? ROAD.none;
     if (value === ROAD.none) continue;
     roads.count++;

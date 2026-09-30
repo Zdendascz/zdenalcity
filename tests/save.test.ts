@@ -183,23 +183,11 @@ describe('round-trip', () => {
     expect([...restored.buildings.values()]).toEqual(before.buildings);
     expect(restored.nextBuildingId).toBe(before.nextBuildingId);
     /*
-     * `lastPopulation` se **neporovnává**, protože se neukládá: `applySaveToWorld`
-     * ho dopočítá z načtených budov, aby načaté město nestartovalo s falešným
-     * skokem růstu proti nule. Ostatní kasa a sazby přežít musí.
+     * Celá kasa včetně `lastPopulation`. Do T132 se ta po načtení dopočítávala
+     * z budov, takže první měsíční uzávěrka měřila růst proti jinému číslu než
+     * hra bez přerušení. Dopočítává se už jen savu staršímu verze 6 (migrace).
      */
-    const withoutPopulation = (
-      economy: typeof restored.economy,
-    ): Omit<typeof restored.economy, 'lastPopulation'> => {
-      const copy = { ...economy };
-      delete (copy as { lastPopulation?: number }).lastPopulation;
-      return copy;
-    };
-    expect(withoutPopulation(restored.economy)).toEqual(
-      withoutPopulation(before.economy as typeof restored.economy),
-    );
-    expect(restored.economy.lastPopulation).toBe(
-      [...restored.buildings.values()].reduce((sum, building) => sum + building.population, 0),
-    );
+    expect(restored.economy).toEqual(before.economy);
     expect(restored.demand).toEqual(before.demand);
     expect(restored.seed).toBe(before.seed);
 
@@ -266,18 +254,23 @@ describe('round-trip', () => {
 
     applySaveToWorld(restored, migrate(unpackSave(bytes)));
 
-    // Voda je odvozená (R10), takže se po loadu **nuluje**, ne dědí.
-    expect(restored.watered.size).toBe(0);
-    expect(restored.waterlessStreak.size).toBe(0);
+    // Z minulého města nesmí zůstat nic. Co nese save (od verze 15 i seznam
+    // zavodněných budov a počítadla, T132), přijde ze savu; rozvedená voda se
+    // nuluje a v prvním tiku přepočítá.
+    expect(restored.watered.has(4242)).toBe(false);
+    expect(restored.watered).toEqual(world.watered);
+    expect(restored.waterlessStreak.has(4242)).toBe(false);
+    expect(restored.waterlessStreak).toEqual(world.waterlessStreak);
     expect([...restored.waterSupply].every((value) => value === 0)).toBe(true);
     expect(restored.waterNetworkDirty).toBe(true);
 
     assumeWatered(restored); // viz round-trip: vodárna nemá na téhle mapě břeh
 
-    // Pokrytí je odvozené, do savu nepatří a po loadu se počítá znovu.
-    expect(restored.coverage.size).toBe(0);
+    // Pokrytí je ze savu (katastrofy z něj čtou dřív, než se přepočítá), ne
+    // z minulého města, a po loadu se stejně přepočítá znovu.
+    expect(restored.coverage).toEqual(world.coverage);
     expect(restored.coverageDirty).toBe(true);
-    expect(restored.downgradeStreak.size).toBe(0);
+    expect(restored.downgradeStreak).toEqual(world.downgradeStreak);
     // Financování i hrubé vrstvy přepsal save, ne zbytek po minulém městě.
     expect(restored.serviceFunding.has('parks')).toBe(false);
     expect([...restored.coarse.landValue]).toEqual([...world.coarse.landValue]);
@@ -358,10 +351,19 @@ describe('round-trip', () => {
     expect(restored.trafficCursor).toBe(37);
   });
 
-  it('odvozená doprava se neukládá a po loadu je čistá (R10)', async () => {
-    // Zátěž a dosažitelnost předchozího města nesmí přetéct do načteného:
-    // silnice jsou jinde a budovy mají jiná id.
-    const { world } = await builtCity();
+  it('doprava přijde ze savu, ne z předchozího města (verze 15)', async () => {
+    // Zátěž a dosažitelnost se vyhlazují přes mnoho běhů, takže se od T132
+    // ukládají. Předchozí město ale do načteného přetéct nesmí: silnice jsou
+    // jinde a budovy mají jiná id.
+    const { world, content } = await builtCity();
+    wireUnderRoads(world);
+    const systems = createDefaultSystems(content, content.getBalance());
+    for (let tick = 0; tick < 300; tick++) {
+      tickWorld(world, systems);
+      assumeWatered(world);
+    }
+    expect([...world.trafficLoad].some((value) => value > 0)).toBe(true);
+    expect(world.jobAccess.size).toBeGreaterThan(0);
     const bytes = serializeSave(world, OPTIONS);
 
     const restored = createWorld(1);
@@ -372,8 +374,10 @@ describe('round-trip', () => {
 
     applySaveToWorld(restored, migrate(unpackSave(bytes)));
 
-    expect([...restored.trafficLoad].every((value) => value === 0)).toBe(true);
-    expect(restored.jobAccess.size).toBe(0);
+    expect(restored.trafficLoad).toEqual(world.trafficLoad);
+    expect(restored.jobAccess.has(1234)).toBe(false);
+    expect(restored.jobAccess).toEqual(world.jobAccess);
+    // Násobitele dostupnosti jsou výstup růstu, ne paměť — přepočítá je.
     expect([...restored.jobAccessCells].every((value) => value === 1)).toBe(true);
     expect(restored.cityJobAccess).toBe(1);
   });
@@ -404,9 +408,11 @@ describe('round-trip', () => {
     applySaveToWorld(restored, migrate(unpackSave(serializeSave(world, OPTIONS))));
 
     expect(restored.layers.pipe).toEqual(before);
-    // A síť se po loadu musí přepočítat — voda sama se neukládá (R10).
+    // A síť se po loadu musí přepočítat — rozvedená voda se neukládá (R10).
+    // Seznam zavodněných budov ano (verze 15), ptají se na něj katastrofy
+    // dřív, než vodovod v prvním tiku doběhne.
     expect(restored.waterNetworkDirty).toBe(true);
-    expect(restored.watered.size).toBe(0);
+    expect(restored.watered).toEqual(world.watered);
     expect([...restored.waterSupply].every((value) => value === 0)).toBe(true);
   });
 

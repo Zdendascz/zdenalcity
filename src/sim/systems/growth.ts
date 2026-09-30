@@ -67,6 +67,13 @@ function grow(world: WorldState, catalogue: BuildingCatalogue, balance: Balance)
   // Jednou za běh, ne u každého pokusu — seznam se během něj nemění tak, aby
   // to hráč poznal, a procházet všechny budovy dvanáctkrát je zbytečné.
   const present = presentDefinitions(world);
+  // Zónované dlaždice **setříděné podle indexu**, ne v pořadí množiny (audit
+  // T132). Množina si pamatuje pořadí vkládání: za běhu je to pořadí, v jakém
+  // hráč zónoval, kdežto po načtení savu pořadí dlaždic (`rebuildTileIndex`).
+  // Vážený los prochází kandidáty popořadě, takže stejný hod kostkou padl po
+  // načtení na jinou parcelu a město se od uloženého tiku vyvíjelo jinak.
+  // Třídí se líně a jednou za běh — běh bez poptávky to neplatí vůbec.
+  let zoned: number[] | null = null;
 
   // Pevné pořadí kategorií, ne pořadí nějaké mapy — jinak by determinismus
   // závisel na historii vkládání (P2).
@@ -74,7 +81,8 @@ function grow(world: WorldState, catalogue: BuildingCatalogue, balance: Balance)
     const attempts = attemptsFor(world, balance, category, cityAccess);
     if (attempts === 0) continue;
 
-    const candidates = collectCandidates(world, balance, category, reach, access);
+    zoned ??= [...world.zonedTiles].sort((a, b) => a - b);
+    const candidates = collectCandidates(world, balance, category, zoned, reach, access);
     let total = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
 
     for (let attempt = 0; attempt < attempts && total > 0; attempt++) {
@@ -137,6 +145,7 @@ function collectCandidates(
   world: WorldState,
   balance: Balance,
   category: RciCategory,
+  zoned: readonly number[],
   reach: Uint8Array,
   access: Float32Array,
 ): Candidate[] {
@@ -144,8 +153,9 @@ function collectCandidates(
   const candidates: Candidate[] = [];
 
   // Prochází se **zónované dlaždice**, ne celá mapa (R20 fáze 4). Na velké
-  // mapě je zóna zlomek plochy a zbytek nemá růstu co nabídnout.
-  for (const tile of world.zonedTiles) {
+  // mapě je zóna zlomek plochy a zbytek nemá růstu co nabídnout. Pořadí je
+  // podle indexu dlaždice, viz `grow`.
+  for (const tile of zoned) {
     if (buildingId[tile] !== 0 || road[tile] !== 0) continue;
     if (categoryForZone(zone[tile] ?? ZONE.none) !== category) continue;
 
