@@ -17,7 +17,7 @@ import {
 } from './palette';
 import { placedFootprint } from '@/sim/buildings';
 import { areaHeightRange, groundHeightAt } from '@/sim/heights';
-import { depthOrder } from './depth';
+import { depthOrder, insertIntoOrder } from './depth';
 import type { DepthBox } from './depth';
 import { decorDensity, decorHere, decorPick, decorShift, decorTiles, rubbleSlope } from './decor';
 import type { RubbleSlope, TerrainDecor } from './decor';
@@ -132,6 +132,13 @@ const LAMP_SPOTS: readonly (readonly [number, number, number, boolean])[] = [
 const CULL_SIDE = 448;
 const CULL_UP = 512;
 const CULL_DOWN = 256;
+
+/**
+ * Kolik změněných uzlů se ještě vkládá do hotového pořadí (T133). Každé
+ * vložení projde celé pořadí, takže nad touhle hranicí je levnější seřadit
+ * všechno znovu.
+ */
+const INSERT_LIMIT = 48;
 
 /** Pod tímhle zoomem je strom pár pixelů a houpání by jen zrnilo. */
 const SWAY_MIN_ZOOM = 0.6;
@@ -289,6 +296,9 @@ export class BuildingRenderer {
    * `setBox` a `remove`, jinudy se do `boxes` nesahá.
    */
   private orderDirty = true;
+  /** Poslední pořadí kreslení a uzly, které od něj přibyly nebo se pohnuly. */
+  private order: number[] = [];
+  private readonly changedBoxes = new Set<number>();
   /**
    * Uzly podle druhu (T133). Místní přestavba jde po id dlaždice, úplná
    * po téhle množině — dřív se kvůli ní procházelo `[...views.keys()]`
@@ -905,6 +915,7 @@ export class BuildingRenderer {
       return;
     }
     this.boxes.set(id, box);
+    this.changedBoxes.add(id);
     this.orderDirty = true;
   }
 
@@ -1223,7 +1234,16 @@ export class BuildingRenderer {
   private reorder(): void {
     this.orderDirty = false;
     this.depthCache.clear();
-    const order = depthOrder(this.boxes);
+    // Pár nových uzlů se vloží do minulého pořadí (T133); celé přeřazení
+    // jen když jich je moc nebo když vložit nejdou. Viz `insertIntoOrder`.
+    let order: number[] | null = null;
+    if (this.order.length > 0 && this.changedBoxes.size <= INSERT_LIMIT) {
+      const kept = this.order.filter((id) => this.boxes.has(id) && !this.changedBoxes.has(id));
+      order = insertIntoOrder(kept, this.boxes, [...this.changedBoxes]);
+    }
+    order ??= depthOrder(this.boxes);
+    this.order = order;
+    this.changedBoxes.clear();
     for (let i = 0; i < order.length; i++) {
       const id = order[i]!;
       const view = this.views.get(id);
@@ -1716,6 +1736,7 @@ export class BuildingRenderer {
     this.skirts.get(id)?.destroy();
     this.skirts.delete(id);
     if (this.boxes.delete(id)) this.orderDirty = true;
+    this.changedBoxes.delete(id);
     const chunk = this.chunkOf.get(id);
     if (chunk !== undefined) {
       this.chunkNodes[chunk]?.delete(id);

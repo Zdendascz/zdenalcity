@@ -243,3 +243,74 @@ export function depthOrder(boxes: ReadonlyMap<number, DepthBox>): number[] {
 
   return order;
 }
+
+/**
+ * Vloží nové uzly do **hotového** pořadí, místo aby se řadilo celé znovu
+ * (T133). Vrací nové pořadí, nebo `null`, když to vložením nejde — pak se
+ * musí zavolat `depthOrder`.
+ *
+ * Celé přeřazení 9 442 uzlů autorova města stálo v prohlížeči 25–37 ms a při
+ * požáru přibývala suť po hromadách každých pár tiků. Přitom `order` bez
+ * změněných uzlů je pořád platné pořadí (odebráním uzlu žádná podmínka
+ * nevznikne) a nový uzel stačí vložit **za všechny, které musí být před ním,
+ * a před všechny, které musí být za ním**. Mezi nimi se místo vybere podle
+ * `seedRank`, stejně jako by ho vybral Kahnův algoritmus.
+ *
+ * Když nový uzel musí být zároveň za někým a před někým, kdo je v pořadí
+ * dřív — třeba budova, která spojí dva dosud nezávislé řetězy —, přeřadí se
+ * jen **úsek mezi nimi** i s novým uzlem. Uzly mimo úsek se nehnou, takže
+ * jejich podmínky platí dál; nový uzel má všechny, kdo musí být před ním,
+ * buď před úsekem, nebo v něm, a totéž platí pro ty za ním.
+ *
+ * `null` vrací jen při chybějícím půdorysu; volající pak řadí celé znovu.
+ */
+export function insertIntoOrder(
+  order: readonly number[],
+  boxes: ReadonlyMap<number, DepthBox>,
+  added: readonly number[],
+): number[] | null {
+  const ids = [...order];
+  const list: DepthBox[] = [];
+  for (const id of ids) {
+    const box = boxes.get(id);
+    if (!box) return null;
+    list.push(box);
+  }
+  // Nové uzly v pořadí `seedRank`, ať se mezi sebou vloží přirozeně.
+  const incoming = added
+    .map((id) => [id, boxes.get(id)] as const)
+    .filter((entry): entry is readonly [number, DepthBox] => entry[1] !== undefined)
+    .sort((a, b) => seedRank(a[1], b[1]) || a[0] - b[0]);
+
+  for (const [id, box] of incoming) {
+    const from = columnFrom(box);
+    const to = columnTo(box);
+    let after = -1; // poslední, kdo musí být před ním
+    let before = list.length; // první, kdo musí být za ním
+    for (let i = 0; i < list.length; i++) {
+      const other = list[i]!;
+      // Pruhy obrazovky se míjejí → nepřekryjí se, pořadí je jedno.
+      if (columnTo(other) <= from || columnFrom(other) >= to) continue;
+      if (mustDrawBefore(other, box)) {
+        if (i > after) after = i;
+      } else if (mustDrawBefore(box, other)) {
+        if (i < before) before = i;
+      }
+    }
+    if (after >= before) {
+      // Přeřadit jen úsek `before..after` i s novým uzlem.
+      const window = new Map<number, DepthBox>();
+      for (let i = before; i <= after; i++) window.set(ids[i]!, list[i]!);
+      window.set(id, box);
+      const local = depthOrder(window);
+      ids.splice(before, after - before + 1, ...local);
+      list.splice(before, after - before + 1, ...local.map((key) => window.get(key)!));
+      continue;
+    }
+    let at = after + 1;
+    while (at < before && seedRank(list[at]!, box) <= 0) at++;
+    ids.splice(at, 0, id);
+    list.splice(at, 0, box);
+  }
+  return ids;
+}
