@@ -462,7 +462,7 @@ describe('vysoké a nízké napětí, trafostanice (T136)', () => {
     tickPower(world, catalogue);
     expect(house(world)?.powered).toBe(true);
     const trafo = [...world.buildings.values()].find((b) => b.definitionId === 'test:trafo');
-    expect(world.transformerLoad.get(trafo!.id)).toEqual({ load: 20, capacity: 30, overloaded: false });
+    expect(world.transformerLoad.get(trafo!.id)).toEqual({ load: 20, capacity: 30, overloaded: false, highVoltage: true });
   });
 
   it('plné trafo pustí, co unese, a zhasne jen dům navíc', () => {
@@ -474,7 +474,7 @@ describe('vysoké a nízké napětí, trafostanice (T136)', () => {
       .sort((a, b) => a.id - b.id);
     expect(houses.map((b) => b.powered)).toEqual([true, false]);
     const trafo = [...world.buildings.values()].find((b) => b.definitionId === 'test:trafo');
-    expect(world.transformerLoad.get(trafo!.id)).toEqual({ load: 30, capacity: 30, overloaded: true });
+    expect(world.transformerLoad.get(trafo!.id)).toEqual({ load: 30, capacity: 30, overloaded: true, highVoltage: true });
   });
 
   it('vysoké napětí přes zónu blok nenapojí', () => {
@@ -506,5 +506,35 @@ describe('vysoké a nízké napětí, trafostanice (T136)', () => {
     buildWire(world, 20, 20, WIRE.low);
     tickPower(world, catalogue);
     expect(world.wireLive[index(20, 20, world.size)]).toBe(0);
+  });
+});
+
+describe('úzké hrdlo jinde a trafo bez vysokého napětí (T137)', () => {
+  it('blok za plnou přípojkou je „napojený, ale proud nestačí"', () => {
+    const catalogue = catalogueOf(PLANT, HOUSE);
+    const tight: Balance = {
+      ...VANILLA_BALANCE,
+      power: { wires: [{ cost: 0, capacity: 30, upkeep: 0 }, { cost: 0, capacity: 1000, upkeep: 0 }] },
+    };
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    // Plná přípojka (7, 11), za ní silnice-přejezd (8..9, 11) a blok tří domů.
+    for (const x of [7, 8, 9]) buildWire(world, x, 11, WIRE.low);
+    for (const x of [10, 11, 12]) placeDefinition(world, catalogue, 'test:house', x, 11);
+    tickPower(world, catalogue, tight);
+    expect(world.wireOverloaded[index(7, 11, world.size)]).toBe(1);
+    // Dům na konci bloku: připojený, ale hladový.
+    expect(world.powerStarved[index(12, 11, world.size)]).toBe(1);
+  });
+
+  it('trafo jen mezi nízkým napětím hlásí, že mu chybí vysoké', () => {
+    const catalogue = catalogueOf(PLANT, HOUSE, TRAFO);
+    const world = createWorld(1);
+    placeDefinition(world, catalogue, 'test:plant', 5, 11);
+    buildWire(world, 7, 11, WIRE.low);
+    placeDefinition(world, catalogue, 'test:trafo', 8, 11);
+    tickPower(world, catalogue);
+    const trafo = [...world.buildings.values()].find((b) => b.definitionId === 'test:trafo');
+    expect(world.transformerLoad.get(trafo!.id)?.highVoltage).toBe(false);
   });
 });

@@ -298,6 +298,9 @@ export class BuildingInfo {
     } else if ((definition.power?.transformer ?? 0) > 0) {
       rows.push(['ui.info.transformerLoad', `0 / ${formatNumber(definition.power?.transformer ?? 0)}`]);
     }
+    if ((definition.power?.transformer ?? 0) > 0 && transformer?.highVoltage !== true) {
+      rows.push(['ui.info.transformerFeed', t('ui.info.transformerNoHigh')]);
+    }
 
     // Co budova zpracuje. Bez tohohle řádku byla spalovna k nerozeznání od
     // kůlny: karta o ní neřekla vůbec nic a hráč neměl jak zjistit, jestli mu
@@ -559,7 +562,15 @@ export class BuildingInfo {
       el(
         'span',
         `gauge__flag ${parcel.power ? 'is-high' : 'is-low'}`,
-        t(parcel.power ? 'ui.parcel.powerYes' : parcel.powerBlockedByRuin ? 'ui.parcel.powerRuin' : 'ui.parcel.powerNo'),
+        t(
+          parcel.power
+            ? 'ui.parcel.powerYes'
+            : parcel.powerBlockedByRuin
+              ? 'ui.parcel.powerRuin'
+              : parcel.powerStarved
+                ? 'ui.parcel.powerStarved'
+                : 'ui.parcel.powerNo',
+        ),
       ),
     );
     parent.appendChild(power);
@@ -570,7 +581,9 @@ export class BuildingInfo {
       const kind = t(wire.type === 2 ? 'ui.tool.wire.high' : 'ui.tool.wire.low');
       const state = wire.overloaded
         ? t('ui.parcel.wireOverloaded', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
-        : wire.live
+        : wire.live && parcel.powerStarved
+          ? t('ui.parcel.wireStarved', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
+          : wire.live
           ? t('ui.parcel.wireLoad', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
           : t('ui.parcel.wireDead', { capacity: formatNumber(wire.capacity) });
       parent.appendChild(

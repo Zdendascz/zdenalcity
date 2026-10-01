@@ -78,6 +78,7 @@ export interface ReadonlyWorldView {
   readonly wireLoad: Readonly<Float32Array>;
   readonly wireOverloaded: Readonly<Uint8Array>;
   readonly wireLive: Readonly<Uint8Array>;
+  readonly powerStarved: Readonly<Uint8Array>;
   readonly transformerLoad: ReadonlyMap<number, TransformerLoad>;
   readonly powerRevision: number;
   /** Spokojenost na hrubé mřížce — hlavní číslo HUDu a vlastní overlay (§9). */

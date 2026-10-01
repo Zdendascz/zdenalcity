@@ -4462,3 +4462,11 @@ jedna po druhé. A vypadlý úsek ukazoval zatížení z dřívějšího přepo�
   se první, se kterým projde všechno. Jinak by si tok cesty vybral libovolně.
 - Na savu autora (mesto 39): blok u 7,115 svítí celý (31 budov, 9 370),
   rozvodna nese 60 000 ze 100 000. Přepočet ze zapamatovaného tvaru ~12 ms.
+- **Úzké hrdlo jinde** (mesto 40, parcela 83,93): proud do oblasti nedojde,
+  protože ji napájí přípojky od trafostanic na okraji, které jedou na plno
+  (např. jediný dílek 65,100 od trafa 64,100). Zelená „0 / 20 000" u ní lhala.
+  Teď `world.powerStarved`: oblast připojená, ale hladová, a vedení k ní jsou
+  **fialová** („napojené, proud nestačí — úzké hrdlo je u tmavě červeného
+  úseku"), panel parcely to řekne stejně.
+- Trafo bez vysokého napětí (postavené mezi dvě vedení nízkého) hlásí
+  v panelu, že nemá co přepojit (`TransformerLoad.highVoltage`).

@@ -167,6 +167,11 @@ export interface TransformerLoad {
   load: number;
   capacity: number;
   overloaded: boolean;
+  /**
+   * Vede k trafu vysoké napětí (nebo stojí u elektrárny)? Hráč stavěl trafa
+   * mezi dvě vedení nízkého napětí, kde nemají co přepojit (T137).
+   */
+  highVoltage: boolean;
 }
 
 export interface WorldState {
@@ -294,6 +299,12 @@ export interface WorldState {
    * napětí vede nad parcelou, která sama proud nemá (T136).
    */
   wireLive: Uint8Array;
+  /**
+   * Dlaždice je k síti připojená, ale proud do ní nestačí — úzké hrdlo je
+   * jinde, u plného úseku nebo trafa (T137). Runtime. Bez tohohle hráč viděl
+   * zelené vedení s nulou a parcelu bez proudu a nevěděl proč (hlásil autor).
+   */
+  powerStarved: Uint8Array;
   /** Zatížení trafostanic podle id budovy (T136). Runtime, přepočítá se se sítí. */
   transformerLoad: Map<number, TransformerLoad>;
   /** Zvedne se při každém přepočtu sítě — podle toho se překreslí vedení. */
@@ -575,6 +586,7 @@ export function createWorld(
     wireLoad: new Float32Array(size * size),
     wireOverloaded: new Uint8Array(size * size),
     wireLive: new Uint8Array(size * size),
+    powerStarved: new Uint8Array(size * size),
     transformerLoad: new Map(),
     powerRevision: 0,
     waterSupply: new Uint8Array(size * size),
@@ -712,6 +724,7 @@ export function resizeWorld(world: WorldState, size: number): void {
   world.wireLoad = new Float32Array(size * size);
   world.wireOverloaded = new Uint8Array(size * size);
   world.wireLive = new Uint8Array(size * size);
+  world.powerStarved = new Uint8Array(size * size);
   world.transformerLoad = new Map();
   world.jobAccessCells = new Float32Array(coarseCellsOf(size)).fill(1);
   world.happiness = new Uint8Array(coarseCellsOf(size)).fill(NEUTRAL_HAPPINESS);

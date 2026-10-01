@@ -2545,6 +2545,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         ['wire-low', 'ui.legend.wire.low'],
         ['wire-high', 'ui.legend.wire.high'],
         ['wire-overloaded', 'ui.legend.wire.overloaded'],
+        ['wire-starved', 'ui.legend.wire.starved'],
         ['wire-dead', 'ui.legend.wire.dead'],
       ]);
       return;

@@ -324,6 +324,8 @@ export interface ParcelExplanation {
    * (hlásil autor) — je potřeba mu říct, že musí zbourat.
    */
   powerBlockedByRuin: boolean;
+  /** K síti připojená, ale proud nestačí — úzké hrdlo je jinde (T137). */
+  powerStarved: boolean;
   /**
    * Vedení na dlaždici a jak je vytížené (T136): „ať člověk ví co a jak".
    * `null`, když tu vedení není.
@@ -515,6 +517,7 @@ export function explainParcel(
     water: world.waterSupply[tile] === 1,
     power: world.layers.power[tile] === 1,
     wire: parcelWire(world, balance, tile),
+    powerStarved: (world.powerStarved[tile] ?? 0) === 1,
     powerBlockedByRuin:
       (world.rubble[tile] ?? 0) !== 0 ||
       world.buildings.get(world.layers.buildingId[tile] ?? 0)?.abandoned === true,

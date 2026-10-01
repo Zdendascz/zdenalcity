@@ -27,6 +27,11 @@ const OVERLOAD_COLOR = 0x7a0d0d;
  * autor: „jak je možné, že na té dlaždici není elektřina?").
  */
 const DEAD_COLOR = 0x8a8f96;
+/**
+ * Vedení k síti připojené, ale proud za ním nestačí — úzké hrdlo je proti
+ * proudu u tmavě červeného úseku (T137). Zelená s nulou tu lhala.
+ */
+const STARVED_COLOR = 0xb06ad9;
 const OUTLINE_COLOR = 0x1b1f24;
 
 export class WireOverlay {
@@ -80,6 +85,8 @@ export class WireOverlay {
         color = OVERLOAD_COLOR;
       } else if ((world.wireLive[tile] ?? 0) === 0) {
         color = DEAD_COLOR;
+      } else if ((world.powerStarved[tile] ?? 0) === 1) {
+        color = STARVED_COLOR;
       } else {
         const ratio = Math.min(1, (world.wireLoad[tile] ?? 0) / Math.max(1, this.capacity(type)));
         color = LOAD_COLORS[Math.min(LOAD_COLORS.length - 1, Math.floor(ratio * LOAD_COLORS.length))] ?? LOAD_COLORS[0];

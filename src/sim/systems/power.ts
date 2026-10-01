@@ -343,7 +343,17 @@ function recompute(
   }
   world.wireOverloaded = wireOverloaded;
   world.wireLive = wireLive;
+  world.powerStarved = starvedTiles(graph, reached, flow.delivered, demand);
 
+  // Strana vysokého napětí trafa: má kromě trafa samotného ještě nějaké
+  // vedení, nebo v ní stojí elektrárna?
+  const linked = new Uint8Array(regions);
+  for (let i = 0; i < graph.links.length; i += 2) {
+    const a = graph.links[i]!;
+    const b = graph.links[i + 1]!;
+    if (a < regions) linked[a] = 1;
+    if (b < regions) linked[b] = 1;
+  }
   const transformerLoad = new Map<number, TransformerLoad>();
   graph.trafos.forEach((trafo, i) => {
     const load = Math.abs(flow.trafo[i] ?? 0);
@@ -351,12 +361,18 @@ function recompute(
       load: Math.round(load),
       capacity: trafo.capacity,
       overloaded: flow.trafoLimits[i] === 1,
+      highVoltage: linked[trafo.b] === 1 || (supply[trafo.b] ?? 0) > 0,
     });
   });
   // Trafo, které do sítě vůbec nevede (zaplavené), hlásí nulu.
   for (const transformer of transformers) {
     if (!transformerLoad.has(transformer.id)) {
-      transformerLoad.set(transformer.id, { load: 0, capacity: transformer.capacity, overloaded: false });
+      transformerLoad.set(transformer.id, {
+        load: 0,
+        capacity: transformer.capacity,
+        overloaded: false,
+        highVoltage: false,
+      });
     }
   }
   world.transformerLoad = transformerLoad;
@@ -670,6 +686,38 @@ function maxFlow(graph: Graph, supply: Float64Array, demand: Float64Array, scale
     });
   }
   return { delivered, wire, trafo, wireLimits, trafoLimits };
+}
+
+/**
+ * Dlaždice, které k síti připojené jsou, ale proud jim nestačí: oblast, které
+ * nedoteklo, co potřebuje, a úseky vedení, které na takovou oblast navazují.
+ * Úzké hrdlo bývá daleko (plná přípojka u trafa) a hráč u sebe vidí jen
+ * prázdné vedení — tohle mu řekne, že problém je proti proudu.
+ */
+function starvedTiles(
+  graph: Graph,
+  reached: Uint8Array,
+  delivered: Float64Array,
+  demand: Float64Array,
+): Uint8Array {
+  const { cells, nodeOf, regions } = graph;
+  const starved = new Uint8Array(regions + graph.wireNode.length);
+  for (let r = 0; r < regions; r++) {
+    if (reached[r] === 1 && (demand[r] ?? 0) > (delivered[r] ?? 0) + 1e-6) starved[r] = 1;
+  }
+  const links = graph.links;
+  for (let i = 0; i < links.length; i += 2) {
+    const a = links[i]!;
+    const b = links[i + 1]!;
+    if (a >= regions && b < regions && starved[b] === 1) starved[a] = 1;
+    if (b >= regions && a < regions && starved[a] === 1) starved[b] = 1;
+  }
+  const out = new Uint8Array(cells);
+  for (let tile = 0; tile < cells; tile++) {
+    const node = nodeOf[tile] ?? -1;
+    if (node >= 0 && starved[node] === 1) out[tile] = 1;
+  }
+  return out;
 }
 
 /** Uzly grafu spojené s elektrárnou cestou, která vede (bez ohledu na kapacitu). */
