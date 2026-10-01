@@ -55,3 +55,7 @@ dist-dev/
 art/parts/templates/
 art/parts/archive/
 art/parts/preview/
+
+# Syrové ikony T138 (docs/09-IKONY.md): 1024² a znovu vygenerovatelné.
+# Do repa jde jen zmenšenina v content/vanilla/icons/.
+art/icons/t138/*.png

@@ -240,6 +240,7 @@ def request(
     reference: bytes | None,
     size: str,
     background: str = 'transparent',
+    quality: str | None = None,
 ) -> bytes:
     """Jeden obrázek. Vrací PNG.
 
@@ -247,7 +248,11 @@ def request(
     Reference nese styl — bez ní se sada rozejde, protože každé sezení kreslí
     trochu jinak. Ověřeno na prvních devíti obrázcích: projekce kolísala od
     1,18 : 1 po 1,60 : 1.
+
+    `quality` se posílá, jen když je zadané (ikony T138 chtějí 'medium'
+    kvůli ceně); sprity ho nechávají na výchozí hodnotě modelu.
     """
+    extra = {} if quality is None else {'quality': quality}
     if reference is None:
         body = json.dumps({
             'model': model,
@@ -259,6 +264,7 @@ def request(
             # ubrala oblohu, takže si řekne o 'opaque'.
             'background': background,
             'output_format': 'png',
+            **extra,
         }).encode('utf-8')
         req = urllib.request.Request(
             f'{API}/generations',
@@ -272,8 +278,12 @@ def request(
                 'prompt': prompt,
                 'size': size,
                 'n': '1',
-                'background': 'transparent',
+                # Dřív tu stálo natvrdo 'transparent'. Výchozí hodnota
+                # parametru je pořád ta, takže sprity se nemění; ikony T138
+                # s referencí chtějí 'opaque'.
+                'background': background,
                 'output_format': 'png',
+                **extra,
             },
             {'image[]': ('reference.png', reference)},
         )
