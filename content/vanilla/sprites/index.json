@@ -2316,11 +2316,11 @@
       "building": "vanilla:residential_terraces",
       "variant": "a",
       "file": "residential_terraces__a.png",
-      "width": 522,
-      "height": 363,
+      "width": 640,
+      "height": 447,
       "anchor": [
-        313,
-        363
+        384,
+        447
       ]
     },
     {
@@ -2889,10 +2889,10 @@
       "variant": "b",
       "file": "theatre__b.png",
       "width": 512,
-      "height": 360,
+      "height": 380,
       "anchor": [
-        267,
-        360
+        286,
+        380
       ]
     },
     {
