@@ -14,7 +14,7 @@ import {
 import { computeBudget } from '@/sim/systems/economy';
 import type { WorldState } from '@/sim/world';
 import { button, el } from './dom';
-import { formatNumber } from './format';
+import { formatMoney } from './format';
 import { iconSvg, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
@@ -197,10 +197,10 @@ export class FinancePanel {
     form.rating.textContent = t('ui.finance.percent', {
       value: String(Math.round(world.economy.creditRating * 100)),
     });
-    form.loanCap.textContent = formatNumber(cap);
+    form.loanCap.textContent = formatMoney(cap);
     form.loanRate.textContent = t('ui.finance.percent', { value: rate.toFixed(1) });
     const budget = computeBudget(world, this.catalogue, balance);
-    form.monthlyNet.textContent = formatNumber(budget.income - budget.expenses);
+    form.monthlyNet.textContent = formatMoney(budget.income - budget.expenses);
     form.loanAmount.max = String(cap);
     form.loanTerm.min = String(finance.minTermMonths);
     form.loanTerm.max = String(finance.maxTermMonths);
@@ -218,15 +218,15 @@ export class FinancePanel {
     if (loanOk) {
       const terms = loanTerms(amount, rate, term);
       form.loanPreview.textContent = t('ui.finance.loanPreview', {
-        payment: formatNumber(terms.payment),
-        total: formatNumber(terms.total),
-        interest: formatNumber(terms.total - amount),
+        payment: formatMoney(terms.payment),
+        total: formatMoney(terms.total),
+        interest: formatMoney(terms.total - amount),
       });
     } else if (world.loans.length >= finance.maxLoans) {
       form.loanPreview.textContent = t('ui.finance.tooManyLoans', { max: finance.maxLoans });
     } else {
       form.loanPreview.textContent = t('ui.finance.loanHint', {
-        cap: formatNumber(cap),
+        cap: formatMoney(cap),
         min: finance.minTermMonths,
         max: finance.maxTermMonths,
       });
@@ -239,7 +239,7 @@ export class FinancePanel {
     /* --- dluhopisy --- */
     const bonds = finance.bonds;
     const bondLimit = bondCap(world, balance);
-    form.bondCap.textContent = formatNumber(bondLimit);
+    form.bondCap.textContent = formatMoney(bondLimit);
     form.bondAmount.max = String(bondLimit);
     form.bondRate.max = String(bonds.maxRate);
     form.bondMaturity.min = String(Math.round(bonds.minMaturityTicks / YEAR));
@@ -275,15 +275,15 @@ export class FinancePanel {
       const share = subscriptionRate(world, balance, coupon);
       form.bondPreview.textContent = t('ui.finance.bondPreview', {
         share: Math.round(share * 100),
-        expected: formatNumber(Math.floor(offered * share)),
-        fee: formatNumber(fee),
-        coupon: formatNumber(Math.round((offered * coupon) / 100)),
+        expected: formatMoney(Math.floor(offered * share)),
+        fee: formatMoney(fee),
+        coupon: formatMoney(Math.round((offered * coupon) / 100)),
       });
     } else if (offered > 0 && world.economy.funds < fee) {
-      form.bondPreview.textContent = t('ui.finance.cannotAffordFee', { fee: formatNumber(fee) });
+      form.bondPreview.textContent = t('ui.finance.cannotAffordFee', { fee: formatMoney(fee) });
     } else {
       form.bondPreview.textContent = t('ui.finance.bondHint', {
-        cap: formatNumber(bondLimit),
+        cap: formatMoney(bondLimit),
         rate: bonds.maxRate,
         min: Math.round(bonds.minMaturityTicks / YEAR),
         max: Math.round(bonds.maxMaturityTicks / YEAR),
@@ -309,9 +309,9 @@ export class FinancePanel {
           'p',
           'finance__row',
           t('ui.finance.loanRow', {
-            principal: formatNumber(loan.principal),
-            remaining: formatNumber(loan.remaining),
-            payment: formatNumber(loan.payment),
+            principal: formatMoney(loan.principal),
+            remaining: formatMoney(loan.remaining),
+            payment: formatMoney(loan.payment),
             paid: loan.paidMonths,
             term: loan.termMonths,
           }),
@@ -333,7 +333,7 @@ export class FinancePanel {
 
     for (const grant of rows) {
       const node = el('p', grant.awarded ? 'finance__row is-done' : 'finance__row');
-      const amount = formatNumber(grant.amount);
+      const amount = formatMoney(grant.amount);
       if (grant.awarded) {
         node.textContent = t('ui.finance.grantAwarded', { name: t(grant.name), amount });
       } else if (grant.needed > 0 && grant.holds) {
@@ -368,8 +368,8 @@ export class FinancePanel {
         'p',
         bond.defaulted ? 'finance__row is-negative' : 'finance__row',
         t(bond.defaulted ? 'ui.finance.bondDefaulted' : 'ui.finance.bondRow', {
-          subscribed: formatNumber(bond.subscribed),
-          offered: formatNumber(bond.offered),
+          subscribed: formatMoney(bond.subscribed),
+          offered: formatMoney(bond.offered),
           rate: bond.rate,
           years: Math.max(0, Math.round((bond.maturityTick - world.tick) / YEAR)),
         }),

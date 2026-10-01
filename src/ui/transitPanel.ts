@@ -5,7 +5,7 @@ import type { LineStats, TransitLine } from '@/sim/transit';
 import { lineFault, lineProblems, lineRuns, modeOf, noStats } from '@/sim/transit';
 import type { WorldState } from '@/sim/world';
 import { button, el } from './dom';
-import { formatNumber } from './format';
+import { formatMoney, formatNumber } from './format';
 import { iconSvg, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
@@ -288,7 +288,7 @@ export class TransitPanel {
       this.stepper(
         'vehicles',
         t('ui.transit.vehicles'),
-        t('ui.transit.vehicleCount', { count: line.vehicles, cost: formatNumber(vehicleCost) }),
+        t('ui.transit.vehicleCount', { count: line.vehicles, cost: formatMoney(vehicleCost) }),
         () => this.dispatch({ type: 'set_vehicles', lineId: line.id, vehicles: line.vehicles - 1 }),
         () => this.dispatch({ type: 'set_vehicles', lineId: line.id, vehicles: line.vehicles + 1 }),
         line.vehicles <= 0,
@@ -300,7 +300,7 @@ export class TransitPanel {
       this.stepper(
         'fare',
         t('ui.transit.fare'),
-        formatNumber(line.fare),
+        formatMoney(line.fare),
         () => this.dispatch({ type: 'set_fare', lineId: line.id, fare: line.fare - 1 }),
         () => this.dispatch({ type: 'set_fare', lineId: line.id, fare: line.fare + 1 }),
         line.fare <= 0,
@@ -386,8 +386,8 @@ export class TransitPanel {
         transported: formatNumber(Math.round(stats.transported)),
         demand: formatNumber(Math.round(stats.demand)),
         capacity: formatNumber(stats.capacity),
-        income: formatNumber(stats.income),
-        upkeep: formatNumber(stats.upkeep),
+        income: formatMoney(stats.income),
+        upkeep: formatMoney(stats.upkeep),
       }),
     );
   }

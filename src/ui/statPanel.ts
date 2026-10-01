@@ -1,9 +1,15 @@
 import type { StatBreakdown } from '@/sim/statBreakdown';
 import { el } from './dom';
-import { formatNumber } from './format';
+import { formatMoney, formatNumber, moneyParams } from './format';
 import { sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
+
+/**
+ * Údaje, které jsou peníze, a proto se píšou s měnou (T138). Obyvatelé,
+ * práce ani proud „Kčs" nedostanou — to by byla lež v jednotkách.
+ */
+const MONEY_STATS: readonly string[] = ['funds', 'balance'];
 
 /**
  * Z čeho je číslo v liště.
@@ -72,8 +78,9 @@ export class StatPanel {
     this.root.appendChild(sheetHeader(t(`ui.hud.${key}`), t('ui.common.close'), () => this.close()));
 
     const columns = el('div', 'stat__columns');
-    columns.appendChild(this.column(t('ui.stat.plus'), breakdown.plus, 'is-income'));
-    columns.appendChild(this.column(t('ui.stat.minus'), breakdown.minus, 'is-expense'));
+    const amount = MONEY_STATS.includes(key) ? formatMoney : formatNumber;
+    columns.appendChild(this.column(t('ui.stat.plus'), breakdown.plus, 'is-income', amount));
+    columns.appendChild(this.column(t('ui.stat.minus'), breakdown.minus, 'is-expense', amount));
     this.root.appendChild(columns);
 
     const total = el('div', 'stat__total');
@@ -82,19 +89,24 @@ export class StatPanel {
       el(
         'span',
         breakdown.total < 0 ? 'year__amount is-negative' : 'year__amount',
-        formatNumber(breakdown.total),
+        amount(breakdown.total),
       ),
     );
     this.root.appendChild(total);
 
     if (breakdown.note) {
       this.root.appendChild(
-        el('p', 'sheet__note', t(breakdown.note.key, breakdown.note.params)),
+        el('p', 'sheet__note', t(breakdown.note.key, moneyParams(breakdown.note.params))),
       );
     }
   }
 
-  private column(title: string, rows: StatBreakdown['plus'], tone: string): HTMLElement {
+  private column(
+    title: string,
+    rows: StatBreakdown['plus'],
+    tone: string,
+    amount: (value: number) => string,
+  ): HTMLElement {
     const t = (name: string) => this.i18n.t(name);
     const column = el('div', 'year__column');
     column.appendChild(el('h3', 'year__heading', title));
@@ -103,7 +115,7 @@ export class StatPanel {
     for (const row of rows) {
       const line = el('div', 'year__row');
       line.appendChild(el('span', 'year__name', t(row.label)));
-      line.appendChild(el('span', `year__amount ${tone}`, formatNumber(row.value)));
+      line.appendChild(el('span', `year__amount ${tone}`, amount(row.value)));
       column.appendChild(line);
     }
     return column;

@@ -1,5 +1,5 @@
 import { button, el, setPressed } from './dom';
-import { formatNumber } from './format';
+import { formatMoney, formatNumber } from './format';
 import { iconSvg } from './icons';
 import type { ToolbarOverflow } from './hud';
 import type { I18n } from './i18n';
@@ -171,7 +171,7 @@ export class Toolbar {
     if (tool.capacity !== undefined) {
       parts.push(this.i18n.t('ui.tool.capacity', { value: formatNumber(tool.capacity) }));
     }
-    if (tool.cost !== undefined && tool.cost > 0) parts.push(formatNumber(tool.cost));
+    if (tool.cost !== undefined && tool.cost > 0) parts.push(formatMoney(tool.cost));
     if (tool.hotkey) parts.push(tool.hotkey.toUpperCase());
     return parts.join(' · ');
   }

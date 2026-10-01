@@ -1,7 +1,7 @@
 import type { Ledger } from '@/sim/ledger';
 import { ledgerTotal } from '@/sim/ledger';
 import { button, el } from './dom';
-import { formatNumber } from './format';
+import { formatMoney } from './format';
 import { sheetHeader } from './icons';
 import type { I18n } from './i18n';
 
@@ -103,11 +103,11 @@ export class YearReport {
       'p',
       result < 0 ? 'year__result is-negative' : 'year__result',
       result < 0
-        ? t('ui.year.deficit', { amount: formatNumber(-result) })
-        : t('ui.year.surplus', { amount: formatNumber(result) }),
+        ? t('ui.year.deficit', { amount: formatMoney(-result) })
+        : t('ui.year.surplus', { amount: formatMoney(result) }),
     );
     summary.appendChild(big);
-    summary.appendChild(el('p', 'year__funds', t('ui.year.funds', { funds: formatNumber(funds) })));
+    summary.appendChild(el('p', 'year__funds', t('ui.year.funds', { funds: formatMoney(funds) })));
     columns.appendChild(summary);
     this.panel.appendChild(columns);
 
@@ -140,13 +140,13 @@ export class YearReport {
     for (const [key, amount] of rows) {
       const row = el('div', 'year__row');
       row.appendChild(el('span', 'year__name', t(`ui.ledger.${key}`)));
-      row.appendChild(el('span', `year__amount ${tone}`, formatNumber(amount)));
+      row.appendChild(el('span', `year__amount ${tone}`, formatMoney(amount)));
       column.appendChild(row);
     }
 
     const sum = el('div', 'year__row year__row--total');
     sum.appendChild(el('span', 'year__name', t('ui.year.total')));
-    sum.appendChild(el('span', `year__amount ${tone}`, formatNumber(total)));
+    sum.appendChild(el('span', `year__amount ${tone}`, formatMoney(total)));
     column.appendChild(sum);
     return column;
   }

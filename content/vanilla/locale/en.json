@@ -624,7 +624,7 @@
   "ui.finance.bonds": "Bonds",
   "ui.finance.cap": "Cap",
   "ui.finance.rate": "Interest",
-  "ui.finance.amount": "Amount",
+  "ui.finance.amount": "Amount (Kčs)",
   "ui.finance.term": "Term (months)",
   "ui.finance.coupon": "Coupon (% per year)",
   "ui.finance.maturity": "Maturity (years)",
@@ -949,5 +949,6 @@
   "ui.home.shareCopied": "Link copied to the clipboard.",
   "ui.home.shareSent": "Sent, thank you!",
   "ui.help.transit.title": "Public transport",
-  "ui.help.transit.body": "A stop is a building, a line is a list of stops and vehicles are a number. No rails and no tunnels are built — tram and metro are abstractions, not track. The metro is a stop with a bigger radius and higher capacity; nothing is dug underground.\n\nBefore the first stop you need a depot. Without one the game refuses the stop.\n\nA line runs when it has at least two stops, vehicles, and — for tram and metro — power at the stops. One stop may serve several lines at once.\n\nThe run/park button parks the line: vehicles sit in the depot, carry nobody and earn nothing — but pay no upkeep either, and the stops stay. The cross on a stop drops it from the line, clicking its name shows it on the map.\n\nA demolished stop leaves the line on its own. The line keeps running on the rest, and when fewer than two remain it says so."
+  "ui.help.transit.body": "A stop is a building, a line is a list of stops and vehicles are a number. No rails and no tunnels are built — tram and metro are abstractions, not track. The metro is a stop with a bigger radius and higher capacity; nothing is dug underground.\n\nBefore the first stop you need a depot. Without one the game refuses the stop.\n\nA line runs when it has at least two stops, vehicles, and — for tram and metro — power at the stops. One stop may serve several lines at once.\n\nThe run/park button parks the line: vehicles sit in the depot, carry nobody and earn nothing — but pay no upkeep either, and the stops stay. The cross on a stop drops it from the line, clicking its name shows it on the map.\n\nA demolished stop leaves the line on its own. The line keeps running on the rest, and when fewer than two remain it says so.",
+  "ui.currency": "Kčs"
 }

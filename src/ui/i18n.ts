@@ -10,7 +10,7 @@
 /** Čím se v parametru oddělují klíče seznamu. */
 const LIST_SEPARATOR = ',';
 
-import { setNumberLocale } from './format';
+import { setCurrency, setNumberLocale } from './format';
 
 export const FALLBACK_LANGUAGE = 'en';
 
@@ -85,6 +85,9 @@ export class I18n {
    */
   private applyLocale(): void {
     setNumberLocale(this.has('ui.locale.tag') ? this.t('ui.locale.tag') : this.language);
+    // Měna je v překladu ze stejného důvodu jako značka jazyka: mod s jinou
+    // zemí si ji přepíše, aniž by sahal do kódu (T138).
+    setCurrency(this.has('ui.currency') ? this.t('ui.currency') : 'Kčs');
     // Jazyk stránky podle jazyka hry. V `index.html` je napevno `cs`, jenže
     // jazyk se vybírá z prohlížeče — anglickému hráči pak odečítačka četla
     // angličtinu českou výslovností a prohlížeč nabízel překlad z češtiny.

@@ -7,7 +7,7 @@ import { averageHappiness } from '@/sim/systems/happiness';
 import type { DemandBreakdown } from '@/sim/diagnostics';
 import { totalJobs, totalPopulation } from '@/sim/world';
 import { button, el, setExpanded, setPressed, setStyle, setText, setTitle } from './dom';
-import { formatDecimal1, formatNumber, formatPercent } from './format';
+import { formatDecimal1, formatMoney, formatNumber, formatPercent } from './format';
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
 import type { LayoutMode } from './layout';
@@ -549,7 +549,7 @@ export class Hud {
 
     const population = totalPopulation(buildings);
 
-    this.setValue('funds', formatNumber(economy.funds));
+    this.setValue('funds', formatMoney(economy.funds));
     this.setAlarm('funds', economy.funds < 0);
     this.setValue('population', formatNumber(population));
     this.setValue('jobs', formatNumber(totalJobs(buildings)));
@@ -565,7 +565,9 @@ export class Hud {
     );
     this.setValue(
       'balance',
-      `+${formatNumber(economy.lastIncome)} / −${formatNumber(economy.lastExpenses)}`,
+      // Měna jen jednou, na konci: „+1 200 / −800 Kčs". Dvakrát by se bilance
+      // do lišty vedle kasy nevešla a nic by to neřeklo navíc.
+      `+${formatNumber(economy.lastIncome)} / −${formatMoney(economy.lastExpenses)}`,
     );
     this.setValue('date', this.i18n.t('ui.hud.date', dateParts(tick)));
     if (this.autosaveNote) {

@@ -80,3 +80,52 @@ export function formatDecimal1(value: number): string {
 export function formatNumber(value: number): string {
   return narrowSpaces(formatter('number', {}).format(value));
 }
+
+/**
+ * Jméno měny. Přepisuje ho `I18n` z klíče `ui.currency` (T138).
+ *
+ * Autor: „A měna, všude doplníš Kčs." Do teď hra psala holá čísla a kasa
+ * „60 000" se od počtu obyvatel lišila jen popiskem nad ní. Je to stav
+ * v modulu ze stejného důvodu jako jazyk čísel výš: měna je ve hře jedna
+ * a protahovat ji stovkou volajících by z ní udělalo parametr, na který se
+ * zapomene. V angličtině je taky „Kčs" — hra se odehrává v Československu.
+ */
+let currency = 'Kčs';
+
+export function setCurrency(label: string): void {
+  currency = label;
+}
+
+/**
+ * Částka s měnou: „12 345 Kčs".
+ *
+ * Mezi číslem a měnou je nezlomitelná mezera, aby se „Kčs" v úzkém sloupci
+ * nezalomilo na další řádek bez čísla. **Jediná cesta, jak napsat peníze** —
+ * kdo píše `${formatNumber(x)} Kčs` ručně, dřív nebo později měnu zdvojí
+ * nebo vynechá.
+ */
+export function formatMoney(value: number): string {
+  return `${formatNumber(value)}\u00a0${currency}`;
+}
+
+/**
+ * Parametry hlášek, které jsou peníze.
+ *
+ * Simulace posílá v odmítnutí holá čísla (`error.notEnoughFunds` s `cost`
+ * a `funds`) a nesmí vědět nic o formátu (P1) — měnu proto doplní rozhraní
+ * ve chvíli překladu. Jména jsou napříč hláškami jednoznačná: `capacity`
+ * nebo `count` mezi nimi schválně nejsou.
+ */
+export const MONEY_PARAMS: readonly string[] = ['cost', 'funds', 'cap', 'fee', 'amount'];
+
+/** Kopie parametrů, ve které jsou peněžní čísla už napsaná jako částky. */
+export function moneyParams(
+  params: Readonly<Record<string, string | number>> | undefined,
+): Record<string, string | number> | undefined {
+  if (params === undefined) return undefined;
+  const out: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(params)) {
+    out[name] = typeof value === 'number' && MONEY_PARAMS.includes(name) ? formatMoney(value) : value;
+  }
+  return out;
+}

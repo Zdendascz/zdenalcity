@@ -8,7 +8,7 @@ import type { Building, WorldState } from '@/sim/world';
 import { ROAD, TERRAIN } from '@/sim/layers';
 import { iconSvg, sheetHeader } from './icons';
 import { cssUrl, el } from './dom';
-import { formatNumber, formatPercent, landValueTermKeys } from './format';
+import { formatMoney, formatNumber, formatPercent, landValueTermKeys } from './format';
 import { dateParts } from './hud';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
@@ -269,7 +269,7 @@ export class BuildingInfo {
       ['ui.info.footprint', `${definition.footprint[0]} × ${definition.footprint[1]}`],
       ['ui.info.level', String(building.level)],
       ['ui.info.built', t('ui.hud.date', dateParts(building.builtAtTick))],
-      ['ui.info.cost', formatNumber(definition.construction.cost)],
+      ['ui.info.cost', formatMoney(definition.construction.cost)],
     ];
 
     if (building.population > 0) rows.push(['ui.hud.population', formatNumber(building.population)]);
@@ -333,9 +333,9 @@ export class BuildingInfo {
 
     const tax = buildingMonthlyTax(world, definition, building, this.balance);
     const upkeep = buildingMonthlyUpkeep(world, this.balance, definition, building);
-    rows.push(['ui.info.monthlyIncome', `+${formatNumber(tax)}`]);
-    rows.push(['ui.info.monthlyUpkeep', `−${formatNumber(upkeep)}`]);
-    rows.push(['ui.info.monthlyNet', formatNumber(tax - upkeep)]);
+    rows.push(['ui.info.monthlyIncome', `+${formatMoney(tax)}`]);
+    rows.push(['ui.info.monthlyUpkeep', `−${formatMoney(upkeep)}`]);
+    rows.push(['ui.info.monthlyNet', formatMoney(tax - upkeep)]);
 
     if (definition.environment?.pollution) {
       rows.push(['ui.info.pollution', formatNumber(definition.environment.pollution)]);

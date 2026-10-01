@@ -3,6 +3,7 @@ import { createVanillaSource } from '@/content/loader';
 import { ContentRegistry } from '@/content/registry';
 import { HELP_TOPICS } from '@/ui/help';
 import { buildingFacts, HELP_PROBLEMS, PROBLEM_BY_REASON } from '@/ui/helpData';
+import { formatMoney } from '@/ui/format';
 import type { Definition } from '@/content/schema';
 
 /**
@@ -130,6 +131,7 @@ describe('nápověda: stavby', () => {
     expect(value(facts.gives, 'ui.help.fact.waterOut')).toBe(
       String(works.water?.production ?? 0),
     );
-    expect(value(facts.takes, 'ui.help.fact.cost')).toBe(String(works.construction.cost));
+    // Cena je peníze, tak s měnou (T138).
+    expect(value(facts.takes, 'ui.help.fact.cost')).toBe(formatMoney(works.construction.cost));
   });
 });

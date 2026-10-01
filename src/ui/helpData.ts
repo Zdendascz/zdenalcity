@@ -1,5 +1,6 @@
 import type { BuildingDefinition } from '@/content/schema';
 import { terrainNameKey } from '@/sim/layers';
+import { formatMoney } from './format';
 
 /**
  * Podklad pro nápovědu: **co se dá o stavbě a o problému říct z dat**.
@@ -108,8 +109,10 @@ export function buildingFacts(definition: BuildingDefinition, name: Name): Build
     gives.push(fact('ui.help.fact.transit', name(`ui.transit.mode.${definition.transit.mode}`)));
   }
 
-  takes.push(fact('ui.help.fact.cost', definition.construction.cost));
-  takes.push(fact('ui.help.fact.upkeep', definition.economy.upkeep));
+  // Peníze s měnou (T138): „Cena 24 000 Kčs", ne holé číslo vedle počtu
+  // obyvatel a megawattů, se kterými se v nápovědě plete.
+  takes.push(fact('ui.help.fact.cost', formatMoney(definition.construction.cost)));
+  takes.push(fact('ui.help.fact.upkeep', formatMoney(definition.economy.upkeep)));
   if ((definition.power?.consumption ?? 0) > 0) {
     takes.push(fact('ui.help.fact.powerIn', definition.power?.consumption ?? 0));
   }

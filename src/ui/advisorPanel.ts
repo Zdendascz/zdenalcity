@@ -1,5 +1,6 @@
 import type { CityAdvice } from '@/sim/advisor';
 import { el } from './dom';
+import { moneyParams } from './format';
 import { sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
@@ -91,7 +92,7 @@ export class AdvisorPanel {
       // Doplňující čísla jsou nepovinná: chybějící klíč se nevypíše, místo
       // aby se v panelu objevil syrový `ui.advisor.detail.…`.
       const detailKey = `ui.advisor.detail.${problem.id}`;
-      const detail = problem.detail ? t(detailKey, problem.detail) : detailKey;
+      const detail = problem.detail ? t(detailKey, moneyParams(problem.detail)) : detailKey;
       if (detail !== detailKey) card.appendChild(el('p', 'advisor__detail', detail));
 
       card.appendChild(el('p', 'advisor__cause', t(`ui.help.problem.${problem.id}.cause`)));

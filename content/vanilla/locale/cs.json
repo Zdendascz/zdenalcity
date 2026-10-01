@@ -624,7 +624,7 @@
   "ui.finance.bonds": "Dluhopisy",
   "ui.finance.cap": "Strop",
   "ui.finance.rate": "Úrok",
-  "ui.finance.amount": "Částka",
+  "ui.finance.amount": "Částka (Kčs)",
   "ui.finance.term": "Doba splácení (měsíce)",
   "ui.finance.coupon": "Kupón (% ročně)",
   "ui.finance.maturity": "Splatnost (roky)",
@@ -949,5 +949,6 @@
   "ui.home.shareCopied": "Odkaz zkopírován do schránky.",
   "ui.home.shareSent": "Odesláno, díky!",
   "ui.help.transit.title": "MHD",
-  "ui.help.transit.body": "Zastávka je budova, linka je seznam zastávek a vozidla jsou číslo. Koleje ani tunely se nestaví — tramvaj i metro jsou abstrakce, ne trať. Metro je zastávka s větším dosahem a vyšší kapacitou, nic pod zemí nekopeš.\n\nNež postavíš první zastávku, musíš mít vozovnu. Bez ní hra zastávku odmítne.\n\nLinka jede, když má aspoň dvě zastávky, vozidla a u tramvaje i metra proud u zastávek. Jedna zastávka smí být na více linkách naráz.\n\nTlačítko jede/nejede linku odstaví: vozidla stojí v depu, nikoho nevozí, nevydělá — ale ani neplatí údržbu a zastávky si nechá. Křížek u zastávky ji z linky vyhodí, klik na její jméno ji ukáže na mapě.\n\nZbořená zastávka z linky zmizí sama. Linka jede dál po zbylých, a když jich zbude míň než dvě, řekne to."
+  "ui.help.transit.body": "Zastávka je budova, linka je seznam zastávek a vozidla jsou číslo. Koleje ani tunely se nestaví — tramvaj i metro jsou abstrakce, ne trať. Metro je zastávka s větším dosahem a vyšší kapacitou, nic pod zemí nekopeš.\n\nNež postavíš první zastávku, musíš mít vozovnu. Bez ní hra zastávku odmítne.\n\nLinka jede, když má aspoň dvě zastávky, vozidla a u tramvaje i metra proud u zastávek. Jedna zastávka smí být na více linkách naráz.\n\nTlačítko jede/nejede linku odstaví: vozidla stojí v depu, nikoho nevozí, nevydělá — ale ani neplatí údržbu a zastávky si nechá. Křížek u zastávky ji z linky vyhodí, klik na její jméno ji ukáže na mapě.\n\nZbořená zastávka z linky zmizí sama. Linka jede dál po zbylých, a když jich zbude míň než dvě, řekne to.",
+  "ui.currency": "Kčs"
 }

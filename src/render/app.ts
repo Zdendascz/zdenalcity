@@ -78,7 +78,7 @@ import { CostPopup } from '@/ui/costPopup';
 import { PriceTag } from '@/ui/priceTag';
 import { isRoutine, Notifications } from '@/ui/notifications';
 import { UndoBar } from '@/ui/undoBar';
-import { formatNumber } from '@/ui/format';
+import { formatMoney, formatNumber, moneyParams } from '@/ui/format';
 import { Hud } from '@/ui/hud';
 import { setIconImages } from '@/ui/icons';
 import type { OverlayOption } from '@/ui/hud';
@@ -1762,7 +1762,9 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   /** Ukáže důvod odmítnutí, pokud to není provozní šum. */
   function report(result: Extract<CommandResult, { ok: false }>): void {
     if (isRoutine(result.reason)) return;
-    notifications.show(i18n.t(result.reason, result.params));
+    // Peníze v odmítnutí přijdou ze simulace jako holá čísla; měnu jim dá
+    // až rozhraní (T138), simulace o formátu nic neví (P1).
+    notifications.show(i18n.t(result.reason, moneyParams(result.params)));
   }
 
   function reportCrash(message: string): void {
@@ -2146,7 +2148,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           notifications.show(
             i18n.t('ui.notice.grantAwarded', {
               name: grant ? i18n.t(grant.name) : notice.grantId,
-              amount: formatNumber(notice.amount),
+              amount: formatMoney(notice.amount),
             }),
           );
           break;
@@ -2914,10 +2916,10 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     const text =
       plan.levelling > 0
         ? i18n.t('ui.price.withLevelling', {
-            total: formatNumber(plan.total),
-            levelling: formatNumber(plan.levelling),
+            total: formatMoney(plan.total),
+            levelling: formatMoney(plan.levelling),
           })
-        : formatNumber(plan.total);
+        : formatMoney(plan.total);
     priceTag.show(pointerX, pointerY, text);
   }
 
@@ -3076,7 +3078,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     // co kdy začne stát peníze, aniž by se sem muselo sahat.
     const spent = fundsBefore - world.economy.funds;
     if (spent > 0) {
-      costPopup.show(viewX, viewY, i18n.t('ui.cost.spent', { amount: formatNumber(spent) }));
+      costPopup.show(viewX, viewY, i18n.t('ui.cost.spent', { amount: formatMoney(spent) }));
     }
 
     // Nabídka „Zpět": u bourání vždycky, u stavby jen když stála dost.
@@ -3498,7 +3500,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
     if (price > world.economy.funds) {
       notifications.show(
-        i18n.t('error.notEnoughFunds', { cost: price, funds: world.economy.funds }),
+        i18n.t('error.notEnoughFunds', moneyParams({ cost: price, funds: world.economy.funds })),
       );
       return;
     }
@@ -4047,7 +4049,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
       }
 
       if (total > 0 && tiles.length > 0) {
-        priceTag.show(pointerX, pointerY, formatNumber(total));
+        priceTag.show(pointerX, pointerY, formatMoney(total));
       } else {
         priceTag.hide();
       }
@@ -4107,7 +4109,7 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
       // Cena předem, stejně jako u staveb: kaskáda se platí po rozích a hráč
       // má vědět kolik, ne to zjistit z kasy po kliknutí.
-      if (plan.cost > 0) priceTag.show(pointerX, pointerY, formatNumber(plan.cost));
+      if (plan.cost > 0) priceTag.show(pointerX, pointerY, formatMoney(plan.cost));
       else priceTag.hide();
     } else if (hoveredTile) {
       // Rámeček kreslí **každou dlaždici půdorysu zvlášť a podle jejích čtyř

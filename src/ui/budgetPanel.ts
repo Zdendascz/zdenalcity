@@ -2,7 +2,7 @@ import type { Definition } from '@/content/schema';
 import type { Budget, BudgetLine } from '@/sim/systems/economy';
 import { sheetHeader } from './icons';
 import { el } from './dom';
-import { formatNumber } from './format';
+import { formatMoney, formatNumber } from './format';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
 
@@ -129,14 +129,14 @@ export class BudgetPanel {
 
       const row = el('tr');
       row.appendChild(el('td', 'sheet__name', t(definition.name)));
-      row.appendChild(el('td', undefined, formatNumber(definition.construction.cost)));
+      row.appendChild(el('td', undefined, formatMoney(definition.construction.cost)));
       row.appendChild(el('td', undefined, formatNumber(line.count)));
       row.appendChild(el('td', undefined, `${line.poweredCount}/${line.count}`));
-      row.appendChild(el('td', undefined, income === 0 ? '-' : `+${formatNumber(income)}`));
-      row.appendChild(el('td', undefined, upkeep === 0 ? '-' : `−${formatNumber(upkeep)}`));
+      row.appendChild(el('td', undefined, income === 0 ? '-' : `+${formatMoney(income)}`));
+      row.appendChild(el('td', undefined, upkeep === 0 ? '-' : `−${formatMoney(upkeep)}`));
 
       const net = income - upkeep;
-      const netCell = el('td', net < 0 ? 'is-negative' : undefined, formatNumber(net));
+      const netCell = el('td', net < 0 ? 'is-negative' : undefined, formatMoney(net));
       row.appendChild(netCell);
       table.appendChild(row);
 
@@ -160,10 +160,10 @@ export class BudgetPanel {
       row.appendChild(el('td'));
       row.appendChild(el('td', undefined, formatNumber(sum.count)));
       row.appendChild(el('td'));
-      row.appendChild(el('td', undefined, sum.income === 0 ? '-' : `+${formatNumber(sum.income)}`));
-      row.appendChild(el('td', undefined, sum.upkeep === 0 ? '-' : `−${formatNumber(sum.upkeep)}`));
+      row.appendChild(el('td', undefined, sum.income === 0 ? '-' : `+${formatMoney(sum.income)}`));
+      row.appendChild(el('td', undefined, sum.upkeep === 0 ? '-' : `−${formatMoney(sum.upkeep)}`));
       const net = sum.income - sum.upkeep;
-      row.appendChild(el('td', net < 0 ? 'is-negative' : undefined, formatNumber(net)));
+      row.appendChild(el('td', net < 0 ? 'is-negative' : undefined, formatMoney(net)));
       table.appendChild(row);
     }
 
@@ -175,8 +175,8 @@ export class BudgetPanel {
       row.appendChild(el('td', undefined, formatNumber(budget.roads.count)));
       row.appendChild(el('td'));
       row.appendChild(el('td', undefined, '-'));
-      row.appendChild(el('td', undefined, `−${formatNumber(budget.roads.upkeep)}`));
-      row.appendChild(el('td', 'is-negative', formatNumber(-budget.roads.upkeep)));
+      row.appendChild(el('td', undefined, `−${formatMoney(budget.roads.upkeep)}`));
+      row.appendChild(el('td', 'is-negative', formatMoney(-budget.roads.upkeep)));
       table.appendChild(row);
     }
 
@@ -188,8 +188,8 @@ export class BudgetPanel {
       row.appendChild(el('td', undefined, formatNumber(budget.wires.count)));
       row.appendChild(el('td'));
       row.appendChild(el('td', undefined, '-'));
-      row.appendChild(el('td', undefined, `−${formatNumber(budget.wires.upkeep)}`));
-      row.appendChild(el('td', 'is-negative', formatNumber(-budget.wires.upkeep)));
+      row.appendChild(el('td', undefined, `−${formatMoney(budget.wires.upkeep)}`));
+      row.appendChild(el('td', 'is-negative', formatMoney(-budget.wires.upkeep)));
       table.appendChild(row);
     }
 
@@ -200,10 +200,10 @@ export class BudgetPanel {
       row.appendChild(el('td'));
       row.appendChild(el('td', undefined, formatNumber(budget.transit.vehicles)));
       row.appendChild(el('td'));
-      row.appendChild(el('td', undefined, `+${formatNumber(budget.transit.income)}`));
-      row.appendChild(el('td', undefined, `−${formatNumber(budget.transit.upkeep)}`));
+      row.appendChild(el('td', undefined, `+${formatMoney(budget.transit.income)}`));
+      row.appendChild(el('td', undefined, `−${formatMoney(budget.transit.upkeep)}`));
       const net = budget.transit.income - budget.transit.upkeep;
-      row.appendChild(el('td', net < 0 ? 'is-negative' : undefined, formatNumber(net)));
+      row.appendChild(el('td', net < 0 ? 'is-negative' : undefined, formatMoney(net)));
       table.appendChild(row);
     }
 
@@ -219,8 +219,8 @@ export class BudgetPanel {
       // budovách není tvar, do kterého se vejde.
       row.appendChild(el('td'));
       row.appendChild(el('td', undefined, '-'));
-      row.appendChild(el('td', undefined, `−${formatNumber(budget.debt.payment)}`));
-      row.appendChild(el('td', 'is-negative', formatNumber(-budget.debt.payment)));
+      row.appendChild(el('td', undefined, `−${formatMoney(budget.debt.payment)}`));
+      row.appendChild(el('td', 'is-negative', formatMoney(-budget.debt.payment)));
       table.appendChild(row);
     }
 
@@ -233,8 +233,8 @@ export class BudgetPanel {
       row.appendChild(el('td', undefined, formatNumber(budget.debt.bonds)));
       row.appendChild(el('td'));
       row.appendChild(el('td', undefined, '-'));
-      row.appendChild(el('td', undefined, `−${formatNumber(budget.debt.bondPayment)}`));
-      row.appendChild(el('td', 'is-negative', formatNumber(-budget.debt.bondPayment)));
+      row.appendChild(el('td', undefined, `−${formatMoney(budget.debt.bondPayment)}`));
+      row.appendChild(el('td', 'is-negative', formatMoney(-budget.debt.bondPayment)));
       table.appendChild(row);
     }
 
@@ -243,10 +243,10 @@ export class BudgetPanel {
     total.appendChild(el('td'));
     total.appendChild(el('td'));
     total.appendChild(el('td'));
-    total.appendChild(el('td', undefined, `+${formatNumber(budget.income)}`));
-    total.appendChild(el('td', undefined, `−${formatNumber(budget.expenses)}`));
+    total.appendChild(el('td', undefined, `+${formatMoney(budget.income)}`));
+    total.appendChild(el('td', undefined, `−${formatMoney(budget.expenses)}`));
     const net = budget.income - budget.expenses;
-    total.appendChild(el('td', net < 0 ? 'is-negative' : undefined, formatNumber(net)));
+    total.appendChild(el('td', net < 0 ? 'is-negative' : undefined, formatMoney(net)));
     table.appendChild(total);
 
     this.root.appendChild(table);
@@ -254,7 +254,7 @@ export class BudgetPanel {
     const owed = budget.debt.owed + budget.debt.bondOwed;
     if (owed > 0) {
       this.root.appendChild(
-        el('p', 'sheet__note', t('ui.budget.owed', { owed: formatNumber(owed) })),
+        el('p', 'sheet__note', t('ui.budget.owed', { owed: formatMoney(owed) })),
       );
     }
 
@@ -271,7 +271,7 @@ export class BudgetPanel {
     }
 
     this.root.appendChild(
-      el('p', 'sheet__note', t('ui.budget.funds', { funds: formatNumber(funds) })),
+      el('p', 'sheet__note', t('ui.budget.funds', { funds: formatMoney(funds) })),
     );
   }
 
@@ -322,9 +322,9 @@ export class BudgetPanel {
         t('ui.budget.formula.tax', {
           base: formatNumber(line.taxBase),
           unit: t(line.taxUnitKey),
-          value: line.valuePerUnit || valuePerUnit,
+          value: formatMoney(line.valuePerUnit || valuePerUnit),
           rate: line.taxRate,
-          income: formatNumber(line.income),
+          income: formatMoney(line.income),
         }),
       );
     }
@@ -333,8 +333,8 @@ export class BudgetPanel {
       parts.push(
         t('ui.budget.formula.upkeep', {
           count: line.upkeepCount,
-          each: formatNumber(line.upkeepEach),
-          total: formatNumber(line.upkeep),
+          each: formatMoney(line.upkeepEach),
+          total: formatMoney(line.upkeep),
         }),
       );
     }
