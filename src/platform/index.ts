@@ -70,6 +70,12 @@ export interface FileTransfer {
   read(file: File): Promise<Uint8Array>;
 }
 
+/** Malá trvalá nastavení (jazyk). Zápis, který selže, se tiše zahodí. */
+export interface Preferences {
+  get(key: string): string | null;
+  set(key: string, value: string): void;
+}
+
 export interface Platform {
   readonly id: 'browser' | 'electron' | 'steam' | 'gog';
   readonly storage: SaveStorage;
@@ -104,6 +110,11 @@ export interface Platform {
    * vyžádal.
    */
   resumedAfterUpdate(): boolean;
+  /**
+   * Drobná nastavení hráče, která mají přežít obnovení stránky — dnes jazyk
+   * (T139). Nejde o save: chybějící nebo nečitelná hodnota znamená výchozí.
+   */
+  readonly preferences: Preferences;
 
   getUserId(): Promise<string | null>;
   hasDlc(id: string): boolean;

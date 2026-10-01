@@ -649,14 +649,27 @@ function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOp
   // takže anglicky hrající hráč musel nejdřív rozehrát město, aby si směl
   // přepnout jazyk rozcestníku (T-revize, nález 23).
   if (options.languages && options.languages.list.length > 1) {
+    // Přepínač CZ / EN (T139): obě volby vidět, aktivní zvýrazněná. Dřív
+    // tu byla zeměkoule, která jazyky střídala dokola, a nebylo poznat, co
+    // klik udělá.
     const languages = options.languages;
-    const next = button('home__link', () => {
-      const order = languages.list;
-      const at = order.indexOf(languages.current());
-      const pick = order[(at + 1) % order.length];
-      if (pick) languages.set(pick);
-    });
-    strip.appendChild(fill(next, 'language', 'ui.language.label'));
+    const group = el('div', 'langswitch home__langswitch');
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', t('ui.language.label'));
+    for (const language of languages.list) {
+      const node = button('langswitch__button', () => languages.set(language));
+      const shortKey = `ui.language.short.${language}`;
+      node.textContent = i18nHas(t, shortKey) ? t(shortKey) : language.toUpperCase();
+      const nameKey = `ui.language.${language}`;
+      const name = i18nHas(t, nameKey) ? t(nameKey) : language;
+      node.setAttribute('aria-label', name);
+      const active = language === languages.current();
+      node.classList.toggle('is-active', active);
+      node.setAttribute('aria-pressed', active ? 'true' : 'false');
+      setTooltip(node, { ...tipOf(t, 'ui.language.label'), title: name });
+      group.appendChild(node);
+    }
+    strip.appendChild(group);
   }
 
   // Discord je **odkaz ven**, ne překryv: je to jiné místo, ne další stránka hry.
@@ -748,4 +761,9 @@ function tipOf(t: (key: string) => string, labelKey: string): TooltipContent {
   const hintKey = `${labelKey}.hint`;
   const text = t(hintKey);
   return text === hintKey ? { title: t(labelKey) } : { title: t(labelKey), text };
+}
+
+/** Má překlad tenhle klíč? `t` vrací pro chybějící klíč klíč samotný. */
+function i18nHas(t: (key: string) => string, key: string): boolean {
+  return t(key) !== key;
 }

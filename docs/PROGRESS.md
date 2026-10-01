@@ -4531,3 +4531,17 @@ katastrof podle stavu a „A měna, všude doplníš Kčs."
 - Zbývá: obrázky `wire-*`, `ruins-clear` a `disasters-*` dodává souběžné
   sezení (zatím běží zálohy); trafostanice a rozvodna v nabídce mají ikonu
   z obsahu (`graphics.icon`), ta se tu neměnila.
+
+## Nápověda, angličtina, přepínač CZ / EN (T139, přání autora)
+
+- **Nápověda:** nové téma Elektřina (vysoké a nízké napětí, trafostanice,
+  souběžné přípojky, barvy ve vrstvě, úzká hrdla, ruiny). Opravené zastaralé
+  rady (výpadek proudu, trosky, ruiny), peníze s Kčs a údržbou vedení,
+  ovládání s bublinami, bouráním ruin a přepínačem jazyka. Česky i anglicky.
+- **Přepínač CZ / EN** místo zeměkoule: v pravé liště ve hře i na
+  rozcestníku, aktivní jazyk zvýrazněný, celé jméno jazyka v bublině.
+- **Jazyk se pamatuje** (`platform.preferences`, klíč `language`) — do teď se
+  po obnovení stránky vrátil jazyk prohlížeče. Rozcestník se na změnu jazyka
+  neumí přestavět, takže stránka po volbě naběhne znovu.
+- Popis stránky a manifest jsou dvojjazyčné. Angličtina má všech 1 069 klíčů;
+  česky v ní zůstalo jen to, co tam patří (jméno jazyka, autor, Kčs).

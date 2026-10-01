@@ -284,6 +284,24 @@ export function createBrowserPlatform(): Platform {
     reloadNewVersion,
     restartIntoAutosave,
     resumedAfterUpdate,
+    preferences: {
+      // Prohlížeč s vypnutým úložištěm hodí výjimku i při čtení; jazyk pak
+      // prostě začne podle prohlížeče.
+      get: (key) => {
+        try {
+          return window.localStorage.getItem(`zdenalcity.pref.${key}`);
+        } catch {
+          return null;
+        }
+      },
+      set: (key, value) => {
+        try {
+          window.localStorage.setItem(`zdenalcity.pref.${key}`, value);
+        } catch {
+          // Plné nebo vypnuté úložiště: nastavení platí jen do zavření.
+        }
+      },
+    },
 
     // Zaslepené podle §9. Prohlížeč nezná hráče, DLC ani Workshop; až přijde
     // Electron nebo Steam, přibude vedle tohohle souboru další implementace

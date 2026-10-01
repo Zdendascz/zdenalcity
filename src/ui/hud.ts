@@ -1586,26 +1586,33 @@ export class Hud {
     this.slot(false).appendChild(node);
   }
 
+  /**
+   * Přepínač jazyka **CZ / EN** přímo v liště (T139, přání autora: „přidej
+   * tam přepínač cz / en"). Do teď byl jazyk schovaný v roletce za zeměkoulí
+   * a hráč ho nenašel. Teď jsou vidět obě volby a aktivní je zvýrazněná.
+   *
+   * Popisek tlačítka je **zkratka** (CZ, EN), celé jméno jazyka ve vlastním
+   * jazyce je v bublině — „cs" by hráč nepoznal (T-revize, nález 23), ale
+   * „CZ" vedle „EN" je čitelné na první pohled. Zkratky jsou v překladu,
+   * takže mod si přidá svou.
+   */
   private buildLanguage(): void {
-    const popover = new Popover({
-      icon: 'language',
-      label: this.i18n.t('ui.language.label'),
-      tooltip: describe(this.i18n, 'ui.language.label'),
-    });
-    popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.language.label')));
-
+    const group = el('div', 'langswitch');
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', this.i18n.t('ui.language.label'));
     for (const language of this.i18n.getLanguages()) {
-      const node = button('chip', () => this.callbacks.onLanguageChange(language));
-      // Jazyk se jmenuje **ve svém vlastním jazyce**, ne kódem: „cs" a „en"
-      // jsou dvě tlačítka, ze kterých hráč nepozná, co dostane (T-revize,
-      // nález 23). Jména jsou v překladu, takže mod si přidá své.
-      const key = `ui.language.${language}`;
-      node.textContent = this.i18n.has(key) ? this.i18n.t(key) : language;
+      const node = button('langswitch__button', () => this.callbacks.onLanguageChange(language));
+      const shortKey = `ui.language.short.${language}`;
+      node.textContent = this.i18n.has(shortKey) ? this.i18n.t(shortKey) : language.toUpperCase();
+      const nameKey = `ui.language.${language}`;
+      const name = this.i18n.has(nameKey) ? this.i18n.t(nameKey) : language;
+      node.setAttribute('aria-label', name);
       setPressed(node, language === this.i18n.getLanguage());
-      popover.panel.appendChild(node);
+      node.classList.toggle('is-active', language === this.i18n.getLanguage());
+      this.tip(node, 'ui.language.label', { title: name });
+      group.appendChild(node);
     }
-
-    this.slot(false).appendChild(popover.root);
+    this.slot(false).appendChild(group);
   }
 
   /**

@@ -3156,3 +3156,45 @@ body {
     opacity: 1;
   }
 }
+
+/*
+ * Přepínač jazyka CZ / EN v liště (T139). Stejná výška jako ikonová tlačítka
+ * lišty, aby řada neposkakovala; aktivní jazyk je vyplněný.
+ */
+.langswitch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  background: var(--panel-bg);
+  pointer-events: auto;
+}
+
+.langswitch__button {
+  min-width: 34px;
+  height: calc(var(--icon-size, 38px) - 4px);
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.langswitch__button:hover {
+  color: var(--text);
+}
+
+.langswitch__button.is-active {
+  border-color: var(--accent, #5aa9e6);
+  background: rgb(255 255 255 / 12%);
+  color: var(--text);
+}
+
+.home__langswitch {
+  margin-left: 4px;
+}

@@ -1088,10 +1088,21 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
   for (const language of content.getLanguages()) {
     tables[language] = content.getLocaleTable(language);
   }
+  // Úložiště i soubory jdou přes platform vrstvu (§9). Herní kód nesahá na
+  // `localStorage` ani `Blob` — až přijde Electron, přibude jiná implementace
+  // a tady se nezmění nic. Vzniká už tady, protože si z ní bere jazyk.
+  const platform = createBrowserPlatform();
+
+  // Jazyk, který si hráč vybral, má přednost před jazykem prohlížeče (T139).
+  // Do teď se volba neukládala a po obnovení stránky byla pryč.
+  const savedLanguage = platform.preferences.get('language');
   const i18n = new I18n(
     tables as LocaleTables,
-    pickLanguage([...navigator.languages], content.getLanguages()),
+    savedLanguage !== null && content.getLanguages().includes(savedLanguage)
+      ? savedLanguage
+      : pickLanguage([...navigator.languages], content.getLanguages()),
   );
+  i18n.onChange(() => platform.preferences.set('language', i18n.getLanguage()));
 
   // Grafika se začne stahovat **hned**, zatímco hráč stojí na rozcestníku
   // (T121). Ukazatel visí na `body`, ne na `mount`: rozcestník si svůj
@@ -1132,10 +1143,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
 
   // Hra začíná dialogem: hráč si vybere jméno města a seed a rovnou vidí, jakou
   // mapu dostane (§3 fáze 3). Teprve pak vzniká svět.
-  // Úložiště i soubory jdou přes platform vrstvu (§9). Herní kód nesahá na
-  // `localStorage` ani `Blob` — až přijde Electron, přibude jiná implementace
-  // a tady se nezmění nic.
-  const platform = createBrowserPlatform();
 
   // Rozcestník: značka, snímky ze hry a tři cesty dál — pokračovat, nové
   // město, nebo načíst soubor. Dialog nové hry z něj vychází, nezanikl.
@@ -1174,7 +1181,13 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
           languages: {
             list: content.getLanguages(),
             current: () => i18n.getLanguage(),
-            set: (language) => i18n.setLanguage(language),
+            // Rozcestník se skládá jednou a na změnu jazyka neumí přestavět;
+            // volba se uloží (viz `onChange` výš) a stránka naběhne znovu.
+            set: (language) => {
+              if (language === i18n.getLanguage()) return;
+              i18n.setLanguage(language);
+              window.location.reload();
+            },
           },
           ...(resumeMeta
             ? {
