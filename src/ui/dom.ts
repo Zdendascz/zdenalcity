@@ -43,10 +43,6 @@ export function setText(node: Node, text: string): void {
   if (node.textContent !== text) node.textContent = text;
 }
 
-export function setTitle(node: HTMLElement, title: string): void {
-  if (node.title !== title) node.title = title;
-}
-
 export function setAttr(node: Element, name: string, value: string): void {
   if (node.getAttribute(name) !== value) node.setAttribute(name, value);
 }

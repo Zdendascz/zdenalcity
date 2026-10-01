@@ -5,6 +5,8 @@ import type { ToolbarOverflow } from './hud';
 import type { I18n } from './i18n';
 import { Menu } from './popover';
 import type { ToolOption } from './tools';
+import { describe, setTooltip } from './tooltip';
+import type { TooltipContent } from './tooltip';
 
 /**
  * Paleta nástrojů: jedna řada ikon, obsah až po kliknutí.
@@ -132,7 +134,7 @@ export class Toolbar {
       // „Zdravotnictví", a když je v nabídce jediná, je to totéž místo.
       const only = this.i18n.t(first.labelKey);
       const node = button('toolbar__button', () => this.pick(first));
-      node.title = this.hint(first) === '' ? only : `${only} · ${this.hint(first)}`;
+      setTooltip(node, () => this.tooltip(first));
       node.setAttribute('aria-label', only);
       node.appendChild(iconSvg(first.icon));
       parent.appendChild(node);
@@ -140,13 +142,18 @@ export class Toolbar {
       return;
     }
 
-    const menu = new Menu({ icon: group.icon, label: this.i18n.t(group.key) });
+    const menu = new Menu({
+      icon: group.icon,
+      label: this.i18n.t(group.key),
+      tooltip: () => describe(this.i18n, group.key),
+    });
     menu.setItems(
       group.tools.map((tool) => ({
         id: tool.id,
         label: this.i18n.t(tool.labelKey),
         icon: tool.icon,
         hint: this.hint(tool),
+        tooltip: () => this.tooltip(tool),
         onSelect: () => this.pick(tool),
       })),
     );
@@ -163,6 +170,32 @@ export class Toolbar {
   private pick(tool: ToolOption): void {
     this.overflow?.close();
     this.onSelect(tool);
+  }
+
+  /**
+   * Bublina nástroje (T138): jméno, k čemu je, a pod tím cena, nosnost
+   * a klávesa.
+   *
+   * Popis budovy je její `desc` z obsahu, ostatních nástrojů
+   * `<labelKey>.hint` — obojí nese `hintKey` z definice nástroje, takže tu
+   * není žádné větvení podle druhu (P5).
+   */
+  private tooltip(tool: ToolOption): TooltipContent {
+    const t = (key: string, params?: Record<string, string | number>): string => this.i18n.t(key, params);
+    const meta: string[] = [];
+    if (tool.cost !== undefined && tool.cost > 0) {
+      // Silnice, vedení, potrubí i les se platí po dlaždicích, a „Cena 10 Kčs"
+      // u dálnice by svádělo číst ji jako cenu celé stavby.
+      meta.push(t(tool.perTile ? 'ui.tooltip.pricePerTile' : 'ui.tooltip.price', { price: formatMoney(tool.cost) }));
+    }
+    if (tool.capacity !== undefined) {
+      meta.push(t('ui.tool.capacity', { value: formatNumber(tool.capacity) }));
+    }
+    if (tool.hotkey) meta.push(t('ui.tooltip.hotkey', { key: tool.hotkey.toUpperCase() }));
+    return describe(this.i18n, tool.labelKey, {
+      ...(tool.hintKey !== undefined ? { hintKey: tool.hintKey } : {}),
+      meta: meta.join(' · '),
+    });
   }
 
   /** Napravo od jména: cena, a když ji nástroj nemá, aspoň klávesa. */

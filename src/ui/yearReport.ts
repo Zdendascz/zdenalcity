@@ -2,7 +2,7 @@ import type { Ledger } from '@/sim/ledger';
 import { ledgerTotal } from '@/sim/ledger';
 import { button, el } from './dom';
 import { formatMoney } from './format';
-import { sheetHeader } from './icons';
+import { closeTip, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 
 /**
@@ -81,7 +81,7 @@ export class YearReport {
     this.panel.appendChild(
       sheetHeader(
         t('ui.year.title', { year: ledger.year }),
-        t('ui.common.close'),
+        closeTip(t),
         () => this.close(),
         { heading: 'h1', titleClass: 'dialog__title' },
       ),

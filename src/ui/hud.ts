@@ -6,13 +6,15 @@ import type { ReadonlyWorldView } from '@/sim/simHost';
 import { averageHappiness } from '@/sim/systems/happiness';
 import type { DemandBreakdown } from '@/sim/diagnostics';
 import { totalJobs, totalPopulation } from '@/sim/world';
-import { button, el, setExpanded, setPressed, setStyle, setText, setTitle } from './dom';
+import { button, el, setExpanded, setPressed, setStyle, setText } from './dom';
 import { formatDecimal1, formatMoney, formatNumber, formatPercent } from './format';
 import { iconSvg } from './icons';
 import type { I18n } from './i18n';
 import type { LayoutMode } from './layout';
 import { Menu, Popover } from './popover';
 import { closeOtherSheets } from './sheets';
+import { describe, setTooltip } from './tooltip';
+import type { TooltipOptions } from './tooltip';
 
 /** Než se držené tlačítko lupy rozjede, a jak často pak přidává. */
 const ZOOM_REPEAT_DELAY_MS = 350;
@@ -133,6 +135,8 @@ export interface OverlayOption {
   id: string;
   labelKey: string;
   icon: string;
+  /** Popis do bubliny, když to není `<labelKey>.hint` (dosahy služeb mají jeden společný). */
+  hintKey?: string;
 }
 
 export interface HudState {
@@ -523,8 +527,14 @@ export class Hud {
     node.classList.toggle('is-active', open || tool !== null);
     setExpanded(node, open);
 
-    const label = tool ? tool.label : this.i18n.t('ui.toolbar.more');
-    node.title = label;
+    // Drží-li hráč nástroj ze schované řady, bublina řekne který — ikona na
+    // trojtečce je jeho, ne „další".
+    setTooltip(
+      node,
+      describe(this.i18n, 'ui.toolbar.more', {
+        ...(tool ? { meta: this.i18n.t('ui.toolbar.holding', { name: tool.label }) } : {}),
+      }),
+    );
     node.setAttribute('aria-label', this.i18n.t('ui.toolbar.more'));
     node.replaceChildren(iconSvg(tool ? tool.icon : 'more'));
   }
@@ -614,7 +624,15 @@ export class Hud {
         const lines = breakdown.terms.map(
           (term) => `${this.i18n.t(term.key)}: ${term.value > 0 ? '+' : ''}${term.value}`,
         );
-        setTitle(column, [`${this.i18n.t(row.nameKey)}: ${value}`, ...lines].join('\n'));
+        const tip = [`${this.i18n.t(row.nameKey)}: ${value}`, ...lines].join('\n');
+        if (column.dataset.tip !== tip) {
+          column.dataset.tip = tip;
+          setTooltip(column, {
+            title: `${this.i18n.t(row.nameKey)}: ${value}`,
+            text: this.i18n.t('ui.demand.hint'),
+            meta: lines.join('\n'),
+          });
+        }
       }
     }
 
@@ -837,7 +855,6 @@ export class Hud {
       closeOtherSheets(null);
     });
     node.appendChild(iconSvg('more'));
-    node.title = label;
     node.setAttribute('aria-label', label);
     this.barSlot().appendChild(node);
     this.moreButton = node;
@@ -853,9 +870,9 @@ export class Hud {
     // odjet za okraj mapy jde myší i šipkami a hra do teď neměla jediný prvek,
     // kterým by se hráč vrátil — žádnou minimapu, žádné „na město"
     // (T-revize, nález 18).
-    const home = button('chip chip--tight', () => this.callbacks.onFocusCity());
+    const home = button('toolbar__button', () => this.callbacks.onFocusCity());
     home.appendChild(iconSvg('focus-city'));
-    home.title = this.i18n.t('ui.zoom.city');
+    this.tip(home, 'ui.zoom.city');
     home.setAttribute('aria-label', this.i18n.t('ui.zoom.city'));
     this.controlRow.appendChild(home);
 
@@ -870,8 +887,9 @@ export class Hud {
         this.callbacks.onZoom(factor),
       );
       node.appendChild(iconSvg(icon));
-      node.title = label;
       node.setAttribute('aria-label', label);
+      // Podržení prstu tu přibližuje dál, bublina by se s ním prala.
+      this.tip(node, labelKey, {}, { longPress: false });
 
       /*
        * Držené tlačítko opakuje.
@@ -963,7 +981,16 @@ export class Hud {
       // Oběti se lepí za odpočet, ne místo něj: hráč potřebuje obojí a
       // pohroma, která nikoho nezabila, o tom nemá co říkat.
       const dead = tollOf(disaster);
-      setTitle(node, dead > 0 ? `${head} · ${this.i18n.t('ui.disaster.toll', { dead })}` : head);
+      const meta = dead > 0 ? `${head} · ${this.i18n.t('ui.disaster.toll', { dead })}` : head;
+      // Bublina se přepisuje jen při změně: tohle běží každý snímek.
+      if (node.dataset.tip !== meta) {
+        node.dataset.tip = meta;
+        setTooltip(node, {
+          title: name,
+          text: this.i18n.t(`ui.alert.body.${disaster.kind}`),
+          meta: `${meta}\n${this.i18n.t('ui.disaster.badgeHint')}`,
+        });
+      }
     }
   }
 
@@ -992,7 +1019,12 @@ export class Hud {
     // Na telefonu **není ikonka grafu**: tlačítkem je rovnou kasa s bilancí.
     // Vyžádal si to autor a je to úspora celého jednoho tlačítka v liště, kde
     // se počítá každé.
-    const popover = new Popover({ icon: 'chart', label: this.i18n.t('ui.hud.moreStats'), className: 'popover--stats' });
+    const popover = new Popover({
+      icon: 'chart',
+      label: this.i18n.t('ui.hud.moreStats'),
+      className: 'popover--stats',
+      tooltip: describe(this.i18n, 'ui.hud.moreStats'),
+    });
     popover.trigger.replaceChildren(group);
     popover.panel.classList.add('panel--stats');
     // V roletce jsou **všechna** čísla, i kasa a bilance z tlačítka. Rozpis
@@ -1016,7 +1048,9 @@ export class Hud {
     const stat = explainable
       ? button('stat stat--button', () => this.callbacks.onStatClick(key))
       : el('div', 'stat');
-    if (explainable) stat.title = this.i18n.t('ui.stat.explain');
+    if (explainable) {
+      setTooltip(stat, describe(this.i18n, labelKey, { meta: this.i18n.t('ui.stat.explain') }));
+    }
     stat.appendChild(el('span', 'stat__label', this.i18n.t(labelKey)));
     const value = el('span', 'stat__value', '-');
     stat.appendChild(value);
@@ -1078,7 +1112,9 @@ export class Hud {
       const drawn = iconSvg(speedIcon(speed));
       if (drawn.tagName === 'IMG') node.appendChild(drawn);
       else node.textContent = label;
-      node.title = `${this.i18n.t('ui.speed.label')}: ${label}`;
+      this.tip(node, speed === 0 ? 'ui.speed.pause' : 'ui.speed.run', {
+        title: `${this.i18n.t('ui.speed.label')}: ${label}`,
+      });
       node.setAttribute('aria-label', label);
       group.appendChild(node);
       this.speedButtons.push(node);
@@ -1109,12 +1145,17 @@ export class Hud {
     // Trojtečka, dokud běží pauza nebo normální rychlost; jakmile si hráč
     // pustí něco rychlejšího, vezme si tlačítko jeho ikonu, aby po zavření
     // bylo poznat, že čas letí.
-    const menu = new Menu({ icon: 'more', label: this.i18n.t('ui.speed.label') });
+    const menu = new Menu({
+      icon: 'more',
+      label: this.i18n.t('ui.speed.label'),
+      tooltip: describe(this.i18n, 'ui.speed.label'),
+    });
     menu.setItems(
       this.speeds.slice(2).map((speed, offset) => ({
         id: String(2 + offset),
         label: this.speedLabel(speed),
         icon: speedIcon(speed),
+        tooltip: describe(this.i18n, 'ui.speed.run', { title: this.speedLabel(speed) }),
         onSelect: () => this.callbacks.onSpeed(2 + offset),
       })),
     );
@@ -1147,7 +1188,9 @@ export class Hud {
     this.playShown = shown;
 
     node.replaceChildren(iconSvg(paused ? 'speed-1' : 'speed-pause'));
-    node.title = `${this.i18n.t('ui.speed.label')}: ${label}`;
+    this.tip(node, paused ? 'ui.speed.run' : 'ui.speed.pause', {
+      title: `${this.i18n.t('ui.speed.label')}: ${label}`,
+    });
     node.setAttribute('aria-label', label);
     node.classList.toggle('is-active', !paused);
   }
@@ -1170,7 +1213,7 @@ export class Hud {
         this.callbacks.onSetView(this.lastState.view === 'underground' ? 'surface' : 'underground');
       });
       node.appendChild(iconSvg('view-underground'));
-      node.title = label;
+      this.tip(node, 'ui.view.underground');
       node.setAttribute('aria-label', label);
       this.viewToggle = node;
       this.controlRow.appendChild(node);
@@ -1184,7 +1227,7 @@ export class Hud {
         this.callbacks.onSetView(view.id),
       );
       node.appendChild(iconSvg(view.icon));
-      node.title = label;
+      this.tip(node, view.labelKey);
       node.setAttribute('aria-label', label);
       group.appendChild(node);
       this.viewButtons.set(view.id, node);
@@ -1200,7 +1243,7 @@ export class Hud {
     const label = this.i18n.t('ui.view.ghost');
     const node = button('toolbar__button', () => this.callbacks.onToggleGhost());
     node.appendChild(iconSvg('view-ghost'));
-    node.title = label;
+    this.tip(node, 'ui.view.ghost');
     node.setAttribute('aria-label', label);
     this.ghostButton = node;
     this.slot(true).appendChild(node);
@@ -1214,7 +1257,7 @@ export class Hud {
     const label = this.i18n.t('ui.view.decor');
     const node = button('toolbar__button', () => this.callbacks.onToggleDecor());
     node.appendChild(iconSvg('view-decor'));
-    node.title = label;
+    this.tip(node, 'ui.view.decor');
     node.setAttribute('aria-label', label);
     this.decorButton = node;
     this.slot(true).appendChild(node);
@@ -1231,7 +1274,7 @@ export class Hud {
     const label = this.i18n.t('ui.view.motion');
     const node = button('toolbar__button', () => this.callbacks.onToggleMotion());
     node.appendChild(iconSvg('view-motion'));
-    node.title = label;
+    this.tip(node, 'ui.view.motion');
     node.setAttribute('aria-label', label);
     this.motionButton = node;
     this.slot(false).appendChild(node);
@@ -1245,7 +1288,7 @@ export class Hud {
     const label = this.i18n.t('ui.view.grid');
     const node = button('toolbar__button', () => this.callbacks.onToggleGrid());
     node.appendChild(iconSvg('view-grid'));
-    node.title = label;
+    this.tip(node, 'ui.view.grid');
     node.setAttribute('aria-label', label);
     this.gridButton = node;
     this.barSlot().appendChild(node);
@@ -1255,6 +1298,7 @@ export class Hud {
     const menu = new Menu({
       icon: 'layers',
       label: this.i18n.t('ui.overlay.title'),
+      tooltip: describe(this.i18n, 'ui.overlay.title'),
       lockIcon: true,
       neutralId: 'none',
     });
@@ -1265,12 +1309,16 @@ export class Hud {
         id: 'none',
         label: this.i18n.t('ui.overlay.none'),
         icon: 'layer-none',
+        tooltip: describe(this.i18n, 'ui.overlay.none'),
         onSelect: () => this.callbacks.onToggleLayer('none'),
       },
       ...this.layers.map((layer) => ({
         id: layer.id,
         label: this.i18n.t(layer.labelKey),
         icon: layer.icon,
+        tooltip: describe(this.i18n, layer.labelKey, {
+          ...(layer.hintKey !== undefined ? { hintKey: layer.hintKey } : {}),
+        }),
         onSelect: () => this.callbacks.onToggleLayer(layer.id),
       })),
     ]);
@@ -1291,6 +1339,12 @@ export class Hud {
     const menu = new Menu({
       icon: 'disasters',
       label: this.i18n.t('ui.disaster.title'),
+      // Stav se čte až při ukázání: přepíná se v téže nabídce a bublina
+      // nesmí tvrdit, co platilo při stavbě lišty.
+      tooltip: () =>
+        describe(this.i18n, 'ui.disaster.title', {
+          meta: this.i18n.t(this.lastState.disastersEnabled ? 'ui.disaster.stateOn' : 'ui.disaster.stateOff'),
+        }),
       lockIcon: true,
       className: 'popover--alarm',
     });
@@ -1311,20 +1365,34 @@ export class Hud {
       {
         id: 'toggle',
         label: this.i18n.t(enabled ? 'ui.disaster.turnOff' : 'ui.disaster.turnOn'),
-        icon: 'disasters-toggle',
+        // Dvě ikony podle stavu (T138), ať je poznat bez čtení, jestli
+        // pohromy běží. Ikona ukazuje **stav**, popisek co se stane po kliknutí.
+        icon: enabled ? 'disasters-on' : 'disasters-off',
+        tooltip: describe(this.i18n, enabled ? 'ui.disaster.turnOff' : 'ui.disaster.turnOn', {
+          hintKey: 'ui.disaster.toggle.hint',
+          meta: this.i18n.t(enabled ? 'ui.disaster.stateOn' : 'ui.disaster.stateOff'),
+        }),
         onSelect: () => this.callbacks.onToggleDisasters(),
       },
       ...this.disasters.map((kind) => ({
         id: kind,
         label: this.i18n.t(`ui.disaster.${kind}`),
         icon: kind,
+        tooltip: describe(this.i18n, `ui.disaster.${kind}`, {
+          hintKey: `ui.alert.body.${kind}`,
+          meta: this.i18n.t('ui.disaster.armHint'),
+        }),
         onSelect: () => this.callbacks.onArmDisaster(kind),
       })),
     ]);
   }
 
   private buildTaxes(): void {
-    const popover = new Popover({ icon: 'taxes', label: this.i18n.t('ui.tax.title') });
+    const popover = new Popover({
+      icon: 'taxes',
+      label: this.i18n.t('ui.tax.title'),
+      tooltip: describe(this.i18n, 'ui.tax.title'),
+    });
     popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.tax.title')));
 
     for (const row of TAX_ROWS) {
@@ -1333,14 +1401,16 @@ export class Hud {
 
       const minus = button('chip chip--tight', () => this.callbacks.onTaxChange(row.zone, -1));
       minus.appendChild(iconSvg('tax-decrease'));
-      minus.title = this.i18n.t('ui.tax.decrease');
+      minus.setAttribute('aria-label', this.i18n.t('ui.tax.decrease'));
+      this.tip(minus, 'ui.tax.decrease');
 
       const value = el('span', 'panel__value', '-');
       this.register(`tax-${row.category}`, value);
 
       const plus = button('chip chip--tight', () => this.callbacks.onTaxChange(row.zone, 1));
       plus.appendChild(iconSvg('tax-increase'));
-      plus.title = this.i18n.t('ui.tax.increase');
+      plus.setAttribute('aria-label', this.i18n.t('ui.tax.increase'));
+      this.tip(plus, 'ui.tax.increase');
 
       line.append(minus, value, plus);
       popover.panel.appendChild(line);
@@ -1356,7 +1426,11 @@ export class Hud {
   private buildFunding(): void {
     if (this.serviceClasses.length === 0) return;
 
-    const popover = new Popover({ icon: 'funding', label: this.i18n.t('ui.funding.title') });
+    const popover = new Popover({
+      icon: 'funding',
+      label: this.i18n.t('ui.funding.title'),
+      tooltip: describe(this.i18n, 'ui.funding.title'),
+    });
     popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.funding.title')));
 
     for (const serviceClass of this.serviceClasses) {
@@ -1414,31 +1488,51 @@ export class Hud {
     );
   }
 
+  /**
+   * Bublina z lokalizace: tučně `labelKey`, pod ním `<labelKey>.hint` (T138).
+   * Skládá se až při ukázání, takže po přepnutí jazyka nelže.
+   */
+  private tip(
+    node: HTMLElement,
+    labelKey: string,
+    more: { hintKey?: string; title?: string; meta?: string } = {},
+    options: TooltipOptions = {},
+  ): void {
+    setTooltip(node, () => describe(this.i18n, labelKey, more), options);
+  }
+
   /** Tlačítko, které jen otevírá a zavírá panel. */
   private panelButton(icon: string, labelKey: string, onClick: () => void): HTMLButtonElement {
     const label = this.i18n.t(labelKey);
     const node = button('toolbar__button', onClick);
     node.appendChild(iconSvg(icon));
-    node.title = label;
+    this.tip(node, labelKey);
     node.setAttribute('aria-label', label);
     this.slot(false).appendChild(node);
     return node;
   }
 
   private buildSave(): void {
-    const popover = new Popover({ icon: 'save', label: this.i18n.t('ui.save.title') });
+    const popover = new Popover({
+      icon: 'save',
+      label: this.i18n.t('ui.save.title'),
+      tooltip: describe(this.i18n, 'ui.save.title'),
+    });
     popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.save.title')));
 
     const row = el('div', 'panel__row');
     const quickSave = button('chip', () => this.callbacks.onQuickSave());
     quickSave.append(iconSvg('quicksave'), this.i18n.t('ui.save.quicksave'));
+    this.tip(quickSave, 'ui.save.quicksave');
     const quickLoad = button('chip', () => this.callbacks.onQuickLoad());
     quickLoad.append(iconSvg('quickload'), this.i18n.t('ui.save.quickload'));
+    this.tip(quickLoad, 'ui.save.quickload');
     row.append(quickSave, quickLoad);
 
     const fileRow = el('div', 'panel__row');
     const download = button('chip', () => this.callbacks.onDownload());
     download.append(iconSvg('download'), this.i18n.t('ui.save.download'));
+    this.tip(download, 'ui.save.download');
 
     const input = el('input', 'is-hidden');
     input.type = 'file';
@@ -1452,6 +1546,7 @@ export class Hud {
 
     const open = button('chip', () => this.fileInput?.click());
     open.append(iconSvg('open-file'), this.i18n.t('ui.save.open'));
+    this.tip(open, 'ui.save.open');
     fileRow.append(download, open, input);
 
     // Snímek patří sem, protože je to taky „vem, co je na obrazovce, a dej mi
@@ -1459,6 +1554,7 @@ export class Hud {
     const shotRow = el('div', 'panel__row');
     const shot = button('chip', () => this.callbacks.onScreenshot());
     shot.append(iconSvg('screenshot'), this.i18n.t('ui.save.screenshot'));
+    this.tip(shot, 'ui.save.screenshot');
     shotRow.appendChild(shot);
 
     // Kdy se naposledy uložilo samo. Bez toho hráč netušil, že se to vůbec děje.
@@ -1472,7 +1568,7 @@ export class Hud {
       const updateRow = el('div', 'panel__row');
       const update = button('chip', () => this.callbacks.onReload());
       update.append(iconSvg('reload'), this.i18n.t('ui.save.update'));
-      update.title = this.i18n.t('ui.save.updateHint');
+      this.tip(update, 'ui.save.update', { hintKey: 'ui.save.updateHint' });
       updateRow.appendChild(update);
       popover.panel.appendChild(updateRow);
     }
@@ -1485,13 +1581,17 @@ export class Hud {
     const label = this.i18n.t('ui.help.title');
     const node = button('toolbar__button', () => this.callbacks.onHelp());
     node.appendChild(iconSvg('help'));
-    node.title = label;
+    this.tip(node, 'ui.help.title');
     node.setAttribute('aria-label', label);
     this.slot(false).appendChild(node);
   }
 
   private buildLanguage(): void {
-    const popover = new Popover({ icon: 'language', label: this.i18n.t('ui.language.label') });
+    const popover = new Popover({
+      icon: 'language',
+      label: this.i18n.t('ui.language.label'),
+      tooltip: describe(this.i18n, 'ui.language.label'),
+    });
     popover.panel.appendChild(el('span', 'panel__title', this.i18n.t('ui.language.label')));
 
     for (const language of this.i18n.getLanguages()) {

@@ -343,6 +343,9 @@ export function createLayerOptions(content: ContentRegistry): OverlayOption[] {
       id: `coverage:${serviceClass}`,
       labelKey: `ui.overlay.coverage.${serviceClass}`,
       icon: coverageIconOf(content, serviceClass),
+      // Popis dosahu je jeden pro všechny třídy (T138): mod, který přidá
+      // službu, nemusí psát vlastní větu, aby měla bublina co říct.
+      hintKey: 'ui.overlay.coverage.hint',
     })),
   ];
 }
@@ -457,6 +460,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'pan',
       labelKey: 'ui.tool.pan',
+      hintKey: 'ui.tool.pan.hint',
       icon: 'hand',
       hotkey: 'h',
       groupKey: 'ui.menu.pan',
@@ -468,16 +472,19 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     ...roadTypes.map((road, order) => ({
       id: `road:${road.id}`,
       labelKey: `ui.tool.road.${road.id}`,
+      hintKey: `ui.tool.road.${road.id}.hint`,
       icon: `road-${road.id}`,
       ...(order === 0 ? { hotkey: 'q' } : {}),
       groupKey: 'ui.menu.road',
       groupIcon: `road-${roadTypes[0]?.id ?? 'street'}`,
       cost: road.cost,
+      perTile: true,
       action: { kind: 'road' as const, roadType: order + 1 },
     })),
     {
       id: 'terrain:raise',
       labelKey: 'ui.tool.terrain.raise',
+      hintKey: 'ui.tool.terrain.raise.hint',
       icon: 'terrain-raise',
       hotkey: 'e',
       groupKey: 'ui.menu.terrain',
@@ -487,6 +494,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'terrain:lower',
       labelKey: 'ui.tool.terrain.lower',
+      hintKey: 'ui.tool.terrain.lower.hint',
       icon: 'terrain-lower',
       hotkey: 'd',
       groupKey: 'ui.menu.terrain',
@@ -496,6 +504,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'terrain:level',
       labelKey: 'ui.tool.terrain.level',
+      hintKey: 'ui.tool.terrain.level.hint',
       icon: 'terrain-level',
       hotkey: 'f',
       groupKey: 'ui.menu.terrain',
@@ -505,6 +514,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'terrain:fill',
       labelKey: 'ui.tool.terrain.fill',
+      hintKey: 'ui.tool.terrain.fill.hint',
       icon: 'terrain-fill',
       hotkey: 'g',
       groupKey: 'ui.menu.terrain',
@@ -522,16 +532,19 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'terrain:trees',
       labelKey: 'ui.tool.terrain.trees',
+      hintKey: 'ui.tool.terrain.trees.hint',
       icon: 'plant-trees',
       hotkey: 't',
       groupKey: 'ui.menu.terrain',
       groupIcon: 'terrain-raise',
       cost: content.getBalance().map.plantTreesCost,
+      perTile: true,
       action: { kind: 'plantTrees' },
     },
     {
       id: 'zone:residential',
       labelKey: 'ui.tool.zone.residential',
+      hintKey: 'ui.tool.zone.residential.hint',
       icon: 'zone-residential',
       hotkey: 'r',
       groupKey: 'ui.menu.zone',
@@ -541,6 +554,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'zone:commercial',
       labelKey: 'ui.tool.zone.commercial',
+      hintKey: 'ui.tool.zone.commercial.hint',
       icon: 'zone-commercial',
       hotkey: 'c',
       groupKey: 'ui.menu.zone',
@@ -550,6 +564,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'zone:industrial',
       labelKey: 'ui.tool.zone.industrial',
+      hintKey: 'ui.tool.zone.industrial.hint',
       icon: 'zone-industrial',
       hotkey: 'i',
       groupKey: 'ui.menu.zone',
@@ -559,6 +574,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'bulldoze',
       labelKey: 'ui.tool.bulldoze',
+      hintKey: 'ui.tool.bulldoze.hint',
       icon: 'bulldoze',
       hotkey: 'x',
       groupKey: 'ui.tool.bulldoze',
@@ -571,9 +587,11 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'bulldoze:ruins',
       labelKey: 'ui.tool.demolishRuins',
-      icon: 'explosion',
+      hintKey: 'ui.tool.demolishRuins.hint',
+      // Vlastní ikona (T138): sdílela obrázek s pohromou Výbuch.
+      icon: 'ruins-clear',
       groupKey: 'ui.tool.demolishRuins',
-      groupIcon: 'explosion',
+      groupIcon: 'ruins-clear',
       action: { kind: 'demolishRuins' },
     },
     // Rušení zón je **vlastní nástroj** (rozhodnutí autora, T62). Buldozer se
@@ -583,6 +601,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'zone:clear',
       labelKey: 'ui.tool.zone.clear',
+      hintKey: 'ui.tool.zone.clear.hint',
       icon: 'zone-clear',
       hotkey: 'v',
       groupKey: 'ui.menu.zone',
@@ -594,11 +613,13 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'pipe',
       labelKey: 'ui.tool.pipe',
+      hintKey: 'ui.tool.pipe.hint',
       icon: 'pipe',
       hotkey: 'w',
       groupKey: 'ui.menu.water',
       groupIcon: 'pump_station',
       cost: content.getBalance().water.pipeCost,
+      perTile: true,
       action: { kind: 'pipe' },
     },
     // Vedení (T129) má vlastní nabídku hned vedle Energetiky — do ní se tři
@@ -607,21 +628,25 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'wire:low',
       labelKey: 'ui.tool.wire.low',
-      icon: 'bolt',
+      hintKey: 'ui.tool.wire.low.hint',
+      icon: 'wire-low',
       hotkey: 'j',
       groupKey: 'ui.menu.wires',
-      groupIcon: 'bolt',
+      groupIcon: 'wire-low',
       cost: content.getBalance().power.wires[0]?.cost ?? 0,
+      perTile: true,
       capacity: content.getBalance().power.wires[0]?.capacity ?? 0,
       action: { kind: 'wire', wire: WIRE.low },
     },
     {
       id: 'wire:high',
       labelKey: 'ui.tool.wire.high',
-      icon: 'bolt',
+      hintKey: 'ui.tool.wire.high.hint',
+      icon: 'wire-high',
       groupKey: 'ui.menu.wires',
-      groupIcon: 'bolt',
+      groupIcon: 'wire-low',
       cost: content.getBalance().power.wires[1]?.cost ?? 0,
+      perTile: true,
       capacity: content.getBalance().power.wires[1]?.capacity ?? 0,
       action: { kind: 'wire', wire: WIRE.high },
     },
@@ -629,9 +654,12 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     {
       id: 'wire:remove',
       labelKey: 'ui.tool.wire.remove',
-      icon: 'bulldoze',
+      hintKey: 'ui.tool.wire.remove.hint',
+      // Vlastní ikona, ne radlice (T138): „Bourání vedení nesmí vypadat
+      // stejně jako klasický buldozer." Buldozer bourá všechno, tohle jen dráty.
+      icon: 'wire-remove',
       groupKey: 'ui.menu.wires',
-      groupIcon: 'bolt',
+      groupIcon: 'wire-low',
       action: { kind: 'wire', wire: WIRE.none },
     },
   ];
@@ -650,6 +678,7 @@ export function createTools(content: ContentRegistry): ToolOption[] {
     tools.push({
       id: `place:${definition.id}`,
       labelKey: definition.name, // popisek pojmenuje obsah, ne kód
+      hintKey: definition.description,
       icon: buildingIcon(content, definition),
       ...(order === 0 ? { hotkey: 'u' } : {}),
       groupKey: `ui.menu.${menu}`,

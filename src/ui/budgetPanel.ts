@@ -1,6 +1,6 @@
 import type { Definition } from '@/content/schema';
 import type { Budget, BudgetLine } from '@/sim/systems/economy';
-import { sheetHeader } from './icons';
+import { closeTip, sheetHeader } from './icons';
 import { el } from './dom';
 import { formatMoney, formatNumber } from './format';
 import type { I18n } from './i18n';
@@ -74,7 +74,7 @@ export class BudgetPanel {
 
     this.root.replaceChildren();
 
-    this.root.appendChild(sheetHeader(t('ui.budget.title'), t('ui.common.close'), () => this.toggle()));
+    this.root.appendChild(sheetHeader(t('ui.budget.title'), closeTip(t), () => this.toggle()));
 
     const table = el('table', 'sheet__table');
     const head = el('tr');

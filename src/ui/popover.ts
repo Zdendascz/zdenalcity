@@ -1,6 +1,8 @@
 import { button, el, setExpanded, setPressed } from './dom';
 import { iconSvg } from './icons';
 import { closeOtherSheets } from './sheets';
+import { setTooltip } from './tooltip';
+import type { TooltipSource } from './tooltip';
 
 /**
  * Tlačítko, které rozbalí panel.
@@ -49,8 +51,13 @@ function startListening(): void {
 export interface PopoverOptions {
   /** Jméno ikony na tlačítku. */
   icon: string;
-  /** Už přeložený popisek do tooltipu a vedle ikony. */
+  /** Už přeložený popisek pro odečítačku, do bubliny a vedle ikony. */
   label: string;
+  /**
+   * Bublina nad tlačítkem (T138). Bez ní ukáže aspoň tučný `label`; popis,
+   * k čemu nabídka je, dodává volající, protože ho zná jen on.
+   */
+  tooltip?: TooltipSource;
   /** Ukázat popisek i v liště, ne jen v tooltipu. */
   showLabel?: boolean;
   /** Doplňková třída na kořen, kvůli barvám. */
@@ -92,7 +99,7 @@ export class Popover {
 
     this.root = el('div', `popover${options.className ? ` ${options.className}` : ''}`);
     this.trigger = button('popover__trigger', () => this.toggle());
-    this.trigger.title = options.label;
+    setTooltip(this.trigger, options.tooltip ?? { title: options.label });
     this.trigger.setAttribute('aria-label', options.label);
     // Otevřenost panelu byla vidět jen na třídě `is-open`.
     setExpanded(this.trigger, false);
@@ -193,6 +200,11 @@ export interface MenuItem {
   icon: string;
   /** Cena, klávesa — cokoli, co patří napravo. */
   hint?: string;
+  /**
+   * Bublina u položky (T138): co to je a k čemu. Bez ní tučný název a pod
+   * ním `hint` — to je aspoň tolik, kolik je vidět v řádku.
+   */
+  tooltip?: TooltipSource;
   onSelect(): void;
 }
 
@@ -230,6 +242,13 @@ export class Menu extends Popover {
       node.appendChild(iconSvg(item.icon));
       node.appendChild(el('span', 'menu__label', item.label));
       if (item.hint !== undefined) node.appendChild(el('span', 'menu__hint', item.hint));
+      // Bublina **vedle** seznamu, ne nad ním: nahoře a dole jsou další
+      // položky, které by zakryla.
+      setTooltip(
+        node,
+        item.tooltip ?? { title: item.label, ...(item.hint ? { meta: item.hint } : {}) },
+        { sides: ['right', 'left', 'top', 'bottom'] },
+      );
 
       this.panel.appendChild(node);
       this.items.set(item.id, node);

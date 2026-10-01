@@ -1,6 +1,8 @@
 import { ICON_SHAPES } from '@/render/icons';
 import type { IconShape } from '@/render/icons';
 import { button, el } from './dom';
+import { setTooltip } from './tooltip';
+import type { TooltipContent } from './tooltip';
 
 /**
  * Ikony v uživatelském rozhraní.
@@ -460,7 +462,117 @@ const MOTION: Shape = [
   bar(0.08, 0.62, 0.36, 0.7),
 ];
 
+/**
+ * Stožár s křížkem — odstranit vedení (T138).
+ *
+ * Do teď nesl nástroj radlici buldozeru a autor hlásil, že „bourání vedení
+ * nesmí vypadat stejně jako klasický buldozer": buldozer bourá všechno, tohle
+ * jen dráty. Stožár vlevo a křížek vpravo **vedle sebe**, ne přes sebe —
+ * polygony mají jednu barvu a křížek přes stožár by v něm zmizel.
+ */
+const WIRE_REMOVE: Shape = [
+  // Nohy stožáru do áčka.
+  [
+    [0.1, 0.92],
+    [0.2, 0.92],
+    [0.34, 0.2],
+    [0.28, 0.2],
+  ],
+  [
+    [0.46, 0.92],
+    [0.56, 0.92],
+    [0.38, 0.2],
+    [0.32, 0.2],
+  ],
+  // Dvě ramena s izolátory.
+  bar(0.06, 0.24, 0.62, 0.3),
+  bar(0.14, 0.44, 0.52, 0.5),
+  bar(0.29, 0.08, 0.37, 0.24),
+  // Křížek.
+  [
+    [0.62, 0.56],
+    [0.68, 0.5],
+    [0.96, 0.84],
+    [0.9, 0.9],
+  ],
+  [
+    [0.9, 0.5],
+    [0.96, 0.56],
+    [0.68, 0.9],
+    [0.62, 0.84],
+  ],
+];
+
+/** Hromádka suti s lopatou — odklidit opuštěné budovy a trosky (T136, T138). */
+const RUINS_CLEAR: Shape = [
+  [
+    [0.04, 0.9],
+    [0.2, 0.62],
+    [0.32, 0.7],
+    [0.46, 0.5],
+    [0.62, 0.9],
+  ],
+  bar(0.28, 0.4, 0.4, 0.48),
+  // Lopata šikmo nad hromadou.
+  [
+    [0.66, 0.06],
+    [0.72, 0.1],
+    [0.58, 0.5],
+    [0.52, 0.47],
+  ],
+  [
+    [0.5, 0.44],
+    [0.62, 0.5],
+    [0.58, 0.68],
+    [0.42, 0.6],
+  ],
+  bar(0.7, 0.62, 0.96, 0.9),
+];
+
+/** Plamen zmenšený do horní části — základ obou stavů přepínače katastrof. */
+function smallFlame(): Shape[0] {
+  return (DISASTER[0] ?? []).map(([x, y]) => [0.2 + x * 0.6, y * 0.62] as [number, number]);
+}
+
+/**
+ * Katastrofy zapnuté: plamen nad vypínačem, jezdec **vpravo** (T138).
+ *
+ * Autor: „U ikonky zapnutí katastrof udělej dvě verze, ať je poznat, jestli
+ * jsou zapnuté, nebo vypnuté." Obrázky dodá obsah; tohle je záloha, a proto
+ * se ty dvě liší víc než jen polohou jezdce — ten je na osmnácti pixelech
+ * k nepoznání.
+ */
+const DISASTERS_ON: Shape = [
+  smallFlame(),
+  bar(0.1, 0.74, 0.9, 0.86),
+  circle(0.76, 0.8, 0.13, 12),
+];
+
+/** Katastrofy vypnuté: místo plamene křížek, jezdec **vlevo**. */
+const DISASTERS_OFF: Shape = [
+  [
+    [0.26, 0.1],
+    [0.34, 0.04],
+    [0.74, 0.5],
+    [0.66, 0.56],
+  ],
+  [
+    [0.66, 0.04],
+    [0.74, 0.1],
+    [0.34, 0.56],
+    [0.26, 0.5],
+  ],
+  bar(0.1, 0.74, 0.9, 0.86),
+  circle(0.24, 0.8, 0.13, 12),
+];
+
 const UI_SHAPES: Readonly<Record<string, Shape>> = {
+  'wire-remove': WIRE_REMOVE,
+  // Vedení nese blesk, dokud obsah nedodá obrázek stožáru (T138).
+  ...(ICON_SHAPES.bolt ? { 'wire-low': ICON_SHAPES.bolt, 'wire-high': ICON_SHAPES.bolt } : {}),
+  'ruins-clear': RUINS_CLEAR,
+  'disasters-on': DISASTERS_ON,
+  'disasters-off': DISASTERS_OFF,
   hand: HAND,
   'view-decor': TREE_TOGGLE,
   'view-motion': MOTION,
@@ -584,17 +696,23 @@ export function polygonIcon(name: string): SVGSVGElement {
  */
 export function sheetHeader(
   title: string,
-  closeLabel: string,
+  close: string | TooltipContent,
   onClose: () => void,
   options: { heading?: 'h1' | 'h2'; titleClass?: string } = {},
 ): HTMLElement {
   const header = el('div', 'sheet__header');
   header.appendChild(el(options.heading ?? 'h2', options.titleClass ?? 'sheet__title', title));
 
-  const close = button('chip chip--tight', onClose);
-  close.appendChild(iconSvg('close'));
-  close.title = closeLabel;
-  close.setAttribute('aria-label', closeLabel);
-  header.appendChild(close);
+  const content = typeof close === 'string' ? { title: close } : close;
+  const node = button('chip chip--tight', onClose);
+  node.appendChild(iconSvg('close'));
+  node.setAttribute('aria-label', content.title);
+  setTooltip(node, content);
+  header.appendChild(node);
   return header;
+}
+
+/** Bublina křížku v záhlaví panelu: tučně „Zavřít" a věta pod tím (T138). */
+export function closeTip(t: (key: string) => string): TooltipContent {
+  return { title: t('ui.common.close'), text: t('ui.common.close.hint') };
 }

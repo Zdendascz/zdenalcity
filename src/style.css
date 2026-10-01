@@ -123,6 +123,22 @@ body {
   justify-content: flex-end;
 }
 
+/*
+ * Stálá řada ovládání je **lišta** jako paleta nástrojů vlevo (T138): jeden
+ * tmavý pruh, v něm tlačítka těsně vedle sebe. Na telefonu se řada rozpustí
+ * do toku s paletou (`display: contents` níž) a podklad nese každé tlačítko.
+ */
+.hud__row:not(.hud__row--drawer) {
+  gap: 2px;
+  align-items: center;
+  padding: 4px;
+}
+
+.hud__row--drawer:empty,
+.hud__row:not(.hud__row--drawer):empty {
+  display: none;
+}
+
 /* Statistiky a rychlost drží pohromadě vlevo nahoře; poptávka zůstává vpravo. */
 .hud__top-left {
   display: flex;
@@ -148,8 +164,7 @@ body {
 .demand,
 .popover__panel,
 .toolbar,
-.hud__row > .toolbar__button,
-.hud__extras > .toolbar__button,
+.hud__row:not(.hud__row--drawer),
 .segmented {
   pointer-events: auto;
   padding: 6px 10px;
@@ -472,21 +487,24 @@ body {
   user-select: none;
 }
 
-.menu__item .icon--image,
-.popover__trigger .icon--image {
-  width: 33px;
-  height: 33px;
+/*
+ * Ikona v řádku nabídky. Obrázky jsou neprůhledné čtverce na černé (T138),
+ * takže vyplní celé místo a rohy se zakulatí — jinak by černý čtverec trčel
+ * do zakulaceného tlačítka.
+ */
+.menu__item .icon--image {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
 }
 
 /* V panelech sedí ikona vedle textu, tam stačí menší. */
 .chip .icon--image {
   width: 23px;
   height: 23px;
-}
-
-.segmented__button--icon .icon--image {
-  width: 29px;
-  height: 29px;
+  border-radius: 3px;
+  object-fit: cover;
 }
 
 /* --- paleta nástrojů: jedna řada ikon ----------------------------------- */
@@ -499,37 +517,84 @@ body {
   padding: 4px;
 }
 
+/*
+ * Tlačítko s ikonou v liště. **Jeden vzhled pro všechna** (T138).
+ *
+ * Autor: „Všechny ikony budou … v lištách, ne samostatně." Do teď měla
+ * tlačítka panelů tmavý podklad, roletky (vrstvy, katastrofy, daně, uložení)
+ * žádný, lupa byla čip a paleta nástrojů zase jiná — v pravém dolním rohu tak
+ * stály ikony vytištěné rovnou na trávě vedle ikon v rámečku.
+ *
+ * Teď je to vždycky čtverec stejné velikosti se stejným podkladem, rámečkem
+ * a stavy, a podklad pod celou řadou nese lišta (`.toolbar`, `.hud__row`).
+ * Obrázek ikony je neprůhledný čtverec na černé a **vyplní celé tlačítko**
+ * kromě rámečku; rohy mu ořízne tlačítko. Velikost řídí `--icon-size`, takže
+ * telefon a vysunutá řada mění jedno číslo, ne pět pravidel.
+ */
 .toolbar__button,
 .popover__trigger {
+  --icon-size: 38px;
+
   display: flex;
   gap: 6px;
   align-items: center;
   justify-content: center;
-  /* Kreslená ikona potřebuje víc než těch 30 px, co stačilo jednobarevnému
-     polygonu — na menším tlačítku se z izometrického domku stane skvrna. */
-  min-width: 46px;
-  height: 44px;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  background: none;
+  width: calc(var(--icon-size) + 6px);
+  min-width: calc(var(--icon-size) + 6px);
+  height: calc(var(--icon-size) + 6px);
+  padding: 2px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 6%);
   color: var(--text);
   font: inherit;
   cursor: pointer;
 }
 
+.popover__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar__button > .icon--image,
+.popover__icon > .icon--image {
+  display: block;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+/* Záložní polygon je jednobarevný a menší — v plném čtverci by se rozlil. */
+.toolbar__button > svg.icon,
+.popover__icon > svg.icon {
+  width: 22px;
+  height: 22px;
+}
+
 .toolbar__button:hover,
 .popover__trigger:hover {
+  border-color: rgb(255 255 255 / 30%);
   background: rgb(255 255 255 / 12%);
+}
+
+/* Obrázek zakryje podklad, takže stav nese hlavně rámeček a záře kolem. */
+.toolbar__button:hover > .icon--image,
+.popover__trigger:hover .icon--image {
+  filter: brightness(1.15);
 }
 
 .toolbar__button.is-active,
 .popover__trigger.is-active {
   border-color: var(--accent);
   background: rgb(107 168 232 / 25%);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .popover__trigger.is-open {
+  border-color: rgb(255 255 255 / 45%);
   background: rgb(255 255 255 / 16%);
 }
 
@@ -616,10 +681,51 @@ body {
   cursor: pointer;
 }
 
+/*
+ * Ikona v segmentovaném přepínači: stejná pravidla jako v liště (T138),
+ * jen menší, protože rychlost stojí nahoře vedle statistik.
+ */
 .segmented__button--icon {
+  --icon-size: 30px;
+
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: calc(var(--icon-size) + 6px);
+  height: calc(var(--icon-size) + 6px);
+  padding: 2px;
+  overflow: hidden;
+  border-color: var(--panel-border);
+  background: rgb(255 255 255 / 6%);
+}
+
+.segmented__button--icon > .icon--image {
+  display: block;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.segmented__button--icon > svg.icon {
+  width: 20px;
+  height: 20px;
+}
+
+/*
+ * Pohledy (povrch, podzemí) stojí v pravé liště mezi ostatními tlačítky,
+ * tak mají i jejich velikost — dvě různé výšky v jedné řadě by zubily.
+ */
+.hud__row .segmented__button--icon {
+  --icon-size: 38px;
+}
+
+/* Uvnitř lišty segment podklad nepotřebuje, ten má lišta. */
+.hud__row:not(.hud__row--drawer) > .segmented {
+  padding: 0;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
 }
 
 .segmented__button:hover {
@@ -629,6 +735,7 @@ body {
 .segmented__button.is-active {
   border-color: var(--accent);
   background: rgb(107 168 232 / 25%);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 /* --- úsporná lišta pro telefon ------------------------------------------ */
@@ -708,9 +815,9 @@ body {
   display: none;
 }
 
-.hud__row--drawer .toolbar__button {
-  border: 1px solid transparent;
-  background: none;
+.hud__row--drawer .toolbar__button,
+.hud__row--drawer .popover__trigger {
+  --icon-size: 36px;
 }
 
 /*
@@ -741,8 +848,22 @@ body {
  */
 .hud--compact .toolbar__button,
 .hud--compact .popover__trigger {
+  --icon-size: 34px;
+
+  width: 40px;
   min-width: 40px;
-  padding: 0 3px;
+  height: 44px;
+  padding: 0;
+}
+
+/*
+ * Na telefonu se řada ovládání rozpouští do toku s paletou, takže lištu
+ * nemá kdo nést — podklad dostane každé tlačítko samo, stejný jako lišta.
+ */
+.hud--compact .hud__extras > .toolbar__button,
+.hud--compact .hud__tools-row > .hud__row > .toolbar__button {
+  background: var(--panel-bg);
+  backdrop-filter: blur(2px);
 }
 
 /*
@@ -819,11 +940,16 @@ body {
   }
 }
 
-.hud--compact .toolbar__button .icon--image,
-.hud--compact .popover__trigger .icon--image,
-.hud--compact .segmented__button--icon .icon--image {
-  width: 32px;
-  height: 32px;
+.hud--compact .segmented__button--icon {
+  --icon-size: 32px;
+}
+
+/* Lupa na telefonu stojí v řadě s paletou, tak má i její rozměr. */
+.hud--compact .hud__row .segmented__button--icon {
+  --icon-size: 34px;
+
+  min-width: 40px;
+  height: 44px;
 }
 
 /*
@@ -847,9 +973,13 @@ body {
  * Statistiky **jsou** tím tlačítkem. Ikonka grafu vedle nich zmizela na přání
  * autora: kasa s bilancí je dost velký terč a ušetří to celé jedno tlačítko.
  */
+/* Tlačítkem jsou čísla, ne ikona: čtvercový rozměr lišty pro ně neplatí. */
 .popover--stats .popover__trigger {
+  width: auto;
+  min-width: 0;
   height: auto;
   padding: 6px 10px;
+  overflow: visible;
 }
 
 .popover--stats .stats {
@@ -956,6 +1086,11 @@ body {
   display: block;
   width: 26px;
   height: 26px;
+}
+
+.hud__disaster img {
+  border-radius: 4px;
+  object-fit: cover;
 }
 
 @keyframes disaster-pulse {
@@ -2962,4 +3097,62 @@ body {
    plná barva — obrázek vozovky je průhledný a na kartičce by nebyl vidět. */
 .sheet__surface-tile--road {
   background: #4a4b52;
+}
+
+/* --- bublina s popisem (T138) ------------------------------------------- */
+
+/*
+ * Tooltip u ikon: tučný název, věta k čemu to je, drobně cena nebo stav.
+ * Jedna bublina pro celé rozhraní, staví ji `ui/tooltip.ts`. Klikat se do ní
+ * nedá — leží přes mapu i přes panely a nesmí krást kliknutí tomu, co je pod
+ * ní. Nad vším ostatním, včetně dialogů.
+ */
+.tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(300px, calc(100vw - 16px));
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgb(20 23 28 / 96%);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  user-select: none;
+}
+
+.tooltip__title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tooltip__meta {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  /* Rozpis poptávky má víc řádků, jeden pod druhým. */
+  white-space: pre-line;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tooltip {
+    animation: tooltip-in 0.12s ease-out;
+  }
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }

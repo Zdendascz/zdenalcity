@@ -410,7 +410,7 @@ describe('panel MHD', () => {
     refresh();
 
     // Tlačítko nese jen ikonu, takže se hledá podle popisku pro odečítačku.
-    const pause = mount.querySelector('[title="Odstavit linku (vozidla do depa)"]');
+    const pause = mount.querySelector('[aria-label="Odstavit linku (vozidla do depa)"]');
     expect(pause, 'přepínač jede/nejede v panelu chybí').toBeTruthy();
     (pause as HTMLButtonElement).click();
     expect(sent).toEqual([{ type: 'set_line_paused', lineId, paused: true }]);

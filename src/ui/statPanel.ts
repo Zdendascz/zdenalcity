@@ -1,7 +1,7 @@
 import type { StatBreakdown } from '@/sim/statBreakdown';
 import { el } from './dom';
 import { formatMoney, formatNumber, moneyParams } from './format';
-import { sheetHeader } from './icons';
+import { closeTip, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
 
@@ -75,7 +75,7 @@ export class StatPanel {
     const t = (name: string, params?: Record<string, string | number>) => this.i18n.t(name, params);
     this.root.replaceChildren();
 
-    this.root.appendChild(sheetHeader(t(`ui.hud.${key}`), t('ui.common.close'), () => this.close()));
+    this.root.appendChild(sheetHeader(t(`ui.hud.${key}`), closeTip(t), () => this.close()));
 
     const columns = el('div', 'stat__columns');
     const amount = MONEY_STATS.includes(key) ? formatMoney : formatNumber;

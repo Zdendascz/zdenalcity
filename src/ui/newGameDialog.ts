@@ -8,6 +8,7 @@ import { MAX_HEIGHT } from '@/sim/heights';
 import { button, el, markDialog, setPressed } from './dom';
 import type { I18n } from './i18n';
 import { iconSvg } from './icons';
+import { setTooltip } from './tooltip';
 
 /**
  * Dialog nové hry (§3 zadání fáze 3).
@@ -261,10 +262,15 @@ export function showNewGameDialog(
       draw();
     });
     chip.textContent = `${option}×${option}`;
-    if (option >= HEAVY_SIZE) chip.title = t('ui.newGame.size.heavy');
     // U výchozí velikosti se říká, že je doporučená — jinak je to čtveřice
-    // čísel, ze které si hráč nemá jak vybrat.
-    else if (option === DEFAULT_MAP_SIZE) chip.title = t('ui.newGame.size.recommended');
+    // čísel, ze které si hráč nemá jak vybrat. Bublina, ne `title` (T138).
+    const note =
+      option >= HEAVY_SIZE
+        ? t('ui.newGame.size.heavy')
+        : option === DEFAULT_MAP_SIZE
+          ? t('ui.newGame.size.recommended')
+          : undefined;
+    setTooltip(chip, { title: `${option}×${option}`, ...(note !== undefined ? { text: note } : {}) });
     chips.set(option, chip);
     sizeChips.appendChild(chip);
   }

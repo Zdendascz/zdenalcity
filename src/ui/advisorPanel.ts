@@ -1,7 +1,7 @@
 import type { CityAdvice } from '@/sim/advisor';
 import { el } from './dom';
 import { moneyParams } from './format';
-import { sheetHeader } from './icons';
+import { closeTip, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
 
@@ -70,7 +70,7 @@ export class AdvisorPanel {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
 
-    this.root.appendChild(sheetHeader(t('ui.advisor.title'), t('ui.common.close'), () => this.toggle()));
+    this.root.appendChild(sheetHeader(t('ui.advisor.title'), closeTip(t), () => this.toggle()));
 
     if (advice.tooSmall) {
       // **Moc malé město** není pochvala (T-revize, nález 28). Hráč se zónou,

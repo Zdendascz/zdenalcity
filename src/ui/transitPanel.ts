@@ -6,9 +6,10 @@ import { lineFault, lineProblems, lineRuns, modeOf, noStats } from '@/sim/transi
 import type { WorldState } from '@/sim/world';
 import { button, el } from './dom';
 import { formatMoney, formatNumber } from './format';
-import { iconSvg, sheetHeader } from './icons';
+import { closeTip, iconSvg, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
+import { describe, setTooltip } from './tooltip';
 
 /**
  * Linky MHD (§7 fáze 4).
@@ -151,7 +152,7 @@ export class TransitPanel {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
     this.root.replaceChildren();
 
-    this.root.appendChild(sheetHeader(t('ui.transit.title'), t('ui.common.close'), () => this.toggle()));
+    this.root.appendChild(sheetHeader(t('ui.transit.title'), closeTip(t), () => this.toggle()));
 
     // Módy jsou z katalogu, ne z výčtu v kódu (P5) — mod si přidá svůj a
     // tlačítko na něj se objeví samo.
@@ -161,6 +162,13 @@ export class TransitPanel {
       const node = button('chip', () => this.dispatch({ type: 'create_line', mode }));
       node.appendChild(iconSvg('line-create'));
       node.appendChild(el('span', undefined, t(`ui.transit.mode.${mode}`)));
+      setTooltip(
+        node,
+        describe(this.i18n, 'ui.transit.createLine', {
+          title: t(`ui.transit.mode.${mode}`),
+          hintKey: 'ui.transit.createLine.hint',
+        }),
+      );
       create.appendChild(node);
     }
     this.root.appendChild(create);
@@ -213,14 +221,17 @@ export class TransitPanel {
       this.dispatch({ type: 'set_line_paused', lineId: line.id, paused: !line.paused }),
     );
     pause.appendChild(iconSvg(line.paused ? 'speed-1' : 'speed-pause'));
-    pause.title = t(line.paused ? 'ui.transit.resume' : 'ui.transit.pause');
+    const pauseKey = line.paused ? 'ui.transit.resume' : 'ui.transit.pause';
+    pause.setAttribute('aria-label', t(pauseKey));
+    setTooltip(pause, describe(this.i18n, pauseKey));
     head.appendChild(pause);
 
     const remove = button('chip chip--tight', () =>
       this.dispatch({ type: 'delete_line', lineId: line.id }),
     );
     remove.appendChild(iconSvg('line-delete'));
-    remove.title = t('ui.transit.delete');
+    remove.setAttribute('aria-label', t('ui.transit.delete'));
+    setTooltip(remove, describe(this.i18n, 'ui.transit.delete'));
     head.appendChild(remove);
     section.appendChild(head);
 
@@ -261,14 +272,15 @@ export class TransitPanel {
         x: building.x,
         y: building.y,
       });
-      show.title = t('ui.transit.showStop');
+      setTooltip(show, describe(this.i18n, 'ui.transit.showStop'));
       chip.appendChild(show);
 
       const drop = button('chip__drop', () =>
         this.dispatch({ type: 'remove_stop', lineId: line.id, buildingId: stopId }),
       );
       drop.appendChild(iconSvg('stop-remove'));
-      drop.title = t('ui.transit.removeStop');
+      drop.setAttribute('aria-label', t('ui.transit.removeStop'));
+      setTooltip(drop, describe(this.i18n, 'ui.transit.removeStop'));
       chip.appendChild(drop);
 
       stops.appendChild(chip);

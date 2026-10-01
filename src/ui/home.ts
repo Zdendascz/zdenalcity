@@ -3,6 +3,8 @@ import type { Definition } from '@/content/schema';
 import { MAX_SAVE_FILE_BYTES } from '@/save/format';
 import { button, el, markDialog } from './dom';
 import { iconSvg } from './icons';
+import { setTooltip } from './tooltip';
+import type { TooltipContent } from './tooltip';
 import { showHelp } from './help';
 import type { I18n } from './i18n';
 import { showNewGameDialog } from './newGameDialog';
@@ -429,7 +431,7 @@ function galleryRow(
   ] as const) {
     const node = button(css, () => step(delta));
     node.textContent = delta < 0 ? '‹' : '›';
-    node.title = t(label);
+    setTooltip(node, tipOf(t, label));
     node.setAttribute('aria-label', t(label));
     frame.appendChild(node);
   }
@@ -528,14 +530,14 @@ function showLightbox(
   ] as const) {
     const node = button(css, () => step(delta));
     node.textContent = delta < 0 ? '‹' : '›';
-    node.title = t(label);
+    setTooltip(node, tipOf(t, label));
     node.setAttribute('aria-label', t(label));
     overlay.appendChild(node);
   }
 
   const close_ = button('lightbox__close', close);
   close_.textContent = '×';
-  close_.title = t('ui.home.back');
+  setTooltip(close_, tipOf(t, 'ui.home.back'));
   close_.setAttribute('aria-label', t('ui.home.back'));
   overlay.appendChild(close_);
 
@@ -614,10 +616,11 @@ function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOp
   const note = el('p', 'home__links-note');
 
   /** Ikona s popiskem jen pro odečítačku a pro najetí myší. */
-  function fill(node: HTMLElement, icon: string, label: string): HTMLElement {
+  function fill(node: HTMLElement, icon: string, labelKey: string): HTMLElement {
     node.appendChild(iconSvg(icon));
-    node.title = label;
-    node.setAttribute('aria-label', label);
+    // Bublina, ne `title` (T138): ten se na dotyku neukáže nikdy.
+    setTooltip(node, tipOf(t, labelKey));
+    node.setAttribute('aria-label', t(labelKey));
     return node;
   }
 
@@ -632,15 +635,15 @@ function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOp
       }, SHARE_NOTE_MS);
     });
   });
-  strip.appendChild(fill(share, 'home-share', t('ui.home.share')));
+  strip.appendChild(fill(share, 'home-share', 'ui.home.share'));
 
   // Nápověda: hra nemá tutoriál, takže je to jediné místo, kde se hráč
   // doví, proč mu zóna nezarostla.
   const help = button('home__link', () => showHelp(root, t, undefined, options.catalogue));
-  strip.appendChild(fill(help, 'home-help', t('ui.help.title')));
+  strip.appendChild(fill(help, 'home-help', 'ui.help.title'));
 
   const authors = button('home__link', () => showAuthors(root, t));
-  strip.appendChild(fill(authors, 'home-author', t('ui.home.authors')));
+  strip.appendChild(fill(authors, 'home-author', 'ui.home.authors'));
 
   // Jazyk patří sem, mezi věci o hře. Do teď se dal přepnout **až ve hře**,
   // takže anglicky hrající hráč musel nejdřív rozehrát město, aby si směl
@@ -653,7 +656,7 @@ function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOp
       const pick = order[(at + 1) % order.length];
       if (pick) languages.set(pick);
     });
-    strip.appendChild(fill(next, 'language', t('ui.language.label')));
+    strip.appendChild(fill(next, 'language', 'ui.language.label'));
   }
 
   // Discord je **odkaz ven**, ne překryv: je to jiné místo, ne další stránka hry.
@@ -661,7 +664,7 @@ function aboutRow(t: (key: string) => string, root: HTMLElement, options: HomeOp
   discord.href = DISCORD_URL;
   discord.target = '_blank';
   discord.rel = 'noreferrer noopener';
-  strip.appendChild(fill(discord, 'home-chat', t('ui.home.discord')));
+  strip.appendChild(fill(discord, 'home-chat', 'ui.home.discord'));
 
   section.append(strip, note);
   return section;
@@ -732,4 +735,17 @@ function showAuthors(parent: HTMLElement, t: (key: string) => string): void {
     if (event.target === overlay) overlay.remove();
   });
   parent.appendChild(overlay);
+}
+
+/**
+ * Bublina z lokalizace pro rozcestník: tučně `labelKey`, pod ním
+ * `<labelKey>.hint` (T138).
+ *
+ * Rozcestník dostává jen `t`, ne celé `I18n`, takže chybějící popis se pozná
+ * jako jinde v tomhle souboru — `t` vrátí sám klíč.
+ */
+function tipOf(t: (key: string) => string, labelKey: string): TooltipContent {
+  const hintKey = `${labelKey}.hint`;
+  const text = t(hintKey);
+  return text === hintKey ? { title: t(labelKey) } : { title: t(labelKey), text };
 }

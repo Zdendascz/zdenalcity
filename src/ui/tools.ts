@@ -52,6 +52,12 @@ export type ToolAction =
 export interface ToolOption {
   id: string;
   labelKey: string;
+  /**
+   * Klíč popisu do bubliny (T138): co nástroj dělá a k čemu je. U budov je
+   * to `desc` z definice, u ostatních `<labelKey>.hint`. Chybějící klíč
+   * bublinu neshodí, jen v ní zůstane název — hlídá to test.
+   */
+  hintKey?: string;
   /** Jméno tvaru z `ui/icons.ts` nebo ze střešních symbolů. */
   icon: string;
   /** Klíč `KeyboardEvent.key` malými písmeny. */
@@ -65,6 +71,8 @@ export interface ToolOption {
   groupIcon: string;
   /** Cena, pokud ji zná — vypíše se v nabídce napravo od jména. */
   cost?: number;
+  /** Platí se cena za každou dlaždici tahu (silnice, vedení, potrubí, les)? */
+  perTile?: boolean;
   /**
    * Kolik nástroj unese — vedení a trafostanice (T136). Vypíše se vedle ceny,
    * „ať člověk ví co a jak".

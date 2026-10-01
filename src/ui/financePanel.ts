@@ -15,9 +15,10 @@ import { computeBudget } from '@/sim/systems/economy';
 import type { WorldState } from '@/sim/world';
 import { button, el } from './dom';
 import { formatMoney } from './format';
-import { iconSvg, sheetHeader } from './icons';
+import { closeTip, iconSvg, sheetHeader } from './icons';
 import type { I18n } from './i18n';
 import { closeOtherSheets, registerSheet } from './sheets';
+import { describe, setTooltip } from './tooltip';
 
 /**
  * Půjčky a dluhopisy (§8 fáze 4).
@@ -106,7 +107,7 @@ export class FinancePanel {
   private build(): FinanceForm {
     const t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
 
-    this.root.appendChild(sheetHeader(t('ui.finance.title'), t('ui.common.close'), () => this.toggle()));
+    this.root.appendChild(sheetHeader(t('ui.finance.title'), closeTip(t), () => this.toggle()));
 
     const form: FinanceForm = {
       rating: el('span', 'finance__value'),
@@ -150,6 +151,7 @@ export class FinancePanel {
 
     form.loanButton.appendChild(iconSvg('loan-take'));
     form.loanButton.appendChild(el('span', undefined, t('ui.finance.take')));
+    setTooltip(form.loanButton, describe(this.i18n, 'ui.finance.take'));
     loans.appendChild(form.loanButton);
     loans.appendChild(form.loanTable);
     this.root.appendChild(loans);
@@ -165,6 +167,7 @@ export class FinancePanel {
 
     form.bondButton.appendChild(iconSvg('bond-issue'));
     form.bondButton.appendChild(el('span', undefined, t('ui.finance.issue')));
+    setTooltip(form.bondButton, describe(this.i18n, 'ui.finance.issue'));
     bonds.appendChild(form.bondButton);
     bonds.appendChild(form.bondTable);
     this.root.appendChild(bonds);
