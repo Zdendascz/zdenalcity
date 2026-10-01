@@ -41,7 +41,12 @@ SPEC = ROOT / 'docs' / '18-DILY.md'
 RAW = ROOT / 'art' / 'parts' / 'raw'
 LEDGER = ROOT / 'art' / 'parts' / 'spend.jsonl'
 API = 'https://api.openai.com/v1/images'
-MODEL = 'gpt-image-2'
+# Od 2026-10-01 API u `gpt-image-2` odmítá průhledné pozadí („Transparent
+# background is not supported for this model"); sprity ho potřebují. Nástupce
+# `gpt-image-2.5-sunburst` ho umí a stylem sedí k dosavadní sadě nejlíp
+# (porovnáno na `industrial_park__b` proti `-flare` a `gpt-image-1.5`).
+# Cena v deníku je odhad podle sazeb `gpt-image-2`.
+MODEL = 'gpt-image-2.5-sunburst'
 
 # Strop útraty. O dva dolary pod povolenými 24 — rezerva na nepřesný ceník.
 BUDGET = 22.0

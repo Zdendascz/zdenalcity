@@ -63,7 +63,12 @@ API = 'https://api.openai.com/v1/images'
 # `chatgpt-image-latest` — nejspíš to, co jede v aplikaci — chce ověřenou
 # organizaci a účet ji zatím nemá. Až bude, stojí za pokus: aplikace dělá
 # světlejší obrázky (jas 151 proti 134).
-MODEL = 'gpt-image-2'
+# Od 2026-10-01 API u `gpt-image-2` odmítá průhledné pozadí („Transparent
+# background is not supported for this model"); sprity ho potřebují. Nástupce
+# `gpt-image-2.5-sunburst` ho umí a stylem sedí k dosavadní sadě nejlíp
+# (porovnáno na `industrial_park__b` proti `-flare` a `gpt-image-1.5`).
+# Cena v deníku je odhad podle sazeb `gpt-image-2`.
+MODEL = 'gpt-image-2.5-sunburst'
 
 # Vzory, kterymi se cte zadani. Nadpis budovy je ### nebo ####.
 # Vzory, kterými se čte zadání. Nadpis budovy je ### nebo ####; oddíly

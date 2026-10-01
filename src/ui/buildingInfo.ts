@@ -593,6 +593,11 @@ export class BuildingInfo {
       row.appendChild(el('span', 'gauge__label', kind));
       row.appendChild(el('span', `gauge__flag ${wire.overloaded || !wire.live ? 'is-low' : 'is-high'}`, state));
       parent.appendChild(row);
+      // Úzké hrdlo bez vysvětlení vypadalo nahodile: vedení přes budovy po
+      // obou stranách je zelené a plný je jen dílek mezi nimi (hlásil autor
+      // „bůh ví proč úzké hrdlo"). Přes blok vede proud sám, takže omezuje
+      // jen dílek mimo něj.
+      if (wire.overloaded) parent.appendChild(el('p', 'sheet__note', t('ui.parcel.wireBottleneckHint')));
     }
 
     const rows: [string, string][] = [['ui.info.position', `${parcel.x}, ${parcel.y}`]];
