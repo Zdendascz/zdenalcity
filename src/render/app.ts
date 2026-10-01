@@ -1641,12 +1641,8 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
     (roadType) => content.getBalance().traffic.roadTypes[roadType - 1]?.capacity ?? 0,
   );
 
-  // Elektrické vedení (T129) s vytížením, jen ve vrstvě elektřiny.
-  const wireOverlay = new WireOverlay(
-    worldContainer,
-    world,
-    (type) => content.getBalance().power.wires[type - 1]?.capacity ?? 1,
-  );
+  // Elektrické vedení (T129) a jeho stav, jen ve vrstvě elektřiny.
+  const wireOverlay = new WireOverlay(worldContainer, world);
 
   const hover = new Graphics();
   worldContainer.addChild(hover);
@@ -2543,7 +2539,6 @@ export async function startApp(mount: HTMLElement): Promise<SimHost> {
         ['power-none', 'ui.legend.power.none'],
         // Vedení (T136): barva podle vytížení proti kapacitě.
         ['wire-low', 'ui.legend.wire.low'],
-        ['wire-high', 'ui.legend.wire.high'],
         ['wire-overloaded', 'ui.legend.wire.overloaded'],
         ['wire-starved', 'ui.legend.wire.starved'],
         ['wire-dead', 'ui.legend.wire.dead'],

@@ -4470,3 +4470,20 @@ jedna po druhé. A vypadlý úsek ukazoval zatížení z dřívějšího přepo�
   úseku"), panel parcely to řekne stejně.
 - Trafo bez vysokého napětí (postavené mezi dvě vedení nízkého) hlásí
   v panelu, že nemá co přepojit (`TransformerLoad.highVoltage`).
+- **Vrstva ukazuje stav, ne vytížení** (mesto 41: „přes každou silnici
+  jsou dráty červené, před ní i za ní zelené"). Vytížení úseku s rezervou je
+  v propojené síti libovolné číslo — stejná spotřeba může téct mnoha
+  cestami a výpočet je naplnil nahodile (148 „červených" úseků, skutečně
+  omezujících 23). Vyrovnávání stažením kapacit se na propojené síti
+  nesešlo a stálo 30 ms. Teď: zelená = rezerva, tmavě červená = úzké hrdlo,
+  fialová = připojené, ale nestačí, šedá = bez proudu. Panel u úseku
+  s rezervou píše „má rezervu (unese …)".
+- Úzké hrdlo je **minimální řez nejblíž spotřebě** (zpětné hledání od
+  spotřebiče ve zbytkové síti) — leží u tmavé čtvrti, ne u elektrárny.
+- **Sloučené řady vedení:** dílky s právě dvěma sousedy se slijí do jedné
+  hrany s kapacitou nejslabšího. Přepočet na městě autora 8–15 ms (dřív 30).
+- **Nízké napětí 20 000 → 40 000.** Úzkým hrdlem byl vždycky první dílek
+  nízkého napětí za trafem: trafa posílala přesně 20/40/60 tisíc podle počtu
+  výstupů, rozvodna 100 000 s jedním výstupem jen 20 000. S 40 000 unese
+  jeden výstup celé malé trafo. Na savu autora tmavých budov 430 → 168
+  (118 z nich není připojených vůbec), úzkých hrdel 10.

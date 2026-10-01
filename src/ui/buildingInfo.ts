@@ -582,13 +582,17 @@ export class BuildingInfo {
       const state = wire.overloaded
         ? t('ui.parcel.wireOverloaded', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
         : wire.live && parcel.powerStarved
-          ? t('ui.parcel.wireStarved', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
+          ? t('ui.parcel.wireStarved')
           : wire.live
-          ? t('ui.parcel.wireLoad', { load: formatNumber(wire.load), capacity: formatNumber(wire.capacity) })
+          ? t('ui.parcel.wireSpare', { capacity: formatNumber(wire.capacity) })
           : t('ui.parcel.wireDead', { capacity: formatNumber(wire.capacity) });
-      parent.appendChild(
-        meter(kind, state, wire.live ? Math.min(1, wire.load / Math.max(1, wire.capacity)) : 0),
-      );
+      // Bez pruhu zatížení: kolik teče úsekem s rezervou, je v propojené síti
+      // libovolné číslo (proud jde mnoha cestami). Jisté je jen, jestli úsek
+      // omezuje (T137).
+      const row = el('div', 'gauge gauge--flag');
+      row.appendChild(el('span', 'gauge__label', kind));
+      row.appendChild(el('span', `gauge__flag ${wire.overloaded || !wire.live ? 'is-low' : 'is-high'}`, state));
+      parent.appendChild(row);
     }
 
     const rows: [string, string][] = [['ui.info.position', `${parcel.x}, ${parcel.y}`]];

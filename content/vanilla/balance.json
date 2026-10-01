@@ -113,7 +113,7 @@
   },
   "power": {
     "wires": [
-      { "cost": 12, "capacity": 20000, "upkeep": 0.2 },
+      { "cost": 12, "capacity": 40000, "upkeep": 0.2 },
       { "cost": 60, "capacity": 200000, "upkeep": 3 }
     ]
   },

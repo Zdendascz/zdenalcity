@@ -13,13 +13,16 @@ import { roadPolygons } from './roads';
  * v podzemí. Tvar vedení se počítá jako tvar silnice (`roadPolygons`), jen
  * užší, takže úseky navazují a odbočky sedí.
  *
- * Barva je **vytížení**: zelená volné, přes žlutou a oranžovou k červené
- * u kapacity, tmavě červený přetížený úsek, za kterým je výpadek.
+ * Barva je **stav**, ne vytížení (T137): zelená má rezervu, tmavě červená
+ * je úzké hrdlo, fialová je připojená, ale proud nestačí, šedá je bez
+ * proudu. Vytížení úseku s rezervou je v propojené síti libovolné číslo —
+ * proud jde mnoha cestami a přechod do červené ukazoval plné úseky tam,
+ * kde nic neomezovaly („přes každou silnici jsou dráty červené").
  * Vysoké napětí je širší.
  */
 
 const WIDTH = [0, 0.14, 0.24] as const;
-const LOAD_COLORS = [0x3ecf5a, 0xb9d63a, 0xf1c232, 0xf08a24, 0xe23b2e] as const;
+const SPARE_COLOR = 0x3ecf5a;
 const OVERLOAD_COLOR = 0x7a0d0d;
 /**
  * Vedení, kam proud nedojde. Dřív bylo zelené jako „zátěž 0" — a hráč na
@@ -37,13 +40,11 @@ const OUTLINE_COLOR = 0x1b1f24;
 export class WireOverlay {
   private readonly world: ReadonlyWorldView;
   private readonly graphics = new Graphics();
-  private readonly capacity: (type: number) => number;
   private visible = false;
   private drawnRevision = -1;
 
-  constructor(parent: Container, world: ReadonlyWorldView, capacity: (type: number) => number) {
+  constructor(parent: Container, world: ReadonlyWorldView) {
     this.world = world;
-    this.capacity = capacity;
     this.graphics.visible = false;
     parent.addChild(this.graphics);
   }
@@ -88,8 +89,7 @@ export class WireOverlay {
       } else if ((world.powerStarved[tile] ?? 0) === 1) {
         color = STARVED_COLOR;
       } else {
-        const ratio = Math.min(1, (world.wireLoad[tile] ?? 0) / Math.max(1, this.capacity(type)));
-        color = LOAD_COLORS[Math.min(LOAD_COLORS.length - 1, Math.floor(ratio * LOAD_COLORS.length))] ?? LOAD_COLORS[0];
+        color = SPARE_COLOR;
       }
       for (const polygon of roadPolygons(points, mask, width + 0.06)) {
         this.graphics.poly(polygon).fill({ color: OUTLINE_COLOR, alpha: 0.8 });

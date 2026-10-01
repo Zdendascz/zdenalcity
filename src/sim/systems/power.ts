@@ -204,14 +204,6 @@ interface Transformer {
 /** Kapacita „bez omezení" — větší než jakákoli výroba ve hře. */
 const UNLIMITED = 1e15;
 
-/** Stažení kapacit při rozkládání zátěže, od nejmenšího (viz `recompute`). */
-const BALANCE_STEPS = [0.25, 0.5, 0.75] as const;
-
-function sum(values: Float64Array): number {
-  let total = 0;
-  for (const value of values) total += value;
-  return total;
-}
 
 /** Graf sítě: oblasti a úseky vedení s kapacitou, spojené hranami. */
 interface Graph {
@@ -303,19 +295,7 @@ function recompute(
     if (region >= 0 && consumer.consumption > 0) demand[region] = (demand[region] ?? 0) + consumer.consumption;
   }
 
-  // Tok s rozloženou zátěží: nejdřív s kapacitami staženými na čtvrtinu,
-  // polovinu, tři čtvrtiny. Když i tak projde všechno, co projít může, bere
-  // se ten — maximální tok si jinak cesty vybírá libovolně a ukázal by plný
-  // úsek tam, kde by stačila desetina (hráč by hledal problém, který není).
-  let flow = maxFlow(graph, supply, demand, 1);
-  const best = sum(flow.delivered);
-  for (const scale of BALANCE_STEPS) {
-    const tried = maxFlow(graph, supply, demand, scale);
-    if (sum(tried.delivered) >= best - 1e-6) {
-      flow = tried;
-      break;
-    }
-  }
+  const flow = maxFlow(graph, supply, demand);
 
   // Kam proud dojde: oblasti spojené s elektrárnou cestou, která vede.
   const reached = reachFromSources(graph, supply);
@@ -538,20 +518,137 @@ interface FlowResult {
 }
 
 /**
- * Maximální tok (Dinic) od elektráren ke spotřebě. Úsek vedení je rozdělený
- * na vstup a výstup s kapacitou mezi nimi; oblast je jeden uzel. Pořadí hran
- * je dané pořadím uzlů, takže výsledek je deterministický (P2).
+ * Graf pro výpočet toku se **sloučenými řadami** vedení (T137).
+ *
+ * Vedení je na mapě dlouhé: stovky dílků vysokého napětí za sebou bez
+ * odbočky. Každý jako vlastní uzel znamenal stovky kol hledání cest a jeden
+ * výpočet toku za 25–30 ms. Řada dílků, z nichž každý má právě dva sousedy,
+ * se proto slije do jedné hrany s kapacitou nejslabšího dílku — tok přes ni
+ * je stejný pro všechny její dílky. Uzlem zůstává jen odbočka a konec.
  */
-function maxFlow(graph: Graph, supply: Float64Array, demand: Float64Array, scale: number): FlowResult {
+interface Reduced {
+  /** Uzel toku každého uzlu grafu: oblast → sama, odbočka → vstup; −1 v řadě. */
+  readonly flowIn: Int32Array;
+  readonly flowOut: Int32Array;
+  /** Odbočky: index úseku vedení k (v pořadí `graph.wireNode`). */
+  readonly junctions: Int32Array;
+  /** Řady: konce (uzly toku), kapacita, úseky vedení v ní. */
+  readonly chains: readonly { from: number; to: number; capacity: number; wires: number[] }[];
+  /** Neomezené hrany mezi uzly toku [výstup, vstup, …], obousměrně. */
+  readonly open: Int32Array;
+  /** Počet uzlů toku bez zdroje a spotřebiče. */
+  readonly nodes: number;
+}
+
+const reducedCache = new WeakMap<Graph, Reduced>();
+
+function reduce(graph: Graph): Reduced {
+  const cached = reducedCache.get(graph);
+  if (cached) return cached;
   const R = graph.regions;
   const W = graph.wireNode.length;
-  const S = R + 2 * W;
+  const total = R + W;
+
+  // Sousedé každého uzlu grafu, bez opakování.
+  const neighbours: number[][] = Array.from({ length: total }, () => []);
+  const links = graph.links;
+  for (let i = 0; i < links.length; i += 2) {
+    const a = links[i]!;
+    const b = links[i + 1]!;
+    if (!neighbours[a]!.includes(b)) neighbours[a]!.push(b);
+    if (!neighbours[b]!.includes(a)) neighbours[b]!.push(a);
+  }
+  const inChain = (g: number): boolean => g >= R && neighbours[g]!.length === 2;
+
+  const flowIn = new Int32Array(total).fill(-1);
+  const flowOut = new Int32Array(total).fill(-1);
+  let next = 0;
+  for (let r = 0; r < R; r++) {
+    flowIn[r] = next;
+    flowOut[r] = next;
+    next++;
+  }
+  const junctions: number[] = [];
+  for (let k = 0; k < W; k++) {
+    const g = R + k;
+    if (inChain(g)) continue;
+    flowIn[g] = next++;
+    flowOut[g] = next++;
+    junctions.push(k);
+  }
+
+  // Řady: z každého nenavštíveného dílku řady se jde oběma směry ke koncům.
+  const chains: { from: number; to: number; capacity: number; wires: number[] }[] = [];
+  const visited = new Uint8Array(total);
+  for (let g = R; g < total; g++) {
+    if (!inChain(g) || visited[g] === 1) continue;
+    visited[g] = 1;
+    const wires = [g - R];
+    let capacity = graph.wireCap[g - R] ?? UNLIMITED;
+    const ends: number[] = [];
+    let cycle = false;
+    for (const start of neighbours[g]!) {
+      let previous = g;
+      let current = start;
+      while (inChain(current)) {
+        if (visited[current] === 1) {
+          cycle = true;
+          break;
+        }
+        visited[current] = 1;
+        wires.push(current - R);
+        capacity = Math.min(capacity, graph.wireCap[current - R] ?? UNLIMITED);
+        const [n0, n1] = neighbours[current]! as [number, number];
+        const following = n0 === previous ? n1 : n0;
+        previous = current;
+        current = following;
+      }
+      if (cycle) break;
+      ends.push(current);
+    }
+    if (cycle || ends.length !== 2) continue;
+    const [a, b] = ends as [number, number];
+    if (a === b) continue; // smyčka vedení zpátky do téhož uzlu nic nepřenese
+    chains.push({ from: a, to: b, capacity, wires });
+  }
+
+  // Neomezené hrany mezi uzly, které v řadě nejsou.
+  const open: number[] = [];
+  for (let a = 0; a < total; a++) {
+    if (flowIn[a] === -1) continue;
+    for (const b of neighbours[a]!) {
+      if (b <= a || flowIn[b] === -1) continue;
+      open.push(flowOut[a]!, flowIn[b]!, flowOut[b]!, flowIn[a]!);
+    }
+  }
+
+  const reduced: Reduced = {
+    flowIn,
+    flowOut,
+    junctions: Int32Array.from(junctions),
+    chains,
+    open: Int32Array.from(open),
+    nodes: next,
+  };
+  reducedCache.set(graph, reduced);
+  return reduced;
+}
+
+/**
+ * Maximální tok (Dinic) od elektráren ke spotřebě na sloučeném grafu.
+ * Odbočka vedení je rozdělená na vstup a výstup s kapacitou mezi nimi, řada
+ * je obousměrná hrana s kapacitou nejslabšího dílku, oblast je jeden uzel.
+ * Pořadí hran je dané pořadím uzlů, takže výsledek je deterministický (P2).
+ */
+function maxFlow(graph: Graph, supply: Float64Array, demand: Float64Array): FlowResult {
+  const reduced = reduce(graph);
+  const R = graph.regions;
+  const W = graph.wireNode.length;
+  const S = reduced.nodes;
   const T = S + 1;
   const N = T + 1;
-  const into = (g: number): number => (g < R ? g : R + 2 * (g - R));
-  const outOf = (g: number): number => (g < R ? g : R + 2 * (g - R) + 1);
 
-  const head: number[] = new Array<number>(N).fill(-1);
+  const head = new Int32Array(N).fill(-1);
   const to: number[] = [];
   const cap: number[] = [];
   const next: number[] = [];
@@ -565,21 +662,27 @@ function maxFlow(graph: Graph, supply: Float64Array, demand: Float64Array, scale
     return e;
   };
 
-  const wireArc: number[] = [];
-  for (let k = 0; k < W; k++) {
-    wireArc.push(addArc(R + 2 * k, R + 2 * k + 1, (graph.wireCap[k] ?? UNLIMITED) * scale));
-  }
-  const links = graph.links;
-  for (let i = 0; i < links.length; i += 2) {
-    const a = links[i]!;
-    const b = links[i + 1]!;
-    addArc(outOf(a), into(b), UNLIMITED);
-    addArc(outOf(b), into(a), UNLIMITED);
-  }
-  const trafoArcs: [number, number][] = graph.trafos.map((trafo) => [
-    addArc(outOf(trafo.a), into(trafo.b), trafo.capacity * scale),
-    addArc(outOf(trafo.b), into(trafo.a), trafo.capacity * scale),
-  ]);
+  const junctionArc: number[] = [];
+  reduced.junctions.forEach((k) => {
+    const g = R + k;
+    junctionArc.push(addArc(reduced.flowIn[g]!, reduced.flowOut[g]!, graph.wireCap[k] ?? UNLIMITED));
+  });
+  const chainArcs: [number, number][] = reduced.chains.map((chain) => {
+    const capacity = chain.capacity;
+    return [
+      addArc(reduced.flowOut[chain.from]!, reduced.flowIn[chain.to]!, capacity),
+      addArc(reduced.flowOut[chain.to]!, reduced.flowIn[chain.from]!, capacity),
+    ];
+  });
+  const open = reduced.open;
+  for (let i = 0; i < open.length; i += 2) addArc(open[i]!, open[i + 1]!, UNLIMITED);
+  const trafoArcs: [number, number][] = graph.trafos.map((trafo) => {
+    const capacity = trafo.capacity;
+    return [
+      addArc(reduced.flowOut[trafo.a]!, reduced.flowIn[trafo.b]!, capacity),
+      addArc(reduced.flowOut[trafo.b]!, reduced.flowIn[trafo.a]!, capacity),
+    ];
+  });
   const sinkArc: number[] = [];
   for (let r = 0; r < R; r++) {
     if ((supply[r] ?? 0) > 0) addArc(S, r, supply[r]!);
@@ -656,35 +759,58 @@ function maxFlow(graph: Graph, supply: Float64Array, demand: Float64Array, scale
   }
 
   const used = (e: number): number => (initial[e] ?? 0) - (cap[e] ?? 0);
+  // Úzké hrdlo: minimální řez **co nejblíž spotřebě**. Ze zbytkové sítě se
+  // zpětně hledá, odkud se ještě dá dojít do spotřebiče; plná hrana, za
+  // kterou se dojít dá a před kterou ne, je to, co omezuje. Řezů bývá víc
+  // stejně dobrých; ten u spotřeby leží u tmavé čtvrti, kde ho hráč hledá,
+  // ne někde u elektrárny.
+  const toSink = new Uint8Array(N);
+  toSink[T] = 1;
+  let qh = 0;
+  let qt = 0;
+  queue[qt++] = T;
+  while (qh < qt) {
+    const v = queue[qh++]!;
+    for (let e = head[v]!; e >= 0; e = next[e]!) {
+      // Hrana e vede z v; její dvojče e^1 vede do v. Do v se dá dojít z u,
+      // když na dvojčeti zbývá kapacita.
+      const u = to[e]!;
+      if (toSink[u] === 0 && cap[e ^ 1]! > 1e-9) {
+        toSink[u] = 1;
+        queue[qt++] = u;
+      }
+    }
+  }
+  const cut = (e: number): boolean =>
+    (initial[e] ?? 0) > 0 && toSink[to[e ^ 1]!] === 0 && toSink[to[e]!] === 1;
+
   const delivered = new Float64Array(R);
   sinkArc.forEach((e, r) => {
     if (e >= 0) delivered[r] = used(e);
   });
   const wire = new Float64Array(W);
-  wireArc.forEach((e, k) => {
+  const wireLimits = new Uint8Array(W);
+  reduced.junctions.forEach((k, j) => {
+    const e = junctionArc[j]!;
     wire[k] = used(e);
+    if (cut(e)) wireLimits[k] = 1;
+  });
+  reduced.chains.forEach((chain, c) => {
+    const [ab, ba] = chainArcs[c]!;
+    const through = Math.abs(used(ab) - used(ba));
+    const limiting = cut(ab) || cut(ba);
+    for (const k of chain.wires) {
+      wire[k] = through;
+      // V řadě je plný jen nejslabší dílek — ten omezuje.
+      if (limiting && (graph.wireCap[k] ?? UNLIMITED) <= chain.capacity) wireLimits[k] = 1;
+    }
   });
   const trafo = new Float64Array(graph.trafos.length);
+  const trafoLimits = new Uint8Array(graph.trafos.length);
   trafoArcs.forEach(([ab, ba], i) => {
     trafo[i] = used(ab) - used(ba);
+    if (cut(ab) || cut(ba)) trafoLimits[i] = 1;
   });
-
-  // Úzké hrdlo: po posledním hledání drží `level` dosažitelnost od zdroje ve
-  // zbytkové síti. Hrana, jejíž začátek dosažitelný je a konec ne, leží na
-  // minimálním řezu — ta opravdu omezuje. Při staženém měřítku nic z toho
-  // neplatí: tok tam prošel celý, vedení tedy nic neomezuje.
-  const wireLimits = new Uint8Array(W);
-  const trafoLimits = new Uint8Array(graph.trafos.length);
-  if (scale === 1) {
-    for (let k = 0; k < W; k++) {
-      if (level[R + 2 * k] !== -1 && level[R + 2 * k + 1] === -1) wireLimits[k] = 1;
-    }
-    graph.trafos.forEach((t, i) => {
-      const ab = level[outOf(t.a)] !== -1 && level[into(t.b)] === -1;
-      const ba = level[outOf(t.b)] !== -1 && level[into(t.a)] === -1;
-      if (ab || ba) trafoLimits[i] = 1;
-    });
-  }
   return { delivered, wire, trafo, wireLimits, trafoLimits };
 }
 
