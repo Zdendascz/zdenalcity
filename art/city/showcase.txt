@@ -1,0 +1,11 @@
+=== po 90000 tikách (zbouráno ruin 0, uklizeno prázdných zón 452)
+obyvatel 80719, pracovních míst 40400, budov 4401 (RCI 2596)
+kategorie: utility 154, service 1651, residential 1110, commercial 470, industrial 1016
+úrovně RCI: 1:882 2:512 3:960 4:35 5:207
+elektřina: RCI se proudem 2595/2596 = 100.0 %, výroba 2084800, spotřeba 1844620, úzká hrdla (wireOverloaded) 0, hladové dlaždice 0, nejvytíženější trafo 100 %
+voda: s vodou 2596/2596 = 100.0 %, 10084/12000; odpad 8072/9040, kanalizace 11301/12600
+opuštěných 0
+doprava: 3800 dlaždic silnic, průměrné vytížení 34 %, přetížených 483 (12.7 %), linek MHD 14
+spokojenost 194 / 255 (neutrál 128); obydlené buňky: cena půdy 232, znečištění 33, kriminalita 85, kolony 0.50
+pokrytí: culture 93, education 200, fire 69, health 136, parks 255, police 101, prison 0, social 68, transit 230
+zóny zastavěné/vyznačené: R 2788/2788, C 935/935, I 1280/1280; poptávka R 38 C -84 I -33, kasa 58907751
