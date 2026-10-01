@@ -4487,3 +4487,47 @@ jedna po druhé. A vypadlý úsek ukazoval zatížení z dřívějšího přepo�
   výstupů, rozvodna 100 000 s jedním výstupem jen 20 000. S 40 000 unese
   jeden výstup celé malé trafo. Na savu autora tmavých budov 430 → 168
   (118 z nich není připojených vůbec), úzkých hrdel 10.
+
+## Ikony v lištách, tooltipy, Kčs (T138)
+
+Zadání autora: „U každé ikonky musí být tooltip (ne title!!!) s popisem co to
+je a k čemu to je", „Všechny ikony budou … v lištách, ne samostatně",
+„Bourání vedení nesmí vypadat stejně jako klasický buldozer", dvě verze ikony
+katastrof podle stavu a „A měna, všude doplníš Kčs."
+
+- **Bublina místo `title`** (`ui/tooltip.ts`): jedna pro celé rozhraní, tučný
+  název, věta k čemu to je, drobně cena / nosnost / klávesa / stav. Myš po
+  350 ms (při přejezdu po liště hned), klávesnice při fokusu, dotyk po
+  podržení 450 ms — klepnutí po podržení se zahodí. Zmizí při odjezdu, ztrátě
+  fokusu, Esc, kliknutí a když tlačítko zmizí z dokumentu. Pozice se počítá
+  čistou funkcí `placeTooltip` (nahoru/dolů/vpravo/vlevo, vždy celá na
+  obrazovce). `aria-describedby` po dobu zobrazení; `aria-label` zůstal.
+- **Popisy v lokalizaci**: `<labelKey>.hint` pro nástroje, nabídky, lištu,
+  vrstvy, panely a rozcestník; budovy berou svůj `desc`, dosahy služeb jeden
+  společný `ui.overlay.coverage.hint`, pohromy v nabídce `ui.alert.body.*`.
+  Nástroj nese `hintKey` a `perTile` (cena za dlaždici u silnic, vedení,
+  potrubí a lesa). Test hlídá, že popis má každý nástroj, nabídka, vrstva
+  i pohled v obou jazycích a že v HUD není jediný `title`. `setTitle` z `dom.ts`
+  zmizel.
+- **Ikony v lištách**: stálá řada ovládání vpravo je lišta jako paleta
+  vlevo; všechna tlačítka s ikonou (nástroje, roletky, panely, lupa, pohledy,
+  „na město") mají jeden čtvercový vzhled s podkladem, rámečkem a stavy.
+  Obrázek (neprůhledný čtverec na černé) vyplní tlačítko s `object-fit:
+  cover` a zakulacenými rohy; velikost řídí `--icon-size` (lišta 38,
+  telefon 34, vysunutá řada 36, rychlost nahoře 30). Záložní polygon je 22 px.
+- **Nová jména ikon** podle `docs/09-IKONY.md`: `wire-remove` (záloha: stožár
+  s křížkem), `wire-low`/`wire-high` (záloha: blesk), `ruins-clear` (záloha:
+  suť s lopatou), `disasters-on`/`disasters-off` (záloha: plamen + jezdec
+  vpravo / křížek + jezdec vlevo). Přepínač v nabídce katastrof mění ikonu
+  podle stavu, bublina nabídky i přepínače stav vypisuje.
+- **Kčs** jedinou cestou: `formatMoney` („12 345 Kčs", nezlomitelná mezera,
+  měna z `ui.currency`). Kasa, bilance (měna jednou na konci), ceny
+  v nabídkách a bublinách, cenovka u kurzoru, bublina zaplacené ceny,
+  rozpočet včetně rozpisu daně a údržby, půjčky, dluhopisy, dotace, detail
+  budovy, rozpis kasy a bilance, roční vyúčtování, MHD (vozidla, jízdné,
+  příjem, údržba), nápověda (cena, údržba). Peníze v odmítnutích simulace
+  (`error.notEnoughFunds` aj.) a v poradci doplní `moneyParams` až při
+  překladu (P1). Test hlídá, že žádná šablona nepíše Kčs sama vedle parametru.
+- Zbývá: obrázky `wire-*`, `ruins-clear` a `disasters-*` dodává souběžné
+  sezení (zatím běží zálohy); trafostanice a rozvodna v nabídce mají ikonu
+  z obsahu (`graphics.icon`), ta se tu neměnila.
