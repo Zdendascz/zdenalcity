@@ -2845,10 +2845,10 @@
       "variant": "a",
       "file": "substation__a.png",
       "width": 512,
-      "height": 292,
+      "height": 326,
       "anchor": [
-        274,
-        292
+        251,
+        326
       ]
     },
     {
