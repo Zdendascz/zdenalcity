@@ -1,93 +1,116 @@
-# citybuilder
+# Zdenalcity
 
+Izometrický budovatel měst ve stylu SimCity 2000. Běží v prohlížeči, na počítači
+i na telefonu, česky i anglicky.
 
+**▶ Hrát: [games.zdendas.cz/zdenalcity](https://games.zdendas.cz/zdenalcity/)**
 
-## Getting started
+![Přehled města](public/shots/prehled.webp)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+| | |
+|---|---|
+| ![Čtvrť](public/shots/ctvrt-640.webp) | ![Nábřeží](public/shots/nabrezi-640.webp) |
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+*An isometric city builder in the spirit of SimCity 2000, written in TypeScript
+and PixiJS. Runs in the browser, in Czech and English.
+[Play it here.](https://games.zdendas.cz/zdenalcity/)*
 
-## Add your files
+## Co ve hře je
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+- **Zóny a růst:** bydlení, obchod a průmysl, pět úrovní budov, rozšiřování
+  a slučování parcel, chátrání a opuštěné domy. Růst řídí poptávka, daně,
+  cena půdy a dostupnost práce.
+- **Terén:** generátor map se šesti typy krajiny, svahy, řeky, skála a mokřady,
+  terraforming, mosty a volitelná velikost mapy.
+- **Doprava:** několik typů silnic, dopravní model s kolonami, MHD s linkami,
+  zastávkami, vozovnami a jízdným.
+- **Sítě:** elektřina s vysokým a nízkým napětím, trafostanicemi a rozvodnami,
+  vodovod a kanalizace v podzemním pohledu.
+- **Služby:** policie, hasiči, zdravotnictví, školství, kultura a sociální
+  služby s dosahem a financováním. Kriminalita, znečištění a spokojenost
+  obyvatel.
+- **Peníze:** rozpočet, daně, údržba, půjčky, dotace, dluhopisy a úvěrový
+  rating. Měnou jsou Kčs.
+- **Katastrofy:** požáry, povodně, tornáda, zemětřesení, sesuvy, výbuchy,
+  průmyslové a chemické havárie, blackout, epidemie, stávky a nepokoje.
+  Dají se vypnout.
+- **Ostatní:** ukládání a načítání her, nápověda, poradce, roční vyúčtování,
+  přepínač CZ / EN a instalace jako aplikace (PWA).
+
+## Spuštění
+
+Je potřeba Node `^20.19.0 || >=22.12.0`.
+
+```bash
+npm install
+npm run dev
+```
+
+Vite vypíše adresu, na které hra běží (standardně `http://localhost:5173`).
+
+| Příkaz | Co dělá |
+|---|---|
+| `npm run dev` | vývojový server |
+| `npm run build` | typová kontrola a produkční build do `dist/` |
+| `npm run preview` | servíruje hotový build |
+| `npm test` | testy (Vitest) |
+| `npm run check` | lint, typecheck a testy; musí projít před každým commitem |
+
+Hra je čistě statická, k provozu nepotřebuje žádný server. Postup nasazení
+je v [docs/DEPLOY.md](docs/DEPLOY.md).
+
+## Jak je projekt postavený
+
+Stack: **TypeScript, PixiJS 8, Vite**. Rozhraní je v obyčejném HTML a CSS.
 
 ```
-cd existing_repo
-git remote add origin https://cumina.klusakovi.com/zdendascz/citybuilder.git
-git branch -M main
-git push -uf origin main
+src/
+  sim/       simulace: deterministická, bez DOM a bez rendereru
+  render/    izometrické vykreslování (PixiJS), kamera, picking
+  ui/        HUD, nástroje, panely, nápověda, překlady
+  content/   načítání obsahu přes ContentSource
+  save/      ukládání, ZIP kontejner, migrace mezi verzemi
+  platform/  prohlížeč: úložiště, preference
+content/vanilla/
+  buildings/ definice budov v JSON
+  sprites/, tiles/, icons/, parts/, skirts/   obrázky
+  locale/    cs.json, en.json
+  balance.json
+tests/       jednotkové a golden testy, fixtury savů
+tools/       skripty pro sprity, ikony, dlaždice a simulace
+docs/        specifikace a záznam postupu
 ```
 
-## Integrate with your tools
+Pravidla, která drží architekturu pohromadě:
 
-* [Set up project integrations](https://cumina.klusakovi.com/zdendascz/citybuilder/-/settings/integrations)
+1. **Simulace nezná renderer.** `src/sim/` nesmí importovat Pixi, DOM ani
+   `render/`, `ui/` a `platform/`. Hlídá to ESLint.
+2. **Simulace je deterministická.** Stejný seed a stejné vstupy dají
+   bit-identický výsledek. Žádné `Math.random` ani `Date.now`, jen `world.rng`.
+3. **Simulace pracuje v gridových souřadnicích.** Izometrie existuje jen
+   v `src/render/`.
+4. **Mřížková data jsou typed arrays**, jedna vrstva na atribut, ne pole objektů.
+5. **Obsah jsou data.** Žádná konkrétní budova není v kódu, všechno je JSON
+   v `content/`, takže ho mod může přidat i přepsat.
+6. **ID definic jsou stringy s namespace** (`vanilla:clinic`), v savu nikdy čísla.
+7. **Save má `formatVersion`** a migrace jsou čisté funkce ověřené fixturami.
 
-## Collaborate with your team
+Podrobnosti jsou ve [specifikaci architektury](docs/01-ARCHITEKTURA.md),
+aktuální stav v [docs/PROGRESS.md](docs/PROGRESS.md).
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+## Grafika
 
-## Test and Deploy
+Sprity budov, povrchy terénu, ikony a obrázky událostí vznikly generováním
+obrázků a následným zpracováním skripty v `tools/` (ořez, sladění s izometrickou
+mřížkou, převod do WebP). Skripty, které volají OpenAI Images API, čtou klíč
+z proměnné prostředí `OPENAI_API_KEY`. Pro hraní ani vývoj kódu potřeba není,
+hotové obrázky jsou v repozitáři. Když nějaký obrázek chybí, hra místo něj
+nakreslí jednoduchý kvádr.
 
-Use the built-in continuous integration in GitLab.
+Zadání a postupy: [sprity služeb](docs/06-SPRITY-SLUZEB.md),
+[sprity zón](docs/07-SPRITY-ZONY.md), [dlaždice](docs/08-DLAZDICE.md),
+[ikony](docs/09-IKONY.md).
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+## Autor
 
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Zdeněk Klusák ([Zdendascz](https://github.com/Zdendascz))
