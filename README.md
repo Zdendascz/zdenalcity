@@ -114,3 +114,4 @@ Zadání a postupy: [sprity služeb](docs/06-SPRITY-SLUZEB.md),
 ## Autor
 
 Zdeněk Klusák ([Zdendascz](https://github.com/Zdendascz))
+([zdendas.cz](https://zdendas.cz))
